@@ -5,7 +5,7 @@ API changes: Completion Queue creation
 * Status: Draft
 * Implemented in: C/C++
 * Last updated: Jan 23rd 2017
-* Discussion at: N/A
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/PNHNTuFQZaA
 
 ## Abstract
 The proposal is to refine the completion queue creation API so that it provides
