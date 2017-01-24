@@ -1,0 +1,150 @@
+API changes: Completion Queue creation
+----
+* Author(s): Sree Kuchibhotla
+* Approver: a11r
+* Status: Draft
+* Implemented in: C/C++
+* Last updated: Jan 23rd 2017
+* Discussion at: N/A
+
+## Abstract
+The proposal is to refine the completion queue creation API so that it provides
+better error-checking and makes it easier to implement new scenarios in future
+
+## Background
+1. A completion queue is created by using the following API
+   - ` grpc_completion_queue *grpc_completion_queue_create(void *reserved)`
+
+2. To get the result out of a completion queue, the caller must call one of the following two APIs:
+   - `grpc_event grpc_completion_queue_next(grpc_completion_queue *cq, gpr_timespec deadline, void *reserved);`
+   - `grpc_event grpc_completion_queue_pluck(grpc_completion_queue *cq, void * tag, gpr_timespec deadline, void *reserved)`
+
+   `grpc_completion_queue_next` and `grpc_completion_queue_pluck` cannot both be called on the same completion queue. Doing so might cause the `grpc_completion_queue_pluck` call to be stuck indefinitely because the `tag` might have been returned to the caller via the `grpc_completion_queue_next` call. Currently we do not have a good way to prevent the user from doing this. 
+
+3. Internally, every completion queue currently has an associated 'pollset' containing file descriptors used for I/O.  gRPC core library does not create any threads on its own and instead all the rpc-related I/O (i.e polling the file descriptors, reading and writing messages) happens in the threads that call either `grpc_completion_queue_next` or `grpc_completion_queue_pluck`
+
+4. A completion queue that can be used to listen to incoming RPCs or to be notified of server shutdown MUST be registered as a 'server completion queue' using one of the following two APIs:
+   - `grpc_server_register_completion_queue()`
+   - `grpc_server_register_non_listening_completion_queue()`
+   Unless registered as a non-listening completion queue, a server completion queue will have the 'listening fd' (i.e the fd corresponding to the port on which the server is listening) in its 'pollset'.
+
+5. At the C++ layer, a grpc 'Server' may contain multiple 'Services'. Each 'Service' may be either synchronous or asynchronous. If the Server contains atleast one synchronous service, the gRPC C++ library creates a few server completion queues and a thread pool to "poll" the completion queues for incoming RPCs
+
+### Problems with the current Completion Queue APIs
+
+- No error checks / validations to prevent the user from calling completion queue next and pluck APIs
+
+- The API is not flexible enough to create new types of completion queue models in future; like for example, a call-back based completion queue
+
+- Tight coupling of completion-queue and pollsets presents some tricky challenges.  If an application creates a completion queue, our current model dictates that the application should call `grpc_completion_queue_next` or `grpc_completion_queue_pluck` very regularly (preferably in a tight loop) to ensure progress happens.  This can lead to many gotchas:
+    - In case of a C++ server containing a 'hybrid service' (i.e a service where some methods are exposed using synchronous API and some with asynchronous API), it is important to ensure that `grpc_completion_queue_next` or `grpc_completion_queue_pluck` are actively called on any server completion queues that are created. (Note: The non-listening completion queue was created to fix this but it is still a bit hard to use this correctly)
+
+   - In case of a 'mixed server' (i.e a server implementing multiple 'services' some of which are synchronous and some asynchronous), we might end up with too many completion queues because the presence of a synchronous service means that the gRPC C++ library already creates several server completion queues and a thread pool to poll them. The presence of asynchronous services means that the application (using grpc c++ server) is potentially creating one or more server completion queues too and is actively polling those completion queues.  Too many threads polling the completion queues can potentially result in multiple threads polling the same set of fds in the underlying pollsets and result in more contention at the completion queue / polling engine level (The exact details on why this happens is beyond the scope of this gRFC. See gRPC epoll based polling engine design [here](https://github.com/grpc/grpc/blob/master/doc/epoll-polling-engine.md) if interested - it is not required to read this for this gRPC)
+
+### Related Proposals:  n/a
+
+## Proposal
+
+The proposal is to modify the current APIs to clearly specify what type of completion queue is being created/used.  To this end, we are proposing the following changes:
+
+#### Changes to GRPC C Core API
+
+##### 1. Create two enums: `grpc_cq_completion_type` and `grpc_cq_polling_type` at gRPC C core API layer
+
+```
+typedef enum {
+  /* Events are popped out of the completion queue
+     by calling grpc_completion_queue_next() API ONLY */
+  GRPC_CQ_NEXT = 0,
+
+  /* Events are popped out of the completion queue
+     by calling grpc_completion_queue_pluck() API ONLY */
+  GRPC_CQ_PLUCK
+
+  /* In future we will add more types like GRPC_CQ_CALLBACK */
+} grpc_cq_completion_type
+
+
+typedef enum {
+  /* Default option.  Completion queues will have an
+     associated pollset and it is expected that
+     grpc_completion_queue_next(), grpc_completion_queue_pluck()
+     (or any other future polling APIs we might introduce) are
+     called very actively to ensure I/O progress */
+  DEFAULT_POLLING,
+
+  /* Similar to DEFAULT_POLLING except that the pollset
+     associated with the completion queue will not have
+     any listening fds (if the completion queue is used
+     as a server completion queue) */
+  NON_LISTENING,
+
+  /* The completion queue will NOT have any associated
+     pollset. This means, while grpc_completion_queue_next()
+     or grpc_completion_queue_pluck() should be called to
+     pop events out of the queue, it is not required to call
+     them actively to ensure I/O progress */
+  NON_POLLING,
+} grpc_cq_polling_type
+
+```
+
+##### 2.  Change the `grpc_completion_queue_create()` API to the following:
+
+```
+GRPCAPI grpc_completion_queue *grpc_completion_queue_create(
+    const grpc_cq_completion_type completion_type,
+    const grpc_cq_polling_type polling_type, 
+    void *reserved);
+```
+
+##### 3.  Add validations to `grpc_completion_queue_next()` and `grpc_completion_queue_pluck()` APIs
+
+Assert if `grpc_completion_queue_next()` is called on a GRPC_CQ_PLUCK type completion queue and vice versa
+
+#### Changes to GRPC C++ API
+
+##### 1.  Create two enums to mirror the gRPC C Core's enums
+
+```
+class CompletionQueue : private GrpcLibraryCodegen {
+
+public:
+  ...
+  enum CompletionType {
+    NEXT,
+    PLUCK
+  };
+
+  enun PollingType {
+    DEFAULT_POLLING, // Default
+    NON_LISTENING,
+    NON_POLLING
+  };
+
+```
+
+NOTE: There is NO need to add validations to the following APIs (to check the API call with the completion type) since it is already added at the gRPC C Core API level.
+
+```
+  CompletionQueue::Next()
+  CompletionQueue::AsyncNext()
+  CompletionQueue::Pluck()
+```
+
+#### Changes to all other wrapped language APIs
+Similar to the one I described in C++ API changes section (to use the new `grpc_completion_queue_create` API)
+
+## Rationale
+The rationale for these changes is already discussed in the "Problems with the current Completion Queue APIs" section above.
+To summarize, with these new changes:
+  - It is relatively easier to write and reason-about complex servers (i.e servers containing a mix of sync/async services, hybrid services etc)
+  - We get better validation/error-checks in the API and more flexibility in the API
+
+
+## Implementation
+All the relevant details are described in the proposal section above
+
+## Open issues (if applicable)
+
+Should we even have a non-listening type.  The reason it was added (i.e Hybrid server scenario) can now be satisfied with a non-polling completion queue
