@@ -90,7 +90,11 @@ class Stub {
   unique_ptr<ClientWriterInterface<Request>> RequestStream(
       ClientContext* context,
       Response* response);
-  // newly added overload
+  // newly added overloads
+  unique_ptr<ClientWriterInterface<Request>> RequestStream(
+      ClientContext* context,
+      WriteOptions options,
+      Response* response);
   unique_ptr<ClientWriterInterface<Request>> RequestStream(
       ClientContext* context,
       const Request& first_message, WriteOptions options,
@@ -100,7 +104,11 @@ class Stub {
   unique_ptr<ClientAsyncWriterInterface<Request>> AsyncRequestStream(
       ClientContext* context,
       Response* response, CompletionQueue* cq, void* tag);
-  // newly added overload
+  // newly added overloads
+  unique_ptr<ClientWriterInterface<Request>> AsyncRequestStream(
+      ClientContext* context,
+      WriteOptions options,
+      Response* response, CompletionQueue* cq, void* tag);
   unique_ptr<ClientWriterInterface<Request>> AsyncRequestStream(
       ClientContext* context,
       const Request& first_message, WriteOptions options,
@@ -109,7 +117,10 @@ class Stub {
   // existing sync bidi-streaming signature
   unique_ptr<ClientReaderWriterInterface<Request, Response>> BidiStream(
       ClientContext* context);
-  // newly added overload
+  // newly added overloads
+  unique_ptr<ClientReaderWriterInterface<Request, Response>> BidiStream(
+      ClientContext* context,
+      WriteOptions options);
   unique_ptr<ClientReaderWriterInterface<Request, Response>> BidiStream(
       ClientContext* context,
       const Request& first_message, WriteOptions options);
@@ -118,7 +129,11 @@ class Stub {
   unique_ptr<ClientReaderWriterInterface<Request, Response>> AsyncBidiStream(
       ClientContext* context,
       CompletionQueue* cq, void* tag);
-  // newly added overload
+  // newly added overloads
+  unique_ptr<ClientReaderWriterInterface<Request, Response>> AsyncBidiStream(
+      ClientContext* context,
+      WriteOptions options,
+      CompletionQueue* cq, void* tag);
   unique_ptr<ClientReaderWriterInterface<Request, Response>> AsyncBidiStream(
       ClientContext* context,
       const Request& first_message, WriteOptions options,
