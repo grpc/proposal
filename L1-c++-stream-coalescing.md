@@ -44,6 +44,12 @@ class WriteOptions {
  public:
   // ... existing interface ...
 
+  // corked bit: aliases set_buffer_hint currently, with the intent that
+  // set_buffer_hint will be removed in the future
+  WriteOptions& set_corked();
+  WriteOptions& clear_corked();
+  bool is_corked();
+
   // last-message bit: indicates this is the last message in a stream
   // client-side:  makes Write the equivalent of performing Write, WritesDone in
   //               a single step
@@ -82,62 +88,15 @@ void Write(const W& msg, WriteOptions options, void* tag);
 void WriteAndFinish(const W& msg, WriteOptions options, const Status& status void* tag);
 ```
 
-### Expand client streaming stub signatures to add an overload that takes the first message
+### Expand ClientContext to allow corking metadata
 ```c++
-class Stub {
+class ClientContext {
  public:
-  // existing sync client-streaming signature
-  unique_ptr<ClientWriterInterface<Request>> RequestStream(
-      ClientContext* context,
-      Response* response);
-  // newly added overloads
-  unique_ptr<ClientWriterInterface<Request>> RequestStream(
-      ClientContext* context,
-      WriteOptions options,
-      Response* response);
-  unique_ptr<ClientWriterInterface<Request>> RequestStream(
-      ClientContext* context,
-      const Request& first_message, WriteOptions options,
-      Response* response);
+  // ...
 
-  // existing async client-streaming signature
-  unique_ptr<ClientAsyncWriterInterface<Request>> AsyncRequestStream(
-      ClientContext* context,
-      Response* response, CompletionQueue* cq, void* tag);
-  // newly added overloads
-  unique_ptr<ClientWriterInterface<Request>> AsyncRequestStream(
-      ClientContext* context,
-      WriteOptions options,
-      Response* response, CompletionQueue* cq, void* tag);
-  unique_ptr<ClientWriterInterface<Request>> AsyncRequestStream(
-      ClientContext* context,
-      const Request& first_message, WriteOptions options,
-      Response* response, CompletionQueue* cq, void* tag);
-
-  // existing sync bidi-streaming signature
-  unique_ptr<ClientReaderWriterInterface<Request, Response>> BidiStream(
-      ClientContext* context);
-  // newly added overloads
-  unique_ptr<ClientReaderWriterInterface<Request, Response>> BidiStream(
-      ClientContext* context,
-      WriteOptions options);
-  unique_ptr<ClientReaderWriterInterface<Request, Response>> BidiStream(
-      ClientContext* context,
-      const Request& first_message, WriteOptions options);
-
-  // existing async bidi-streaming signature
-  unique_ptr<ClientReaderWriterInterface<Request, Response>> AsyncBidiStream(
-      ClientContext* context,
-      CompletionQueue* cq, void* tag);
-  // newly added overloads
-  unique_ptr<ClientReaderWriterInterface<Request, Response>> AsyncBidiStream(
-      ClientContext* context,
-      WriteOptions options,
-      CompletionQueue* cq, void* tag);
-  unique_ptr<ClientReaderWriterInterface<Request, Response>> AsyncBidiStream(
-      ClientContext* context,
-      const Request& first_message, WriteOptions options,
-      CompletionQueue* cq, void* tag);
+  // flag that metadata should be corked (and not sent until the first message
+  // is sent
+  void set_initial_metadata_corked(bool corked);
 };
 ```
 
@@ -151,18 +110,11 @@ constructors provide first class discoverability to these API's. Importantly
 code completion tools should offer them as suggestions to new developers, and
 they'll appear in top-level documentation.
 
-The Stub constructors allow a C++ implementation that forms a C core batch
+The ClientContext change allows a C++ implementation that forms a C core batch
 containing both initial metadata and the first message.
 
-By additionally offering WriteOptions on the new stub constructors we also allow
-coalescing all of (initial metadata, one message, trailing metadata) for
-applications that can benefit from it:
-```c++
-Status foo = stub->RequestStream(&ctx, only_message, WriteOptions().set_last(),
-                                 &response);
-```
-The simple nature of WriteLast implementation offers an additional avenue for
-developers to discover this option.
+By combining a corked initial metadata and WriteLast, clients can coalesce all
+of initial metadata, only message send, and half close.
 
 ## Implementation
 
