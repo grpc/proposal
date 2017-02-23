@@ -5,7 +5,8 @@ NodeJS Client Interceptors
 * Status: Draft
 * Implemented in: Java, Go
 * Last updated: 2017-02-17
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at:
+  https://stash.corp.netflix.com/projects/CPIE/repos/nf-eureka2-registration/pull-requests/13/overview
 
 ## Abstract
 
