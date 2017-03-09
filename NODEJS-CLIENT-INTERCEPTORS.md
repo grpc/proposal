@@ -3,7 +3,7 @@ NodeJS Client Interceptors
 * Author(s): David Vroom-Duke (dduke@netflix.com), William Thurston (wthurston@netflix.com), David Liu (dliu@netflix.com), Howard Yuan (hyuan@netflix.com), Eran Landau (elandau@netflix.com)
 * Approver: a11r
 * Status: Draft
-* Implemented in: Java, Go
+* Implemented in: NodeJS
 * Last updated: 2017-03-09
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/LxT1JjN33Q4
 
@@ -67,8 +67,11 @@ var interceptor = (new InterceptorBuilder())
 ```
 
 The `options` argument to the `InterceptingCall` constructor includes all the options accepted by the base `grpc.Call`
-constructor, in addition to a `MethodDescriptor` object. The `MethodDescriptor` is a container for properties of the
-call which are used internally and may also be useful to consumers:
+constructor. Modifying the options that are passed to the `InterceptingCall` constructor will have the effect of
+changing the options passed to the underlying `grpc.Call` constructor.
+
+Additionally, the `options` argument includes a `MethodDescriptor` object. The `MethodDescriptor` is a container for
+properties of the call which are used internally and may also be useful to interceptors:
 
 ```javascript
 /**
@@ -85,6 +88,9 @@ call which are used internally and may also be useful to consumers:
  */
 MethodDescriptor(name, path, method_type, serialize, deserialize)
 ```
+
+*Do not modify the `options.method_descriptor` object, it is not used by the underlying gRPC code and will only affect
+downstream interceptors*
 
 A `caller` object is a POJO implementing zero or more outbound interceptor methods:
 
@@ -192,9 +198,20 @@ var listener = (new ListenerBuilder())
     .build();
 ```
 
-To intercept errors, implement the `onReceiveStatus` method and test for `status.code !== grpc.status.OK`.
+A `StatusBuilder` will be provided to produce gRPC status objects:
 
-To intercept trailers, examine `status.metadata` in the `onReceiveStatus` method.
+```javascript
+var status = (new StatusBuilder())
+    .withCode(grpc.status.OK)
+    .withDetails('Status message')
+    .withMetadata(new Metadata())
+    .build();
+```
+
+**To intercept errors, implement the `onReceiveStatus` method and test for `status.code !== grpc.status.OK`.**
+
+**To intercept trailers, examine `status.metadata` in the `onReceiveStatus` method.**
+
 
 ### Examples
 #### Simple
@@ -246,6 +263,7 @@ outbound messages.
 An example of a caching interceptor for unary RPCs which stores the provided listener for later use (short-circuiting
 the call if there is a cache hit):
 ```javascript
+// Unary RPCs only
 var interceptor = (new InterceptorBuilder())
     .withInterceptCall(function(options) {
         var savedMetadata;
@@ -264,24 +282,24 @@ var interceptor = (new InterceptorBuilder())
                 messageNext = next;
             })
             .withHalfClose(function(next) {
-                var cachedValue = _getCachedResponse(storedMessage.value);
+                var cachedValue = _getCachedResponse(savedMessage.value);
                 if (cachedValue) {
                     var cachedMessage = new Message(cachedValue);
-                    storedListener.onReceiveMetadata(new Metadata());
-                    storedListener.onReceiveMessage(cachedMessage);
-                    storedListener.onReceiveStatus((new StatusBuilder())
+                    savedListener.onReceiveMetadata(new Metadata());
+                    savedListener.onReceiveMessage(cachedMessage);
+                    savedListener.onReceiveStatus((new StatusBuilder())
                         .withCode(grpc.status.OK)
                         .build());
                 } else {
-                    registry.addCall(storedMessage.value + '_miss');
+                    registry.addCall(savedMessage.value + '_miss');
                     var newListener = (new ListenerBuilder())
                         .withOnReceiveMessage(function(message, next) {
-                            _store(storedMessage.value, message.value);
+                            _store(savedMessage.value, message.value);
                             next(message);
                         })
                         .build();
                     startNext(savedMetadata, newListener);
-                    messageNext(storedMessage);
+                    messageNext(savedMessage);
                     next();
                 }
             })
@@ -295,6 +313,7 @@ var interceptor = (new InterceptorBuilder())
 
 An example retry interceptor for unary RPCs creates new calls when the status shows a failure:
 ```javascript
+// Unary RPCs only
 var maxRetries = 3;
 var interceptor = (new InterceptorBuilder())
     .withInterceptCall(function(options) {
@@ -358,7 +377,7 @@ var interceptor = (new InterceptorBuilder())
 
 An example of providing fallbacks to failed requests for unary or client-streaming RPCs:
 ```javascript
-
+// Unary or client-streaming RPCs only
 var interceptor = (new InterceptorBuilder())
     .withInterceptCall(function(options) {
         var savedMessage;
@@ -373,7 +392,9 @@ var interceptor = (new InterceptorBuilder())
                     .withOnReceiveStatus(function(status, next) {
                         if (status.code !== grpc.status.OK) {
                             savedMessageNext(fallback_response);
-                            next((new StatusBuilder()).withCode(grpc.status.OK));
+                            next((new StatusBuilder())
+                                .withCode(grpc.status.OK)
+                                .build());
                         } else {
                             savedMessageNext(savedMessage);
                             next(status);
