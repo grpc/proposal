@@ -31,7 +31,7 @@ Interceptors must implement `interceptCall`:
 /**
  * @param {object} options
  * @param {MethodDescriptor} options.method_descriptor A container of properties describing the call (see below)
- * @param {grpc.ChannelCredentials} [options.credentials] Credentials used to authenticate with the server
+ * @param {grpc.CallCredentials} [options.credentials] Credentials used to authenticate with the server
  * @param {number} [options.deadline] The deadline for the call
  * @param {string} [options.host] The server to call
  * @param {grpc.Call} [options.parent] The parent call
@@ -447,6 +447,8 @@ var constructor_options = {
 };
 var client = new InterceptingClient('localhost:8080', credentials, constructor_options);
 ```
+
+The order of the InterceptorProviders will determine the order of the resulting interceptor stack.
 
 #### At Call Invocation
 
