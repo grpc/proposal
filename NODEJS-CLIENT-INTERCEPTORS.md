@@ -24,8 +24,22 @@ None
 
 ## Proposal
 
+### A simple example
+This example logs all outbound messages:
+```javascript
+var interceptor = function(options) {
+    return new InterceptingCall(options, {
+        sendMessage: function(message, next) {
+            console.log(message);
+            next(message);
+        }
+    });
+};
+client.myCall(message, { interceptors: [interceptor] });
+```
+
 ### Interceptor API
-Interceptors must implement `interceptCall`:
+An interceptor is a function which takes an `options` object and returns and `InterceptingCall` object:
 
 ```javascript
 /**
@@ -38,32 +52,30 @@ Interceptors must implement `interceptCall`:
  * @param {number} [options.propagate_flags] Propagation flags for the underlying grpc.Call
  * @return {InterceptingCall}
  */
-interceptCall(options)
+var interceptor = function(options) {}
 ```
 
-The `interceptCall` method allows developers to modify the call options, store any call-scoped values needed, and define
-interceptor methods. An `InterceptorBuilder` will be provided to easily construct an interceptor.
+An interceptor function allows developers to modify the call options, store any call-scoped values needed, and define
+interception methods.
 
-`interceptCall` must return an `InterceptingCall` object. An `InterceptingCall` is a container for the call options
-and an optional `caller` object. Returning `new InterceptingCall(options)` will satisfy the contract (but provide no
-interceptor functionality).
+The interceptor function must return an `InterceptingCall` object. An `InterceptingCall` is a container for the call
+options and an optional `caller` object. Returning `new InterceptingCall(options)` will satisfy the contract (but
+provide no interceptor functionality).
 
 Most interceptors will define a `caller` object (described below) which is passed to the the `InterceptingCall`
 constructor: `return new InterceptingCall(options, caller)`
 
-A simple interceptor example:
+A simple interceptor example (using the optional CallerBuilder object):
 ```javascript
-var interceptor = (new InterceptorBuilder())
-    .withInterceptCall(function(options) {
-        var caller = (new CallerBuilder())
-            .withSendMessage(function(message, next) {
-                logger.log(message);
-                next(message);
-            })
-            .build();
-        return new InterceptingCall(options, caller);
-    })
-    .build();
+var interceptor = function(options) {
+    var caller = (new CallerBuilder())
+        .withSendMessage(function(message, next) {
+            logger.log(message);
+            next(message);
+        })
+        .build();
+    return new InterceptingCall(options, caller);
+};
 ```
 
 The `options` argument to the `InterceptingCall` constructor includes all the options accepted by the base `grpc.Call`
@@ -92,11 +104,11 @@ MethodDescriptor(name, path, method_type, serialize, deserialize)
 *Do not modify the `options.method_descriptor` object, it is not used by the underlying gRPC code and will only affect
 downstream interceptors*
 
-A `caller` object is a POJO implementing zero or more outbound interceptor methods:
+A `caller` object is a POJO implementing zero or more outbound interception methods:
 
 ```javascript
 /**
- * An interceptor method called before an outbound call has started.
+ * An interception method called before an outbound call has started.
  * @param {Metadata} metadata The call's outbound metadata (request headers).
  * @param {object} listener The listener which will be intercepting inbound operations
  * @param {Function} next A callback which continues the gRPC interceptor chain.
@@ -106,7 +118,7 @@ start(metadata, listener, next)
 ```
 ```javascript
 /**
- * An interceptor method called prior to every outbound message.
+ * An interception method called prior to every outbound message.
  * @param {object} A protobuf message
  * @param {function} next A callback which continues the gRPC interceptor chain, called with the message to send.
  */
@@ -114,14 +126,14 @@ sendMessage(message, next)
 ```
 ```javascript
 /**
- * An interceptor method called when the outbound stream closes (after the message is sent).
+ * An interception method called when the outbound stream closes (after the message is sent).
  * @param {function} next A callback which continues the gRPC interceptor chain.
  */
 halfClose(next)
 ```
 ```javascript
 /**
- * An interceptor method called when the stream is canceled from the client.
+ * An interception method called when the stream is canceled from the client.
  * @param {message} string|null A cancel message if provided
  * @param {function} next A callback which continues the gRPC interceptor chain.
  */
@@ -144,11 +156,11 @@ var caller = (new CallerBuilder())
 ```
 
 A `listener` object implements zero or more methods for intercepting inbound operations. The listener passed into
-a caller's `start` method implements all the inbound interceptor methods and represents the listener chain constructed
+a caller's `start` method implements all the inbound interception methods and represents the listener chain constructed
 by any previous interceptors. Three usage patterns are supported for listeners:
 1) Pass the listener along without modification: `next(metadata, listener)`. In this case the interceptor declines
 to intercept any inbound operations.
-2) Create a new listener with one or more inbound interceptor methods and pass it to `next`. In this case the
+2) Create a new listener with one or more inbound interception methods and pass it to `next`. In this case the
 interceptor will fire on the inbound operations implemented in the new listener.
 3) Store the listener to make direct inbound calls on later. This effectively short-circuits the interceptor stack.
 An example of an interceptor using this pattern to provide client-side caching is included below.
@@ -160,7 +172,7 @@ The `listener` methods are:
 ```javascript
 
 /**
- * An inbound interceptor method triggered when metadata is received.
+ * An inbound interception method triggered when metadata is received.
  * @param {Metadata} metadata The metadata received (response headers).
  * @param {function} next A callback which continues the gRPC interceptor chain. Pass it the metadata to respond with.
  */
@@ -168,7 +180,7 @@ onReceiveMetadata(metadata, next)
 ```
 ```javascript
 /**
- * An inbound interceptor method triggered when each message is received.
+ * An inbound interception method triggered when each message is received.
  * @param {object} message The protobuf message received.
  * @param {function} next A callback which continues the gRPC interceptor chain. Pass it the message to respond with.
  */
@@ -176,7 +188,7 @@ onReceiveMessage(message, next)
 ```
 ```javascript
 /**
- * An inbound interceptor method triggered when status is received.
+ * An inbound interception method triggered when status is received.
  * @param {object} status The status received.
  * @param {function} next A callback which continues the gRPC interceptor chain. Pass it the status to respond with.
  */
@@ -215,38 +227,36 @@ var status = (new StatusBuilder())
 
 ### Examples
 #### Simple
-A trivial implementation of all interceptor methods using the builders:
+A trivial implementation of all interception methods using the builders:
 ```javascript
-var interceptor = (new InterceptorBuilder())
-    .withInterceptCall(function(options) {
-        const caller = (new CallerBuilder())
-            .withStart(function(metadata, listener, next) {
-                const newListener = (new ListenerBuilder())
-                    .withOnReceiveMetadata(function(metadata, next) {
-                        next(metadata);
-                    })
-                    .withOnReceiveMessage(function(message, next) {
-                        next(message);
-                    })
-                    .withOnReceiveStatus(function(status, next) {
-                        next(status);
-                    })
-                    .build();
-                next(metadata, newListener);
-            })
-            .withSendMessage(function(message, next) {
-                next(messasge);
-            })
-            .withHalfClose(function(next) {
-                next();
-            })
-            .withCancel(function(message, next) {
-                next();
-            })
-            .build();
-        return new InterceptingCall(options, caller);
-    })
-    .build();
+var interceptor = function(options) {
+    const caller = (new CallerBuilder())
+        .withStart(function(metadata, listener, next) {
+            const newListener = (new ListenerBuilder())
+                .withOnReceiveMetadata(function(metadata, next) {
+                    next(metadata);
+                })
+                .withOnReceiveMessage(function(message, next) {
+                    next(message);
+                })
+                .withOnReceiveStatus(function(status, next) {
+                    next(status);
+                })
+                .build();
+            next(metadata, newListener);
+        })
+        .withSendMessage(function(message, next) {
+            next(messasge);
+        })
+        .withHalfClose(function(next) {
+            next();
+        })
+        .withCancel(function(message, next) {
+            next();
+        })
+        .build();
+    return new InterceptingCall(options, caller);
+};
 ```
 (Callers and listeners do not need to implement all methods)
 
@@ -264,49 +274,47 @@ An example of a caching interceptor for unary RPCs which stores the provided lis
 the call if there is a cache hit):
 ```javascript
 // Unary RPCs only
-var interceptor = (new InterceptorBuilder())
-    .withInterceptCall(function(options) {
-        var savedMetadata;
-        var startNext;
-        var savedListener;
-        var savedMessage;
-        var messageNext;
-        var caller = (new CallerBuilder())
-            .withStart(function(metadata, listener, next) {
-                savedMetadata = metadata;
-                savedListener = listener;
-                startNext = next;
-            })
-            .withSendMessage(function(message, next) {
-                savedMessage = message;
-                messageNext = next;
-            })
-            .withHalfClose(function(next) {
-                var cachedValue = _getCachedResponse(savedMessage.value);
-                if (cachedValue) {
-                    var cachedMessage = new Message(cachedValue);
-                    savedListener.onReceiveMetadata(new Metadata());
-                    savedListener.onReceiveMessage(cachedMessage);
-                    savedListener.onReceiveStatus((new StatusBuilder())
-                        .withCode(grpc.status.OK)
-                        .build());
-                } else {
-                    registry.addCall(savedMessage.value + '_miss');
-                    var newListener = (new ListenerBuilder())
-                        .withOnReceiveMessage(function(message, next) {
-                            _store(savedMessage.value, message.value);
-                            next(message);
-                        })
-                        .build();
-                    startNext(savedMetadata, newListener);
-                    messageNext(savedMessage);
-                    next();
-                }
-            })
-            .build();
-        return new InterceptingCall(options, caller);
-    })
-    .build();
+var interceptor = function(options) {
+    var savedMetadata;
+    var startNext;
+    var savedListener;
+    var savedMessage;
+    var messageNext;
+    var caller = (new CallerBuilder())
+        .withStart(function(metadata, listener, next) {
+            savedMetadata = metadata;
+            savedListener = listener;
+            startNext = next;
+        })
+        .withSendMessage(function(message, next) {
+            savedMessage = message;
+            messageNext = next;
+        })
+        .withHalfClose(function(next) {
+            var cachedValue = _getCachedResponse(savedMessage.value);
+            if (cachedValue) {
+                var cachedMessage = new Message(cachedValue);
+                savedListener.onReceiveMetadata(new Metadata());
+                savedListener.onReceiveMessage(cachedMessage);
+                savedListener.onReceiveStatus((new StatusBuilder())
+                    .withCode(grpc.status.OK)
+                    .build());
+            } else {
+                registry.addCall(savedMessage.value + '_miss');
+                var newListener = (new ListenerBuilder())
+                    .withOnReceiveMessage(function(message, next) {
+                        _store(savedMessage.value, message.value);
+                        next(message);
+                    })
+                    .build();
+                startNext(savedMetadata, newListener);
+                messageNext(savedMessage);
+                next();
+            }
+        })
+        .build();
+    return new InterceptingCall(options, caller);
+};
 ```
 
 **Retries**
@@ -315,62 +323,60 @@ An example retry interceptor for unary RPCs creates new calls when the status sh
 ```javascript
 // Unary RPCs only
 var maxRetries = 3;
-var interceptor = (new InterceptorBuilder())
-    .withInterceptCall(function(options) {
-        var savedMetadata;
-        var savedSendMessage;
-        var savedReceiveMessage;
-        var savedMessageNext;
-        var methodName = options.method_descriptor.name;
-        var caller = (new CallerBuilder())
-            .withStart(function(metadata, listener, next) {
-                savedMetadata = metadata;
-                var new_listener = (new ListenerBuilder())
-                    .withOnReceiveMessage(function(message, next) {
-                        savedReceiveMessage = message;
-                        savedMessageNext = next;
-                    })
-                    .withOnReceiveStatus(function(status, next) {
-                        var retries = 0;
-                        var retry = function(message, metadata, options) {
-                            retries++;
-                            client[methodName](message, metadata, options, function(err, response) {
-                                if (err) {
-                                    if (retries <= maxRetries) {
-                                        retry(message, metadata, options);
-                                    } else {
-                                        savedMessageNext(response);
-                                        next(status);
-                                    }
-                                    return;
+var interceptor = function(options) {
+    var savedMetadata;
+    var savedSendMessage;
+    var savedReceiveMessage;
+    var savedMessageNext;
+    var methodName = options.method_descriptor.name;
+    var caller = (new CallerBuilder())
+        .withStart(function(metadata, listener, next) {
+            savedMetadata = metadata;
+            var new_listener = (new ListenerBuilder())
+                .withOnReceiveMessage(function(message, next) {
+                    savedReceiveMessage = message;
+                    savedMessageNext = next;
+                })
+                .withOnReceiveStatus(function(status, next) {
+                    var retries = 0;
+                    var retry = function(message, metadata, options) {
+                        retries++;
+                        client[methodName](message, metadata, options, function(err, response) {
+                            if (err) {
+                                if (retries <= maxRetries) {
+                                    retry(message, metadata, options);
+                                } else {
+                                    savedMessageNext(response);
+                                    next(status);
                                 }
-                                var ok_status = (new StatusBuilder())
-                                    .withCode(grpc.status.OK)
-                                    .build();
-                                savedMessageNext(response);
-                                next(ok_status);
-                            });
-                        };
-                        if (status.code !== grpc.status.OK) {
-                            var new_options = _.clone(options);
-                            new_options.interceptors = [];
-                            retry(savedSendMessage, savedMetadata, new_options);
-                        } else {
-                            savedMessageNext(savedReceiveMessage);
-                            next(status);
-                        }
-                    })
-                    .build();
-                next(metadata, new_listener);
-            })
-            .withSendMessage(function(message, next) {
-                savedSendMessage = message;
-                next(message);
-            })
-            .build();
-        return new InterceptingCall(options, caller);
-    })
-    .build();
+                                return;
+                            }
+                            var ok_status = (new StatusBuilder())
+                                .withCode(grpc.status.OK)
+                                .build();
+                            savedMessageNext(response);
+                            next(ok_status);
+                        });
+                    };
+                    if (status.code !== grpc.status.OK) {
+                        var new_options = _.clone(options);
+                        new_options.interceptors = [];
+                        retry(savedSendMessage, savedMetadata, new_options);
+                    } else {
+                        savedMessageNext(savedReceiveMessage);
+                        next(status);
+                    }
+                })
+                .build();
+            next(metadata, new_listener);
+        })
+        .withSendMessage(function(message, next) {
+            savedSendMessage = message;
+            next(message);
+        })
+        .build();
+    return new InterceptingCall(options, caller);
+};
 ```
 
 **Fallbacks**
@@ -378,35 +384,33 @@ var interceptor = (new InterceptorBuilder())
 An example of providing fallbacks to failed requests for unary or client-streaming RPCs:
 ```javascript
 // Unary or client-streaming RPCs only
-var interceptor = (new InterceptorBuilder())
-    .withInterceptCall(function(options) {
-        var savedMessage;
-        var savedMessageNext;
-        var caller = (new CallerBuilder())
-            .withStart(function(metadata, listener, next) {
-                var new_listener = (new ListenerBuilder())
-                    .withOnReceiveMessage(function(message, next) {
-                        savedMessage = message;
-                        savedMessageNext = next;
-                    })
-                    .withOnReceiveStatus(function(status, next) {
-                        if (status.code !== grpc.status.OK) {
-                            savedMessageNext(fallback_response);
-                            next((new StatusBuilder())
-                                .withCode(grpc.status.OK)
-                                .build());
-                        } else {
-                            savedMessageNext(savedMessage);
-                            next(status);
-                        }
-                    })
-                    .build();
-                next(metadata, new_listener);
-            })
-            .build();
-        return new InterceptingCall(options, caller);
-    })
-    .build();
+var interceptor = function(options) {
+    var savedMessage;
+    var savedMessageNext;
+    var caller = (new CallerBuilder())
+        .withStart(function(metadata, listener, next) {
+            var new_listener = (new ListenerBuilder())
+                .withOnReceiveMessage(function(message, next) {
+                    savedMessage = message;
+                    savedMessageNext = next;
+                })
+                .withOnReceiveStatus(function(status, next) {
+                    if (status.code !== grpc.status.OK) {
+                        savedMessageNext(fallback_response);
+                        next((new StatusBuilder())
+                            .withCode(grpc.status.OK)
+                            .build());
+                    } else {
+                        savedMessageNext(savedMessage);
+                        next(status);
+                    }
+                })
+                .build();
+            next(metadata, new_listener);
+        })
+        .build();
+    return new InterceptingCall(options, caller);
+};
 ```
 
 ### Use
@@ -478,14 +482,14 @@ The interceptor module will produce a proxy for the `grpc.Call` object which tri
 corresponding events.
 
 In the invocation of a `grpc.Call`'s `startBatch`, a set of gRPC opTypes are passed. This is the mapping of the
-outbound opTypes to the interceptor methods they will trigger:
+outbound opTypes to the interception methods they will trigger:
 
 ```
 grpc.opType.SEND_INITIAL_METADATA -> start
 grpc.opType.SEND_MESSAGE -> sendMessage
 grpc.opType.SEND_CLOSE_FROM_CLIENT -> halfClose
 ```
-On the inbound side, these opTypes will map to these interceptor methods when responses are received from the server:
+On the inbound side, these opTypes will map to these interception methods when responses are received from the server:
 ```
 grpc.opType.RECV_INITIAL_METADATA -> onReceiveMetadata
 grpc.opType.RECV_MESSAGE -> onReceiveMessage
@@ -506,12 +510,12 @@ interceptorA outbound ->
     interceptorB inbound ->
 interceptorA inbound
 ```
-All the appropriate interceptor methods on a given interceptor fire before the next interceptor is evaluated. (i.e.
+All the appropriate interception methods on a given interceptor fire before the next interceptor is evaluated. (i.e.
 interceptorA's `start` and `sendMessage` would fire before interceptorB's `start` and `sendMessage`)
 
 #### Horizontal execution
-The order of execution for interceptor methods is by operation. Given a chain of interceptors and a batch of operations,
-we will execute all interceptor methods for the current operation before moving to the next. For example if you
+The order of execution for interception methods is by operation. Given a chain of interceptors and a batch of operations,
+we will execute all interception methods for the current operation before moving to the next. For example if you
 define three interceptors which all implement `start` and `sendMessage` methods, the execution order would be:
 ```
 interceptorA start
@@ -524,7 +528,7 @@ interceptorC sendMessage
 
 #### Serialization and Deserialization
 To provide interceptors with useful message objects, we will move all serialization and deserialization to a common
-`startBatch` wrapper. This allows us to intercept the `startBatch` method and trigger outbound interceptor methods
+`startBatch` wrapper. This allows us to intercept the `startBatch` method and trigger outbound interception methods
 before serialization happens. On the inbound side, we will deserialize the messages before triggering interceptor
 methods.
 
@@ -557,7 +561,7 @@ The implementation will include:
 
 - A `client_interceptors.js` module with the logic for producing a `grpc.Call` proxy.
 - Modifying the `client.js` module to use the `client_interceptors` module.
-- Tests which exercise the client interceptor methods for all four RPC types.
+- Tests which exercise the client interception methods for all four RPC types.
 - Markdown documentation with example interceptors.
 
 All steps will be implemented by Netflix engineers.
