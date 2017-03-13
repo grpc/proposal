@@ -227,34 +227,34 @@ var status = (new StatusBuilder())
 
 ### Examples
 #### Simple
-A trivial implementation of all interception methods using the builders:
+A trivial implementation of all interception methods without using the builders:
 ```javascript
 var interceptor = function(options) {
-    const caller = (new CallerBuilder())
-        .withStart(function(metadata, listener, next) {
-            const newListener = (new ListenerBuilder())
-                .withOnReceiveMetadata(function(metadata, next) {
+    var caller = {
+        start: function(metadata, listener, next) {
+            var newListener = {
+                onReceiveMetadata: function(metadata, next) {
                     next(metadata);
-                })
-                .withOnReceiveMessage(function(message, next) {
+                },
+                onReceiveMessage: function(message, next) {
                     next(message);
-                })
-                .withOnReceiveStatus(function(status, next) {
+                },
+                onReceiveStatus: function(status, next) {
                     next(status);
-                })
-                .build();
+                }
+            };
             next(metadata, newListener);
-        })
-        .withSendMessage(function(message, next) {
+        },
+        sendMessage: function(message, next) {
             next(messasge);
-        })
-        .withHalfClose(function(next) {
+        },
+        halfClose: function(next) {
             next();
-        })
-        .withCancel(function(message, next) {
+        },
+        cancel: function(message, next) {
             next();
-        })
-        .build();
+        }
+    };
     return new InterceptingCall(options, caller);
 };
 ```
