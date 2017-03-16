@@ -21,6 +21,7 @@ Table of Contents
         * [Hedging Policy](#hedging-policy)
         * [Throttling Retry Attempts and Hedged RPCs](#throttling-retry-attempts-and-hedged-rpcs)
         * [Pushback](#pushback)
+        * [Limits on Retries and Hedges](#limits-on-retries-and-hedges)
         * [Summary of Retry and Hedging Logic](#summary-of-retry-and-hedging-logic)
      * [Retry Internals](#retry-internals)
         * [Where Retries Occur](#where-retries-occur)
@@ -35,8 +36,6 @@ Table of Contents
         * [Hedging Policy](#hedging-policy-1)
         * [Throttling Configuration](#throttling-configuration)
         * [Integration with Service Config](#integration-with-service-config)
-  * [Open issues](#open-issues)
-     * [Security](#security)
 
 ## Abstract
 
@@ -171,26 +170,34 @@ Servers may explicitly pushback by setting metadata in their response to the cli
 
 Pushback may also be received to a hedged request. If the pushback says not to retry, no further hedged requests will be sent. If the pushback says to retry after a given delay, the next hedged request (if any) will be issued after the given delay has elapsed.
 
-A new metadata key, `"x-grpc-retry-pushback-ms"`, will be added to support server pushback. If the value for pushback is set to -1, then it will be seen as the server asking the client not to retry at all.
+A new metadata key, `"grpc-retry-pushback-ms"`, will be added to support server pushback. The value is to be an integer with no unnecessary leading zeros that represents how many milliseconds to wait before sending a retry. If the value for pushback is set to -1, then it will be seen as the server asking the client not to retry at all.
+
+#### Limits on Retries and Hedges
+
+Both `maxRetryAttempts` in `retryPolicy` and `maxRequests` in `hedgingPolicy` have, by default, a client-side maximum value of 5. This client-side maximum value can be changed by the client through the use of channel arguments. Service owners may specify a higher value for these parameters, but higher values will be treated as equal to the maximum value by the client implementation. This mitigates security concerns related to the service config being transferred to the client via DNS.
 
 #### Summary of Retry and Hedging Logic
 There are five possible types of server responses. The list below enumerates the behavior of retry and hedging policies for each type of response. In all cases, if the maximum number of retry attempts or the maximum number of hedged requests is reached, no further RPCs are sent. Hedged RPCs are returned to the client application when all outstanding and pending requests have either received a response or been canceled.
 
 1. OK
-  1. Retry policy: Successful response, return success to client application
-  2. Hedging policy: Successful response, cancel previous and pending hedges
+    1. Retry policy: Successful response, return success to client application
+    2. Hedging policy: Successful response, cancel previous and pending hedges
+
 2. Retryable/Non-Fatal Status Code
-  1. Retry policy: Retry according to policy
-  2. Hedging policy: Immediately send next scheduled hedged request, if any. Subsequent hedged requests will resume at `hedgingDelayMs`
+    1. Retry policy: Retry according to policy
+    2. Hedging policy: Immediately send next scheduled hedged request, if any. Subsequent hedged requests will resume at `hedgingDelayMs`
+
 3. Fatal Status Code
-  1. Retry policy: Don't retry, return failure to client application
-  2. Hedging policy: Cancel previous and pending hedges
+    1. Retry policy: Don't retry, return failure to client application
+    2. Hedging policy: Cancel previous and pending hedges
+
 4. Pushback: Don't retry
-  1. Retry policy: Don't retry, return failure to client application
-  2. Hedging policy: Don’t send any more hedged requests.
+    1. Retry policy: Don't retry, return failure to client application
+    2. Hedging policy: Don’t send any more hedged requests.
+
 5. Pushback: Retry in *n* ms
-  1. Retry policy: Retry in *n* ms. If this attempt also fails, retry delay will reset to initial backoff for the following retry (if applicable)
-  2. Hedging policy: Send next hedged request in *n* ms. Subsequent hedged requests will resume at `n + hedgingDelayMs`
+    1. Retry policy: Retry in *n* ms. If this attempt also fails, retry delay will reset to initial backoff for the following retry (if applicable)
+    2. Hedging policy: Send next hedged request in *n* ms. Subsequent hedged requests will resume at `n + hedgingDelayMs`
 
 ![State Diagram](A6_graphics/StateDiagram.png)
 
@@ -259,7 +266,7 @@ Since retry throttling is designed to prevent server application overload, and t
 
 Both client and server application logic will have access to data about retries via gRPC metadata. Upon seeing an RPC from the client, the server will know if it was a retry, and moreover, it will know the number of previously made attempts. Likewise, the client will receive the number of retry attempts made when receiving the results of an RPC.
 
-The new header names for exposing the metadata will be `"x-grpc-retry-attempts"` to give clients and servers access to the attempt count. The value for this field will be a human-readable integer.
+The new header names for exposing the metadata will be `"grpc-retry-attempts"` to give clients and servers access to the attempt count. The value for this field will be an integer.
 
 #### Disabling Retries
 
@@ -276,13 +283,13 @@ Additionally, to present a clearer picture of retry attempts, we add three addit
 1. Total number of retry attempts made
 2. Total number of retry attempts which failed
 3. A histogram of retry attempts made:
-  1. The number of retry attempts will be classified into the following buckets: 
-    1. >=1, >=2, >=3, >=4, >=5, >=10, >=100, >=1000
-  2. Each retry attempt increments the count in exactly bucket. For example:
-    1. The 1st retry attempt adds one to the ">=1" count
-    2. The 2nd retry attempt adds one to the ">=2" count, leaving the count for ">=1" unchanged.
-    3. The 5th through 9th retry attempts each add one to the ">=5" count.
-    4. The 10th through 99th retry attempts each add one to the ">=10" count.
+    1. The number of retry attempts will be classified into the following buckets: 
+        1. \>=1, >=2, >=3, >=4, >=5, >=10, >=100, >=1000
+    2. Each retry attempt increments the count in exactly bucket. For example:
+        1. The 1st retry attempt adds one to the ">=1" count
+        2. The 2nd retry attempt adds one to the ">=2" count, leaving the count for ">=1" unchanged.
+        3. The 5th through 9th retry attempts each add one to the ">=5" count.
+        4. The 10th through 99th retry attempts each add one to the ">=10" count.
 
 For hedged requests, we record the same stats as above, treating the first hedged request as the initial RPC and subsequent hedged requests as retry attempts.
 
@@ -452,9 +459,3 @@ The retry policy is transmitted to the client through the service config mechani
   }
 }
 ```
-
-## Open issues
-
-### Security
-
-There is an outstanding security issue concerning the use of service config, in that it may enable distributing potentially malicious configuration including retry policies. This does not change any of the retry logic, but will have to be resolved before retries are made available to service owners.
