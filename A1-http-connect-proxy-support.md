@@ -4,7 +4,7 @@ HTTP CONNECT Proxy Support
 * Approver: a11r
 * Status: Draft
 * Implemented in: C-core (Java and Go are in progress)
-* Last updated: 2017-02-23
+* Last updated: 2017-03-20
 * Discussion at: https://groups.google.com/d/topic/grpc-io/zG7iYpDw6lk/discussion
 
 ## Abstract
@@ -26,13 +26,14 @@ It accepts a TCP connection from a client, creates a new TCP connection
 to another server, and forwards all bytes from the client to the server,
 without actually understanding anything about the contents of those bytes.
 
-Note that client-side per-call load-balancing within gRPC requires knowing
-the addresses of the backends. Because of this, use of a TCP-level proxy
-may limit the ability to do client-side per-call load balacing in some
-environments.
+Note that client-side per-call load-balancing within gRPC requires the
+client to establish connections to individual backends.  Because of this,
+use of a TCP-level proxy may limit the ability to do client-side per-call
+load balacing in some environments.
 
-### Related Proposals: 
+### Related Proposals
 
+- [gRFC A2: Service Configs in DNS](https://github.com/grpc/proposal/pull/5)
 - [gRFC A5: Encoding grpclb data in DNS](https://github.com/grpc/proposal/pull/10)
 
 ## Proposal
@@ -212,6 +213,10 @@ The following additional changes have also been made:
   mapper hook for address rewriting)
 - [grpc/grpc#9557](https://github.com/grpc/grpc/pull/9557) (adds proxy
   mapper hook for name rewriting)
+
+In Go, this functionality is being provided via a custom dialer:
+
+- [grpc/grpc-go#1098](https://github.com/grpc/grpc-go/pull/1098)
 
 ## Open issues (if applicable)
 
