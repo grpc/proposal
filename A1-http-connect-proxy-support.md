@@ -2,7 +2,7 @@ HTTP CONNECT Proxy Support
 --------------------------
 * Author(s): Mark D. Roth (roth@google.com), Eric Anderson (ejona@google.com)
 * Approver: a11r
-* Status: Draft
+* Status: Implemented
 * Implemented in: C-core (Java and Go are in progress)
 * Last updated: 2017-03-20
 * Discussion at: https://groups.google.com/d/topic/grpc-io/zG7iYpDw6lk/discussion
