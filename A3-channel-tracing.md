@@ -30,7 +30,7 @@ Channel connectivity issues are the root cause of a significant portion of user 
 
 ## Proposal
 
-To implement channel tracing, we will introduce a dedicated, in-memory tracing object that is owned by each channel and subchannel. We will add a new function to the grpc channel api that allows library users to retrieve all of the trace for the channel as a JSON or protobuf object. This returned trace will eventually be hooked into a UI, or exported through the ongoing grpcz project, where it could be used for debugging channel issues. The tracer will be enabled or disabled via a new channel argument.
+To implement channel tracing, we will introduce a dedicated, in-memory tracing object that is owned by each channel and subchannel. We will add a new function to the grpc channel api that allows library users to retrieve all of the trace for the channel as a JSON or protobuf object. This returned trace will eventually be hooked into a UI, or exported through the ongoing grpcz project, where it could be used for debugging channel issues. The tracer will be enabled or disabled via a new channel argument, GRPC_ARG_CHANNEL_TRACING.
 
 ### Format of Exported Data
 
@@ -85,33 +85,34 @@ message TraceNode {
   google.protobuf.Timestamp time = 3;
   // unique id of subchannel associated with this trace
   // only used for trace present in the parent
-  uint32 subchannel_id = 4;
+  int64 subchannel_id = 4;
 
-  enum ConnectivityState {
+  enum ChannelState {
+    GRPC_CHANNEL_UNKNOWN = 0;
     // channel has just been initialized
-    GRPC_CHANNEL_INIT = 0;
+    GRPC_CHANNEL_INIT = 1;
     // channel is idle
-    GRPC_CHANNEL_IDLE = 1;
+    GRPC_CHANNEL_IDLE = 2;
     // channel is connecting
-    GRPC_CHANNEL_CONNECTING = 2;
+    GRPC_CHANNEL_CONNECTING = 3;
     // channel is ready for work
-    GRPC_CHANNEL_READY = 3;
+    GRPC_CHANNEL_READY = 4;
     // channel has seen a failure but expects to recover
-    GRPC_CHANNEL_TRANSIENT_FAILURE = 4;
+    GRPC_CHANNEL_TRANSIENT_FAILURE = 5;
     // channel has seen a failure that it cannot recover from
-    GRPC_CHANNEL_SHUTDOWN = 5;
+    GRPC_CHANNEL_SHUTDOWN = 6;
   };
   // state the channel was in when the trace was logged
-  ConnectivityState state = 5;
+  ChannelState state = 5;
 };
 
 // trace data for one channel or subchannel
 message TraceData {
   // unique id of subchannel associated with this trace data
   // set to zero if this is a channel's trace data
-  uint32 subchannel_id = 1;
+  int64 subchannel_id = 1;
    // tracks total trace nodes seen, since many may be overwritten
-  int32 num_nodes_logged = 2;
+  int64 num_nodes_logged = 2;
   // time for creation for the channel or subchannel tracer
   google.protobuf.Timestamp start_time = 3;
   // all of the data for this tracer
@@ -122,8 +123,6 @@ message TraceData {
 message ChannelTrace {
   // parent channel data
   TraceData channel_data = 1;
-  // tracks total subchannel seen, since some may be dropped as they go inactive
-  int32 num_subchannels_seen = 2;
   // data for the subchannels of this channel
   repeated TraceData subchannel_data = 3;
 }
@@ -139,14 +138,14 @@ One downside to this approach is the potential for the tracer to bloat memory. F
 
 ### Basic Design
 
-The implementation will be done in the C-core first, with Java and Go to follow. The tracer object will hold a linked list of trace node and a linked list of subchannel tracers. Each of the subchannel tracers will hold their own linked lists of trace nodes.
+The implementation will be done in the C-core first, with Java and Go to follow. The tracer object will hold a linked list of trace nodes. If a trace node pertains to a subchannel, then it will point to a tracer for that subchannel. tracers are refcounted objects.
 
 ```C
 // One node of tracing data
 struct grpc_trace_node {
-  grpc_slice* data;
+  const char* data;
   grpc_error* error;
-  gpr_timespec time;
+  gpr_timespec time_created;
   grpc_connectivity_state connectivity_state;
   grpc_trace_node* next;
 
@@ -155,8 +154,9 @@ struct grpc_trace_node {
   grpc_channel_tracer* subchannel;
 };
 
-struct trace_node_list {
-  int size;
+struct grpc_trace_node_list {
+  size_t size;
+  size_t max_size;
   grpc_trace_node* head_trace;
   grpc_trace_node* tail_trace;
 };
@@ -165,9 +165,8 @@ struct trace_node_list {
 struct grpc_channel_tracer {
   gpr_refcount refs;
   gpr_mu tracer_mu; 
-  uint32_t num_nodes_logged;
-  trace_node_list node_list;
-  uint32_t num_subchannels_logged;
+  int64_t num_nodes_logged;
+  grpc_trace_node_list node_list;
   gpr_timespec time_created;
 };
 ```
@@ -179,22 +178,23 @@ The tracer files with expose several calls which with the C-core code can intera
 ```C
 /* Initializes the tracing object with gpr_malloc. The caller has
    ownership over the returned tracing object */
-grpc_channel_tracer* grpc_channel_tracer_create();
+grpc_channel_tracer* grpc_channel_tracer_create(size_t max_nodes);
 
 /* Adds a new trace node to the tracing object */
 void grpc_channel_tracer_add_trace(grpc_channel_tracer* tracer, 
-    char* trace, struct grpc_error* error, gpr_timespec time, 
+    char* trace, struct grpc_error* error,
     grpc_connectivity_state connectivity_state);
 
 /* Frees all of the resources held by the tracer object */
-void grpc_channel_tracer_destroy(grpc_channel_tracer* tracer);
+void grpc_channel_tracer_unref(grpc_channel_tracer* tracer);
 ```
 ### API Changes
 
-And finally, the tracer will add a new method to the C-core API:
+And finally, a new method will be added to the channel surface:
+
 ```C
 /* returns the tracing data in the form of a grpc json object */
-grpc_json* grpc_channel_tracer_get_trace(grpc_channel_tracer* tracer);
+grpc_json* grpc_channel_get_trace(grpc_channel* channel);
 ```
 
 ### Garbage Collection
