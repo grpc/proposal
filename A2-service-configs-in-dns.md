@@ -16,10 +16,10 @@ in DNS for use in the open-source world.
 
 The [service
 config](https://github.com/grpc/grpc/blob/master/doc/service_config.md)
-mechanism was originally designed for use inside of Google.  However,
-all but one part of the original design will work fine in the open-source
-world.  That one part is the specification of how the service config
-data will be encoded in DNS.
+mechanism was originally designed for use inside of Google.  However, all
+but one part of the original design works fine in the open-source world.
+That one part is the specification of how the service config data will
+be encoded in DNS.  This proposal fills in this missing piece.
 
 ### Related Proposals: 
 
