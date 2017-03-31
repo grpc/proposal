@@ -42,6 +42,7 @@ gRPC server will maintain a list of server workarounds for backward compatibilit
 
 #### Workaround list
 The workaround list on gRPC server is a map from an integer `workaround id` to a `version comparing function`:
+
 | Workaround id | Version comparing function |
 | ------------- | -------------------------- |
 | 1             | `bool higher_than_v_1_2(uint32_t id, grpc_slice user_agent)` |
@@ -86,8 +87,8 @@ Current API requires a client's `user-agent` string to be checked against the ve
 
 ## Implementation
 1. Implement workaround list and surface APIs in C (mxyan@), Java (TBA) and Go (TBA). 
-2. Implement `enable\_workaround` API for user in wrapping languages providing server (TBA).
+2. Implement `enable_workaround` API for user in wrapping languages providing server (TBA).
 3. Create workaround list doc on gRPC Github repo (mxyan@).
 
 ## Open issues (if applicable)
-Currently, gRPC allows user to add custom strings into `user-agent` field. As far as I know all the languages prefix the user's custom `user-agent` in front of gRPC`s `user-agent` string. Some languages, however, allows user to completely overwrite the `user-agent` string, which are not supposed to be. These methods are not documented, but we do not know if users have taken advantage of it. This is a risk associated with identifying client's version with `user-agent` field.
+Currently, gRPC allows user to add custom strings into `user-agent` field. As far as I know all the languages prefix the user's custom `user-agent` in front of gRPC's `user-agent` string. Some languages, however, allows user to completely overwrite the `user-agent` string, which are not supposed to be. These methods are not documented, but we do not know if users have taken advantage of it. This is a risk associated with identifying client's version with `user-agent` field.
