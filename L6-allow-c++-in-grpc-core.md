@@ -5,7 +5,7 @@ Allow C++ in gRPC Core Library
 * Status: Draft
 * Implemented in: n/a
 * Last updated: April 1, 2017
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/yAg-ydC77aE
 
 ## Abstract
 
