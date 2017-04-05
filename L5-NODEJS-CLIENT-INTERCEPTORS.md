@@ -88,6 +88,7 @@ properties of the call which are used internally and may also be useful to inter
 ```javascript
 /**
  * @param {string} name The name of the call, i.e. 'myCall'
+ * @param {string} service_name The name of the service
  * @param {string} path The full path of the call, i.e. '/MyService/MyCall'
  * @param {MethodType} method_type One of four types:
  *     MethodType.UNARY,
@@ -98,7 +99,7 @@ properties of the call which are used internally and may also be useful to inter
  * @param {Function} deserialize The function used to deserialize a message
  * @constructor
  */
-MethodDescriptor(name, path, method_type, serialize, deserialize)
+MethodDescriptor(name, service_name, path, method_type, serialize, deserialize)
 ```
 
 *Do not modify the `options.method_descriptor` object, it is not used by the underlying gRPC code and will only affect
