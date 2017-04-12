@@ -38,57 +38,21 @@ The major considerations of the design are:
 gRPC server should identify the version of a client by analysing the `user-agent` header field on the server side. Current format of `user-agent` is well defined by the doc [PROTOCOL-HTTP2](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md). With this definition we can extract gRPC language and version from client's `user-agent` string and identify user's compatibility issues.
 
 ### Server backward compatibility management
-gRPC server will maintain a list of server workarounds for backward compatibility issues. These workarounds are disabled by default for performance consideration. If a user cares about a backward compatibility issue, they should be able to enable the workaround. In this case gRPC server will identify the version of each client and determine whether the workaround should be applied.
+When a backward compatibility issue emerges, server may implement workaround for these issues. When building a server, the workarounds in the server should be listed in an enumeration, each of them identified by an ID. The server should support turning on/off each of these workarounds by ID at run time. All workarounds should be disabled by default. 
 
-#### Workaround list
-The workaround list on gRPC server is a map from an integer `workaround id` to a `version comparing function`:
+#### API
+A server should export a single API to users, which allows them to enable/disable a workaround by its ID.
 
-| Workaround id | Version comparing function |
-| ------------- | -------------------------- |
-| 1             | `bool higher_than_v_1_2(uint32_t id, grpc_slice user_agent)` |
-| 2             | `bool not_objc_or_higher_than_v_1_3(uint32_t id, grpc_slice user_agent)` |
-| ...           | ... |
+#### Workaround management
+Each workaround should be well documented in gRPC repository. The doc should include a list of workarounds. Each item includes the ID of the workaround, corresponding issue it resolves, how the workaround is being implemented, and the date when it is included. Users may refer to this doc to enable a workaround they care about. 
 
-* `Version comparing function` should be a function which takes a client `user-agent` string as parameter and returns a bool value indicating whether a workaround should be applied
-* The workaround list should be well documented in gRPC repository. The doc should include the items of the list, as well as detailed description of each workaround and its corresponding compatibility issue, so that users can identify those workarounds they want to enable
-* The list should be compiled into gRPC server and shipped to users in releases
-* An item is add to the list when a backward compatibility issue is raised and a workaround is implemented on the server
-* Updated list will be pushed to users in the next release (or next import for Google3)
-* An item should be removed from the list after 6 months (roughly 4 minor version releases)
-
-The list should be implemented and maintained by the three core languages for interoperability. Wrapping languages should use surface APIs (below) to access the table.
-
-#### APIs
-```
-GRPCAPI void enable_workaround(uint32_t id);
-```
-* This API allows user to enable a particular server workaround for incompatible clients.
-* It should be exported by core languages and wrapping languages which allow users to create gRPC server. 
-
-```
-GRPCAPI bool is_client_compatible(uint32_t id, grpc_slice user_agent);
-```
-* This API allows gRPC server to check whether a workaround should be applied for a particular client, by checking the client's `user-agent`.
-* Returns `true` if
-  1. The workaround `id` is not enabled by `enable_workaround`, or
-  2. `Version comparing function` of workaround `id` returns `true` for the particular `user-agent`.
-* It should be exported to wrapping languages as a surface API.
-* For performance, this function should be called as few times as possible, e.g. once for each client and each workaround at channel creation.
+An item is added to the list of workarounds when it is implemented in the server. An item in the list of workarounds should be removed 6 months (roughly 4 minor version releases) after it was added.
 
 ## Rationale
-### User-agent field
-Since gRPC currently follows a 6-weeks release cycle, using current `user-agent` field to identify a client's version should allow users to be blocked by a backward compatibility issue for at most 6 weeks. This should be acceptable in most cases.
-
-### Version comparing function
-Instead of determining client's compatibility by a minimum version number, we decided to make it more general with `version comparing function`. This allows more flexibility in determining client's compatibility, such as including client's language into consideration.
-
-### Performance
-Current API requires a client's `user-agent` string to be checked against the version comparing functions of all items in the workaround list, involving a lot of (likely duplicated) string processing. Depends on how much performance we need, an alternative is to extract key information from `user-agent` (e.g. gRPC version, language, transport, etc.) and use them as parameter of `version comparing functions`. It is a tradeoff of flexibility to performance that we may want to consider.
+### Enable/Disable workarounds
+The design of enabling/disabling workarounds are based on performance considerations. We do not want a user who does not care about a particular workaround to suffer from performance cost on turning on that workaround, so all workarounds are disabled by default. Only when a user needs a workaround that they enable it with the API provided by server.
 
 ## Implementation
-1. Implement workaround list and surface APIs in C (mxyan@), Java (TBA) and Go (TBA). 
-2. Implement `enable_workaround` API for user in wrapping languages providing server (TBA).
+1. Implement in C (mxyan@), Java (TBA) and Go (TBA). 
+2. Implement in wrapping languages providing server (TBA).
 3. Create workaround list doc on gRPC Github repo (mxyan@).
-
-## Open issues (if applicable)
-Currently, gRPC allows user to add custom strings into `user-agent` field. As far as I know all the languages prefix the user's custom `user-agent` in front of gRPC's `user-agent` string. Some languages, however, allows user to completely overwrite the `user-agent` string, which are not supposed to be. These methods are not documented, but we do not know if users have taken advantage of it. This is a risk associated with identifying client's version with `user-agent` field.
