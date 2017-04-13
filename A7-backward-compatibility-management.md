@@ -1,7 +1,7 @@
 Backward Compatibility Management
 ----
 * Author(s): Muxi Yan, Feng Li
-* Approver: a11r
+* Approver: ctiller
 * Status: Draft
 * Implemented in: All languages supporting gRPC server
 * Last updated: 03/30/2017
@@ -34,19 +34,30 @@ The major considerations of the design are:
 * Servers that do not care about any backward compatibility issue would not need to do anything special
 * Servers that care about a particular backward compatibility issue can invoke an API of gRPC library to configure the server so that the server will apply workaround to that issue based on client's version.
 
-### Client version identification
-gRPC server should identify the version of a client by analysing the `user-agent` header field on the server side. Current format of `user-agent` is well defined by the doc [PROTOCOL-HTTP2](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md). With this definition we can extract gRPC language and version from client's `user-agent` string and identify user's compatibility issues.
+### Server backward compatibility workarounds
+When a backward compatibility issue emerges, gRPC servers may implement workaround for these issues. Each workaround should be documented in a gRPC doc and assigned a unique ID in the format `WORKAROUND_ID_*` where the last part of the ID is a brief description of the workaround. In all gRPC server languages, the workarounds IDs should be listed in an enumeration named `workaround_ids` (may be tweaked following naming convention of each language) exported to users:
+```
+enumeration workaround_ids {
+  WORKAROUND_ID_CRONET_COMPRESSION,
+  WORKAROUND_ID_VERSION_MISMATCH,
+  ...
+}
+```
 
-### Server backward compatibility management
-When a backward compatibility issue emerges, server may implement workaround for these issues. When building a server, the workarounds in the server should be listed in an enumeration, each of them identified by an ID. The server should support turning on/off each of these workarounds by ID at run time. All workarounds should be disabled by default. 
+Workarounds should be implemented in a way that they can be enabled or disabled. A workaround should be executed only when it is in enabled state. In considerantion of performance, all workarounds are disabled by default. gRPC servers should provide users an API to enable/disable a workaround by its ID at run time:
+```
+enable_workaround(id : workaround_ids, enable : bool) : bool
+```
+The parameter `id` specifies the ID of the workaround to be enabled/disabled, and the parameter `enable` specifies to enable (`true`) or disable (`false`) the workaround. The API function should return `true` if the workaround is supported in the server or `false` otherwise.
 
-#### API
-A server should export a single API to users, which allows them to enable/disable a workaround by its ID.
+### Workarounds management
+All backward compatibility workarounds should be documented in the file `grpc/docs/workaround_list`. The doc contains a list of workarounds implemented in gRPC servers. Each item in the list includes the ID of the workaround, corresponding issue it resolves, how the workaround is being implemented, the date when it is included, current status of the workaround (e.g. implemented in which gRPC servers), and other remarks. Users may refer to this doc to find and then enable a workaround they care about. 
 
-#### Workaround management
-Each workaround should be well documented in gRPC repository. The doc should include a list of workarounds. Each item includes the ID of the workaround, corresponding issue it resolves, how the workaround is being implemented, and the date when it is included. Users may refer to this doc to enable a workaround they care about. 
+When a backward compatibility issue emerges, the gRPC team member who is assigned to this issue should add an item to the workaround list doc, then implement corresponding workaround and/or assign the implementation in various languages of gRPC servers to one or more other team members.
 
-An item is added to the list of workarounds when it is implemented in the server. An item in the list of workarounds should be removed 6 months (roughly 4 minor version releases) after it was added.
+When a workaround is implemented in one language of gRPC server, the implementer should update current status of the workaround item in the doc.
+
+An item in the workaround list, together with the corresponding workaround in code base, should be removed 6 months (roughly 4 minor version releases) after it was added.
 
 ## Rationale
 ### Enable/Disable workarounds
@@ -56,3 +67,5 @@ The design of enabling/disabling workarounds are based on performance considerat
 1. Implement in C (mxyan@), Java (TBA) and Go (TBA). 
 2. Implement in wrapping languages providing server (TBA).
 3. Create workaround list doc on gRPC Github repo (mxyan@).
+
+Fireball is currently waiting for this implementation in their ESF endpoint, so the need of implementing this in C and C++ takes precedence over other languages.
