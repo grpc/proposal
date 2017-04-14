@@ -44,7 +44,7 @@ enumeration workaround_ids {
 }
 ```
 
-Workarounds should be implemented in a way that they can be enabled or disabled. A workaround should be executed only when it is in enabled state. In considerantion of performance, all workarounds are disabled by default. gRPC servers should provide users an API to enable/disable a workaround by its ID at run time:
+Workarounds should be implemented in a way that they can be enabled or disabled. A workaround should be executed only when it is in enabled state. In considerantion of performance, all workarounds are disabled by default. gRPC servers should provide users an API to enable/disable a workaround by its ID at construction time:
 ```
 enable_workaround(id : workaround_ids, enable : bool) : bool
 ```
