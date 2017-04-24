@@ -5,7 +5,8 @@ Server-side Connection Management
 * Status: Implemented
 * Implemented in: C, Java, Go
 * Last updated: 2017-01-27
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at:
+  https://groups.google.com/d/topic/grpc-io/DIiIMiq9sV8/discussion
 
 ## Abstract
 
