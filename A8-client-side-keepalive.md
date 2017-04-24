@@ -5,7 +5,8 @@ Client-side Keepalive
 * Status: Implemented
 * Implemented in: C, Java, Go
 * Last updated: 2017-03-31
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at:
+  https://groups.google.com/d/topic/grpc-io/Yc5_vSUJgwQ/discussion
 
 ## Abstract
 
