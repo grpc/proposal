@@ -46,9 +46,9 @@ enumeration workaround_ids {
 
 Workarounds should be implemented in a way that they can be enabled or disabled. A workaround should be executed only when it is in enabled state. In considerantion of performance, all workarounds are disabled by default. gRPC servers should provide users an API to enable a workaround by its ID at construction time:
 ```
-enable_workaround(id : workaround_ids) : bool
+enable_workaround(id : workaround_ids) : void
 ```
-The parameter `id` specifies the ID of the workaround to be enabled. The API function should return `true` if the workaround is supported in the server or `false` otherwise.
+The parameter `id` specifies the ID of the workaround to be enabled.
 
 ### Workarounds management
 All backward compatibility workarounds should be documented in the file `grpc/docs/workaround_list`. The doc contains a list of workarounds implemented in gRPC servers. Each item in the list includes the ID of the workaround, corresponding issue it resolves, how the workaround is being implemented, the date when it is included, current status of the workaround (e.g. implemented in which gRPC servers), and other remarks. Users may refer to this doc to find and then enable a workaround they care about. 
