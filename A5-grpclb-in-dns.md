@@ -4,7 +4,7 @@ Load Balancing and DNS
 * Approver: a11r
 * Status: Draft
 * Implemented in:
-* Last updated: 2017-02-23
+* Last updated: 2017-05-01
 * Discussion at: https://groups.google.com/d/topic/grpc-io/6be1QsHyZkk/discussion
 
 ## Abstract
@@ -159,7 +159,10 @@ will need to be found for these environments.
 
 ### Java
 
-TODO(notcarl): Provide content for this section.
+Java will depend on JNDI, Netty DNS, dnsjava, or a another DNS library
+to do SRV record resolution. The existing name resolver, `DnsNameResolver`,
+will be modified to resolve the additional records and include them in
+the Attributes presented to the load balancer.
 
 ### Go
 
