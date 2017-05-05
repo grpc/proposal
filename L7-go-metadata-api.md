@@ -3,8 +3,8 @@ Go Metadata API Change
 * Author(s): Doug Fawley
 * Approver: a11r
 * Status: Ready for Implementation
-* Last updated: 2017/05/04
-* Discussion at:
+* Last updated: 2017/05/05
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/-qM_UnYFHJs
 
 ## Abstract
 
