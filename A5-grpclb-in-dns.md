@@ -4,7 +4,7 @@ Load Balancing and DNS
 * Approver: a11r
 * Status: Draft
 * Implemented in:
-* Last updated: 2017-05-01
+* Last updated: 2017-05-16
 * Discussion at: https://groups.google.com/d/topic/grpc-io/6be1QsHyZkk/discussion
 
 ## Abstract
@@ -145,7 +145,7 @@ seems to be a much better fit for this purpose.
 ### C-core
 
 In C-core, this implementation will rely on use of the c-ares DNS
-library, which is being added in
+library, which was added in
 [grpc/grpc#7771](https://github.com/grpc/grpc/pull/7771).
 
 Specifically, we will change the c-ares resolver implementation to
@@ -166,7 +166,8 @@ the Attributes presented to the load balancer.
 
 ### Go
 
-TODO(roth): Talk to Go folks about content for this section.
+Go will use the `LookupSRV` function in package `net` to do SRV record
+resolution.
 
 ## Open issues (if applicable)
 
