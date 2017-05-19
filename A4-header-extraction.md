@@ -1,0 +1,266 @@
+Automatically Setting Metadata Based On Request Payload
+-------------------------------------------------------
+* Author(s): Mark D. Roth (roth@google.com)
+* Approver: a11r
+* Status: Draft
+* Implemented in: <language, ...>
+* Last updated: 2017-01-25
+* Discussion at: https://groups.google.com/d/topic/grpc-io/oOzQi1cpNfM/discussion
+
+## Abstract
+
+A mechanism for automatically setting initial metadata in a request by
+extracting information from the request payload.
+
+## Background
+
+It is often desirable to have an affinity key associated with each
+request that can be used for request routing.  Typically, this affinity
+key is based on some field from the request payload (e.g., a user name
+or a resource indicator).
+
+Because the data needed for the affinity key is in the request payload,
+it is necessary to access the deserialized request payload to generate
+the affinity key.  However, it is inefficient to deserialize the request
+payload on the server side, especially if the client is speaking to
+a proxy that is responsible for doing the routing but that would not
+otherwise need to deserialize the payload.  Thus, it makes more sense
+to extract the necessary information from the payload on the client,
+which already has the deserialized data in memory.  The affinity key can
+then be attached to the request as initial metadata, which the server
+(and/or proxy) can use for routing without having to deserialize the
+request payload.
+
+### Related Proposals:
+
+This gRFC will be followed by another one that will
+dictate how the affinity key described in this document
+will be used for affinity-based routing in [load
+balancing](https://github.com/grpc/grpc/blob/master/doc/load-balancing.md).
+
+## Proposal
+
+We will support a simple mechanism involving splitting a string on a
+given delimiter character and then recombining only a certain number of
+the resulting elements.  This will allow for common situations where the
+request names a hierarchical resource and request routing only cares
+about the highest N parts of the tree.
+
+The specification that tells us how to extract
+the headers will be configured as part of the [service
+config](https://github.com/grpc/grpc/blob/master/doc/service_config.md).
+There will also be a way to explicitly specify it via the gRPC client API.
+
+Note that for streaming RPCs, we extract headers only from the first
+request message on the stream.
+
+Note that because we need to see the first request message before we can
+determine the set of headers to send, we need to defer sending initial
+metadata until the client sends the first message, which is a change
+from the normal behavior.  This new behavior will take effect only if
+there is a header extraction config specified for the call.
+
+### Specification for Extracting Headers
+
+The specification of how to construct headers from the request payload
+will be configured via a JSON string of the following form:
+
+```
+// A list of zero or more header specifications.
+[
+  {
+    // The field name to extract from the payload.
+    // When protocol buffers are used for the payload, this must refer to
+    // a non-repeated string field.  If it is a field inside of another
+    // field (i.e., in a nested message), then '.' characters may be used
+    // to delimit the path elements, but none of the fields along that
+    // path may be repeated fields.  If the specified path does not exist
+    // in the payload, then no header will be added.
+    'payloadFieldName': string,
+
+    // Delimiter character, used both when splitting the value from the
+    // payload field into elements and when re-joining those elements to
+    // form the header value.  Must be a single ASCII character; if any
+    // other value is specified, then no header will be added.  If absent,
+    // the entire payload field will be used.
+    'delimiterCharacter': string,
+
+    // Number of split elements to keep (integer).
+    // Note that leading delimiter characters (those at the beginning of
+    // the payload field) are skipped; they do not count toward this
+    // number and are not added to the resulting header field.  If set
+    // to 0 or a negative value, no header will be added.  Ignored if the
+    // 'delimiterCharacter' field is not present.
+    'numElementsToKeep': number,
+
+    // Name of header to add.
+    // Note that if multiple entries list the same header name, or if
+    // the application already specified a header with this name, then
+    // the request will wind up with multiple headers of the same name.
+    'headerName': string
+  }
+]
+```
+
+When encoded in the service config, the above JSON object will be the
+value of a per-method parameter called `headerExtraction`.
+
+### Example
+
+Let's say that the request contains the following fields (protobuf syntax):
+
+```
+resource: {
+  id: "//foo/bar/baz"
+}
+user: "roth@quux@mumble@frotz"
+transaction_id: "some_big_opaque_string"
+```
+
+And let's say that the service config contains the following header
+extraction configuration:
+
+```
+[
+  {
+    'payloadFieldName': 'resource.id',
+    'delimiterCharacter': '/',
+    'numElementsToKeep': 2,
+    'headerName': 'resource_affinity_key'
+  },
+  {
+    'payloadFieldName': 'user',
+    'delimiterCharacter': '@',
+    'numElementsToKeep': 3,
+    'headerName': 'user_affinity_key'
+  },
+  {
+    'payloadFieldName': 'transaction_id',
+    'headerName': 'transaction_affinity_key'
+  },
+  {
+    'payloadFieldName': 'does_not_exist',
+    'headerName': 'will_not_be_added'
+  }
+]
+```
+
+This would result in the following headers:
+
+```
+resource_affinity_key: foo/bar
+user_affinity_key: roth@quux@mumble
+transaction_affinity_key: some_big_opaque_string
+```
+
+## Rationale
+
+We considered supporting regular expressions to generate the header from
+the payload field, but we ruled that out for performance reasons.
+
+## Implementation
+
+We will prioritize implementation in Java and C-core.
+
+### Java
+
+TODO(notcarl): Provide information on proposed API and other
+implementation details.
+
+### C-core
+
+In C-core, the challenge of implementing header extraction is that
+the serialization happens in the wrapped language layer, before C-core
+is called.  However, the service config (which will provide the header
+extraction configuration) is obtained via name resolution, which happens
+inside of C-core.
+
+For efficiency reasons, we do not want to have to deserialize the payload
+inside of C-core.  And doing so is redundant, because the wrapped
+language already has the deserialized payload available anyway.  So we
+will address this by having the wrapped language provide a callback that
+can be invoked by C-core to extract the necessary header.
+
+The following new structs will be defined in
+[grpc_types.h](https://github.com/grpc/grpc/blob/master/include/grpc/impl/codegen/grpc_types.h):
+
+```
+// Used to request payload field extraction from the caller.
+struct {
+  // Populated by C-core to indicate the payload field to extract.
+  const char* payload_field_name;
+  // Populated by the caller to provide the value of the specified
+  // payload field.  Ownership is passed back to C-core.
+  // Can be set to NULL to indicate that the payload field could not be
+  // extracted (e.g., the field was not present or the field name was
+  // invalid).
+  char* payload_field_value;
+} payload_field_extraction;
+
+struct {
+  payload_field_extraction *extraction;
+  size_t count;
+} payload_field_extractions;
+```
+
+In addition, the `grpc_op` struct in the same header will be extended
+to allow the wrapped language layer to provide a callback to be used
+by C-core to extract the requested header fields.  Because some wrapped
+languages may not be able to perform this callback synchronously, there
+will be both a sync and an async version of this callback.  Specifically,
+the following fields will be added to the `send_message` struct inside
+of the `grpc_op` struct:
+
+```
+// Opaque data passed in from the wrapped language to be passed to the
+// callback from C-core.
+void* payload_extraction_user_data;
+
+// Wrapped languages must provide one of these two callbacks for each
+// SEND_MESSAGE op.  In both cases, the callback is responsible for
+// setting the \a payload_field_value field of each entry in
+// \a extractions.
+
+// Synchronous API.  The \a user_data parameter will be set to the value
+// of the \a payload_extraction_user_data field above.
+// On error, sets \a error_msg to indicate the error (in which case the
+// caller (C-core) takes ownership).
+void (*payload_extractor_sync_func)(payload_field_extractions* extractions,
+                                    void* user_data, char** error_msg);
+
+// Async API.  The \a user_data_from_caller parameter will be set to the
+// value of the \a payload_extraction_user_data field above.  Invokes
+// \a done_cb when the extraction is finished.  Must invoke \a done_cb from
+// a thread that is not already in C-core (i.e., cannot be invoked
+// directly from \a payload_extractor_async_func).  The
+// \a user_data_from_core parameter will be passed to \a done_cb.
+// On failure, sets \a error_msg to indicate the error (in which case,
+// \a done_cb takes ownership).
+void (*payload_extractor_async_func)(
+    payload_field_extractions* extractions, void* user_data_from_caller,
+    void* user_data_from_core,
+    void (*done_cb)(void* user_data_from_core, char* error_msg));
+```
+
+Corresponding fields will be added to the `grpc_transport_stream_op`
+struct in
+[transport.h](https://github.com/grpc/grpc/blob/master/src/core/lib/transport/transport.h).
+A new filter will then be implemented that will invoke the callback to
+extract the requested fields based on the header extraction information
+from the service config.
+
+If the service config specifies header extractions information but we
+cannot extract the required payload information (either because no
+payload extraction callback was passed down with the send-message
+op or because the payload callback failed), then the call will fail with
+an INTERNAL status code.
+
+Note that because we need to see the first request message in order to
+construct headers, this means that in the presence of a header
+extraction configuration, a `GRPC_OP_SEND_INITIAL_METADATA` op will not
+be processed until after the first `GRPC_OP_SEND_MESSAGE` op is
+requested.
+
+## Open issues (if applicable)
+
+N/A
