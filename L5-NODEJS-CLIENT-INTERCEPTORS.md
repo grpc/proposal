@@ -1,10 +1,10 @@
 NodeJS Client Interceptors
 ----
 * Author(s): David Vroom-Duke (dduke@netflix.com), William Thurston (wthurston@netflix.com), David Liu (dliu@netflix.com), Howard Yuan (hyuan@netflix.com), Eran Landau (elandau@netflix.com)
-* Approver: a11r
-* Status: Draft
+* Approver: murgatroid99
+* Status: Final
 * Implemented in: NodeJS
-* Last updated: 2017-05-02
+* Last updated: 2017-06-01
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/LxT1JjN33Q4
 
 ## Abstract
