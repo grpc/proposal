@@ -9,7 +9,7 @@ Github Issue Disposal Policy
 
 ## Abstract
 
-There are hundreds of open issues in the 3 gRPC repos, some open for over 2 years. gRPC team periodically spends valuable time scrubbing the issue list. This proposal lays down concrete criteria for disposing of issues filed by OSS community.
+There are hundreds of open issues in the 3 gRPC repos, some open for over 2 years. gRPC team periodically spends valuable time scrubbing the issue list. This proposal lays down concrete criteria for disposing of issues.
 
 ## Background
 
