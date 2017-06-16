@@ -31,27 +31,36 @@ Can we do better?
 
 ## Proposal
 
-We propose the following.
+Our goal is to reduce the noise in the Issues database. This is important because
+* High quality Issues database will increase developer productivity (Devs search the database regularly)
+* Increase in triage efficiency will help community get answers faster
 
-### Keep status updated
+We increase the quality of the database by ensuring that open issues correlate with open work items. It implies closing (but not deleting) issues for which no work is scheduled in near future (2 quarters). Important to note - Closing the issue does not mean that the request is invalid. It might be that it never rose in priority order, or that we don't have a strong signal from community about the importance of the issue. These issues are still searchable and can be reopened without losing any information.
+
+More specifically we propose the following
+
+### Close stale issues
 
 Close following types of issues with explanation. Anyone can reopen if they disagree with the disposition.
 * Issues that are fixed, or should have been fixed
 * Issues that are waiting for more information and have not seen an update in over a month
 
-### Correct classification
+### Correctly classify issues
 
-Issues that start out as bugs can turn into feature requests or document requests. Use following *mutually exclusive* labels to identify the nature of an issue - Question, Enhancement, Bug.
+Issues that start out as bugs can turn into feature requests or document requests. Use following **mutually exclusive** labels to identify the nature of an issue - Question, Enhancement, Bug.
 
 ### Bring transparency to feature request handling
 
 * Old feature requests (pending for over a year)
-	* Make an honest assessment about feasibility and utility. Reject if appropriate with explanation. If the community feels strongly about the feature, anyone can open a new issue with added justification. This issue can then follow the New Issue path below.
-	* If the feature request makes sense but we have no immediate plans, then consolidate in a separate document and close the issue. This is equivalent of adding "Someday" label.
-
-Important note - Closing the issue does not mean that the request is invalid. It might be that it never rose in priority order, or that we don't have a strong signal from community about the importance of this feature.
+	* Make an honest assessment about feasibility and utility.
+	* Reject if appropriate with explanation. If the community feels strongly about the feature, anyone can reopen the issue with added justification.
+	* If the feature request makes sense but we have no immediate plans, then close the issue with "WONTFIX-P4".
 
 * Newer feature requests
-	* Outright reject where appropriate with explanation
-	* Reconsider during quarterly planning for next 4 quarters
+	* Reject where appropriate with explanation
+	* Reconsider during quarterly planning for next 2 quarters.
   * When a year passes without implementation, follow the Old feature request disposition
+
+### Close documentation related issues
+
+* Close issues that only contain questions about gRPC. The mailing list, IRC and Stackoverflow are more appropriate channels for this communication.
