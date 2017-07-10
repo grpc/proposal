@@ -23,7 +23,7 @@ the gRPC C++ wrapping, moving some components to `namespace
 grpc::internal`, and moving some class constructors to `private` (with
 friends or appropriately-named `static` factories for internalized generation).
 
-### Related Proposals: 
+### Related Proposals:
 
 N/A
 
@@ -32,9 +32,9 @@ N/A
 The C++ gRPC wrapping includes numerous classes and functions, but
 they fall into five separate categories:
 
-1. Documented for public use
+1. Documented for public use by end-user client/server applications
 1. Intended for interfacing with serialization layers such as protobuf
-1. Intended for use through the code-generation layer
+1. Intended for use through a code-generation layer
 1. Intended for use in the internal implementation of gRPC C++
 1. Intended for interfacing with gRPC core
 
@@ -44,7 +44,7 @@ three should not be used as such. This will be achived by
 moving classes and functions in the latter three categories to `namespace
 grpc::internal`.
 
-* Accessed through codegen 
+* Accessed through codegen
   - `RpcMethod`
   - `BlockingUnaryCall`
 
