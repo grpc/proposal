@@ -134,7 +134,7 @@ When a non-error response is received (in response to any of the hedged requests
 
 If a non-fatal status code is received from a hedged request, then the next hedged request in line is sent immediately, shortcutting its hedging delay. If any other status code is received, all outstanding RPCs are canceled and the error is returned to the client application layer.
 
-If all instances of a hedged RPC fail, there are no additional retry attempts. Essentially, hedging can be seen as retrying the original RPC before a failure is even received. 
+If all instances of a hedged RPC fail, there are no additional retry attempts. Essentially, hedging can be seen as retrying the original RPC before a failure is even received.
 
 If server pushback that specifies not to retry is received in response to a hedged request, no further hedged requests should be issued for the call.
 
@@ -234,7 +234,7 @@ The gRPC client library will support application-configured limits for the amoun
 
 RPCs may only be retried when they are contained in the buffer. New RPCs which do not fit in the available buffer space (either due to the total available buffer space, or due to the per-RPC limit) will not be retryable, but the original RPC will still be sent.
 
-Hedged RPCs with a non-zero delay will only send out the subsequent hedged requests when the original RPC remains in the buffer. For hedge policies with a delay of zero milliseconds, the RPC does not need to be placed in the buffer at all and the outgoing RPCs can be sent immediately then discarded. 
+Hedged RPCs with a non-zero delay will only send out the subsequent hedged requests when the original RPC remains in the buffer. For hedge policies with a delay of zero milliseconds, the RPC does not need to be placed in the buffer at all and the outgoing RPCs can be sent immediately then discarded.
 
 After the RPC response has been returned to the client application layer, the RPC is removed from the buffer.
 
@@ -283,7 +283,7 @@ Additionally, to present a clearer picture of retry attempts, we add three addit
 1. Total number of retry attempts made
 2. Total number of retry attempts which failed
 3. A histogram of retry attempts made:
-    1. The number of retry attempts will be classified into the following buckets: 
+    1. The number of retry attempts will be classified into the following buckets:
         1. \>=1, >=2, >=3, >=4, >=5, >=10, >=100, >=1000
     2. Each retry attempt increments the count in exactly bucket. For example:
         1. The 1st retry attempt adds one to the ">=1" count
@@ -297,7 +297,7 @@ For hedged requests, we record the same stats as above, treating the first hedge
 
 Retry and hedging configuration is set as part of the service config, which is transmitted to the client during DNS resolution. Like other aspects of the service config, retry or hedging policies can be specified per-method, per-service, or per-server name.
 
-Service owners must choose between a retry policy or a hedging policy. Unless the service owner specifies a policy in the configuration, retries and hedging will not be enabled. The retry policy and hedging policy each have their own set of configuration options, detailed below. 
+Service owners must choose between a retry policy or a hedging policy. Unless the service owner specifies a policy in the configuration, retries and hedging will not be enabled. The retry policy and hedging policy each have their own set of configuration options, detailed below.
 
 The parameters for throttling retry attempts and hedged RPCs when failures exceed a certain threshold are also set in the service config. Throttling applies across methods and services on a particular server, and thus may only be configured per-server name.
 
@@ -385,7 +385,7 @@ The retry policy is transmitted to the client through the service config mechani
 
         // Exponential backoff parameters. The initial retry attempt will occur at
         // random(0, initialBackoffMs). In general, the nth attempt will occur at
-        // random(0, 
+        // random(0,
         //   min(initialBackoffMs*backoffMultiplier**(n-1), maxBackoffMs)).
         "initialBackoffMs": number,  // Required. Must be greater than zero.
         "maxBackoffMs": number,  // Required. Must be greater than zero.
