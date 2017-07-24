@@ -142,7 +142,7 @@ Hedged requests should be sent to distinct backends, if possible. To facilitate 
 
 #### Throttling Retry Attempts and Hedged RPCs
 
-gRPC prevents server overload due to retries and hedged RPCs by disabling these policies when the client’s ratio of failures to successes passes a certain threshold. The throttling is done per server name. Retry throttling may be configured as follows:
+gRPC prevents server overload due to retries and hedged RPCs by disabling these policies when the client’s ratio of failures to successes passes a certain threshold. The throttling is done per server process. Retry throttling may be configured as follows:
 
 ```
 "retryThrottling": {  
@@ -151,11 +151,11 @@ gRPC prevents server overload due to retries and hedged RPCs by disabling these 
 }
 ```
 
-Throttling may only be specified per server name, rather than per method or per service.
+Throttling may only be specified per server process, rather than per method or per service.
 
-For each server name, the gRPC client maintains a `token_count` variable which is initially set to `maxTokens`. Every outgoing RPC (regardless of service or method invoked) will effect `token_count` as follows:
-* Every failed RPC will decrement the `token_count` by 1. 
-* Every successful RPC will increment the `token_count` by `tokenRatio`. 
+For each server process, the gRPC client maintains a `token_count` variable which is initially set to `maxTokens`. Every outgoing RPC (regardless of service or method invoked) will effect `token_count` as follows:
+* Every failed RPC will decrement the `token_count` by 1.
+* Every successful RPC will increment the `token_count` by `tokenRatio`.
 
 If `token_count` is less than or equal to the threshold, defined to be `(maxTokens / 2)`, then RPCs will not be retried until `token_count` rises over the threshold.
 
@@ -295,11 +295,11 @@ For hedged requests, we record the same stats as above, treating the first hedge
 
 ### Configuration Language
 
-Retry and hedging configuration is set as part of the service config, which is transmitted to the client during DNS resolution. Like other aspects of the service config, retry or hedging policies can be specified per-method, per-service, or per-server name.
+Retry and hedging configuration is set as part of the service config, which is transmitted to the client during DNS resolution. Like other aspects of the service config, retry or hedging policies can be specified per-method, per-service, or per-server process.
 
-Service owners must choose between a retry policy or a hedging policy. Unless the service owner specifies a policy in the configuration, retries and hedging will not be enabled. The retry policy and hedging policy each have their own set of configuration options, detailed below. 
+Service owners must choose between a retry policy or a hedging policy. Unless the service owner specifies a policy in the configuration, retries and hedging will not be enabled. The retry policy and hedging policy each have their own set of configuration options, detailed below.
 
-The parameters for throttling retry attempts and hedged RPCs when failures exceed a certain threshold are also set in the service config. Throttling applies across methods and services on a particular server, and thus may only be configured per-server name.
+The parameters for throttling retry attempts and hedged RPCs when failures exceed a certain threshold are also set in the service config. Throttling applies across methods and services on a particular server, and thus may only be configured per-server process.
 
 #### Retry Policy
 
@@ -348,7 +348,7 @@ The following example issues three hedged requests simultaneously:
 ```
 
 #### Throttling Configuration
-Throttling configuration applies to all services and methods on a given server, and so can only be set per-server name. The following configuration throttles retry attempts and hedged RPCs when the client's ratio of failures to successes exceeds ~10%.
+Throttling configuration applies to all services and methods on a given server, and so can only be set per-server process. The following configuration throttles retry attempts and hedged RPCs when the client's ratio of failures to successes exceeds ~10%.
 
 ```
 "retryThrottling": {  
