@@ -5,7 +5,7 @@ Resolver and balancer API changes
 * Status: In Review
 * Implemented in: <language, ...>
 * Last updated: 2017/07/19
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/rUDN7-cZvz8
 
 ## Abstract
 
