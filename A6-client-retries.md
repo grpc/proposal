@@ -153,9 +153,9 @@ gRPC prevents server overload due to retries and hedged RPCs by disabling these 
 
 Throttling may only be specified per server name, rather than per method or per service.
 
-For each server name, the gRPC client maintains a `token_count` variable which is initially set to `maxTokens`. Every outgoing RPC (regardless of service or method invoked) will effect `token_count` as follows:
-* Every failed RPC will decrement the `token_count` by 1. 
-* Every successful RPC will increment the `token_count` by `tokenRatio`. 
+For each server name, the gRPC client maintains a `token_count` variable which is initially set to `maxTokens` and can take values between `0` and `maxTokens`. Every outgoing RPC (regardless of service or method invoked) will effect `token_count` as follows:
+* Every failed RPC will decrement the `token_count` by 1.
+* Every successful RPC will increment the `token_count` by `tokenRatio`.
 
 If `token_count` is less than or equal to the threshold, defined to be `(maxTokens / 2)`, then RPCs will not be retried until `token_count` rises over the threshold.
 
@@ -435,8 +435,10 @@ The retry policy is transmitted to the client through the service config mechani
   // successes exceeds a threshold.
   //
   // For each server name, the gRPC client will maintain a token_count which is
-  // initially set to maxTokens. Every outgoing RPC (regardless of service or
-  // method invoked) will change token_count as follows:
+  // initially set to maxTokens, and can take values between 0 and maxTokens.
+  //
+  // Every outgoing RPC (regardless of service or method invoked) will change
+  // token_count as follows:
   //
   //   - Every failed RPC will decrement the token_count by 1.
   //   - Every successful RPC will increment the token_count by tokenRatio.
