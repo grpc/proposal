@@ -71,6 +71,10 @@ In some cases, gRPC can guarantee that a request has never been seen by the serv
 
 Lastly, information about number of retry attempts will be exposed to the client and server applications through metadata. Find more details [here](#exposed-retry-metadata).
 
+![State Diagram](A6_graphics/basic_retry.png)
+
+[Link to SVG file](A6_graphics/basic_retry.svg)
+
 ### Detailed Design
 
 #### Retry Policy Capabilities
@@ -95,6 +99,10 @@ Each of these configuration options is detailed in its own section below.
 `maxRetryAttempts` specifies the maximum number of retry attempts per original RPC.
 
 gRPC's call deadlines apply to the entire chain of original RPC and retry attempts. The time limit begins when the original RPC is issued to the gRPC client library. For example, if the specified deadline is 500ms and after 500ms only one retry has been attempted, the call is cancelled even if `maxRetryAttempts` is set to two or greater.
+
+![State Diagram](A6_graphics/too_many_attempts.png)
+
+[Link to SVG file](A6_graphics/too_many_attempts.svg)
 
 ##### Exponential Backoff
 
@@ -139,6 +147,10 @@ If all instances of a hedged RPC fail, there are no additional retry attempts. E
 If server pushback that specifies not to retry is received in response to a hedged request, no further hedged requests should be issued for the call.
 
 Hedged requests should be sent to distinct backends, if possible. To facilitate this, the gRPC client will maintain a list of previously used backend addresses for each hedged RPC. This list will be passed to the gRPC client's local load-balancing policy. The load balancing policy may use this information to send the hedged request to an address that was not previously used. If all available backend addresses have already been used, the load-balancing policy's response is implementation-dependent.
+
+![State Diagram](A6_graphics/basic_hedge.png)
+
+[Link to SVG file](A6_graphics/basic_hedge.svg)
 
 #### Throttling Retry Attempts and Hedged RPCs
 
@@ -261,6 +273,10 @@ In the first case, in which the RPC never leaves the client, the client library 
 Similarly, if the RPC reaches the server, but has never been seen by the server application logic (the second bullet), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy.
 
 Since retry throttling is designed to prevent server application overload, and these transparent retries do not make it to the server application layer, they do not count as failures when deciding whether to throttle retry attempts.
+
+![State Diagram](A6_graphics/transparent.png)
+
+[Link to SVG file](A6_graphics/transparent.svg)
 
 #### Exposed Retry Metadata
 
