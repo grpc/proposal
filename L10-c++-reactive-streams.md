@@ -98,6 +98,7 @@ class TestServiceImpl : public TestService::ReactiveService {
 service UpstreamService {
   rpc GetUserInfo (UserInfoRequest) returns (UserInfoResponse) {}
   rpc ResolveUsername (ResolveUsernameRequest) returns (ResolveUsernameResponse) {}
+  rpc GetShoppingCart (GetShoppingCartRequest) returns (GetShoppingCartResponse) {}
 }
 
 message UserInfoRequest {
@@ -117,9 +118,19 @@ message ResolveUsernameResponse {
   string userid = 1;
 }
 
+message GetShoppingCartRequest {
+  string userid = 1;
+}
+
+message GetShoppingCartResponse {
+  repeated string items = 1;
+}
+
 service TestService {
   rpc CountryByUserid (CountryByUseridRequest) returns (CountryByUseridResponse) {}
   rpc CountryByUsername (CountryByUsernameRequest) returns (CountryByUsernameResponse) {}
+  rpc RenderShoppingCart (RenderShoppingCartRequest) returns (RenderShoppingCartResponse) {}
+  rpc CountryByUseridRace (CountryByUseridRequest) returns (CountryByUseridResponse) {}
 }
 
 message CountryByUseridRequest {
@@ -137,6 +148,15 @@ message CountryByUsernameRequest {
 message CountryByUsernameResponse {
   string country = 1;
 }
+
+message RenderShoppingCartRequest {
+  string userid = 1;
+}
+
+message RenderShoppingCartResponse {
+  string username = 1;
+  repeated string items = 2;
+}
 ```
 
 ```cpp
@@ -146,10 +166,23 @@ UserInfoRequest MakeUserInfoRequest(const std::string& userid) {
   return request;
 }
 
+GetShoppingCartRequest MakeGetShoppingCartRequest(const std::string& userid) {
+  GetShoppingCartRequest request;
+  request.set_userid(userid);
+  return request;
+}
+
+CountryByUseridResponse MakeCountryByUseridResponse(
+    const std::string& country) {
+  CountryByUseridResponse response;
+  response.set_country(country);
+  return response;
+}
+
 class TestServiceImpl : public TestService::ReactiveService {
  public:
   /// Request handler that makes one upstream request
-  AnyPublisher<CountryByUserIdResponse> CountryByUseridHandler(
+  AnyPublisher<CountryByUserIdResponse> CountryByUserid(
       CountryByUseridRequest request) override {
     return AnyPublisher<CountryByUserIdResponse>(Pipe(
         // Make RPC call to get userinfo
@@ -164,7 +197,7 @@ class TestServiceImpl : public TestService::ReactiveService {
   }
 
   /// Request handler that makes two upstream requests in a row
-  AnyPublisher<CountryByUsernameResponse> CountryByUsernameHandler(
+  AnyPublisher<CountryByUsernameResponse> CountryByUsername(
       CountryByUsernameRequest request) override {
     ResolveUsernameRequest resolve_username_request;
     resolve_username_request.set_username(request.username());
@@ -179,9 +212,53 @@ class TestServiceImpl : public TestService::ReactiveService {
         }),
         // Then take the resulting userinfo and construct a response
         Map([](UserInfoResponse response) {
-          CountryByUsernameResponse final_response;
-          final_response.set_country(response.country());
-          return final_response;
+          return MakeCountryByUseridResponse(response.country());
+        })));
+  }
+
+  /// Request handler that makes two upstream requests in parallel and combines
+  /// the results.
+  AnyPublisher<RenderShoppingCartResponse> RenderShoppingCart(
+      RenderShoppingCartRequest request) override {
+    auto user_info = upstream_service_.GetUserInfo(
+        MakeUserInfoRequest(request.userid()));
+    auto shopping_cart = upstream_service_.GetShoppingCartRequest(
+        MakeGetShoppingCartRequest(request.userid()));
+
+    return AnyPublisher<CountryByUsernameResponse>(Pipe(
+        // Wait for getting the user info and shopping cart together. This
+        // operator gives us a Publisher of
+        // std::tuple<UserInfoResponse, GetShoppingCartResponse>
+        Zip(user_info, shopping_cart),
+        // Here, it would be possible to use Map with a mapper function that
+        // takes a tuple but that's a bit inconvenient. Splat helps with that:
+        Map(Splat([](
+            UserInfoResponse user_info_response,
+            GetShoppingCartResponse get_shopping_cart_response) {
+          RenderShoppingCartResponse response;
+          response.set_username(user_info_response.username());
+          (*response.mutable_items()) = get_shopping_cart_response.items();
+          return response;
+        }))));
+  }
+
+  /// Request handler that makes two upstream requests in parallel and uses the
+  /// response that comes first. (The rpc that turned out to be slower is
+  /// cancelled.)
+  AnyPublisher<CountryByUserIdResponse> CountryByUseridRace(
+      CountryByUseridRequest request) override {
+    auto user_info = upstream_service_.GetUserInfo(
+        MakeUserInfoRequest(request.userid()));
+    return AnyPublisher<CountryByUserIdResponse>(Pipe(
+        // Make two requests to get the user info in pararallel. Publishers are
+        // lazy and can usually be used more than once. This could also be
+        // different requests.
+        Merge(user_info, user_info),
+        // We are only interested in one of the responses.
+        Take(1),
+        // Convert the result to a response of the proper type
+        Map([](UserInfoResponse response) {
+          return MakeCountryByUseridResponse(response.country());
         })));
   }
 
@@ -238,6 +315,7 @@ class TestServiceImpl : public TestService::ReactiveService {
 
 * Because this is a client streaming RPC, the parameter to `TestServiceImpl::Sum` is an `AnyPublisher<SumRequest>` instead of a `SumRequest` directly. This is the only difference between non-streaming and client streaming RPCs for application code.
 * `Sum()` as used here is a rather silly example, but it is possible for users of the API to write their own operators: [Here is the implementation of `Sum()`](https://github.com/per-gron/shuriken/blob/master/src/rs/include/rs/sum.h). Writing another operator is as easy as writing `Sum()`.
+* For more info on `Zip`, see its documentation [in rs](https://github.com/per-gron/shuriken/blob/master/src/rs/doc/reference.md#zippublisher) and [in ReactiveX](http://reactivex.io/documentation/operators/zip.html).
 
 
 #### Server streaming: FizzBuzz
@@ -299,7 +377,6 @@ class TestServiceImpl : public TestService::ReactiveService {
 More examples are possible, but this is already getting long. Please ask for more if you want to see what a particular use case would look like. Omitted examples include:
 
 * **Bidirectional streaming:** It is just client and server streaming combined. The handler takes a Publisher and returns a Publisher that can emit more than one element.
-* **Making two upstream calls in parallel:** Can be done with the [`Zip` operator](https://github.com/per-gron/shuriken/blob/master/src/rs/doc/reference.md#zippublisher).
 * **Cancellation:** Most of the time no explicit code related to cancellation is needed. For example, if an RPC has made two upstream requests in parallel and one fails, the other is automatically cancelled. This works with timeouts and streams, making two calls and using just the fastest result ([`Merge()`](https://github.com/per-gron/shuriken/blob/master/src/rs/doc/reference.md#mergepublisher)+[`Take(1)`](https://github.com/per-gron/shuriken/blob/master/src/rs/doc/reference.md#takecount)) etc as well.
 * **Error handling:** With errors, Publishers behave very much like futures/promises do in most languages/implementations. It is basically an async version of `try`/`catch`. Errors are automatically propagated through the chain of operators until they are caught, usually with the `Catch` operator.
 
