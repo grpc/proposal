@@ -365,7 +365,9 @@ A prototype of what is suggested in this RFC can be found [here](https://github.
 
 Implementation of this RFC would involve:
 
-* Prepare the [rs](https://github.com/per-gron/shuriken/tree/master/src/rs) library so that it can be accepted as gRPC code.
+* Prepare the [rs](https://github.com/per-gron/shuriken/tree/master/src/rs) library so that it can be accepted as gRPC code:
+  * Backport to C++11.
+  * Remove usage of `std::exception_ptr` and make it possible to use `grpc::Status` instead.
 * Improve the prototype library so that it can be used for experimental purposes (fix memory leaks etc).
 * Write a protobuf code generator to be able to remove the most expensive C++ templates from the prototype and to make the API nicer.
 * Implement missing features in the prototype: Finish cancellation support, add support for timeouts, metadata etc.
@@ -382,6 +384,5 @@ The author could do much of this work, but it would be awesome to get help.
 * There are certain details in the current gRPC C++ API that seem to be missing: For example, the author could not find how get a signal in the server when a unary RPCs is cancelled.
 * The rs library is a fairly minimal implementation of Reactive Streams. One thing that many Rx libraries have that rs does not is a concept for a Publisher that emits only one value. This would increase the complexity of the library a bit, but it could be worth it for the additional type safety and performance benefits it would bring.
 * [rs](https://github.com/per-gron/shuriken/tree/master/src/rs) breaks Google's code style in the following ways. I am unsure about how exactly to fix this.
-  * **It uses C++14:** This is mostly for ease of implementation; it should be possible to backport to C++11.
   * **It uses rvalue references:** These could mostly be changed to by-value instead, but I have a hard time justifying the performance penalty.
-  * **It uses `std::exception_ptr`:** Reactive Streams has built in error handling that is based on having a generic type for errors. `std::exception_ptr` is C++'s type for that. rs could use something else, but the chances of being able to convince the Reactive Streams people that rs should become the official C++ version of Reactive Streams is likely low without `std::exception_ptr`. Please note that rs never throws, it uses `std::exception_ptr` only as a container type.
+* It is not yet decided where the code for rs should be: Should it be a part of gRPC or a separate library?
