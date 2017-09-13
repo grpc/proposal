@@ -2,9 +2,9 @@ Load Balancing and DNS
 ----
 * Author(s): Mark D. Roth (roth@google.com)
 * Approver: a11r
-* Status: Draft
-* Implemented in:
-* Last updated: 2017-05-16
+* Status: Implemented
+* Implemented in: C-core (Go and Java in progress)
+* Last updated: 2017-09-13
 * Discussion at: https://groups.google.com/d/topic/grpc-io/6be1QsHyZkk/discussion
 
 ## Abstract
