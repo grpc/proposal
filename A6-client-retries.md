@@ -276,6 +276,8 @@ gRPC implementations must expose information about this second case in the RPC m
 
 Since retry throttling is designed to prevent server application overload, and these transparent retries do not make it to the server application layer, they do not count as failures when deciding whether to throttle retry attempts.
 
+Similarly, transparent retries do not count toward the limit of configured retry attempts (`maxRetryAttempts`).
+
 ![State Diagram](A6_graphics/transparent.png)
 
 [Link to SVG file](A6_graphics/transparent.svg)
