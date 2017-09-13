@@ -2,9 +2,9 @@ gRPC Retry Design
 ----
 * Author(s): [Noah Eisen](https://github.com/ncteisen) and [Eric Gribkoff](https://github.com/ericgribkoff)
 * Approver: a11r
-* Status: Draft
+* Status: Ready for Implementation
 * Implemented in:
-* Last updated: 02/10/2017
+* Last updated: 2017-09-13
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/zzHIICbwTZE
 
 Table of Contents
