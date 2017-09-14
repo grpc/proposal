@@ -268,11 +268,15 @@ RPC failures can occur in three distinct ways:
 
 The last case is handled by the configurable retry policy that is the main focus of this document. The first two cases are retried automatically by the gRPC client library, **regardless** of the retry configuration set by the service owner. We are able to do this because these request have not made it to the server application logic, and thus are always safe to retry.
 
-In the first case, in which the RPC never leaves the client, the client library will immediately retry the call once. If this immediate retry fails, then the failure will be treated just like the third bullet point. This means that it will be handled by the configured retry policy.
+In the first case, in which the RPC never leaves the client, the client library can transparently retry until a success occurs, or the RPC's deadline passes.
 
-Similarly, if the RPC reaches the server, but has never been seen by the server application logic (the second bullet), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy.
+If the RPC reaches the gRPC server library, but has never been seen by the server application logic (the second case), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy. This extra caution is needed because this cases involves extra load on the wire.
+
+gRPC implementations must expose information about this second case in the RPC metadata, allowing service owners to see how many RPCs are falling into this category. The header name for exposing this metadata will be `"grpc-transparent-retry-attempts"`. The value for this field will be an integer.
 
 Since retry throttling is designed to prevent server application overload, and these transparent retries do not make it to the server application layer, they do not count as failures when deciding whether to throttle retry attempts.
+
+Similarly, transparent retries do not count toward the limit of configured retry attempts (`maxRetryAttempts`).
 
 ![State Diagram](A6_graphics/transparent.png)
 
@@ -282,7 +286,7 @@ Since retry throttling is designed to prevent server application overload, and t
 
 Both client and server application logic will have access to data about retries via gRPC metadata. Upon seeing an RPC from the client, the server will know if it was a retry, and moreover, it will know the number of previously made attempts. Likewise, the client will receive the number of retry attempts made when receiving the results of an RPC.
 
-The new header names for exposing the metadata will be `"grpc-retry-attempts"` to give clients and servers access to the attempt count. The value for this field will be an integer.
+The header name for exposing the metadata will be `"grpc-retry-attempts"` to give clients and servers access to the attempt count. The value for this field will be an integer.
 
 #### Disabling Retries
 
