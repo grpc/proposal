@@ -143,12 +143,12 @@ functionality can be provided by deriving from `ClientInterceptor` and adding
 unified hooks (e.g. `BeginCall`, `EndCall`) that can be overridden once but
 operate on all types of RPC invocations.
 
-In order to carry satellite data across interceptors and `CallInvoker`s,
-this proposal suggests `CallOptions` to be amended with a `Tag` property
-and a `WithTag` helped method to register a custom arbitrary object, or
-a dictionary of values.  This is the only other piece of client interceptors
-that requires being implemented from within the `Grpc.Core` assembly due
-to `internal` access requirements.
+In order to carry satellite data across interceptors and `CallInvoker`s, this
+proposal suggests `CallOptions` to be amended with an `Items` dictionary and a
+`WithItems` helper method to register a custom dictionary which would hold
+shared state across the interceptors and `CallInvoker`s.  This is the only other
+piece of client interceptors that requires being implemented within the
+`Grpc.Core` since it needs adding a member to `CallOptions` structure.
 
 
 ### Server Interceptors
@@ -196,10 +196,9 @@ async Task ServerStreamingServerHandler<TRequest, TResponse>(TRequest request, I
 async Task DuplexStreamingServerHandler<TRequest, TResponse>(IAsyncStreamReader<TRequest> requestStream, IServerStreamWriter<TResponse> responseStream, ServerCallContext context, DuplexStreamingServerMethod<TRequest, TResponse> next);
 ```
 
-In order to carry satellite data between interceptors and the handler, adding a
-`Tag` property to `ServerCallContext` may be justified.  A more high-level
-canonical derived class from `ServerInterceptor` for providing most common
-functionalities can be done here as well.
+In order to carry satellite data between interceptors and the handler, this
+proposal suggests adding an `Items` dictionary to `ServerCallContext` to hold
+arbitrary state.
 
 ## Rationale
 
