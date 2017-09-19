@@ -2,10 +2,10 @@ Title
 ----
 * Author(s): mehrdada
 * Approver: jtattermusch
-* Status: Draft
+* Status: In Review
 * Implemented in: C#
-* Last updated: September 18, 2017
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: September 19, 2017
+* Discussion at: https://groups.google.com/d/topic/grpc-io/GKcnFC3oxhk/discussion
 
 ## Abstract
 
