@@ -40,7 +40,7 @@ they fall into five separate categories:
 
 This gRFC aims to clarify that the first two are intended for public
 use (the second one to support custom serializers), but that the last
-three should not be used as such. This will be achived by
+three should not be used as such. This will be achieved by
 moving classes and functions in the latter three categories to `namespace
 grpc::internal`.
 
