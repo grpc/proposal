@@ -2,7 +2,7 @@ Title
 ----
 * Author(s): Shaun McCormick (@splittingred)
 * Approver: mehrdada / apolcyn
-* Status: In Review
+* Status: Implemented
 * Implemented in: Ruby
 * Last updated: September 25, 2017
 * Discussion at: https://groups.google.com/d/msg/grpc-io/YRfZe7IH69k/FdSI_CGEAAAJ
