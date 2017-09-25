@@ -2,9 +2,9 @@ Title
 ----
 * Author(s): Shaun McCormick (@splittingred)
 * Approver: mehrdada / apolcyn
-* Status: In Review
+* Status: Implemented
 * Implemented in: Ruby
-* Last updated: Sept 6, 2017
+* Last updated: September 25, 2017
 * Discussion at: https://groups.google.com/d/msg/grpc-io/YRfZe7IH69k/FdSI_CGEAAAJ
 
 ## Abstract
@@ -16,7 +16,7 @@ behave similarly, using a compositional model for interceptors that allow for re
 ## Background
 
 The Ruby language implementation for gRPC does not currently have an interceptor interface, whereas other languages
-(ex: Go, Java) do. Application concerns and extensibility are currently closed in the Ruby implementation, making
+like Go and Java do. Application concerns and extensibility are currently closed in the Ruby implementation, making
 it difficult to extend the libraries for various application needs. 
 
 ### Related Proposals: 
@@ -25,11 +25,16 @@ it difficult to extend the libraries for various application needs.
 
 ## Proposal
 
-Add both server and client interceptors to the Ruby gRPC implementation. Similar to the Golang implementation,
-interceptors are set at the initialization of the client stub and RPC Server. They provide per-call interception
-for gRPC Ruby services and clients.
+Add both server and client interceptors to the Ruby gRPC implementation. Similar to the implementation
+in Go, interceptors are set at the initialization of the client stub and RPC server. They provide per-call
+interception for gRPC Ruby services and clients.
 
 ### Client Interceptors
+
+On the client side, interceptors inherit from `GRPC::ClientInterceptor` class. Interceptor objects are
+then instantiated and registered on the stub upon its initialization.
+
+#### Illustrating Example
 
 This interceptor naively logs outbound requests and the method they call, and injects
 a unique `request_id` metadata value into the metadata sent:
@@ -88,7 +93,7 @@ MyStub.new(
 )
 ```
 
-Interceptors maintain order of insertion by using the FIFO execution order native to Ruby's Array. 
+Interceptors maintain order of insertion by using the FIFO execution order native to Ruby's `Array`. 
 In other words, if multiple interceptors are added, they will intercept in the order they were set in the 
 passed array.
 
@@ -117,6 +122,11 @@ Also, the metadata hash here is able to be updated and will propagate to the ser
 This allows client interceptors to inject metadata for calls dynamically.
 
 ### Server Interceptors
+
+On the server side, interceptors inherit from `GRPC::ServerInterceptor` class and are then
+instantiated and registered on the `RPCServer`.
+
+#### Illustrating Example
 
 This interceptor logs incoming requests and the service and method they call:
 
@@ -181,7 +191,7 @@ This example will produce logs like:
 
 > [GRPC::Internal] (MyService.a_failing_rpc_method) An error occurred in my service!
 
-### Server Interception API
+#### Server Interception API
 
 Server interceptors act as decorators around handlers. Similar to client interceptors, server interceptors
 have four separate methods, one for each request type. 
@@ -221,7 +231,7 @@ requests and makes explicit the differences between each in the arguments.
 
 ## Implementation
 
-Implementation is currently finishing review here: https://github.com/grpc/grpc/pull/12100
+Implemented in: https://github.com/grpc/grpc/pull/12100
 
 ### General Changes
 
