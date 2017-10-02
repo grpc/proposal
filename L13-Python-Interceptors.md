@@ -2,10 +2,10 @@ Title
 ----
 * Author(s): mehrdada
 * Approver: nathanielmanistaatgoogle
-* Status: Draft
+* Status: In Review
 * Implemented in: Python
 * Last updated: October 2, 2017
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/d/msg/grpc-io/7qIzyCPWbUA/1NKGXAQHCgAJ
 
 ## Abstract
 
