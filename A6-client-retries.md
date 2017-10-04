@@ -83,7 +83,7 @@ Retry policies support configuring the maximum number of retries, the parameters
 
 ```
 "retryPolicy": {  
-  "maxRetryAttempts": 3,
+  "maxAttempts": 4,
   "initialBackoffMs": 100,
   "maxBackoffMs": 1000,
   "backoffMultiplier": 2,
@@ -96,9 +96,9 @@ Each of these configuration options is detailed in its own section below.
 
 ##### Maximum Number of Retries
 
-`maxRetryAttempts` specifies the maximum number of retry attempts per original RPC.
+`maxAttempts` specifies the maximum number of RPC attempts, including the original request.
 
-gRPC's call deadlines apply to the entire chain of original RPC and retry attempts. The time limit begins when the original RPC is issued to the gRPC client library. For example, if the specified deadline is 500ms and after 500ms only one retry has been attempted, the call is cancelled even if `maxRetryAttempts` is set to two or greater.
+gRPC's call deadline applies across all attempts for a given RPC. For example, if the specified deadline for an RPC is July 23 9:00:00pm PDT the operation will fail after that time regardless of how many attempts were configured or attempted.
 
 ![State Diagram](A6_graphics/too_many_attempts.png)
 
@@ -124,7 +124,7 @@ Hedged requests are configured with the following parameters:
 
 ```
 "hedgingPolicy": {  
-  "maxRequests": 3,
+  "maxAttempts": 4,
   "hedgingDelayMs": 500,
   "nonFatalStatusCodes": [  
     "UNAVAILABLE",
@@ -134,7 +134,7 @@ Hedged requests are configured with the following parameters:
 }
 ```
 
-When a method has chosen a `hedgingPolicy`, the first RPC is sent immediately, as with a standard non-hedged call. After `hedgingDelayMs` has elapsed without a successful response, the second RPC will be issued. If neither RPC has received a response after `hedgingDelayMs` has elapsed again, a third RPC is sent, and so on, up to `maxRequests`. In the above configuration, after 1ms there would be one outstanding hedged RPC, after 501ms there would be two outstanding hedged RPCs, and after 1001ms there would be three outstanding hedged RPCs. As with retries, gRPC call deadlines apply to the entire chain of hedged requests. The time limit starts when the original RPC is issued, and if the deadline is reached all outstanding hedged requests are aborted.
+When a method has chosen a `hedgingPolicy`, the original RPC is sent immediately, as with a standard non-hedged call. After `hedgingDelayMs` has elapsed without a successful response, the second RPC will be issued. If neither RPC has received a response after `hedgingDelayMs` has elapsed again, a third RPC is sent, and so on, up to `maxAttempts`. In the above configuration, after 1ms there would be one outstanding RPC (the original), after 501ms there would be two outstanding RPCs (the original and the first hedged RPC), after 1001ms there would be three outstanding RPCs, and after 1501ms there would be four. As with retries, gRPC call deadlines apply to the entire chain of hedged requests. Once a deadline has passed, the operation fails regardless of in-flight RPCS, and regardless of the hedging configuration.
 
 The implementation will ensure that the listener returned to the client application forwards its calls (such as `onNext` or `onClose`) to all outstanding hedged RPCs.
 
@@ -178,7 +178,8 @@ Neither retry attempts or hedged RPCs block when `token_count` is less than or e
 The only RPCs that are counted as failures for the throttling policy are RPCs that fail with a status code that qualifies as a [retryable](#retryable-status-codes) or [non-fatal status code](#hedging-policy), or that receive a pushback response indicating not to retry. This avoids conflating server failure with responses to malformed requests (such as the `INVALID_ARGUMENT` status code).
 
 #### Pushback
-Servers may explicitly pushback by setting metadata in their response to the client. The pushback can either tell the client to retry after a given delay or to not retry at all. If the client has already exhausted its `maxRetryAttempts`, the call will not be retried even if the server says to retry after a given delay.
+
+Servers may explicitly pushback by setting metadata in their response to the client. The pushback can either tell the client to retry after a given delay or to not retry at all. If the client has already exhausted its `maxAttempts`, the call will not be retried even if the server says to retry after a given delay.
 
 Pushback may also be received to a hedged request. If the pushback says not to retry, no further hedged requests will be sent. If the pushback says to retry after a given delay, the next hedged request (if any) will be issued after the given delay has elapsed.
 
@@ -186,7 +187,7 @@ A new metadata key, `"grpc-retry-pushback-ms"`, will be added to support server 
 
 #### Limits on Retries and Hedges
 
-Both `maxRetryAttempts` in `retryPolicy` and `maxRequests` in `hedgingPolicy` have, by default, a client-side maximum value of 5. This client-side maximum value can be changed by the client through the use of channel arguments. Service owners may specify a higher value for these parameters, but higher values will be treated as equal to the maximum value by the client implementation. This mitigates security concerns related to the service config being transferred to the client via DNS.
+`maxAttempts` in both `retryPolicy` and `hedgingPolicy` have, by default, a client-side maximum value of 5. This client-side maximum value can be changed by the client through the use of channel arguments. Service owners may specify a higher value for these parameters, but higher values will be treated as equal to the maximum value by the client implementation. This mitigates security concerns related to the service config being transferred to the client via DNS.
 
 #### Summary of Retry and Hedging Logic
 There are five possible types of server responses. The list below enumerates the behavior of retry and hedging policies for each type of response. In all cases, if the maximum number of retry attempts or the maximum number of hedged requests is reached, no further RPCs are sent. Hedged RPCs are returned to the client application when all outstanding and pending requests have either received a response or been canceled.
@@ -276,7 +277,7 @@ gRPC implementations must expose information about this second case in the RPC m
 
 Since retry throttling is designed to prevent server application overload, and these transparent retries do not make it to the server application layer, they do not count as failures when deciding whether to throttle retry attempts.
 
-Similarly, transparent retries do not count toward the limit of configured retry attempts (`maxRetryAttempts`).
+Similarly, transparent retries do not count toward the limit of configured RPC attempts (`maxAttempts`).
 
 ![State Diagram](A6_graphics/transparent.png)
 
@@ -323,11 +324,11 @@ The parameters for throttling retry attempts and hedged RPCs when failures excee
 
 #### Retry Policy
 
-This is an example of a retry policy and its associated configuration. It implements exponential backoff with a maximum of three retry attempts, only retrying RPCs when an `UNAVAILABLE` status code is received.
+This is an example of a retry policy and its associated configuration. It implements exponential backoff with a maximum of four RPC attempts (1 original RPC, and 3 retries), only retrying RPCs when an `UNAVAILABLE` status code is received.
 
 ```
 "retryPolicy": {  
-  "maxRetryAttempts": 3,
+  "maxAttempts": 4,
   "initialBackoffMs": 100,
   "maxBackoffMs": 1000,
   "backoffMultiplier": 2,
@@ -339,11 +340,11 @@ This is an example of a retry policy and its associated configuration. It implem
 
 #### Hedging Policy
 
-The following example of a hedging policy configuration will issue up to three hedged requests for each RPC, spaced out at 500ms intervals, until either: one of the requests receives a valid response, all fail, or the overall call deadline is reached. Analogously to `retryableStatusCodes` for the retry policy, `nonFatalStatusCodes` determines how hedging behaves when a non-OK response is received.
+The following example of a hedging policy configuration will issue an original RPC, then up to three hedged requests for each RPC, spaced out at 500ms intervals, until either: one of the requests receives a valid response, all fail, or the overall call deadline is reached. Analogously to `retryableStatusCodes` for the retry policy, `nonFatalStatusCodes` determines how hedging behaves when a non-OK response is received.
 
 ```
 "hedgingPolicy": {  
-  "maxRequests": 3,
+  "maxAttempts": 4,
   "hedgingDelayMs": 500,
   "nonFatalStatusCodes": [  
     "UNAVAILABLE",
@@ -353,11 +354,11 @@ The following example of a hedging policy configuration will issue up to three h
 }
 ```
 
-The following example issues three hedged requests simultaneously:
+The following example issues four RPCs simultaneously:
 
 ```
 "hedgingPolicy": {  
-  "maxRequests": 3,
+  "maxAttempts": 4,
   "hedgingDelayMs": 0,
   "nonFatalStatusCodes": [  
     "UNAVAILABLE",
@@ -398,10 +399,10 @@ The retry policy is transmitted to the client through the service config mechani
       // RPCs will not be retried or hedged.
 
       "retryPolicy": {
-        // The maximum number of retry attempts, exclusive of the original RPC.
+        // The maximum number of RPC attempts, including the original RPC.
         //
-        // This field is required and must be greater than zero.
-        "maxRetryAttempts": number,
+        // This field is required and must be two or greater.
+        "maxAttempts": number,
 
         // Exponential backoff parameters. The initial retry attempt will occur at
         // random(0, initialBackoffMs). In general, the nth attempt will occur at
@@ -420,16 +421,16 @@ The retry policy is transmitted to the client through the service config mechani
       }
 
       "hedgingPolicy": {
-        // The hedging policy will send up to maxRequests copies of the hedged
-        // RPC. This number is inclusive of all requests, including the original
-        // RPC.
+        // The hedging policy will send up to maxAttempts RPCs.
+        // This number represents the all RPC attempts, including the
+        // original and all the hedged RPCs.
         //
-        // This field is required and must be greater than 1.
-        "maxRequests": number,
+        // This field is required and must be two or greater.
+        "maxAttempts": number,
 
-        // The first RPC will be sent immediately, but the maxRequests-1 subsequent
-        // hedged RPCs will be sent at intervals of every hedgingDelayMs. Set this
-        // to 0 to immediately send all maxRequests RPCs.
+        // The original RPC will be sent immediately, but the maxAttempts-1 
+        // subsequent hedged RPCs will be sent at intervals of every hedgingDelayMs. 
+        // Set this to 0 to immediately send all maxAttempts RPCs.
         "hedgingDelayMs": number,
 
         // The set of status codes which indicate other hedged RPCs may still
