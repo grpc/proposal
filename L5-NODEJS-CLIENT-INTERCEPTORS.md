@@ -157,7 +157,8 @@ to intercept any inbound operations.
 interceptor will fire on the inbound operations implemented in the new listener.
 3) Store the listener to make direct inbound calls on later. This effectively short-circuits the interceptor stack.
 An example of an interceptor using this pattern to provide client-side caching is included below in the Examples
-section.
+section. Short-circuiting a request in this way will skip interceptors which have not yet fired, but will fire the
+listeners on any 'earlier' interceptors in the stack.
 
 *Do not modify the listener passed in. Either pass it along unmodified or call methods on it to short-circuit the
 interceptor stack.*
@@ -217,6 +218,21 @@ var status = (new StatusBuilder())
 **To intercept errors, implement the `onReceiveStatus` method and test for `status.code !== grpc.status.OK`.**
 
 **To intercept trailers, examine `status.metadata` in the `onReceiveStatus` method.**
+
+#### Internal Errors and Exceptions
+
+Exceptions are not handled by the interceptor framework, we expect
+interceptor authors to either handle the exceptions their interceptors
+can throw or assume the Node process will crash on exceptions. This is in
+accordance with the [Joyent guidance](https://www.joyent.com/node-js/production/design/errors)
+to only catch exceptions which are known to be operational errors.
+
+In the case of an error during the execution of an interceptor,
+interceptor authors have the following options:
+1) Short-circuiting the call and returning a gRPC error to the client's consumer.
+2) Throwing an exception which the client's consumer will have to catch
+or crash on.
+3) Doing nothing and continuing with the call.
 
 
 ### Examples
