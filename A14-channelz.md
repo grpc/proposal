@@ -1,11 +1,11 @@
 gRPC Channelz
 ====
-* Author(s): Carl Mastrngelo
+* Author(s): Carl Mastrangelo
 * Approver: a11r
 * Status: In Review
 * Implemented in: 
 * Last updated: 10/11/17
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/5IYOMVm0Ufs
 
 Abstract
 ----
