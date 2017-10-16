@@ -4,7 +4,7 @@ Title
 * Approver: jtattermusch
 * Status: In Review
 * Implemented in: C#
-* Last updated: September 19, 2017
+* Last updated: October 16, 2017
 * Discussion at: https://groups.google.com/d/topic/grpc-io/GKcnFC3oxhk/discussion
 
 ## Abstract
@@ -24,10 +24,13 @@ this has some limitations in composition and the ability to decouple
 functionality was basically non-existent.
 
 
-### Related Proposals: 
+### Related Proposals:
 
 * [Ruby Client and Server
   Interceptors](https://github.com/grpc/proposal/pull/34) proposal
+* [Node Client Interceptors](https://github.com/grpc/proposal/pull/14) proposal
+* [Python Client and Server
+  Interceptors](https://github.com/grpc/proposal/pull/39) proposal
 
 ## Proposal
 
