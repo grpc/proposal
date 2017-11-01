@@ -84,8 +84,8 @@ Retry policies support configuring the maximum number of retries, the parameters
 ```
 "retryPolicy": {  
   "maxAttempts": 4,
-  "initialBackoffMs": 100,
-  "maxBackoffMs": 1000,
+  "initialBackoff": ".1s",
+  "maxBackoff": "1s",
   "backoffMultiplier": 2,
   "retryableStatusCodes": [  
     "UNAVAILABLE"
@@ -106,9 +106,9 @@ gRPC's call deadline applies across all attempts for a given RPC. For example, i
 
 ##### Exponential Backoff
 
-The `initialBackoffMs`, `maxBackoffMs`, and `backoffMultiplier` parameters determine the randomized delay before retry attempts.
+The `initialBackoff`, `maxBackoff`, and `backoffMultiplier` parameters determine the randomized delay before retry attempts.
 
-The initial retry attempt will occur at `random(0, initialBackoffMs)`. In general, the `n`-th attempt will occur at `random(0, min(initialBackoffMs*backoffMultiplier**(n-1), maxBackoffMs))`.
+The initial retry attempt will occur at `random(0, initialBackoff)`. In general, the `n`-th attempt will occur at `random(0, min(initialBackoff*backoffMultiplier**(n-1), maxBackoff))`.
 
 ##### Retryable Status Codes
 
@@ -125,7 +125,7 @@ Hedged requests are configured with the following parameters:
 ```
 "hedgingPolicy": {  
   "maxAttempts": 4,
-  "hedgingDelayMs": 500,
+  "hedgingDelay": ".5s",
   "nonFatalStatusCodes": [  
     "UNAVAILABLE",
     "INTERNAL",
@@ -134,7 +134,7 @@ Hedged requests are configured with the following parameters:
 }
 ```
 
-When a method has chosen a `hedgingPolicy`, the original RPC is sent immediately, as with a standard non-hedged call. After `hedgingDelayMs` has elapsed without a successful response, the second RPC will be issued. If neither RPC has received a response after `hedgingDelayMs` has elapsed again, a third RPC is sent, and so on, up to `maxAttempts`. In the above configuration, after 1ms there would be one outstanding RPC (the original), after 501ms there would be two outstanding RPCs (the original and the first hedged RPC), after 1001ms there would be three outstanding RPCs, and after 1501ms there would be four. As with retries, gRPC call deadlines apply to the entire chain of hedged requests. Once a deadline has passed, the operation fails regardless of in-flight RPCS, and regardless of the hedging configuration.
+When a method has chosen a `hedgingPolicy`, the original RPC is sent immediately, as with a standard non-hedged call. After `hedgingDelay` has elapsed without a successful response, the second RPC will be issued. If neither RPC has received a response after `hedgingDelay` has elapsed again, a third RPC is sent, and so on, up to `maxAttempts`. In the above configuration, after 1ms there would be one outstanding RPC (the original), after 501ms there would be two outstanding RPCs (the original and the first hedged RPC), after 1001ms there would be three outstanding RPCs, and after 1501ms there would be four. As with retries, gRPC call deadlines apply to the entire chain of hedged requests. Once a deadline has passed, the operation fails regardless of in-flight RPCS, and regardless of the hedging configuration.
 
 The implementation will ensure that the listener returned to the client application forwards its calls (such as `onNext` or `onClose`) to all outstanding hedged RPCs.
 
@@ -183,7 +183,7 @@ Servers may explicitly pushback by setting metadata in their response to the cli
 
 Pushback may also be received to a hedged request. If the pushback says not to retry, no further hedged requests will be sent. If the pushback says to retry after a given delay, the next hedged request (if any) will be issued after the given delay has elapsed.
 
-A new metadata key, `"grpc-retry-pushback-ms"`, will be added to support server pushback. The value is to be an integer with no unnecessary leading zeros that represents how many milliseconds to wait before sending a retry. If the value for pushback is set to -1, then it will be seen as the server asking the client not to retry at all.
+A new metadata key, `"grpc-retry-pushback-ms"`, will be added to support server pushback. The value is to be an ASCII encoded signed 32-bit integer with no unnecessary leading zeros that represents how many milliseconds to wait before sending a retry. If the value for pushback is negative or unparseble, then it will be seen as the server asking the client not to retry at all.
 
 #### Limits on Retries and Hedges
 
@@ -198,7 +198,7 @@ There are five possible types of server responses. The list below enumerates the
 
 2. Retryable/Non-Fatal Status Code
     1. Retry policy: Retry according to policy
-    2. Hedging policy: Immediately send next scheduled hedged request, if any. Subsequent hedged requests will resume at `hedgingDelayMs`
+    2. Hedging policy: Immediately send next scheduled hedged request, if any. Subsequent hedged requests will resume at `hedgingDelay`
 
 3. Fatal Status Code
     1. Retry policy: Don't retry, return failure to client application
@@ -210,7 +210,7 @@ There are five possible types of server responses. The list below enumerates the
 
 5. Pushback: Retry in *n* ms
     1. Retry policy: Retry in *n* ms. If this attempt also fails, retry delay will reset to initial backoff for the following retry (if applicable)
-    2. Hedging policy: Send next hedged request in *n* ms. Subsequent hedged requests will resume at `n + hedgingDelayMs`
+    2. Hedging policy: Send next hedged request in *n* ms. Subsequent hedged requests will resume at `n + hedgingDelay`
 
 ![State Diagram](A6_graphics/StateDiagram.png)
 
@@ -287,7 +287,7 @@ Similarly, transparent retries do not count toward the limit of configured RPC a
 
 Both client and server application logic will have access to data about retries via gRPC metadata. Upon seeing an RPC from the client, the server will know if it was a retry, and moreover, it will know the number of previously made attempts. Likewise, the client will receive the number of retry attempts made when receiving the results of an RPC.
 
-The header name for exposing the metadata will be `"grpc-retry-attempts"` to give clients and servers access to the attempt count. The value for this field will be an integer.
+The header name for exposing the metadata will be `"grpc-previous-rpc-attempts"` to give clients and servers access to the attempt count. This value represents the number of preceding retry attempts. Thus, it will not be present on the first RPC, will be 1 for the second RPC, and so on. The value for this field will be an integer.
 
 #### Disabling Retries
 
@@ -329,8 +329,8 @@ This is an example of a retry policy and its associated configuration. It implem
 ```
 "retryPolicy": {  
   "maxAttempts": 4,
-  "initialBackoffMs": 100,
-  "maxBackoffMs": 1000,
+  "initialBackoff": ".1s",
+  "maxBackoff": "1s",
   "backoffMultiplier": 2,
   "retryableStatusCodes": [  
     "UNAVAILABLE"
@@ -345,7 +345,7 @@ The following example of a hedging policy configuration will issue an original R
 ```
 "hedgingPolicy": {  
   "maxAttempts": 4,
-  "hedgingDelayMs": 500,
+  "hedgingDelay": ".5s",
   "nonFatalStatusCodes": [  
     "UNAVAILABLE",
     "INTERNAL",
@@ -359,7 +359,7 @@ The following example issues four RPCs simultaneously:
 ```
 "hedgingPolicy": {  
   "maxAttempts": 4,
-  "hedgingDelayMs": 0,
+  "hedgingDelay": "0s",
   "nonFatalStatusCodes": [  
     "UNAVAILABLE",
     "INTERNAL",
@@ -405,11 +405,15 @@ The retry policy is transmitted to the client through the service config mechani
         "maxAttempts": number,
 
         // Exponential backoff parameters. The initial retry attempt will occur at
-        // random(0, initialBackoffMs). In general, the nth attempt will occur at
+        // random(0, initialBackoff). In general, the nth attempt will occur at
         // random(0,
-        //   min(initialBackoffMs*backoffMultiplier**(n-1), maxBackoffMs)).
-        "initialBackoffMs": number,  // Required. Must be greater than zero.
-        "maxBackoffMs": number,  // Required. Must be greater than zero.
+        //   min(initialBackoff*backoffMultiplier**(n-1), maxBackoff)).
+        // The following two fields take their form from:
+        // https://developers.google.com/protocol-buffers/docs/proto3#json
+        // They are representations of the proto3 Duration type.
+        // They both must be greater than zero.
+        "initialBackoff": string,  // Required. Long decimal with "s" appended
+        "maxBackoff": string,  // Required. Long decimal with "s" appended
         "backoffMultiplier": number  // Required. Must be greater than zero.
 
         // The set of status codes which may be retried.
@@ -429,9 +433,12 @@ The retry policy is transmitted to the client through the service config mechani
         "maxAttempts": number,
 
         // The original RPC will be sent immediately, but the maxAttempts-1 
-        // subsequent hedged RPCs will be sent at intervals of every hedgingDelayMs. 
-        // Set this to 0 to immediately send all maxAttempts RPCs.
-        "hedgingDelayMs": number,
+        // subsequent hedged RPCs will be sent at intervals of every hedgingDelay. 
+        // Set this to "0s", or leave unset, to immediately send all maxAttempts RPCs.
+        // hedgingDelay takes its form from:
+        // https://developers.google.com/protocol-buffers/docs/proto3#json
+        // It is a representation of the proto3 Duration type.
+        "hedgingDelay": string,
 
         // The set of status codes which indicate other hedged RPCs may still
         // succeed. If a non-fatal status code is returned by the server, hedged
