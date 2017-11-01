@@ -4,7 +4,7 @@ gRPC Channelz
 * Approver: a11r
 * Status: In Review
 * Implemented in: 
-* Last updated: 10/11/17
+* Last updated: 11/1/17
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/5IYOMVm0Ufs
 
 Abstract
@@ -29,19 +29,23 @@ and connections that process currently has.  In a process, there are multiple
 clients and servers.  To avoid confusion, a strict terminology will be used:
 
 1.  A "channel" represents an abstraction that can start and complete RPCs.  A
-    channel may have subchannels which are themselves also channels.  A
-    channel is a directed acyclic graph (DAG).  Only leaf channels may have
-    sockets.  Interior channels may only have subchannels.
-2.  A "server" represents the entry point for RPCs.  A server may have one or
-    more listening sockets, and has a collection of "services".  Unlike clients,
-    servers are not hierarchical.  A server may only have sockets.
-3.  An "endpoint" is either a channel or a server.  The local and remote
+    channel may have channels and subchannels.  A channel is a directed 
+    acyclic graph (DAG).  Only leaf channels may have
+    sockets.  Interior channels may only have channels and subchannels.
+2.  A "subchannel" represents an abstraction that is load balanced over by an 
+    owning channel. A subchannel may have channels and subchannels.  A 
+    subchannel is a directed acyclic graph (DAG).  Only leaf subchannels may 
+    have sockets.  Interior subchannels may only have channels and subchannels.
+3.  A "server" represents the entry point for RPCs.  A server may have one or
+    more listening sockets, and has a collection of "services".  Unlike 
+    clients, servers are not hierarchical.  A server may only have sockets.
+4.  An "endpoint" is either a channel or a server.  The local and remote
     endpoints may exist within the same process.
-4.  A "socket" is roughly equivalent to a file descriptor.  A socket may be
+5.  A "socket" is roughly equivalent to a file descriptor.  A socket may be
     connected or unconnected (such as a listen socket).
-5.  A "connection", sometimes called a transport, represents the link between
+6.  A "connection", sometimes called a transport, represents the link between
     two endpoints.  It is included here for completeness.
-6.  A "client" is a role rather than an abstraction.  A client is the initiator
+7.  A "client" is a role rather than an abstraction.  A client is the initiator
     of connections and RPCs, via its channels.  A client has channels, which it
     uses to send RPCs. This term is used less commonly.
 
@@ -71,23 +75,34 @@ The data representation of each ref:
 ![message ref structure][message ref structure]
 
 
-## Channels
+## Channels and Subchannels
 
-Channels are hierarchical organized into a tree structure.  A channel may have
-any number of "sub" channels.  Each subchannel is itself a channel and can also
-have subchannels.  Each channel may also have any number of sockets.   However,
-a given subchannel cannot have heterogeneous children.  That is, a channel may
-have subchannels or sockets, but not both.
+Channels and Subchannels are hierarchically organized into a DAG structure.  A
+channel may have any number of channels and subchannels.  Each subchannel can
+also have channels and subchannels.  Each channel and subchannel may also have
+any number of sockets.   However, a given channel or subchannel cannot have
+heterogeneous children.  That is, a channel or subchannel may have
+channels and subchannels, or  have sockets, but not both.
+
+A subchannel represents a channel that is load balanced over.  When a channel
+has both subchannels and channels, the channels are not delegated to by the 
+superchannel.  Channels and Subchannels will be used interchangeably unless
+explicitly noted.
 
 Each channel has a ChannelRef reference which includes the channel id and an
 optional name.  The name is included for human consumption.  There are no
 restrictions on the name but it should be limited to a reasonable length.
 
+Each subchannel has a SubchannelRef reference which includes the subchannel id
+and an optional name.  The name is included for human consumption.  There are 
+no restrictions on the name but it should be limited to a reasonable length.
+
 ![channel hierarchy 1][channel hierarchy 1]
 
 ### Channel Data
 
-Channels include data about themselves, notably their initial parameters and their call stats.  Currently the data includes:
+Channels include data about themselves, notably their initial parameters and 
+their call stats.  Currently the data includes:
 
 * Channel state ( See: connectivity-semantics-and-api.md )
 * Channel target, if applicable.  Subchannels may not have a target
@@ -349,6 +364,7 @@ Channelz exposes four methods to access channelz data:
 * GetTopChannels returns the root channels for channel trees
 * GetServers returns the servers in the system
 * GetChannel returns info about a specific channel
+* GetSubchannel returns info about a specific subchannel
 * GetSocket returns info about a socket
 
 ## Continuation Tokens
@@ -630,18 +646,48 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-// Channel is a logical grouping of subchannels and sockets.
+// Channel is a logical grouping of channels, subchannels and sockets.
 message Channel {
   // The identifier for this channel.
   ChannelRef ref = 1;
   // Data specific to this channel.
   ChannelData data = 2;
-  ChannelTrace trace = 3;
-  // At most one of 'subchannel_ref' and 'socket' is set.
+  // At most one of 'channel_ref+subchannel_ref' and 'socket' is set.
+  
+  // There are no ordering guarantees on the order of channel refs.
+  // There may not be cycles in the ref graph.
+  // A channel ref may be present in more than one channel or subchannel.
+  repeated ChannelRef channel_ref = 3;
+  
+  // At most one of 'channel_ref+subchannel_ref' and 'socket' is set.
   // There are no ordering guarantees on the order of subchannel refs.
-  // There may not be cycles in the subchannel_ref graph.
-  // A subchannel ref may be present in more than one channel's subchannels.
-  repeated ChannelRef subchannel_ref = 4;
+  // There may not be cycles in the ref graph.
+  // A sub channel ref may be present in more than one channel or subchannel.
+  repeated SubchannelRef subchannel_ref = 4;
+  
+  // There are no ordering guarantees on the order of sockets.
+  repeated SocketRef socket = 5;
+}
+
+// Channel is a logical grouping of channels, subchannels and sockets.
+message Subchannel {
+  // The identifier for this channel.
+  SubchannelRef ref = 1;
+  // Data specific to this channel.
+  ChannelData data = 2;
+  // At most one of 'channel_ref+subchannel_ref' and 'socket' is set.
+  
+  // There are no ordering guarantees on the order of channel refs.
+  // There may not be cycles in the ref graph.
+  // A channel ref may be present in more than one channel or subchannel.
+  repeated ChannelRef channel_ref = 3;
+  
+  // At most one of 'channel_ref+subchannel_ref' and 'socket' is set.
+  // There are no ordering guarantees on the order of subchannel refs.
+  // There may not be cycles in the ref graph.
+  // A sub channel ref may be present in more than one channel or subchannel.
+  repeated SubchannelRef subchannel_ref = 4;
+  
   // There are no ordering guarantees on the order of sockets.
   repeated SocketRef socket = 5;
 }
@@ -659,16 +705,18 @@ message ChannelData {
 
   // The target this channel originally tried to connect to.  May be absent
   string target = 2;
+  
+  ChannelTrace trace = 3;
 
   // The number of calls started on the channel
-  int64 calls_started = 3;
+  int64 calls_started = 4;
   // The number of calls that have completed with an OK status
-  int64 calls_succeeded = 4;
+  int64 calls_succeeded = 5;
   // The number of calls that have a completed with a non-OK status
-  int64 calls_failed = 5;
+  int64 calls_failed = 6;
 
   // The last time a call was started on the channel.
-  google.protobuf.Timestamp last_call_started_timestamp = 6;
+  google.protobuf.Timestamp last_call_started_timestamp = 7;
 }
 
 message ChannelTrace {
@@ -684,12 +732,21 @@ message ChannelRef {
   reserved 3, 4, 5, 6;
 }
 
+message SubchannelRef {
+  // The globally unique id for this subchannel.  Must be a positive number.
+  int64 subchannel_id = 7;
+  // An optional name associated with the subchannel.
+  string name = 8;
+  // Intentionally don't use field numbers from other refs.
+  reserved 1, 2, 3, 4, 5, 6;
+}
+
 message SocketRef {
   int64 socket_id = 3;
   // An optional name associated with the socket.
   string name = 4;
   // Intentionally don't use field numbers from other refs.
-  reserved 1, 2, 5, 6;
+  reserved 1, 2, 5, 6, 7, 8;
 }
 
 message ServerRef {
@@ -698,32 +755,30 @@ message ServerRef {
   // An optional name associated with the server.
   string name = 6;
   // Intentionally don't use field numbers from other refs.
-  reserved 1, 2, 3, 4;
+  reserved 1, 2, 3, 4, 7, 8;
 }
 
 message Server {
   ServerRef ref = 1;
   ServerData data = 2;
-  ServerChannelTrace trace = 3;
 
-  // The list of all connected sockets refs, possibly including those in
-  // listen_socket.  There are no ordering guarantees.
-  repeated SocketRef socket = 4;
   // The sockets that the server is listening on.  There are no ordering
   // guarantees.
-  repeated SocketRef listen_socket = 5;
+  repeated SocketRef listen_socket = 3;
 }
 
 message ServerData {
+  ServerChannelTrace trace = 1;
+  
   // The number of incoming calls started on the server
-  int64 calls_started = 1;
+  int64 calls_started = 2;
   // The number of incoming calls that have completed with an OK status
-  int64 calls_succeeded = 2;
+  int64 calls_succeeded = 3;
   // The number of incoming calls that have a completed with a non-OK status
-  int64 calls_failed = 3;
+  int64 calls_failed = 4;
 
   // The last time a call was started on the server.
-  google.protobuf.Timestamp last_call_started_timestamp = 4;
+  google.protobuf.Timestamp last_call_started_timestamp = 5;
 }
 
 message ServerChannelTrace {
@@ -899,12 +954,16 @@ message SocketOptionTcpInfo {
 
 service Channelz {
   // Gets all root channels (e.g. channels the application has directly
-  // created). This does not include "subchannels".
+  // created). This does not include subchannels nor non-top level channels.
   rpc ListRootChannels(ListRootChannelsRequest) returns (ListRootChannelsResponse);
   // Gets all servers that exist in the process.
   rpc ListServers(ListServersRequest) returns (ListServersResponse);
-  // Returns a single Channel (or Subchannel), or else a NOT_FOUND code.
+  // Gets all server sockets servers that exist in the process.
+  rpc ListServerSockets(ListServerSocketsRequest) returns (ListServerSocketsResponse);
+  // Returns a single Channel, or else a NOT_FOUND code.
   rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
+  // Returns a single Subchannel, or else a NOT_FOUND code.
+  rpc GetSubchannel(GetSubchannelRequest) returns (GetSubchannelResponse);
   // Returns a single Socket or else a NOT_FOUND code.
   rpc GetSocket(GetSocketRequest) returns (GetSocketResponse);
 }
@@ -921,6 +980,23 @@ message ListServersResponse {
   repeated Server server = 1;
   // If set, indicates that the list of servers is the final list.  Requesting
   // more servers will only return more if they are created after this RPC
+  // completes.
+  bool end = 2;
+}
+
+message ListServerSocketsRequest {
+  int64 server_id = 1;
+  // start_socket_id indicates that only sockets at or above this id should be
+  // included in the results.
+  int64 start_socket_id = 2;
+}
+
+message ListServerSocketsResponse {
+  // list of socket refs that the connection detail service knows about.  Sorted in
+  // ascending socket_id order.
+  repeated SocketRef socket_ref = 1;
+  // If set, indicates that the list of sockets is the final list.  Requesting
+  // more sockets will only return more if they are created after this RPC
   // completes.
   bool end = 2;
 }
@@ -947,6 +1023,14 @@ message GetChannelRequest {
 
 message GetChannelResponse {
   Channel channel = 1;
+}
+
+message GetSubchannelRequest {
+  int64 subchannel_id = 1;
+}
+
+message GetSubchannelResponse {
+  Subchannel subchannel = 1;
 }
 
 message GetSocketRequest {
