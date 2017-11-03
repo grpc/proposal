@@ -24,9 +24,10 @@ this useful service.
 
 # Channelz Service
 
-The Channelz Service, hereafter channelz, reports all known channels, servers,
-and connections that process currently has.  In a process, there are multiple
-clients and servers.  To avoid confusion, a strict terminology will be used:
+The Channelz Service, hereafter channelz, reports all known channels, 
+subchannels, servers, and connections that process currently has.  In a process,
+there are multiple clients and servers.  To avoid confusion, a strict
+terminology will be used:
 
 1.  A "channel" represents an abstraction that can start and complete RPCs.  A
     channel may have channels and subchannels.  A channel is a directed 
@@ -36,16 +37,19 @@ clients and servers.  To avoid confusion, a strict terminology will be used:
     owning channel. A subchannel may have channels and subchannels.  A 
     subchannel is a directed acyclic graph (DAG).  Only leaf subchannels may 
     have sockets.  Interior subchannels may only have channels and subchannels.
-3.  A "server" represents the entry point for RPCs.  A server may have one or
+3.  A descendent channel is either a channel or subchannel that is logically 
+    owned by a higher level channel.  Typically these are subchannels, but may
+    be channels themselves. 
+4.  A "server" represents the entry point for RPCs.  A server may have one or
     more listening sockets, and has a collection of "services".  Unlike 
     clients, servers are not hierarchical.  A server may only have sockets.
-4.  An "endpoint" is either a channel or a server.  The local and remote
+5.  An "endpoint" is either a channel or a server.  The local and remote
     endpoints may exist within the same process.
-5.  A "socket" is roughly equivalent to a file descriptor.  A socket may be
+6.  A "socket" is roughly equivalent to a file descriptor.  A socket may be
     connected or unconnected (such as a listen socket).
-6.  A "connection", sometimes called a transport, represents the link between
+7.  A "connection", sometimes called a transport, represents the link between
     two endpoints.  It is included here for completeness.
-7.  A "client" is a role rather than an abstraction.  A client is the initiator
+8.  A "client" is a role rather than an abstraction.  A client is the initiator
     of connections and RPCs, via its channels.  A client has channels, which it
     uses to send RPCs. This term is used less commonly.
 
@@ -54,8 +58,8 @@ clients and servers.  To avoid confusion, a strict terminology will be used:
 
 The channelz service exposes internal implementation details in a public way.
 Since different implementations have different internal details, the channelz
-data is lightly abstracted.  There are three top level entities exposed:
-Channels, Servers, and Sockets.
+data is lightly abstracted.  There are four top level entities exposed:
+Channels, Subchannels, Servers, and Sockets.
 
 Each entity is uniquely identified by a positive integer, called the id.  This
 id must be distinct and may not be reused over the lifetime of the process for
@@ -67,8 +71,8 @@ Since protobuf treats the number 0 as the default value, it is unused as an id.
 Along with the id, a human readable name can optionally be associated with each
 the id.  The id and the name together form a "reference".  Thus, Channels,
 Servers and Sockets are identified by their respective references.  These
-references are abbreviated ChannelRefs, ServerRefs, and SocketRefs.  Note that
-only the id is necessary to query channelz.
+references are abbreviated ChannelRefs, SubchannelRefs, ServerRefs, and 
+SocketRefs.  Note that only the id is necessary to query channelz.
 
 The data representation of each ref:
 
@@ -77,17 +81,17 @@ The data representation of each ref:
 
 ## Channels and Subchannels
 
-Channels and Subchannels are hierarchically organized into a DAG structure.  A
-channel may have any number of channels and subchannels.  Each subchannel can
-also have channels and subchannels.  Each channel and subchannel may also have
-any number of sockets.   However, a given channel or subchannel cannot have
-heterogeneous children.  That is, a channel or subchannel may have
-channels and subchannels, or  have sockets, but not both.
+Channels and Subchannels, or descendent channel, are hierarchically organized
+into a DAG structure.  The union of all channels and subchannels may not contain
+a cycle.  A descendent channel may have any number of descendent channels. Each
+descendent channel may also have any number of sockets.   However, a given 
+descendent channel cannot have heterogeneous children.  That is, a channel or
+subchannel may have descendent channels, or have sockets, but not both.
 
-A subchannel represents a channel that is load balanced over.  When a channel
+A subchannel represents a channel that is load-balanced over.  When a channel
 has both subchannels and channels, the channels are not delegated to by the 
-superchannel.  Channels and Subchannels will be used interchangeably unless
-explicitly noted.
+superchannel.  An example would be a channel that is used by the ancestor 
+channel, but does not handle RPCs given by the application.
 
 Each channel has a ChannelRef reference which includes the channel id and an
 optional name.  The name is included for human consumption.  There are no
@@ -101,22 +105,23 @@ no restrictions on the name but it should be limited to a reasonable length.
 
 ### Channel Data
 
-Channels include data about themselves, notably their initial parameters and 
-their call stats.  Currently the data includes:
+Channels and Subchannels include data about themselves, notably their initial
+parameters and their call stats.  Currently the data includes:
 
 * Channel state ( See: connectivity-semantics-and-api.md )
-* Channel target, if applicable.  Subchannels may not have a target
+* Channel trace
+* Channel target, if applicable.
 * Number of calls starts, succeeded, and failed.  Note this is slightly
   different than the number of streams.  See the Socket Data section.
 * Time of the last call started.
 
 In general, each piece of data included is specific to the channel itself and
-NOT of its subchannels.  This is to say that an ancestor channel is not an
-aggregator for descendent channels.  The target of a channel may be different
-from that of its parent, or not present at all.  The channel state may be
-different from the ancestor channel state.   The number of calls started,
-succeeded, and failed should reflect if calls were specifically tied to the
-channel.
+NOT of its descendent channels.  This is to say that an ancestor channel
+is not an aggregator for descendent channels.  The target of a channel or
+subchannel may be different from that of its parent, or not present at all.  The
+channel state may be different from the ancestor channel state.   The number of
+calls started, succeeded, and failed should reflect if calls were specifically
+tied to the channel.
 
 The number of calls started, succeeded, and failed on a channel gives insight
 into the activity of the channel.  Subtracting the number of failed and
@@ -126,36 +131,36 @@ time.  The ratio between succeeded calls and failed calls gives a rough
 estimation of how healthy the channel has been.  The last call started timestamp
 indicates how close the channel is towards entering the idle state.
 
-### Channel Trace
+#### Channel Trace
 
-Channels also have a concept of a channel trace.  This includes interesting
-events that have happened on the channel recently.  Example events include
-entering different channel states, name resolution, load balancing changes,
-unreachability, etc.  As mentioned earlier, this tracing info is specific to the
-channel, and not an aggregation of subchannel traces.
+Channels and Subchannels also have a concept of a channel trace.  This includes
+interesting events that have happened on the channel recently.  Example events
+include entering different channel states, name resolution, load balancing
+changes, unreachability, etc.  As mentioned earlier, this tracing info is
+specific to the channel, and not an aggregation of descendent channel traces.
 
-The channel traces may include ids pointing to channels outside of the current
-channel tree.  Since channel traces use the same ids as the channels themselves,
-this allows a user to query for more information about a channel given its
-trace.  For example, the trace may mention that name resolution failed on a
-different channel outside of the tree.
+The channel traces may include ids pointing to channels and subchannels outside
+of the current DAG.  Since channel traces use the same ids as the channels 
+themselves, this allows a user to query for more information about a channel 
+given its trace.  For example, the trace may mention that name resolution 
+failed on a different channel outside of the tree.
 
 ### Subchannels
 
-To keep the size of the Channel message down, only the ChannelRefs of
-subchannels will be included in the channel.  These refs can be used to walk the
-channel hierarchy.  Subchannels are not included in the top level channels, and
-thus do not need to be paginated.  A user may query for all the subchannels in
-parallel. As mentioned above, if there are any Sockets on the channel, there
-will be no subchannels.   This invariant exists to simplify the tree structure,
-and more closely match the known implementations of gRPC.
+To keep the size of the Channel message down, only the ChannelRefs and 
+SubchannelRefs will be included in the channel or subchannel.  These refs can
+be used to walk the hierarchy.  Subchannels are not included in the top level
+channels, and thus do not need to be paginated.  A user may query for all the
+subchannels in parallel. As mentioned above, if there are any Sockets on the 
+channel, there will be no descendent channels.   This invariant exists to 
+simplify the tree structure, and more closely match the known implementations of
+gRPC.
 
-Subchannels may be only tangentially related the channel tree.  The channel tree
-represents a "has-a" rather than a "is-a" relationship.  In the common case,
-there will be many subchannels.  These subchannels will be used to balance RPCs
-for a given target.
+The channel DAG represents a "has-a" rather than a "is-a" relationship.  In the
+common case, there will be many subchannels.  These subchannels will be used to
+balance RPCs for a given target.
 
-Alternatively, a given channel’s load balancer may itself make RPCs to gather
+Alternatively, a given channel's load balancer may itself make RPCs to gather
 data about which subchannels to prefer.  Thus, the load balancing subchannels
 are owned by a parent, but do not share its target.
 
@@ -170,13 +175,13 @@ gRPC implementations.
 
 ### Sockets
 
-Like subchannels, only SocketRefs are included on a channel.  This is done for
-two main reasons.  The size of the socket message may be large, and there may be
-many sockets for a given channel.  Secondly, it can be CPU intensive to fill in
-the socket information, even though the information might not be desired.  As
-mentioned in the section above, if there are any subchannels, there will be no
-sockets.  This invariant exists to simplify the tree structure, and more closely
-match the known implementations of gRPC.
+Like channels and subchannels, only SocketRefs are included on a channel.  This 
+is done for two main reasons.  The size of the socket message may be large, and
+there may be many sockets for a given channel.  Secondly, it can be CPU 
+intensive to fill in the socket information, even though the information might 
+not be desired.  As mentioned in the section above, if there are any descendent 
+channels, there will be no sockets.  This invariant exists to simplify the
+DAG structure, and more closely match the known implementations of gRPC.
 
 ![channel hierarchy 3][channel hierarchy 3]
 
@@ -187,7 +192,7 @@ Servers are conceptually simpler than channels, and thus do not have the same
 hierarchical model.  There is no need for load balancing or name resolution.
 Each "subchannel" is tied to a single socket, so the subchannel and socket are
 flattened into just the socket.  Also, there are traditionally very few servers
-running in a given process, and thus don’t need a more complex model to express
+running in a given process, and thus don't need a more complex model to express
 their structure.
 
 A server is an entry point for RPCs to be handled by a set of services.  The
@@ -195,8 +200,8 @@ group of services roughly defines a server, though services can be shared
 between servers.  A server may be listening on any number of ports, though
 commonly there is only one.  Each server has a ServerRef.  Like a ChannelRef, it
 has a unique id and an optional name.   The id is unique, even among the ids of
-channels and sockets.  This makes it impossible to accidentally refer to the
-wrong entity type when querying channelz.
+channels, subchannels, and sockets.  This makes it impossible to accidentally 
+refer to the wrong entity type when querying channelz.
 
 Note that even with no Servers present, channelz data is still collected.  If in
 the future a server is started, it can expose the channelz service which
@@ -303,7 +308,7 @@ slowdown.  The amount of window granted by each endpoint to each other is a
 constantly evolving number, which each endpoint sending chunks of window.  For
 the particular flow control windows in the socket data, they are the windows as
 defined by the underlying transport.  For example, HTTP/2 transports report the
-connection level flow control window.  Implementations that don’t support flow
+connection level flow control window.  Implementations that don't support flow
 control may set this to the max value, implying that there is no limitation.
 Note that only the connection level flow control window is reported, rather than
 the stream level.  TCP level flow and congestion control counters are exposed
@@ -380,7 +385,7 @@ that the user sends to traverse the entities.
 
 This mechanism provides a reasonable expectation of visiting each entity.  As
 entities are created and destroyed, their ids will remain stable.  Since ids are
-never reused existing entities can’t accidentally get skipped.  New entities may
+never reused existing entities can't accidentally get skipped.  New entities may
 be added before the current cursor, but all entities that existed at the time
 scanning started can be reached.  Additionally, since the ids are stable and the
 results sorted, other users can repeat the query and see the same page.
@@ -395,7 +400,7 @@ For example, the following sequence of events could occur: (C = client, S = serv
 
 In this exchange, the client C requests some pages starting with the invalid
 id 0.  The server sends back a page with 3 results.  After the user looks at the
-first three items, the last item’s id plus one is requested (9 + 1 = 10).  While
+first three items, the last item's id plus one is requested (9 + 1 = 10).  While
 there is no channel with id 10, the server S sends back the first 3 items
 greater than 10.  The client repeats the query with the new latest number, but
 gets back a response where the server indicated there were no more results.
@@ -460,7 +465,7 @@ structure.
 
 Additionally, subchannels are practically identical to channels; the only
 difference is there location in the tree.  Even though they would have had a
-specific message type, it didn’t make sense to have two substantially equivalent
+specific message type, it didn't make sense to have two substantially equivalent
 messages.
 
 ## Servers and Channels or just Channels
@@ -469,7 +474,7 @@ In the existing implementations of gRPC, servers are implemented using channels.
 There are not many behavioral differences between clients and servers for a
 given connection.  They both speak the same protocol.  Many of the fields
 overlap between the two types, and it could be conceptually simpler to unify
-them into one type.  For fields that don’t apply to one or the other, the field
+them into one type.  For fields that don't apply to one or the other, the field
 could be left unset.  There is also a fair amount of flexibility in the current
 model with regards to channel structuring, why place an arbitrary division
 between channels and servers?
@@ -479,11 +484,11 @@ when it comes to overlapping entities.
 
 When it comes to selectively setting or checking fields, it may not be clear
 from the documentation if the field should be accessible.  Some fields may be
-sometimes set, but users may use them anyways.  For example a server doesn’t
+sometimes set, but users may use them anyways.  For example a server doesn't
 have a single "target" it is connected to, but with a unified structure it would
 not be clear if the missing target was a buggy channel or a server.  Another
 example is the number of retries on a given channel.  If there were zero, was it
-because it was a server, or because it was a channel that simply didn’t retry?
+because it was a server, or because it was a channel that simply didn't retry?
 
 Having more concrete message types makes the proto definition more self
 documenting.  While comments could explain when which fields are set, having
@@ -511,7 +516,7 @@ retrieve the results since the offset can be calculated in constant time.
 
 The problems with this approach are numerous, and readily visible in the
 previous system.  Mainly,  there is unstated but wrong assumption: the channel
-set doesn’t change.  Channels can be created and destroyed concurrently while
+set doesn't change.  Channels can be created and destroyed concurrently while
 the results are being paged through.  This means that page 1 will have its
 results constantly changing on active systems.  Trying to share the page with
 someone else risks them seeing a completely different result set.  When
@@ -540,7 +545,7 @@ to do so much work.
 
 A fifth problem is that having a page size at all raises ambiguity.  For
 example, if the page size is 100, and the user is on page 50, but the user wants
-to change to using a smaller page size like 25, there isn’t a good way to do so.
+to change to using a smaller page size like 25, there isn't a good way to do so.
 The offset into the result set is now conflated with how many results are
 desired.
 
@@ -582,7 +587,7 @@ like a subchannels, but represent call level information specific to a server
 channel.  In the current hierarchy, there is only room for servers to record
 stream level info as opposed to call level.
 
-While not being able to store call level information is unfortunate, it isn’t
+While not being able to store call level information is unfortunate, it isn't
 so bad.   For example, each socket that a server has encompasses all information
 that a channel does.  Each stream corresponds to a call.
 
@@ -614,7 +619,7 @@ channel field.
 This would be something like using surrogate key, perhaps a UUID, to identify
 the entity.  This allows flexibility to change the implementation without
 affecting the interface.  The problem with this is that it makes the
-implementor’s life easier, but not the consumer’s!  It is useful to be able to
+implementor's life easier, but not the consumer's!  It is useful to be able to
 cross reference ids from channelz to logs to even a live running system.
 
 ### Use hierarchical ids
@@ -624,9 +629,9 @@ to express the lineage in the id.  For example, if channel 2 is a child of
 channel 1, its key could be "1-2".  This would allow fast lookup, and allow
 validation that the node requested was actually the one returned.  The pain
 point for this scheme is that it is more complicated to implement for not much
-benefit.  There is a minor downside too: it means entities can’t be reparented
+benefit.  There is a minor downside too: it means entities can't be reparented
 if the implementation ever wanted to.   No known implementations do this, but it
-isn’t forbidden.  Specifying the full hierarchy in the key would give rise to
+isn't forbidden.  Specifying the full hierarchy in the key would give rise to
 errors about the channel not being found.
 
 [message ref structure]: A14/1.svg "Message Reference Structure"
@@ -669,7 +674,7 @@ message Channel {
   repeated SocketRef socket = 5;
 }
 
-// Channel is a logical grouping of channels, subchannels and sockets.
+// Channel is a logical grouping of channels, subchannels, and sockets.
 message Subchannel {
   // The identifier for this channel.
   SubchannelRef ref = 1;
