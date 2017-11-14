@@ -17,9 +17,9 @@ Background
 gRPC needs a way to expose internal details about connections.  This
 information can be used to debug or diagnose a live program which may be
 exhibiting undesirable network behavior.  In Stubby, this need is fulfilled by
-the "rpcz" page, which exposes aggregated RPC stats as well as listing all
-incoming and outgoing connections.  gRPC would like to include and improve on
-this useful service.
+the sub-pages of the /rpcz page, which exposes aggregated RPC stats as well as
+listing all incoming and outgoing connections.  gRPC would like to include and
+improve on this useful service.
 
 
 # Channelz Service
@@ -37,7 +37,7 @@ terminology will be used:
     owning channel. A subchannel may have channels and subchannels.  A 
     subchannel is a directed acyclic graph (DAG).  Only leaf subchannels may 
     have sockets.  Interior subchannels may only have channels and subchannels.
-3.  A descendent channel is either a channel or subchannel that is logically 
+3.  A "descendent channel" is either a channel or subchannel that is logically
     owned by a higher level channel.  Typically these are subchannels, but may
     be channels themselves. 
 4.  A "server" represents the entry point for RPCs.  A server may have one or
@@ -81,7 +81,7 @@ The data representation of each ref:
 
 ## Channels and Subchannels
 
-Channels and Subchannels, or descendent channel, are hierarchically organized
+Channels and Subchannels, or descendent channels, are hierarchically organized
 into a DAG structure.  The union of all channels and subchannels may not contain
 a cycle.  A descendent channel may have any number of descendent channels. Each
 descendent channel may also have any number of sockets.   However, a given 
@@ -108,10 +108,10 @@ no restrictions on the name but it should be limited to a reasonable length.
 Channels and Subchannels include data about themselves, notably their initial
 parameters and their call stats.  Currently the data includes:
 
-* Channel state ( See: connectivity-semantics-and-api.md )
+* Channel state ( See: [connectivity-semantics-and-api.md][connectivity-semantics] )
 * Channel trace
 * Channel target, if applicable.
-* Number of calls starts, succeeded, and failed.  Note this is slightly
+* Number of calls started, succeeded, and failed.  Note this is slightly
   different than the number of streams.  See the Socket Data section.
 * Time of the last call started.
 
@@ -145,7 +145,7 @@ themselves, this allows a user to query for more information about a channel
 given its trace.  For example, the trace may mention that name resolution 
 failed on a different channel outside of the tree.
 
-### Subchannels
+### Descendent channels
 
 To keep the size of the Channel message down, only the ChannelRefs and 
 SubchannelRefs will be included in the channel or subchannel.  These refs can
@@ -153,7 +153,7 @@ be used to walk the hierarchy.  Subchannels are not included in the top level
 channels, and thus do not need to be paginated.  A user may query for all the
 subchannels in parallel. As mentioned above, if there are any Sockets on the 
 channel, there will be no descendent channels.   This invariant exists to 
-simplify the tree structure, and more closely match the known implementations of
+simplify the tree structure and more closely match the known implementations of
 gRPC.
 
 The channel DAG represents a "has-a" rather than a "is-a" relationship.  In the
@@ -166,12 +166,6 @@ are owned by a parent, but do not share its target.
 
 ![channel hierarchy 2][channel hierarchy 2]
 
-Lastly, subchannels may not be shared across different channel trees.  Each
-channel has at most one parent.  If a channel tree is used between multiple
-other channels, it must reside in its own tree.  For example, a name resolver
-channel may be used by many other top level channels, but is not a descendant of
-them.  This also serves to simplify the data, and match the internals of known
-gRPC implementations.
 
 ### Sockets
 
@@ -212,7 +206,7 @@ includes prior channel information.
 Server data includes data about the server, similar to Channel Data.  As of this
 writing server data is a subset of the channel data:
 
-* Number of calls starts, succeeded, and failed.  Note this is slightly
+* Number of calls started, succeeded, and failed.  Note this is slightly
   different than the number of streams.
 * Time of the last call started
 
@@ -290,8 +284,8 @@ keep the socket alive.  Generally this is an HTTP/2 PING frame.  However, not
 all PING frames are keep alives.  Specifically, pings that were sent as a reply
 (ACK bit set) or were used for reasons unrelated to keep alives should not count
 towards this.  For example, if pings were used to measure network bandwidth,
-they would not be treated as keep alives.   The idea is to measure how often the
-local endpoint is doing extra work to keep the connection alive.
+they would not be treated as keep alives.   The intent is to measure how often 
+the local endpoint is doing extra work to keep the connection alive.
 
 
 Like Channel data, the last time a stream was started by the remote or local
@@ -316,8 +310,8 @@ via socket options.
 
 #### Socket Options
 
-At this low level in the gRPC stack, the implementation difference begin vary
-more greatly.  Each OS or platform may have differing amounts of socket
+At this low level in the gRPC stack, implementation differences become more 
+significant. Each OS or platform may have differing amounts of socket
 information available.  To address these differences, each socket option name
 and value is expressed as a string.
 
@@ -341,14 +335,14 @@ impractical, though they are encouraged to do so.
 ### Addresses
 
 An important part of debugging a connection is finding "who" the socket is
-connected to.  Toanswer this question each socket exposes a remote and a local
+connected to.  To answer this question each socket exposes a remote and a local
 address field.  The address implies what kind of socket it is (e.g. TCP, UDP,
 UDS, etc.) as well as the the identity used to establish the connection (e.g.
 IP Address, port number, filename, etc.).
 
 Not every socket has a remote address;  listening sockets may only include a
-local address.  Not every socket has a local address; UDS sockets may only
-include a remote address.
+local address.  Not every socket has a local address; Unix domain sockets may 
+only include a remote address.
 
 By default, only TCP and UDS addresses are defined.  Because there are many
 kinds of address families that cannot be anticipated, the address includes an
@@ -391,11 +385,11 @@ scanning started can be reached.  Additionally, since the ids are stable and the
 results sorted, other users can repeat the query and see the same page.
 
 For example, the following sequence of events could occur: (C = client, S = server)
-1.  C sends ListRootChannels(id=0)
+1.  C sends GetTopChannels(id=0)
 2.  S sends RootChannels 1, 5, 9 but not 12, 13, 17, 18
-3.  C sends ListRootChannels(id=9+1)
+3.  C sends GetTopChannels(id=9+1)
 4.  S send RootChannels 12, 13, 17 but not 18
-5.  C sends ListRootChannels(id=17+1)
+5.  C sends GetTopChannels(id=17+1)
 6.  S sends RootChannels 18, end=true
 
 In this exchange, the client C requests some pages starting with the invalid
@@ -413,7 +407,7 @@ it may decide to return fewer entities.  Since there is a flag in the response
 indicating that the user is at the end, channelz may even return an empty list.
 All ids are valid start points, including non positive ids.
 
-## ListRootChannels
+## GetTopChannels
 
 This method returns all the root channels in the process.  Users are expected
 to make this query first when investigating channels.  As mentioned in the
@@ -422,10 +416,10 @@ channels, as well as a boolean flag indicating if there may be more results.
 Users who wish to get the next results should use the largest channel id from
 the previous results in the subsequent query.
 
-## ListServers
+## GetServers
 
-This method returns all servers in the process.  The usage is identical to List
-RootChannels, except that servers are returned.  Users are expected to make this
+This method returns all servers in the process.  The usage is identical to GetTop
+Channels, except that servers are returned.  Users are expected to make this
 query first when investigating servers.  Since servers are not hierarchical,
 there is no GetServer method.
 
@@ -638,6 +632,7 @@ errors about the channel not being found.
 [channel hierarchy 1]: A14/2.svg "Channel Hierarchy"
 [channel hierarchy 2]: A14/3.svg "Channel Hierarchy"
 [channel hierarchy 3]: A14/4.svg "Channel Hierarchy"
+[connectivity-semantics](https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md)
 
 
 ## Proto
@@ -651,7 +646,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-// Channel is a logical grouping of channels, subchannels and sockets.
+// Channel is a logical grouping of channels, subchannels, and sockets.
 message Channel {
   // The identifier for this channel.
   ChannelRef ref = 1;
@@ -960,11 +955,11 @@ message SocketOptionTcpInfo {
 service Channelz {
   // Gets all root channels (e.g. channels the application has directly
   // created). This does not include subchannels nor non-top level channels.
-  rpc ListRootChannels(ListRootChannelsRequest) returns (ListRootChannelsResponse);
+  rpc GetTopChannels(GetTopChannelsRequest) returns (GetTopChannelsResponse);
   // Gets all servers that exist in the process.
-  rpc ListServers(ListServersRequest) returns (ListServersResponse);
+  rpc GetServers(GetServersRequest) returns (GetServersResponse);
   // Gets all server sockets servers that exist in the process.
-  rpc ListServerSockets(ListServerSocketsRequest) returns (ListServerSocketsResponse);
+  rpc GetServerSockets(GetServerSocketsRequest) returns (GetServerSocketsResponse);
   // Returns a single Channel, or else a NOT_FOUND code.
   rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
   // Returns a single Subchannel, or else a NOT_FOUND code.
@@ -973,13 +968,13 @@ service Channelz {
   rpc GetSocket(GetSocketRequest) returns (GetSocketResponse);
 }
 
-message ListServersRequest {
+message GetServersRequest {
   // start_server_id indicates that only servers at or above this id should be
   // included in the results.
   int64 start_server_id = 1;
 }
 
-message ListServersResponse {
+message GetServersResponse {
   // list of servers that the connection detail service knows about.  Sorted in
   // ascending server_id order.
   repeated Server server = 1;
@@ -989,14 +984,14 @@ message ListServersResponse {
   bool end = 2;
 }
 
-message ListServerSocketsRequest {
+message GetServerSocketsRequest {
   int64 server_id = 1;
   // start_socket_id indicates that only sockets at or above this id should be
   // included in the results.
   int64 start_socket_id = 2;
 }
 
-message ListServerSocketsResponse {
+message GetServerSocketsResponse {
   // list of socket refs that the connection detail service knows about.  Sorted in
   // ascending socket_id order.
   repeated SocketRef socket_ref = 1;
@@ -1006,13 +1001,13 @@ message ListServerSocketsResponse {
   bool end = 2;
 }
 
-message ListRootChannelsRequest {
+message GetTopChannelsRequest {
   // start_channel_id indicates that only channels at or above this id should be
   // included in the results.
   int64 start_channel_id = 1;
 }
 
-message ListRootChannelsResponse {
+message GetRootChannelsResponse {
   // list of channels that the connection detail service knows about.  Sorted in
   // ascending channel_id order.
   repeated Channel channel = 1;
