@@ -4,7 +4,7 @@ Service Config via DNS
 * Approver: a11r
 * Status: Implemented
 * Implemented in: C-core (Go and Java in progress)
-* Last updated: 2017-09-13
+* Last updated: 2017-11-10
 * Discussion at: https://groups.google.com/d/topic/grpc-io/DkweyrWEXxU/discussion
 
 ## Abstract
@@ -49,19 +49,19 @@ determine which choice will be selected by a given client:
     // If a field is absent or empty, it matches all clients.
     // All fields must match a client for this choice to be selected.
     //
-    // Client language(s): a list of strings (e.g., 'c++', 'java', 'go',
-    // 'python', etc).
-    'clientLanguage': [string],
+    // Client language(s): a list of strings (e.g., "c++", "java", "go",
+    // "python", etc).
+    "clientLanguage": [string],
     // Percentage: integer from 0 to 100 indicating the percentage of
     // clients that should use this choice.
-    'percentage': number,
+    "percentage": number,
     // Client hostname(s): a list of strings.
-    'clientHostname': [string],
+    "clientHostname": [string],
 
     // The service config data object for clients that match the above
     // criteria.  (The format for this object is defined in
     // https://github.com/grpc/grpc/blob/master/doc/service_config.md.)
-    'serviceConfig': object
+    "serviceConfig": object
   }
 ]
 ```
@@ -72,10 +72,13 @@ In DNS, the service config data (in the form documented in the previous
 section) will be encoded in a TXT record via the mechanism described in
 [RFC-1464](https://tools.ietf.org/html/rfc1464) using the attribute name
 `grpc_config`.  The attribute value will be a JSON list containing service
-config choices.  For example, here is an example TXT record:
+config choices.  The TXT record will be for a DNS name that is the same
+as the gRPC server name, but with the prefix `_grpc_config.`.
+
+For example, here is an example TXT record for server `myserver`:
 
 ```
-myserver  3600  TXT  "grpc_config=[{'serviceConfig':{'loadBalancingPolicy':'round_robin','methodConfig':[{'name':[{'service':'MyService','method':'Foo'}],'waitForReady':true}]}}]"
+_grpc_config.myserver  3600  TXT "grpc_config=[{\"serviceConfig\":{\"loadBalancingPolicy\":\"round_robin\",\"methodConfig\":[{\"name\":[{\"service\":\"MyService\",\"method\":\"Foo\"}],\"waitForReady\":true}]}}]"
 ```
 
 Note that TXT records are limited to 255 bytes per string, as per
@@ -101,16 +104,17 @@ When encoding the service config in DNS, TXT records are the "obvious"
 choice, since the service config is effectively additional metadata
 associated with the DNS name.
 
+We use the `_grpc_config` prefix for the DNS entry to allow a service
+config to be specified for a service whose primary record is a CNAME
+record, because DNS does not allow any other record for a same name
+that contains a CNAME record.
+
 ## Implementation
 
-The implementation will be done in C-core first.  Once the new c-ares
-DNS resolver code (https://github.com/grpc/grpc/pull/7771) has been
-merged, we will extend it to query for the TXT records and return the
-resulting service config JSON data.
-
-Note that, due to platform support issues, we will initially *not*
-support the c-ares resolver under Windows or for Node.  Alternatives
-will need to be found for these environments.
+The implementation has been done in C-core as part of the c-ares DNS
+resolver.  We are currently working toward making the c-ares resolver
+the default DNS resolver for C-core.  This requires things like Windows
+and Node support and adding address sorting.
 
 ## Open issues (if applicable)
 
