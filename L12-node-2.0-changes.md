@@ -5,7 +5,7 @@ Node.js gRPC 2.0 API changes
 * Status: Draft
 * Implemented in: Node.js
 * Last updated: 2017-11-27
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/AIJ9oGXKCrU
 
 ## Abstract
 
