@@ -251,7 +251,7 @@ Hedged RPCs with a non-zero delay will only send out the subsequent hedged reque
 
 After the RPC response has been returned to the client application layer, the RPC is removed from the buffer.
 
-For client-side streaming RPCs, if additional outgoing messages would cause the buffered size to exceed the per-RPC limit, the entire message will be removed from the buffer and thus no longer retryable.
+For client-side streaming RPCs, if additional outgoing messages would cause the buffered size to exceed the per-RPC limit, the entire message will be removed from the buffer and thus no longer retryable. In the case of hedging, this situation would cause all but one hedges RPC to stop making progress. The RPC that is furthest along in terms of outgoing messages will be the once to continue communication.
 
 When an RPC is evicted from the buffer, pending hedged requests should be canceled immediately. Implementations must avoid potential scheduling race conditions when canceling pending requests concurrently with incoming responses to already sent hedges, and ensure that failures are relayed to the client application logic when no more hedged requests will be possible and all outstanding requests have returned.
 
