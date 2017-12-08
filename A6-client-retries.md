@@ -247,11 +247,15 @@ The gRPC client library will support application-configured limits for the amoun
 
 RPCs may only be retried when they are contained in the buffer. New RPCs which do not fit in the available buffer space (either due to the total available buffer space, or due to the per-RPC limit) will not be retryable, but the original RPC will still be sent.
 
-Hedged RPCs with a non-zero delay will only send out the subsequent hedged requests when the original RPC remains in the buffer. For hedge policies with a delay of zero milliseconds, the RPC does not need to be placed in the buffer at all and the outgoing RPCs can be sent immediately then discarded.
-
 After the RPC response has been returned to the client application layer, the RPC is removed from the buffer.
 
-For client-side streaming RPCs, if additional outgoing messages would cause the buffered size to exceed the per-RPC limit, the entire message will be removed from the buffer and thus no longer retryable. In the case of hedging, this situation would cause all but one hedges RPC to stop making progress. The RPC that is furthest along in terms of outgoing messages will be the once to continue communication.
+Client streaming RPCs will take up additional buffer space with each subsequent message, so additional buffering policy is needed. When the application sends a message on an RPC that causes the RPC to exceed the buffer limit, the RPC becomes committed, meaning that we choose one attempt to continue and stop all others.
+
+For retriable RPCs, when an RPC becomes committed, the client will continue with the currently in-flight attempt but will not make any subsequent attempts, even if the current attempt fails with a retryable status and there are retry attempts remaining.
+
+For hedged RPCs, when an RPC becomes committed, the client will continue the currently in-flight attempt on which the maximum number of messages have already been sent. All other currently in-flight attempts will be immediately cancelled, and no subsequent attempts will be started.
+
+Once we have committed to a particular attempt, any messages that have already been sent on the that attempt can be immediately freed from the buffer, and any subsequent messages will be sent without buffering.
 
 When an RPC is evicted from the buffer, pending hedged requests should be canceled immediately. Implementations must avoid potential scheduling race conditions when canceling pending requests concurrently with incoming responses to already sent hedges, and ensure that failures are relayed to the client application logic when no more hedged requests will be possible and all outstanding requests have returned.
 
