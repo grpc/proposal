@@ -1,0 +1,83 @@
+Add a new option to the ThreadManager to add the max number of threads
+----
+* Author(s): Sree Kuchibhotla (sreecha)
+* Approver: ctiller, vjpai
+* Status: In Review
+* Implemented in: C++
+* Last updated: Dec 14, 2017
+* Discussion at: 
+
+## Abstract
+C++ `ThreadManager` is a specialized thread pool used to implement 
+the C++ Synchronous server. 
+
+Currently, `ThreadManager` can be configured to have minimum and maximum
+number of polling threads. While this helps to always have threads available
+to poll for work, it does nothing to throttle polling if the `ThreadManager`
+is overloaded with work.
+
+The proposal here is to add another parameter that specifies an upper
+threshold on the number of threads that can be active in the `ThreadManager`.
+Once the ThreadManager hits this limit, no new threads will be created
+until the number of threads fall below this number.
+
+## Background
+Currently, a syncrhonous server is created by passing the following parameters to server builder:
+
+- Number of server completion queues: The number of completion queues created on the server for accepting and processing requests
+- Minimum number of pollers per completion queue: The minimum number of threads that SHOULD be polling the completion queue
+- Maximum number of pollers per completion queue: The maximum number of polling threads a completion queue can have
+- Completion queue polling timeout: The timeout used by the polling threads when calling `grpc_completion_queue_next()`
+
+The above parameters are passed to `server_builder` via the following API:
+
+ ```C++
+ 
+  /// Options for synchronous servers.
+  enum SyncServerOption {
+    NUM_CQS,         ///< Number of completion queues.
+    MIN_POLLERS,     ///< Minimum number of polling threads.
+    MAX_POLLERS,     ///< Maximum number of polling threads.
+    CQ_TIMEOUT_MSEC  ///< Completion queue timeout in milliseconds.
+  };
+
+  /// Only useful if this is a Synchronous server.
+  ServerBuilder& SetSyncServerOption(SyncServerOption option, int value);
+  
+    
+  ```
+
+Internally, the synchronous server creates one `ThreadManager` instance **per completion queue**. 
+
+```
+ The following are the default values (i.e values used if SetSyncServerOption) is NOT called
+ 
+   Number of cqs: 1
+   Min pollers per cq : 1
+   Max pollers per cq: 1
+   CQ timeout: 10000 msec
+ ```
+
+### Related Proposals:
+
+N/A
+
+## Proposal
+
+The proposal here is to add another parameter that specifies an upper
+threshold on the number of threads that can be active in the `ThreadManager`.
+
+The following is the only visible change to the public API:
+
+  - Add a `MAX_THREADS` to the `ServerBuilder::SyncServerOption` enum
+
+
+## Rationale
+Sometimes we might have to stop polling altogether if the server is overloaded with work. 
+Currently there is no way to do that (since the minimum pollers setting always ensures
+some thread is polling for work)
+
+Adding this new setting to configure a max threads per completion queue is a easy way to fix this.
+
+## Open issues (if applicable)
+
