@@ -60,7 +60,7 @@ determine which choice will be selected by a given client:
     // All other numbers are considered invalid.
     "percentage": number,
     // Client hostname(s): a list of strings.  Each name is case 
-    // sensitive and must be an exact match as the hostname according to
+    // sensitive and must be an exact match of the hostname according to
     // the system.
     "clientHostname": [string],
 
