@@ -48,23 +48,37 @@ determine which choice will be selected by a given client:
     // Criteria used to select this choice.
     // If a field is absent or empty, it matches all clients.
     // All fields must match a client for this choice to be selected.
+    // If any unexpected field name is present in this object, the entire
+    // choice is considered invalid.
     //
     // Client language(s): a list of strings (e.g., "c++", "java", "go",
-    // "python", etc).
+    // "python", etc).  Each string is case insensitive.
     "clientLanguage": [string],
     // Percentage: integer from 0 to 100 indicating the percentage of
-    // clients that should use this choice.
+    // clients that should use this choice.  If present, the number must
+    // match the regular expression `^0|[0-9]|[1-9][0-9]|100$`
+    // All other numbers are considered invalid.
     "percentage": number,
-    // Client hostname(s): a list of strings.
+    // Client hostname(s): a list of strings.  Each name is case 
+    // sensitive and must be an exact match as the hostname according to
+    // the system.
     "clientHostname": [string],
 
     // The service config data object for clients that match the above
     // criteria.  (The format for this object is defined in
     // https://github.com/grpc/grpc/blob/master/doc/service_config.md.)
+    // If this field is not an object, or is missing, or is otherwise 
+    // invalid, this service config choice is considered invalid.
     "serviceConfig": object
   }
 ]
 ```
+
+If the service config choice cannot be parsed, or otherwise is not 
+semantically valid, it will be ignored.  Consumers of the service config
+SHOULD indicate when a config is not valid, but should not fail looking 
+for valid configs. 
+
 
 ### Encoding in DNS TXT Records
 
