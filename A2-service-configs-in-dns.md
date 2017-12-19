@@ -4,7 +4,7 @@ Service Config via DNS
 * Approver: a11r
 * Status: Implemented
 * Implemented in: C-core (Go and Java in progress)
-* Last updated: 2017-11-10
+* Last updated: 2017-12-19
 * Discussion at: https://groups.google.com/d/topic/grpc-io/DkweyrWEXxU/discussion
 
 ## Abstract
