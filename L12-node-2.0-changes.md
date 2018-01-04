@@ -48,6 +48,10 @@ We need to increment the major version of the Node.js gRPC library in order to u
  - Update the `checkClientCertificate` argument of `ServerCredentials.createSsl` from a boolean to an enum to reflect the internal API.
  - Change `ChannelCredentials.createSsl` and `ServerCredentials.createSsl` to use objects instead of positional arguments. In particular, they should use options that are compaitible with [`tls.createSecureContext`](https://nodejs.org/api/tls.html#tls_tls_createsecurecontext_options) accepts: `key`, `cert`, and `ca`. `ServerCredentials.createSsl` will additionally accept a `checkClientCertificate` option.
 
+### Improve Server APIs
+
+ - Replace `tryShutdown` and `forceShutdown` functions with a single `shutdown` function with an additional `options` arguments that accepts a `graceful` option. With `graceful` set to `true`, the behavior will be identical to the current `tryShutdown` behavior, and with `graceful` set to `false`, the behavior will be identical to the current `forceShutdown` behavior. In both cases, it will accept an optional callback.
+
 ### Channels
 
  - Expose the `Channel` constructor as part of the API, with the same arguments the the Client constructor currently has.
@@ -55,4 +59,4 @@ We need to increment the major version of the Node.js gRPC library in order to u
 
 ## Implementation
 
-I (murgatroid99) will implement this during Q4 2017 and Q1 2018.
+I (murgatroid99) will implement this during Q1 2018.
