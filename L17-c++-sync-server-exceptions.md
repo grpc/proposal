@@ -29,12 +29,25 @@ N/A
 
 The C++ sync server should wrap its invocation of user method handler functions
 in a `try/catch` block.
-- If the method handler throws a `std::exception`, the sync server will treat it
-  as though it returned an `UNKNOWN` `Status` marked with the `what` result of
-  the exception as its error message.
-- If the method handler throws any other kind of exception, the sync server will
+- If the method handler throws any kind of exception, the sync server will
   treat it as though it returned an `UNKNOWN` `Status` and will fill in some
   error message.
+
+**NOTE**: An earlier version of this proposal suggested using the
+  `what` result of a `std::exception` as the error message, but this
+  should not be done since it might leak sensitive information from
+  the server implementation.
+
+Additionally, this work will have the following constraints:
+1. No `throw`s will be introduced into the gRPC C++ source code base
+1. gRPC will continue to build and run correctly if the `-fno-exceptions`
+compiler flag is used to prevent the use of C++ exceptions. In that
+case, the pre-existing behavior of the library will be maintained.
+1. A new portability build configuration will be added to guarantee
+that the library continues to build without the use of exceptions.
+1. If there is no exception thrown by a method handler invocation,
+there will be no observable performance impact for common compiler
+and runtime configurations.
 
 ## Rationale
 
@@ -56,9 +69,9 @@ know the details of the user's method handler. Modern compiler and runtime
 implementations also do not take a performance hit from using `try` if there is
 no exception to catch.
 
-Users may want a different status code choice on exceptions. Such users should
-create their own `try/catch` blocks in their method handlers and `return` the
-`Status` of their choice.
+Users may want a different status code or error message choice on
+exceptions. Such users should create their own `try/catch` blocks in
+their method handlers and `return` the `Status` of their choice.
 
 ## Implementation
 
