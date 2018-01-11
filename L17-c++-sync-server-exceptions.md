@@ -2,7 +2,7 @@ C++ synchronous server should catch exceptions from method handlers
 ----
 * Author(s): vpai
 * Approver: a11r
-* Status: Proposed
+* Status: Approved
 * Implemented in: https://github.com/grpc/grpc/pull/13815
 * Last updated: December 19, 2017
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/u1XmQPAi3fA
