@@ -24,6 +24,11 @@ changes to the core surface API in the past without the gRFC process,
 this should not be a continued practice in the future as these
 destabilize the use of core.
 
+As with all gRPC components, gRPC Core follows the principles of
+[semantic versioning](https://semver.org/). Since breaking changes are
+allowed, gRPC Core is currently at version 5.0.0 while gRPC C++ and
+other wrappings are at version 1.9.0.
+
 ### Related Proposals:
 
 N/A
