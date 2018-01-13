@@ -5,7 +5,7 @@ Require gRFCs for core API changes
 * Status: Proposed
 * Implemented in: n/a
 * Last updated: January 12, 2018
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/gHSoRShRl9w
 
 ## Abstract
 
