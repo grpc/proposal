@@ -1,6 +1,6 @@
 Require gRFCs for core API changes
 ----
-* Author(s): vpai
+* Author(s): vjpai
 * Approver: a11r
 * Status: Proposed
 * Implemented in: n/a
