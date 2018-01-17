@@ -4,7 +4,7 @@ Resolver and balancer API changes
 * Approver: a11r
 * Status: In Review
 * Implemented in: <language, ...>
-* Last updated: 2017/07/19
+* Last updated: 2018/01/17
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/rUDN7-cZvz8
 
 ## Abstract
@@ -105,11 +105,11 @@ The RegisterResolver() API registers the resolver to a global resolver map, and 
 
 RegisterBalancer() API registers a balancer. When choosing a balancer to use, the following list is checked in order:
 
- 1. Use the balancer provided by v1 WithBalancer() API (consistent with the old behavior, and balancer auto switching will be disabled)
- 1. Use grpclb if at least one of the resolved addresses is grpclb
- 1. Use the balancer specified by service config
- 1. Use the balancer provided by WithBalancerName() dial option 
- 1. Use pick_first
+1.  Use the balancer provided by v1 WithBalancer() API (consistent with the old behavior, and balancer auto switching will be disabled)
+1.  Use grpclb if at least one of the resolved addresses is grpclb
+1.  Use the balancer specified by service config
+1.  Use the balancer provided by WithBalancerName() dial option 
+1.  Use pick_first
 
 #### Address updates 
 
@@ -169,49 +169,67 @@ package balancer
 import "resolver" // for resolver.Address
 import "connectivity" // for connectivity interface
 
-// SubConnection represents a gRPC sub connection.
+// SubConn represents a gRPC sub connection.
 // Each sub connection contains a list of addresses. gRPC will
 // try to connect to them (in sequence), and stop trying the
-// remainings if one connection was successful.
+// remainder once one connection is successful.
 //
 // The reconnect backoff will be applied on the list, not a single address.
 // For example, try_on_all_addresses -> backoff -> try_on_all_addresses.
 //
-// All SubConnection starts in IDLE, and will not try to connect. To trigger
+// All SubConns start in IDLE, and will not try to connect. To trigger
 // the connecting, Balancers must call Connect.
 // When the connection encounters an error, it will reconnect immediately.
 // When the connection becomes IDLE, it will not reconnect unless Connect is
 // called.
-type SubConnection interface {
-	// UpdateAddresses updates the addresses used in this SubConnection.
-	// gRPC checks if the address of connection in use is still in the new list.
+//
+// This interface is to be implemented by gRPC. Users should not need a
+// brand new implementation of this interface. For the situations like
+// testing, the new implementation should embed this interface. This allows
+// gRPC to add new methods to this interface.
+type SubConn interface {
+	// UpdateAddresses updates the addresses used in this SubConn.
+	// gRPC checks if currently-connected address is still in the new list.
 	// If it's in the list, the connection will be kept.
 	// If it's not in the list, the connection will gracefully closed, and
 	// a new connection will be created.
+	//
+	// This will trigger a state transition for the SubConn.
 	UpdateAddresses([]resolver.Address)
-	// Connect starts the connecting for this SubConnection.
+	// Connect starts the connecting for this SubConn.
 	Connect()
 }
 
-// NewSubConnectionOptions contains options to create new SubConnection.
-type NewSubConnectionOptions struct{}
+// NewSubConnOptions contains options to create new SubConn.
+type NewSubConnOptions struct{}
 
-// ClientConnection represents a gRPC ClientConn.
-type ClientConnection interface {
-	// NewSubConnection is called by balancer to create a new SubConnection.
+// ClientConn represents a gRPC ClientConn.
+//
+// This interface is to be implemented by gRPC. Users should not need a
+// brand new implementation of this interface. For the situations like
+// testing, the new implementation should embed this interface. This allows
+// gRPC to add new methods to this interface.
+type ClientConn interface {
+	// NewSubConn is called by balancer to create a new SubConn.
 	// It doesn't block and wait for the connections to be established.
-	// Behaviors of the SubConnection can be controlled by options.
-	NewSubConnection([]resolver.Address, NewSubConnectionOptions) (SubConnection, error)
-	// RemoveSubConnection removes the SubConnection from ClientConn.
-	// The SubConnection will be shutdown.
-	RemoveSubConnection(SubConnection)
+	// Behaviors of the SubConn can be controlled by options.
+	NewSubConn([]resolver.Address, NewSubConnOptions) (SubConn, error)
+	// RemoveSubConn removes the SubConn from ClientConn.
+	// The SubConn will be shutdown.
+	RemoveSubConn(SubConn)
 
 	// UpdateBalancerState is called by balancer to nofity gRPC that some internal
 	// state in balancer has changed.
 	//
 	// gRPC will update the connectivity state of the ClientConn, and will call pick
-	// on the new picker to pick new SubConnection.
+	// on the new picker to pick new SubConn.
 	UpdateBalancerState(s connectivity.State, p Picker)
+
+	// ResolveNow is called by balancer to notify gRPC to do a name resolving.
+	ResolveNow(resolver.ResolveNowOption)
+
+	// Target returns the dial target for this ClientConn.
+	Target() string
 }
 
 // BuildOptions contains additional information for Build.
@@ -228,8 +246,8 @@ type BuildOptions struct {
 
 // Builder creates a balancer.
 type Builder interface {
-	// Build creates a new balancer with the ClientConnection.
-	Build(cc ClientConnection, opts BuildOptions) Balancer
+	// Build creates a new balancer with the ClientConn.
+	Build(cc ClientConn, opts BuildOptions) Balancer
 	// Name returns the name of balancers built by this builder.
 	// It will be used to pick balancers (for example in service config).
 	Name() string
@@ -244,64 +262,75 @@ type DoneInfo struct {
 	Err error
 }
 
-// ErrNoSubConnAvailable indicates no SubConnection is available for pick().
-// gRPC will block the RPC until a new picker is available via UpdateBalancerState().
-var ErrNoSubConnAvailable = errors.New("no sub connection is available")
+var (
+	// ErrNoSubConnAvailable indicates no SubConn is available for pick().
+	// gRPC will block the RPC until a new picker is available via UpdateBalancerState().
+	ErrNoSubConnAvailable = errors.New("no SubConn is available")
+	// ErrTransientFailure indicates all SubConns are in TransientFailure.
+	// WaitForReady RPCs will block, non-WaitForReady RPCs will fail.
+	ErrTransientFailure = errors.New("all SubConns are in TransientFailure")
+)
 
-// Picker is used by gRPC to pick a SubConnection to send an RPC.
-// Balancer is expected to generate a new picker from it's snapshot everytime it's
+// Picker is used by gRPC to pick a SubConn to send an RPC.
+// Balancer is expected to generate a new picker from its snapshot everytime its
 // internal state has changed.
 //
-// The pickers used by gRPC can be updated by UpdateBalancerState().
+// The pickers used by gRPC can be updated by ClientConn.UpdateBalancerState().
 type Picker interface {
-	// Pick returns the SubConnection to be used to send the RPC.
-	// The returned SubConnection must be one returned by NewSubConnection().
+	// Pick returns the SubConn to be used to send the RPC.
+	// The returned SubConn must be one returned by NewSubConn().
 	//
 	// This functions is expected to return:
-	// - a SubConnection that is known to be READY;
-	// - ErrNoSubConnAvailable if no SubConnection is available, but progress is being
-	//   made (for example, some SubConnection is in CONNECTING mode);
-	// - other errors if no active connecting is happening (for example, all SubConnections
+	// - a SubConn that is known to be READY;
+	// - ErrNoSubConnAvailable if no SubConn is available, but progress is being
+	//   made (for example, some SubConn is in CONNECTING mode);
+	// - other errors if no active connecting is happening (for example, all SubConn
 	//   are in TRANSIENT_FAILURE mode).
 	//
-	// If a SubConnection is returned:
+	// If a SubConn is returned:
 	// - If it is READY, gRPC will send the RPC on it;
 	// - If it is not ready, or becomes not ready after it's returned, gRPC will block
-	//   this call until a new picker is updated and will call pick on the new picker.
+	//   until UpdateBalancerState() is called and will call pick on the new picker.
 	//
 	// If the returned error is not nil:
 	// - If the error is ErrNoSubConnAvailable, gRPC will block until UpdateBalancerState()
-	// - If the error is not ErrNoSubConnAvailable:
-	//   - If the RPC is non-failfast, gRPC will block until UpdateBalancerState()
+	// - If the error is ErrTransientFailure:
+	//   - If the RPC is wait-for-ready, gRPC will block until UpdateBalancerState()
 	//     is called to pick again;
-	//   - Otherwise, RPC is failed with unavailable error.
+	//   - Otherwise, RPC will fail with unavailable error.
+	// - Else (error is other non-nil error):
+	//   - The RPC will fail with unavailable error.
 	//
 	// The returned done() function will be called once the rpc has finished, with the
 	// final status of that RPC.
-	// It could be nil if balancer doesn't care about the RPC status.
-	Pick(ctx context.Context, opts PickOptions) (conn SubConnection, done func(DoneInfo), err error)
+	// done may be nil if balancer doesn't care about the RPC status.
+	Pick(ctx context.Context, opts PickOptions) (conn SubConn, done func(DoneInfo), err error)
 }
 
-// Balancer takes the input from gRPC, manages SubConnections and collect and aggregate
+// Balancer takes input from gRPC, manages SubConns, and collects and aggregates
 // the connectivity states.
 //
-// It also generates and updates Picker to gRPC, which will be used to pick SubConnection
-// for RPCs.
+// It also generates and updates the Picker used by gRPC to pick SubConns for RPCs.
+//
+// HandleSubConnectionStateChange, HandleResolvedAddrs and Close are guaranteed
+// to be called synchronously from the same goroutine.
+// There's no guarantee on picker.Pick, it may be called anytime.
 type Balancer interface {
-	// HandleSubConnectionStateChange is called by gRPC when the connectivity state
+	// HandleSubConnStateChange is called by gRPC when the connectivity state
 	// of sc has changed.
-	// Balancer is expected to aggregate all the state of SubConnections and report
+	// Balancer is expected to aggregate all the state of SubConn and report
 	// that back to gRPC.
 	// Balancer should also generate and update Pickers when its internal state has
 	// been changed by the new state.
-	HandleSubConnectionStateChange(sc SubConnection, state connectivity.State)
-	// HandleResolvedResult is called by gRPC to send updated resolved addresses to
+	HandleSubConnStateChange(sc SubConn, state connectivity.State)
+	// HandleResolvedAddrs is called by gRPC to send updated resolved addresses to
 	// balancers.
-	// Balancer can create new SubConnections or remove SubConnections with the addresses.
+	// Balancer can create new SubConn or remove SubConn with the addresses.
 	// An empty address slice and a non-nil error will be passed if the resolver returns
 	// non-nil error to gRPC.
-	HandleResolvedResult([]resolver.Address, error)
-	// Close closes the balancer.
+	HandleResolvedAddrs([]resolver.Address, error)
+	// Close closes the balancer. The balancer is not required to call
+	// ClientConn.RemoveSubConn for its existing SubConns.
 	Close()
 }
 ```
@@ -368,27 +397,38 @@ type Address struct {
 
 // BuildOption includes additional information for the builder to create
 // the resolver.
-type BuildOption struct {
-}
+type BuildOption struct {}
 
-// ClientConnection contains the callbacks for resolver to notify any updates
+// ClientConn contains the callbacks for resolver to notify any updates
 // to the gRPC ClientConn.
-type ClientConnection interface {
-	// NewAddress is called by resolver to notify ClientConnection a new list
+//
+// This interface is to be implemented by gRPC. Users should not need a
+// brand new implementation of this interface. For the situations like
+// testing, the new implementation should embed this interface. This allows
+// gRPC to add new methods to this interface.
+type ClientConn interface {
+	// NewAddress is called by resolver to notify ClientConn a new list
 	// of resolved addresses.
-	// The address list should be the complete list of new addresses.
-	// Two consecutive call with the same addresses will be noop. It's preferred
-	// that resolver doesn't call this consecutively with non-updated addresses.
+	// The address list should be the complete list of resolved addresses.
 	NewAddress(addresses []Address)
-	// NewServiceConfig is called by resolver to notify ClientConnection a new
+	// NewServiceConfig is called by resolver to notify ClientConn a new
 	// service config. The service config should be provided as a json string.
 	NewServiceConfig(serviceConfig string)
+}
+
+type Target struct {
+	Scheme    string
+	Authority string
+	Endpoint  string
 }
 
 // Builder creates a resolver that will be used to watch name resolution updates.
 type Builder interface {
 	// Build creates a new resolver for the given target.
-	Build(target string, cc ClientConnection, opts BuildOption) Resolver
+	//
+	// gRPC dial calls Build synchronously, and fails if the returned error is
+	// not nil.
+	Build(target Target, cc ClientConn, opts BuildOption) (Resolver, error)
 	// Scheme returns the scheme supported by this resolver.
 	// Scheme is defined at https://github.com/grpc/grpc/blob/master/doc/naming.md.
 	Scheme() string
