@@ -2,7 +2,7 @@ Resolver and balancer API changes
 ----
 * Author(s): menghanl, dfawley, mmukhi
 * Approver: a11r
-* Status: In Review
+* Status: Implemented
 * Implemented in: <language, ...>
 * Last updated: 2018/01/17
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/rUDN7-cZvz8
@@ -543,9 +543,11 @@ To get information from a channel or blocking function call, balancers need to c
 
 ## Implementation
 
-The implementation will be divided into multiple steps and PRs:
+The implementation includes multiple steps and PRs:
 
 *  Change the interfaces and migrate current existing balancers
    * Provide a way to wrap old balancers into new APIs
 *  Add support for service config based on the new APIs
 *  Support switching balancers
+
+The implementation has been done (https://github.com/grpc/grpc-go/issues/1388).
