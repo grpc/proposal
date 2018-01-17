@@ -9,7 +9,7 @@ Resolver and balancer API changes
 
 ## Abstract
 
-The current balancer API in gRPC-go cannot suport balancer hot switching. There are also other issues related to balancer, resolver and connectivity state.
+The current balancer API in gRPC-go cannot support balancer hot switching. There are also other issues related to balancer, resolver and connectivity state.
 
 This document contains the current implementation of balancer in gRPC-go, the issues that cannot be solved with the current set of APIs, and proposed solutions for the issues.
 
@@ -93,8 +93,8 @@ In the new structure, gRPC talks to both resolver and balancer directly. gRPC ma
 #### Initialization 
 
 ```go
-resolver.Register(userCustomResolver())
-balancer.Register(newRoundRobin())
+resolver.Register(userCustomResolverBuilder())
+balancer.Register(newRoundRobinBuilder())
 grpc.Dial(targetName)
 ```
 
@@ -103,7 +103,13 @@ Upon dialing, gRPC calls resolver API to resolve target name, and also gets the 
 The resolver used to resolve the target is picked from the resolvers registered (including default resolvers and custom resolvers), based the target name [scheme](https://github.com/grpc/grpc/blob/master/doc/naming.md#name-syntax). 
 The RegisterResolver() API registers the resolver to a global resolver map, and the scheme in targetName decides which resolver to use. If targetName doesn't contain a scheme, a default resolver (DNS) will be used.
 
-RegisterBalancer() API registers a balancer. When choosing a balancer to use, 1) If at least one of the resolved addresses is grpclb, use grpclb 2) If service config specifies a balancer, use that 3) If user provided a balancer with WithBalancer() API, use that (this is consistent with the old behavior) 4) Otherwise, use pick-first.
+RegisterBalancer() API registers a balancer. When choosing a balancer to use, the following list is checked in order:
+
+ 1. Use the balancer provided by v1 WithBalancer() API (consistent with the old behavior, and balancer auto switching will be disabled)
+ 1. Use grpclb if at least one of the resolved addresses is grpclb
+ 1. Use the balancer specified by service config
+ 1. Use the balancer provided by WithBalancerName() dial option 
+ 1. Use pick_first
 
 #### Address updates 
 
@@ -111,7 +117,7 @@ gRPC watches the updates from resolver. When a new resolver update is received, 
 
 gRPC provides callbacks for balancers to create and remove connections. Balancer should be watching resolved address updates from gRPC, and call the callbacks with the newly updated addresses.
 
-Note that the connection pool is built on the addresses from balancer, not on the addresses from resolver. The addresses used to create connections and addresses used to create subconns are separate, and can be totally unrelated. The balancer can use a list of addresses totally different from the list received to create new connections (grpclb for example). And gRPC doesn't invalidate the connection in the connection pool on resolver updates. Only callbacks from balancer removing addresses can invalidate connections.
+Note that the connection pool is built on the addresses from balancer, not on the addresses from resolver. The addresses used to create connections and addresses used to create subconns are separate, and can be totally unrelated. The balancer can use a list of addresses totally different from the list received to create new connections (grpclb for example). And gRPC doesn't invalidate the connection in the connection pool on resolver updates. Only callbacks from balancer to remove addresses can invalidate connections.
 
 There will be a goroutine watching updates from resolver, maintaining the address pool, and sending updates to balancer.
 
@@ -121,7 +127,7 @@ Note that the resolver API is changed to returning the full address list, not ju
 
 gRPC notifies the balancer of connection whose connectivity state has changed. So balancer can make load balancing decisions based on the connection status.
 
-Also, balancers need to aggregate the connectivity state of all connections, add its own state and report the overall state through connectivity state interface.
+Also, balancers need to aggregate the connectivity state of all connections, add its own state and report the overall state as part of the state of the balancer.
 
 Note that Balancers need to send a signal to gRPC if its internal state has changed, which may have made it valid for gRPC to call another pick, to unblock RPCs blocking on no-connection-available error.
 
@@ -133,7 +139,9 @@ See the comments on Pick() for details on the expected behavior from balancer.
 
 #### Swapping out balancer 
 
-When there's a change in service config LoadBalancingPolicy (or other equivalent such as resolved addresses are balancer servers not backends) which causes the balancer being swapped out, gRPC will
+When there's a change in service config LoadBalancingPolicy (or other equivalent such as resolved addresses are balancer servers not backends) which causes the balancer being swapped out, gRPC will close the existing balancer and build a new balancer. The existing picker will still be used to pick until a new picked is returned from the new balancer.
+
+Optimizations can be done to reuse existing connections in this process:
 
 1.  Build the new balancer with balancer config
 1.  When gRPC callbacks gets called by balancer to create new connections:
@@ -230,8 +238,8 @@ type Builder interface {
 // PickOptions contains addition information for the Pick operation.
 type PickOptions struct{}
 
-// PutInfo contains additional information for Put.
-type PutInfo struct {
+// DoneInfo contains additional information for Done.
+type DoneInfo struct {
 	// Err is the rpc error the RPC finished with. It could be nil.
 	Err error
 }
@@ -268,10 +276,10 @@ type Picker interface {
 	//     is called to pick again;
 	//   - Otherwise, RPC is failed with unavailable error.
 	//
-	// The returned put() function will be called once the rpc has finished, with the
+	// The returned done() function will be called once the rpc has finished, with the
 	// final status of that RPC.
 	// It could be nil if balancer doesn't care about the RPC status.
-	Pick(ctx context.Context, opts PickOptions) (conn SubConnection, put func(PutInfo), err error)
+	Pick(ctx context.Context, opts PickOptions) (conn SubConnection, done func(DoneInfo), err error)
 }
 
 // Balancer takes the input from gRPC, manages SubConnections and collect and aggregate
@@ -319,7 +327,7 @@ const (
 // Reporter reports the connectivity states.
 type Reporter interface {
 	CurrentState() State
-	WaitForStateChange(context.Context, State)
+	WaitForStateChange(context.Context, State) bool
 }
 ```
 
@@ -331,7 +339,6 @@ package resolver
 // SetDefaultScheme sets the default scheme that will be used.
 // The default default scheme is "dns".
 func SetDefaultScheme(scheme string) {
-	...
 }
 
 // AddressType indicates the address type returned by name resolution.
