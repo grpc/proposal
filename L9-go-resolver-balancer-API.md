@@ -3,19 +3,19 @@ Resolver and balancer API changes
 * Author(s): menghanl, dfawley, mmukhi
 * Approver: a11r
 * Status: Implemented
-* Implemented in: <language, ...>
+* Implemented in: go
 * Last updated: 2018/01/17
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/rUDN7-cZvz8
 
 ## Abstract
 
-The current balancer API in gRPC-go cannot support balancer hot switching. There are also other issues related to balancer, resolver and connectivity state.
+The v1 balancer API in gRPC-go cannot support balancer hot switching. There are also other issues related to balancer, resolver and connectivity state.
 
-This document contains the current implementation of balancer in gRPC-go, the issues that cannot be solved with the current set of APIs, and proposed solutions for the issues.
+This document contains the v1 implementation of balancer in gRPC-go, the issues that cannot be solved with the v1 set of APIs, and proposed solutions for the issues.
 
 ## Background
 
-### The current implementation
+### The v1 implementation
 
 ![before](L9_graphics/bar_before.png)
 
@@ -35,7 +35,7 @@ gRPC starts the balancer with the target name. The balancer in the example will 
 
 Balancer gets the address updates from resolver, maintains a pool of resolved addresses, and notifies gRPC of the addresses to which gRPC should create connections. gRPC will create a connection to each of the address, and maintain the connection pool. There will be a gRPC goroutine watching balancer updates and maintaining the connection pool. (Address is the address(IP) + some metadata, so it's possible to create multiple connections to one same server).
 
-Note that the updates in the current resolver API are delta, not the full address list. This is the reason of one of our issues.
+Note that the updates in the v1 resolver API are delta, not the full address list. This is the reason of one of our issues.
 
 ##### If balancer is not provided
 
@@ -55,7 +55,7 @@ gRPC first gets an address picked by the balancer. Balancer picks the address ba
 
 Upon service config updating, gRPC will look at the LoadBalancingPolicy field and decide which balancing policy to use. If the LoadBalancingPolicy specified by the service config is different from what's currently being used, gRPC should be able to change the policy. Refer to go/grpc-service-config for more details on this.
 
-Right now, there's no API to notify balancer of service config changes, so to change the balancing policy, the balancer needs to be swapped out. But swapping out the balancer and at the same time keeping the old resolver and address pool is not feasible because of the current structure.
+Right now, there's no API to notify balancer of service config changes, so to change the balancing policy, the balancer needs to be swapped out. But swapping out the balancer and at the same time keeping the old resolver and address pool is not feasible because of the v1 structure.
 
 #### Randomize the resolved address list 
 
@@ -486,13 +486,13 @@ type Resolver interface {
 
 ### Resolver should be able to randomize the resolved address list 
 
-The current resolver API returns delta, not the full list. To support randoming the returned address list, there are 3 possible solutions:
+The v1 resolver API returns delta, not the full list. To support randoming the returned address list, there are 3 possible solutions:
 
 1.  Change the resolver API to return the full list
     *   Pro: most straightforward, and each resolver implementation can decide on if they want to randomize the address list
     *   Con: it will be an API change
 1.  Do the randomize in balancer, because balancer maintains the address pool
-    *   Pro: no API change, and the current structure still works
+    *   Pro: no API change, and the v1 structure still works
     *   Con: randomizing the resolved address list becomes part of the implementation of balancer, each balancer implementation needs to do it, and it's out of the control of resolvers
 1.  Change the structure between resolver, balancer and gRPC. gRPC talks to resolver and balancer, and also maintains the address pool. gRPC does the randomization on the address pool.
     *   Pro: no API change for resolver, not every balancer needs to implement randomization
@@ -545,7 +545,7 @@ To get information from a channel or blocking function call, balancers need to c
 
 The implementation includes multiple steps and PRs:
 
-*  Change the interfaces and migrate current existing balancers
+*  Change the interfaces and migrate v1 existing balancers
    * Provide a way to wrap old balancers into new APIs
 *  Add support for service config based on the new APIs
 *  Support switching balancers
