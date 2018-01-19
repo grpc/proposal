@@ -5,7 +5,7 @@ Core API to estimate the memory usage of channels and servers
 * Status: {In-Review}
 * Implemented in: core
 * Last updated: 1/18/2018
-* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/FPoXprcT0d4
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/yPqUrrghG44
 
 ## Abstract
 
