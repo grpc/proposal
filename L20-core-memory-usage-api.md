@@ -15,7 +15,7 @@ like Channels and Servers.
 ## Background
 
 Some wrapped languages have garbage collectors that act lazily and that
-don't account for memory that was not allocated by the the language's own
+don't account for memory that was not allocated by the language's own
 memory manager. For example, to the ruby garbage collector, a c-core Channel only
 costs as much memory as the thin wrapper object itself, even though it might actually
 end up allocating much more than that internally for different reasons.
@@ -26,10 +26,11 @@ of informing their garbage collectors about it.
 
 ### Related Proposals:
 https://github.com/grpc/proposal/pull/54 is an explicit API that lets the user
-releases resources explicitly. This API helps to inform the garbage collector
-specifically about memory usage. It could help especially in e.g. the case in which
-there are many <i>live</i> channels consuming large amounts of memory, and we
-want to inform the GC about it.
+releases resources explicitly.
+The API in this proposal is different than #54 because this proposal helps to
+inform the garbage collector specifically about memory usage. It could help
+especially in e.g. the case in which there are many <i>live</i> channels
+consuming large amounts of memory, and we want to inform the GC about it.
 
 ## Proposal
 
