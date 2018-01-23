@@ -37,36 +37,27 @@ The data will be exported as JSON formatted string. The JSON must conform with t
 ```
 {
   "channelData": {
+    "uuid": string,
     "numNodesLogged": number,
     "startTime": timestamp string,
     "nodes": [
       {
-        "uuid": string,
         "data": string,
         "error": string,
         "time": timestamp string,
         // can only be one of the states in connectivity_state.h
         "state": enum string,
-        // uuid of referenced subchannel
-        "subchannel_uuid": string
+        // uuid of referenced subchannel.
+        // Optional, only present if this event refers to a child object.
+        // and example of a referenced child would be a trace event for a
+        // subchannel being created.
+        "child_uuid": string
       },
     ]
   },
-  "numSubchannelsSeen": number,
-  "subchannelData": [
-    {
-      "uuid": string,
-      "numNodesLogged": number,
-      "startTime": timestamp string,
-      "nodes": [
-        {
-          "data": string,
-          "error": string,
-          "time": timestamp string,
-          "state": enum string,
-        },
-      ]
-    },
+  // Optional, only present if this channel has children
+  "childData": [
+    // List of child data, which is of the exact same format as the
   ]
 }
 ```
