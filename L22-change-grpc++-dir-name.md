@@ -8,7 +8,7 @@ gRPC C++ Public Header Directory Change
 * Discussion at: https://groups.google.com/d/msg/grpc-io/SDyc0hSWWG8/pX2n9BSNAQAJ
 
 ## Abstract
-This proposal is to change the name of directory `include/grpc++` to `include/grpcxx` for compatibility issues. 
+This proposal is to change the name of directory `include/grpc++` to `include/grpcpp` for compatibility issues. 
 
 ## Background
 gRPC C++ headers have been using the directory `include/grpc++` for a long time. Currently, users use `#include <grpc++/...>` to include gRPC headers in their source code. Some gRPC internal code and public headers also use this style to include gRPC public headers.
@@ -24,11 +24,11 @@ The 3 restrictions make it impossible to make gRPC C++ library work as Apple fra
 
 ## Proposal
 
-The proposal is to migrate `include/grpc++` directory to `include/grpcxx` in a backwards compatible manner. The objective is that both styles of inclusion `#include <grpc++/...>` and `#include <grpcxx/...>` can be used for all past and future gRPC C++ users.
+The proposal is to migrate `include/grpc++` directory to `include/grpcpp` in a backwards compatible manner. The objective is that both styles of inclusion `#include <grpc++/...>` and `#include <grpcpp/...>` can be used for all past and future gRPC C++ users.
 
 ### Changes to gRPC C++ API
 
-- Make `include/grpcxx` directory the new location for all gRPC C++ public headers; move all current headers from `include/grpc++` to `include/grpcxx`; update all corresponding inclusions inside gRPC code base;
+- Make `include/grpcpp` directory the new location for all gRPC C++ public headers; move all current headers from `include/grpc++` to `include/grpcpp`; update all corresponding inclusions inside gRPC code base;
 - Make wrapper headers in `include/grpc++` for all C++ public headers, preserving the directory structure. This makes current gRPC users build with old directory name. Add deprecation notice to wrapper headers as comments. 
 - Update build systems to expose both headers and wrappers headers to users.
 
