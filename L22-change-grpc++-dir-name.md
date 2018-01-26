@@ -5,7 +5,7 @@ gRPC C++ Public Header Directory Change
 * Status: draft
 * Implemented in: C++
 * Last updated: 01/25/2018
-* Discussion at: 
+* Discussion at: https://groups.google.com/d/msg/grpc-io/SDyc0hSWWG8/pX2n9BSNAQAJ
 
 ## Abstract
 This proposal is to change the name of directory `include/grpc++` to `include/grpcxx` for compatibility issues. 
