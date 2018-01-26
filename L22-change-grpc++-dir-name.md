@@ -31,8 +31,6 @@ The proposal is to migrate `include/grpc++` directory to `include/grpcxx` in a b
 - Make `include/grpcxx` directory the new location for all gRPC C++ public headers; move all current headers from `include/grpc++` to `include/grpcxx`; update all corresponding inclusions inside gRPC code base;
 - Make wrapper headers in `include/grpc++` for all C++ public headers, preserving the directory structure. This makes current gRPC users build with old directory name.
 
-Wrapper headers in `include/grpc++` may be generated with a script by `generate\_projects.sh` to guarantee that every header in `include/grpcxx` has a corresponding wrapper.
-
 ## Rationale
 We think this change is reasonable since, as mentioned in Background section, the old directory name may hurt again in the future. Since this is a rather big API change in C++, wrapper headers are created to make current users build. With this change in place:
 - Users who need to maintain backwards compatibility can keep using the old directory name;
