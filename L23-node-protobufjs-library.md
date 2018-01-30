@@ -5,7 +5,7 @@ Standalone Node.js gRPC+Protobuf.js Library API
 * Status: Draft
 * Implemented in: Node.js
 * Last updated: 2018-01-30
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/t7XFE7Wevow
 
 ## Abstract
 
