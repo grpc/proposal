@@ -273,7 +273,9 @@ smaller than the corresponding call counters.  Conversely, if a stream fails and
 the call is retriable, a new stream may be started.  This could make the stream
 counts higher than the call counts.  Streams are considered successful if they
 have the HTTP/2 EoS bit set, or failed if terminated otherwise (usually an
-HTTP/2 RST_STREAM frame).
+HTTP/2 RST_STREAM frame).  The number of successful streams may also be greater
+than the number of successful calls.  For example, if the stream completes 
+successfully, but the gRPC trailers are invalid.
 
 The message counts represent how many gRPC messages are sent and received.
 Calls may send and receive any number of messages, including zero.
@@ -302,10 +304,10 @@ constantly evolving number, which each endpoint sending chunks of window.  For
 the particular flow control windows in the socket data, they are the windows as
 defined by the underlying transport.  For example, HTTP/2 transports report the
 connection level flow control window.  Implementations that don't support flow
-control may set this to the max value, implying that there is no limitation.
-Note that only the connection level flow control window is reported, rather than
-the stream level.  TCP level flow and congestion control counters are exposed
-via socket options.
+control may leave this blank, implying the limitation is either unknown or 
+doesn't exist.  Note that only the connection level flow control window is 
+reported, rather than the stream level.  TCP level flow and congestion control 
+counters are exposed via socket options.
 
 #### Socket Options
 
@@ -636,7 +638,7 @@ errors about the channel not being found.
 
 ## Proto
 
-```
+```proto
 syntax = "proto3";
 
 package grpc.channelz;
@@ -668,7 +670,8 @@ message Channel {
   repeated SocketRef socket = 5;
 }
 
-// Channel is a logical grouping of channels, subchannels, and sockets.
+// Subchannel is a logical grouping of channels, subchannels, and sockets. 
+// A subchannel is load balanced over by it's ancestor channel or subchannel.
 message Subchannel {
   // The identifier for this channel.
   SubchannelRef ref = 1;
@@ -832,12 +835,12 @@ message SocketData {
   // The amount of window, granted to the local endpoint by the remote endpoint.
   // This may be slightly out of date due to network latency.  This does NOT
   // include stream level or TCP level flow control info.
-  int64 local_flow_control_window = 11;
+  google.protobuf.Int64Value local_flow_control_window = 11;
 
   // The amount of window, granted to the remote endpoint by the local endpoint.
   // This may be slightly out of date due to network latency.  This does NOT
   // include stream level or TCP level flow control info.
-  int64 remote_flow_control_window = 12;
+  google.protobuf.Int64Value  remote_flow_control_window = 12;
 
   repeated SocketOption option = 13;
 }
@@ -957,7 +960,7 @@ service Channelz {
   rpc GetTopChannels(GetTopChannelsRequest) returns (GetTopChannelsResponse);
   // Gets all servers that exist in the process.
   rpc GetServers(GetServersRequest) returns (GetServersResponse);
-  // Gets all server sockets servers that exist in the process.
+  // Gets all server sockets that exist in the process.
   rpc GetServerSockets(GetServerSocketsRequest) returns (GetServerSocketsResponse);
   // Returns a single Channel, or else a NOT_FOUND code.
   rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
