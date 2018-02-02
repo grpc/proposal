@@ -628,7 +628,7 @@ if the implementation ever wanted to.   No known implementations do this, but it
 isn't forbidden.  Specifying the full hierarchy in the key would give rise to
 errors about the channel not being found.
 
-[message ref structure]: A14/1.svg "Message Reference Structure"
+[message ref structure]: A14/1.png "Message Reference Structure"
 [channel hierarchy 1]: A14/2.svg "Channel Hierarchy"
 [channel hierarchy 2]: A14/3.svg "Channel Hierarchy"
 [channel hierarchy 3]: A14/4.svg "Channel Hierarchy"
