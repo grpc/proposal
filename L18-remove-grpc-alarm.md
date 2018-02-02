@@ -2,7 +2,7 @@ Delete grpc_alarm from gRPC core API
 ----
 * Author(s): vjpai
 * Approver: a11r
-* Status: Proposed
+* Status: Approved
 * Implemented in: https://github.com/grpc/grpc/pull/14015
 * Last updated: January 14, 2018
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/ikqxu_dzqQs
