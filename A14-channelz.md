@@ -117,11 +117,11 @@ parameters and their call stats.  Currently the data includes:
 
 In general, each piece of data included is specific to the channel itself and
 NOT of its descendent channels.  This is to say that an ancestor channel
-is not an aggregator for descendent channels.  The target of a channel or
-subchannel may be different from that of its parent, or not present at all.  The
-channel state may be different from the ancestor channel state.   The number of
-calls started, succeeded, and failed should reflect if calls were specifically
-tied to the channel.
+is not an aggregator for descendent channels.  The target of a descendent channel
+may be different from that of its parent.  The target of a descendent subchannel 
+may not be present.  The channel state may be different from the ancestor channel
+state.   The number of calls started, succeeded, and failed should reflect if 
+calls were specifically tied to the channel.
 
 The number of calls started, succeeded, and failed on a channel gives insight
 into the activity of the channel.  Subtracting the number of failed and
@@ -142,8 +142,7 @@ specific to the channel, and not an aggregation of descendent channel traces.
 The channel traces may include ids pointing to channels and subchannels outside
 of the current DAG.  Since channel traces use the same ids as the channels 
 themselves, this allows a user to query for more information about a channel 
-given its trace.  For example, the trace may mention that name resolution 
-failed on a different channel outside of the tree.
+given its trace.
 
 ### Descendent channels
 
@@ -629,7 +628,7 @@ isn't forbidden.  Specifying the full hierarchy in the key would give rise to
 errors about the channel not being found.
 
 [message ref structure]: A14/1.png "Message Reference Structure"
-[channel hierarchy 1]: A14/2.svg "Channel Hierarchy"
+[channel hierarchy 1]: A14/2.png "Channel Hierarchy"
 [channel hierarchy 2]: A14/3.svg "Channel Hierarchy"
 [channel hierarchy 3]: A14/4.svg "Channel Hierarchy"
 [connectivity-semantics](https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md)
