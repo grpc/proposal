@@ -629,7 +629,7 @@ errors about the channel not being found.
 
 [message ref structure]: A14/1.png "Message Reference Structure"
 [channel hierarchy 1]: A14/2.png "Channel Hierarchy"
-[channel hierarchy 2]: A14/3.svg "Channel Hierarchy"
+[channel hierarchy 2]: A14/3.png "Channel Hierarchy"
 [channel hierarchy 3]: A14/4.svg "Channel Hierarchy"
 [connectivity-semantics](https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md)
 
