@@ -2,9 +2,9 @@ gRPC Channelz
 ====
 * Author(s): Carl Mastrangelo
 * Approver: a11r
-* Status: In Review
+* Status: Approved
 * Implemented in: 
-* Last updated: 11/1/17
+* Last updated: 2/5/18
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/5IYOMVm0Ufs
 
 Abstract
@@ -672,7 +672,13 @@ message Channel {
 }
 
 // Subchannel is a logical grouping of channels, subchannels, and sockets. 
-// A subchannel is load balanced over by it's ancestor channel or subchannel.
+// A subchannel is load balanced over by it's ancestor     /**
+     * One or more listeners. Can be a {@link GenericFutureListener} or a {@link DefaultFutureListeners}.
+     * If {@code null}, it means either 1) no listeners were added yet or 2) all listeners were notified.
+     *
+     * Threading - synchronized(this). We must support adding listeners when there is no EventExecutor.
+     */
+    private Object listeners;channel or subchannel.
 message Subchannel {
   // The identifier for this channel.
   SubchannelRef ref = 1;
