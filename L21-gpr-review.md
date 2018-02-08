@@ -2,7 +2,7 @@ Privatize gpr_ headers that are not used by wrapped languages
 ----
 * Author(s): vjpai
 * Approver: nicolasnoble
-* Status: Proposed
+* Status: Approved
 * Implemented in: https://github.com/grpc/grpc/pull/14184, https://github.com/grpc/grpc/pull/14190, https://github.com/grpc/grpc/pull/14196, https://github.com/grpc/grpc/pull/14197
 * Last updated: January 25, 2018
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/xdKVhaGhhAE
