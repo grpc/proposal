@@ -34,9 +34,13 @@ Curate the contents of `include/grpc/support`
 any public API (e.g., `time.h`, `alloc.h`, ...)
 - Move entries to `test/core/util` if they are only used to support
   tests (e.g. `cmdline.h`, `subprocess.h`)
-- Move entries to `src/core/lib/gpr` if they are used only in the core
+- Move entries to `src/core/lib` if they are used only in the core
   and C++ API implementations but not used for any public-facing API
-  (e.g., `avl.h`, `tls.h`)
+  (e.g., `avl.h`, `tls.h`). Files like `tls.h` that relate to portability
+  concerns should be in `src/core/lib/gpr` while those like `avl.h`
+  that are purely algorithmic should move elsewhere in `src/core/lib`
+  and change the `gpr_` prefix in their public contents with the
+  `grpc_` prefix.
 
 ## Rationale
 
