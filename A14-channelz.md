@@ -701,16 +701,18 @@ message Subchannel {
   repeated SocketRef socket = 5;
 }
 
+enum ChannelConnectivityState {
+  UNKNOWN = 0;
+  IDLE = 1;
+  CONNECTING = 2;
+  READY = 3;
+  TRANSIENT_FAILURE = 4;
+  SHUTDOWN = 5;
+}
+
 message ChannelData {
-  enum State {
-    UNKNOWN = 0;
-    IDLE = 1;
-    CONNECTING = 2;
-    READY = 3;
-    TRANSIENT_FAILURE = 4;
-    SHUTDOWN = 5;
-  }
-  State state = 1;
+
+  ChannelConnectivityState state = 1;
 
   // The target this channel originally tried to connect to.  May be absent
   string target = 2;
@@ -728,8 +730,27 @@ message ChannelData {
   google.protobuf.Timestamp last_call_started_timestamp = 7;
 }
 
+message ChannelTraceEvent {
+  string description = 1;
+  string error = 2;
+  google.protobuf.Timestamp event_timestamp = 3;
+  ChannelConnectivityState state = 4;
+  // uuid of referenced subchannel.
+  // Optional, only present if this event refers to a child object.
+  string child_uuid = 5; 
+}
+
+message ChannelTraceData {
+  string uuid = 1;
+  int64 num_events_logged = 2;
+  google.protobuf.Timestamp channel_created_timestamp = 3;
+  repeated ChannelTraceEvent events = 4;
+}
+
 message ChannelTrace {
-  // TODO: fill this in.
+  ChannelTraceData channel_data = 1;
+  // Optional, only present if this channel has children
+  repeated ChannelTrace child_data = 2;
 }
 
 message ChannelRef {
@@ -777,7 +798,7 @@ message Server {
 }
 
 message ServerData {
-  ServerChannelTrace trace = 1;
+  ChannelTrace trace = 1;
   
   // The number of incoming calls started on the server
   int64 calls_started = 2;
@@ -788,10 +809,6 @@ message ServerData {
 
   // The last time a call was started on the server.
   google.protobuf.Timestamp last_call_started_timestamp = 5;
-}
-
-message ServerChannelTrace {
-  // TODO: fill this in.
 }
 
 // Information about an actual connection.  Pronounced "sock-ay".

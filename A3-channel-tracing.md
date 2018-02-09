@@ -47,13 +47,13 @@ The data will be exported as JSON formatted string. The JSON must conform with t
 
 ```
 {
-  "channelData": {
+  "channel_data": {
     "uuid": string,
-    "numEventsLogged": number,
-    "startTime": timestamp string,
+    "num_events_logged": number,
+    "channel_created_timestamp": timestamp string,
     "events": [
       {
-        "data": string,
+        "description": string,
         "error": string,
         "time": timestamp string,
         // can only be one of the states in connectivity_state.h
@@ -67,7 +67,7 @@ The data will be exported as JSON formatted string. The JSON must conform with t
     ]
   },
   // Optional, only present if this channel has children
-  "childData": [
+  "child_data": [
     // List of child data, which is of the exact same format as the
   ]
 }
