@@ -4,7 +4,7 @@ Channel Tracing
 * Approver: markdroth
 * Status: Draft
 * Implemented in: N/A
-* Last updated: 01/02/18
+* Last updated: 02/09/18
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/WFDj3KeHYTI
 
 ## Table of Contents
@@ -16,30 +16,32 @@ Channel Tracing
 
 ## Terminology
 
-This design uses the same terminology discussed in the [channelz](A14-channelz.md) design.
+This design uses the same terminology discussed in the [channelz](A14-channelz.md) design. Channels and subchannels will be handled by the same channel tracing code, so for this design, a channel means either a channel or subchannel from the channelz terminology.
 
 In addition, the following terminology will be used:
-1.  an "trace event" is an interesting thing that happens to a channel. Example include things like creation, address resolution, subchannel creation, connectivity state changes.
-2. "trace data" is all of the data that is contained for one channel. This includes a list of trace events, as well as metadata like the timestamp at which the channel was created.
-3.  a "tracing object" is an in-memory data structure responsible for holding the trace data for a single channel.
+
+1.  a "Trace event" is an interesting thing that happens to a channel. Example include things like creation, address resolution, subchannel creation, connectivity state changes.
+2. "Trace data" is all of the data that is contained for one channel. This includes a list of _Trace events_, as well as metadata like the timestamp at which the channel was created.
+3.  a "Tracing object" is an in-memory data structure responsible for holding the _Trace data_ for a single channel.
 
 ## Abstract
 
-The document proposes adding a dedicated, in-memory tracing object for every channel and subchannel. The tracing object will record important events in the life of a channel, like address resolution, subchannel creation, channel state changes, etc etc. The trace data from this tracing object will be made available through a new gRPC API as a JSON formatted string.
+The document proposes adding a dedicated _Tracing object_ for every channel and subchannel. The _Tracing object_ will record important events in the life of a channel, like address resolution, subchannel creation, channel state changes, etc. The _Trace data_ from this _Tracing object_ will be made available through a new gRPC API as a JSON formatted string.
 
 Channel tracing is one aspect of the wider design, [channelz](A14-channelz.md).
 
 ## Background
 
-Channel connectivity issues are the root cause of a significant portion of user reported gRPC bugs. Channel tracing will be exceedingly helpful for getting live channel data from a misbehaving program.
+Channel connectivity issues are the root cause of a significant portion of user reported gRPC bugs. Channel tracing will be helpful for getting live channel data from a misbehaving program.
 
 ## Proposal
 
-To implement channel tracing, implementations will use a dedicated, in-memory tracing object that is owned by each channel and subchannel. We will add an API that allows library users to retrieve all of the tracing object's data for the channel as a JSON formatted string. Implementations must expose a toggle for this behavior (for example, C++ will add a new channel argument, GRPC_ARG_CHANNEL_TRACING).
+To implement channel tracing, implementations will use a dedicated, in-memory _Tracing object_ that is owned by each channel and subchannel. We will add an API that allows library users to retrieve all of the _Tracing object's_ data for the channel as a JSON formatted string. Implementations must expose a toggle for this behavior (for example, C++ will add a new channel argument, GRPC_ARG_CHANNEL_TRACING).
 
-Since the tracing object exists in memory, care must be taken to prevent the tracing object from using too much memory. Implementations must allow setting a _max_trace_events_ variable to control how many trace events are allowed in any tracing object's event list. Once the limit is reached, the oldest trace event will be overwritten by a new one (a circular buffer).
+Since the tracing objects may consume large amounts of space, care must be taken to prevent the _Tracing object_ from using too many resources. gRPC implementations should allow limiting the number of _Trace events_ retained to a global maximum, as well as a per channel or subchannel maximum.
 
-At certain points a particular subchannel might stop being used. However, the tracing object for that subchannel may still be needed if any trace events from other tracing object reference the subchannel (as in the case of a parent's subchannel being destroyed). In order to efficiently discard old subchannels, implementations must free the tracing object for a subchannel when the trace event signaling that subchannel's destruction is overwritten in the last parent channel to reference it.
+Implementations must keep the _Trace data_ for a subchannel until the _Trace event_ signaling that subchannel's destruction is overwritten or garbage collected in the last parent channel to reference it. After that point, implementations are free to use an appropriate garbage collection algorithm to reclaim the memory that the subchannel's _Tracing object_ was holding.
+
 
 ## Format of Exported Data
 
@@ -48,13 +50,13 @@ The data will be exported as JSON formatted string. The JSON must conform with t
 ```
 {
   "channel_data": {
-    "uuid": string,
+    "channel_id": string,
     "num_events_logged": number,
     "channel_created_timestamp": timestamp string,
     "events": [
       {
         "description": string,
-        "error": string,
+        "status": string,
         "time": timestamp string,
         // can only be one of the states in connectivity_state.h
         "state": enum string,
@@ -62,7 +64,7 @@ The data will be exported as JSON formatted string. The JSON must conform with t
         // Optional, only present if this event refers to a child object.
         // and example of a referenced child would be a trace event for a
         // subchannel being created.
-        "child_uuid": string
+        "child_channel_id": string
       },
     ]
   },

@@ -4,7 +4,7 @@ gRPC Channelz
 * Approver: a11r
 * Status: Approved
 * Implemented in: 
-* Last updated: 2/5/18
+* Last updated: 02/09/18
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/5IYOMVm0Ufs
 
 Abstract
@@ -647,6 +647,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
+import "google/rpc/status.proto";
 
 // Channel is a logical grouping of channels, subchannels, and sockets.
 message Channel {
@@ -701,13 +702,18 @@ message Subchannel {
   repeated SocketRef socket = 5;
 }
 
-enum ChannelConnectivityState {
-  UNKNOWN = 0;
-  IDLE = 1;
-  CONNECTING = 2;
-  READY = 3;
-  TRANSIENT_FAILURE = 4;
-  SHUTDOWN = 5;
+// These come from the specified states in this document:
+// https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
+message ChannelConnectivityState {
+  enum State {
+    UNKNOWN = 0;
+    IDLE = 1;
+    CONNECTING = 2;
+    READY = 3;
+    TRANSIENT_FAILURE = 4;
+    SHUTDOWN = 5;
+  }
+  State state = 1;
 }
 
 message ChannelData {
@@ -730,27 +736,39 @@ message ChannelData {
   google.protobuf.Timestamp last_call_started_timestamp = 7;
 }
 
+// A trace event is an interesting thing that happened to a channel or
+// subchannel, such as creation, address resolution, subchannel creation, etc.
 message ChannelTraceEvent {
+  // High level description of the event.
   string description = 1;
-  string error = 2;
+  // Status/error associated with this event. 
+  google.rpc.Status status = 2;
+  // When this event occurred.
   google.protobuf.Timestamp event_timestamp = 3;
+  // The connectivity state the channel was in when this event occurred.
   ChannelConnectivityState state = 4;
   // uuid of referenced subchannel.
-  // Optional, only present if this event refers to a child object.
-  string child_uuid = 5; 
+  // Optional, only present if this event refers to a child object. For example,
+  // this field would be filled if this trace event was for a subchannel being
+  // created.
+  int64 child_channel_id = 5; 
 }
 
 message ChannelTraceData {
-  string uuid = 1;
+  int64 channel_id = 1;
   int64 num_events_logged = 2;
   google.protobuf.Timestamp channel_created_timestamp = 3;
   repeated ChannelTraceEvent events = 4;
 }
 
 message ChannelTrace {
-  ChannelTraceData channel_data = 1;
+  // Ref to the channel or subchannel that this trace is associated with.
+  // Only one of "channel_ref" and "subchannel_ref" can be set.
+  ChannelRef channel_ref = 1
+  SubchannelRef subchannel_ref = 2;
+  ChannelTraceData channel_data = 3;
   // Optional, only present if this channel has children
-  repeated ChannelTrace child_data = 2;
+  repeated ChannelTrace child_data = 4;
 }
 
 message ChannelRef {
