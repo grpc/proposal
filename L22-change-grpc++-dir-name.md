@@ -2,7 +2,7 @@ gRPC C++ Public Header Directory Change
 ----
 * Author(s): muxi
 * Approver: nicolasnoble
-* Status: draft
+* Status: approved
 * Implemented in: C++
 * Last updated: 01/25/2018
 * Discussion at: https://groups.google.com/d/msg/grpc-io/SDyc0hSWWG8/pX2n9BSNAQAJ
@@ -39,4 +39,4 @@ We think this change is reasonable since, as mentioned in Background section, th
 - Users who need to use gRPC C++ as Apple framework must use the new directory name.
 
 ## Implementation
-Will be implement as part of the [gRPC C++ cocoapods library](https://github.com/grpc/grpc/issues/13582) efforts.
+Will be implemented as part of the [gRPC C++ cocoapods library](https://github.com/grpc/grpc/issues/13582) efforts.
