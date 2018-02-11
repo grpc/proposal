@@ -20,7 +20,7 @@ This design uses the same terminology discussed in the [channelz](A14-channelz.m
 
 In addition, the following terminology will be used:
 
-1.  a "Trace event" is an interesting thing that happens to a channel. Example include things like creation, address resolution, subchannel creation, connectivity state changes.
+1.  a "Trace event" is an interesting thing that happens to a channel. Examples include things like creation, address resolution, subchannel creation, connectivity state changes.
 2. "Trace data" is all of the data that is contained for one channel. This includes a list of _Trace events_, as well as metadata like the timestamp at which the channel was created.
 3.  a "Tracing object" is an in-memory data structure responsible for holding the _Trace data_ for a single channel.
 
@@ -49,13 +49,21 @@ The data will be exported as JSON formatted string. The JSON must conform with t
 
 ```
 {
+  "channel_id": string,
   "channel_data": {
-    "channel_id": string,
+    // Number of events ever logged in this tracing object. This can differ from
+    // events.size() because events can be overwritten or garbage collected by
+    // implementations.
     "num_events_logged": number,
+    // Time that this channel was created.
     "channel_created_timestamp": timestamp string,
+    // List of events that have occurred on this channel.
     "events": [
       {
+        // High level description of the event.
         "description": string,
+        // Status/error associated with this event.
+        // Optional, only present is Status != OK. 
         "status": string,
         "time": timestamp string,
         // can only be one of the states in connectivity_state.h
@@ -70,7 +78,8 @@ The data will be exported as JSON formatted string. The JSON must conform with t
   },
   // Optional, only present if this channel has children
   "child_data": [
-    // List of child data, which is of the exact same format as the
+    // List of child data, which is of the exact same format as this
+    // entire JSON object.
   ]
 }
 ```

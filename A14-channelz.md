@@ -741,13 +741,14 @@ message ChannelData {
 message ChannelTraceEvent {
   // High level description of the event.
   string description = 1;
-  // Status/error associated with this event. 
+  // Status/error associated with this event.
+  // Optional, only present is Status != OK. 
   google.rpc.Status status = 2;
   // When this event occurred.
   google.protobuf.Timestamp event_timestamp = 3;
   // The connectivity state the channel was in when this event occurred.
   ChannelConnectivityState state = 4;
-  // uuid of referenced subchannel.
+  // channel_id of referenced subchannel.
   // Optional, only present if this event refers to a child object. For example,
   // this field would be filled if this trace event was for a subchannel being
   // created.
@@ -755,17 +756,23 @@ message ChannelTraceEvent {
 }
 
 message ChannelTraceData {
-  int64 channel_id = 1;
-  int64 num_events_logged = 2;
-  google.protobuf.Timestamp channel_created_timestamp = 3;
-  repeated ChannelTraceEvent events = 4;
+  // Number of events ever logged in this tracing object. This can differ from
+  // events.size() because events can be overwritten or garbage collected by
+  // implementations.
+  int64 num_events_logged = 3;
+  // Time that this channel was created.
+  google.protobuf.Timestamp channel_created_timestamp = 4;
+  // List of events that have occurred on this channel.
+  repeated ChannelTraceEvent events = 5;
 }
 
 message ChannelTrace {
-  // Ref to the channel or subchannel that this trace is associated with.
-  // Only one of "channel_ref" and "subchannel_ref" can be set.
-  ChannelRef channel_ref = 1
-  SubchannelRef subchannel_ref = 2;
+  // Ref to the channel or subchannel this trace refers to.
+  oneof ref {
+    ChannelRef channel_ref = 1;
+    SubchannelRef subchannel_ref = 2;
+  }
+  // All of the data for this channel.
   ChannelTraceData channel_data = 3;
   // Optional, only present if this channel has children
   repeated ChannelTrace child_data = 4;
