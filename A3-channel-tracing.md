@@ -48,13 +48,29 @@ Implementations must keep the _Trace data_ for a subchannel until the _Trace eve
 The data will be exported as JSON formatted string. The JSON must conform with the [protobuf-json mapping chart](https://developers.google.com/protocol-buffers/docs/proto3#json). The JSON schema will be as follows:
 
 ```
+
+// This is the JSON schema for ref types (they occur multiple time in the JSON
+// schema for ChannelTrace). Only one of channel_ref or subchannel_ref will be
+// present in the ref. The (sub)channel_id field is a globally unique identifier
+// to the channel or subchannel. The name field is a human readable string.
 {
-  "channel_id": string,
+  "channel_ref": {
+    "channel_id": int64,
+    "name": string
+  },
+  "subchannel_ref": {
+    "subchannel_id": int64,
+    "name": string
+  }
+}
+
+{
+  "ref": { <ref type defined above> },
   "channel_data": {
     // Number of events ever logged in this tracing object. This can differ from
     // events.size() because events can be overwritten or garbage collected by
     // implementations.
-    "num_events_logged": number,
+    "num_events_logged": int64,
     // Time that this channel was created.
     "channel_created_timestamp": timestamp string,
     // List of events that have occurred on this channel.
@@ -64,7 +80,7 @@ The data will be exported as JSON formatted string. The JSON must conform with t
         "description": string,
         // Status/error associated with this event.
         // Optional, only present is Status != OK. 
-        "status": string,
+        "status": enum string,
         "time": timestamp string,
         // can only be one of the states in connectivity_state.h
         "state": enum string,
@@ -72,7 +88,7 @@ The data will be exported as JSON formatted string. The JSON must conform with t
         // Optional, only present if this event refers to a child object.
         // and example of a referenced child would be a trace event for a
         // subchannel being created.
-        "child_channel_id": string
+        "child_ref": { <ref type defined above> }
       },
     ]
   },

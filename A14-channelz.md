@@ -748,11 +748,14 @@ message ChannelTraceEvent {
   google.protobuf.Timestamp event_timestamp = 3;
   // The connectivity state the channel was in when this event occurred.
   ChannelConnectivityState state = 4;
-  // channel_id of referenced subchannel.
+  // ref of referenced channel or subchannel.
   // Optional, only present if this event refers to a child object. For example,
   // this field would be filled if this trace event was for a subchannel being
   // created.
-  int64 child_channel_id = 5; 
+  oneof child_ref {
+    ChannelRef channel_ref = 1;
+    SubchannelRef subchannel_ref = 2;
+  }
 }
 
 message ChannelTraceData {
