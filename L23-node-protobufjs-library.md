@@ -2,7 +2,7 @@ Standalone Node.js gRPC+Protobuf.js Library API
 ----
 * Author(s): murgatroid99
 * Approver: wenbozhu
-* Status: Draft
+* Status: Ready for Implementation
 * Implemented in: Node.js
 * Last updated: 2018-01-30
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/t7XFE7Wevow
@@ -29,7 +29,7 @@ For the purpose of definiing services in general, the existing gRPC library has 
 
 This information is sufficient to implement a client or service handler for any kind of method. Then a `ServiceDefintion` is just an object that maps method names to `MethodDefinition` objects. When loading a `.proto` file, more than one service may be loaded, so we additionally define a wrapping type `PackageDefinition`, which maps fully qualified service names to `ServiceDefinition` objects. For example, if a `.proto` file defines the package `a.b` with the services `Service1` and `Service2`, the resulting `PackageDefinition` would have the keys `"a.b.Service1"` and `"a.b.Service2"`.
 
-The library exposes the following functions:
+The library exposes the following function:
 
 ```js
 /**
@@ -39,17 +39,9 @@ The library exposes the following functions:
  * @return {Promise<PackageDefinition>} A promise for an object containing definitions for all of the loaded services
  */
 load(filename, options)
-
-/**
- * Synchronously load a .proto file and all of its transitive imports
- * @param {string} filename File path to the .proto file to load.
- * @param {Object} options Options for loading the file and setting up the deserializers
- * @return {PackageDefinition} An object containing definitions for all of the loaded services
- */
-loadSync(filename, options)
 ```
 
-The `options` parameter to each of those functions is the union of Protobuf.js's [`IParseOptions`](https://github.com/dcodeIO/protobuf.js/blob/cf7b26789f310dccf4c047c2e8ef5a3854f7f41e/index.d.ts#L1014) (which modifies how files are loaded) and [`IConversionOptions`](https://github.com/dcodeIO/protobuf.js/blob/cf7b26789f310dccf4c047c2e8ef5a3854f7f41e/index.d.ts#L1632) (which modifies deserialization functions), plus an `include` option to specify directories to search for dependencies. The full set of options is as follows:
+The `options` parameter of that function is the union of Protobuf.js's [`IParseOptions`](https://github.com/dcodeIO/protobuf.js/blob/cf7b26789f310dccf4c047c2e8ef5a3854f7f41e/index.d.ts#L1014) (which modifies how files are loaded) and [`IConversionOptions`](https://github.com/dcodeIO/protobuf.js/blob/cf7b26789f310dccf4c047c2e8ef5a3854f7f41e/index.d.ts#L1632) (which modifies deserialization functions), plus an `include` option to specify directories to search for dependencies. The full set of options is as follows:
 
  - `keepCase`: a boolean indicating that field names should be preserved. The default is to change them to camel case.
  - `longs`: Can be set to `Number` or `String` to indicate that long values should be represented as that type. The default is `Number`, or a safer object `Long` type if the library is installed.
