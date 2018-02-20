@@ -2,9 +2,9 @@ Title
 ----
 * Author(s): ZhouyihaiDing
 * Approver: mehrdada
-* Status: In Review
+* Status: Approved
 * Implemented in: PHP
-* Last updated: 2/23/2018
+* Last updated: February 20, 2018
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/LNRFA39NVxE
 ## Abstract
 
