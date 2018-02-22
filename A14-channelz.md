@@ -70,8 +70,8 @@ Since protobuf treats the number 0 as the default value, it is unused as an id.
 
 Along with the id, a human readable name can optionally be associated with each
 the id.  The id and the name together form a "reference".  Thus, Channels,
-Servers and Sockets are identified by their respective references.  These
-references are abbreviated ChannelRefs, SubchannelRefs, ServerRefs, and 
+Subchannels, Servers and Sockets are identified by their respective references.
+These references are abbreviated ChannelRefs, SubchannelRefs, ServerRefs, and 
 SocketRefs.  Note that only the id is necessary to query channelz.
 
 The data representation of each ref:
