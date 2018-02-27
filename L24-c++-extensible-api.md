@@ -1,7 +1,7 @@
-Title
-----
+L24: C++ Extensible api
+-----------------------
 * Author(s): makdharma
-* Approver: vpai
+* Approver: vjpai
 * Status: Draft
 * Implemented in: https://github.com/grpc/grpc/pull/14517
 * Last updated: Feb 26, 2018
@@ -9,24 +9,27 @@ Title
 
 ## Abstract
 
-This proposal will enable extending functionality of GRPC C++ API.
+This proposal will enable extending functionality of GRPC C++ API by removing
+the ```final``` keyword and making some class methods ```virtual```. It will allow
+alternate implementations of the API by subclassing the API classes.
 
 ## Background
 
-All GRPC C++ API classes are currently marked "final". The rationale is that
-having  virtual methods might have adverse memory size and performance impact.
-Additionally, adding "final" to public API classes later on would break existing
+All GRPC C++ API classes are currently marked ```final```. The rationale is that
+having virtual methods might have adverse memory size and performance impact.
+Additionally, adding ```final``` to public API classes later on would break existing
 implementations that use classes derived from public API. Hence it is better and
-safer to mark classes "final" unless there's a reason to make them extensible.
+safer to mark classes ```final``` unless there's a reason to make them extensible.
 
 ### Related Proposals:
 
 ## Proposal
 
-* Remove "final" keyword from all public API classes.
+* Remove ```final``` keyword from all public API classes.
 * Move current private core methods and member variables to protected.
-* Mark core methods to virtual, so the functionality can be extended.
-* Each such change should go through thorough performance evaluation.
+* Mark core methods to ```virtual```, so the functionality can be extended.
+* Each such change should go through thorough performance evaluation and should not
+  be accepted if there is any observed performance degradation.
 * Do this work in stages. Begin with Server, ServerBuilder, CompletionQueue
   classes and extend to other classes as needed.
 
@@ -34,12 +37,17 @@ safer to mark classes "final" unless there's a reason to make them extensible.
 ## Rationale
 
 The original rationale for keeping methods private and classes non-extensible
-has not held true. The performance impact of removing "final" from all public
-API classes was not measurable. Meanwhile the final classes and non-virtual
-methods preclude any experimentation with implementation. This proposal will
-allow extending and experimenting with different server and client
-implementations.
+has not held true. The performance impact of removing ```final``` from all public
+API classes was not measurable. See https://github.com/grpc/grpc/pull/14359 for
+result of performance eval and details of which classes/methods were modified.
+Meanwhile the ```final``` classes and non-virtual methods preclude any
+experimentation with implementation. This proposal will allow extending and
+experimenting with different server and client implementations.
 
 ## Implementation
+
+The proposed implementation is in PR https://github.com/grpc/grpc/pull/14517.
+It is limited in scope. It doesn't change every public class and method, but it
+gives enough extensibility to experiment with alternate implementations.
 
 ## Open issues (if applicable)
