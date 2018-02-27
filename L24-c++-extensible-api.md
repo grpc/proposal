@@ -37,12 +37,20 @@ safer to mark classes ```final``` unless there's a reason to make them extensibl
 ## Rationale
 
 The original rationale for keeping methods private and classes non-extensible
-has not held true. The performance impact of removing ```final``` from all public
-API classes was not measurable. See https://github.com/grpc/grpc/pull/14359 for
-result of performance eval and details of which classes/methods were modified.
-Meanwhile the ```final``` classes and non-virtual methods preclude any
-experimentation with implementation. This proposal will allow extending and
-experimenting with different server and client implementations.
+has not held true. Meanwhile the ```final``` classes and non-virtual methods
+preclude any experimentation with implementation. This proposal will allow
+extending and experimenting with different server and client implementations.
+
+The performance impact of removing ```final``` from all public
+API classes was not measurable. Impact of adding ```virtual``` was noticable in
+case of Inproc transport microbenchmarks and only for 256K byte messages.
+However this is a extreme case where virtual was added everywhere which is not
+the intention behind this proposal. The more realistic case is seen in
+performance results of PR https://github.com/grpc/grpc/pull/14517, which shows
+the impact of both adding ```virtual``` and removing ```final``` for a few
+important classes is negligible.
+See https://github.com/grpc/grpc/pull/14359 for details of performance eval in
+the extreme case.
 
 ## Implementation
 
