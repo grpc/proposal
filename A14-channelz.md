@@ -672,13 +672,7 @@ message Channel {
 }
 
 // Subchannel is a logical grouping of channels, subchannels, and sockets. 
-// A subchannel is load balanced over by it's ancestor     /**
-     * One or more listeners. Can be a {@link GenericFutureListener} or a {@link DefaultFutureListeners}.
-     * If {@code null}, it means either 1) no listeners were added yet or 2) all listeners were notified.
-     *
-     * Threading - synchronized(this). We must support adding listeners when there is no EventExecutor.
-     */
-    private Object listeners;channel or subchannel.
+// A subchannel is load balanced over by it's ancestor
 message Subchannel {
   // The identifier for this channel.
   SubchannelRef ref = 1;
@@ -1016,7 +1010,7 @@ message GetTopChannelsRequest {
   int64 start_channel_id = 1;
 }
 
-message GetRootChannelsResponse {
+message GetTopChannelsResponse {
   // list of channels that the connection detail service knows about.  Sorted in
   // ascending channel_id order.
   repeated Channel channel = 1;
