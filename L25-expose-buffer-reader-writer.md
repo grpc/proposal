@@ -5,7 +5,7 @@ Title
 * Status: Draft
 * Implemented in: https://github.com/grpc/grpc/pull/14541
 * Last updated: 02/28/18
-* Discussion at: TODO
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/3FTSA67iios
 
 ## Abstract
 
