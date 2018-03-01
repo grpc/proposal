@@ -4,7 +4,7 @@ gRPC Channelz
 * Approver: a11r
 * Status: Approved
 * Implemented in: 
-* Last updated: 02/09/18
+* Last updated: 2018-03-01
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/5IYOMVm0Ufs
 
 Abstract
@@ -736,49 +736,9 @@ message ChannelData {
   google.protobuf.Timestamp last_call_started_timestamp = 7;
 }
 
-// A trace event is an interesting thing that happened to a channel or
-// subchannel, such as creation, address resolution, subchannel creation, etc.
-message ChannelTraceEvent {
-  // High level description of the event.
-  string description = 1;
-  // Status/error associated with this event.
-  // Optional, only present is Status != OK. 
-  google.rpc.Status status = 2;
-  // When this event occurred.
-  google.protobuf.Timestamp event_timestamp = 3;
-  // The connectivity state the channel was in when this event occurred.
-  ChannelConnectivityState state = 4;
-  // ref of referenced channel or subchannel.
-  // Optional, only present if this event refers to a child object. For example,
-  // this field would be filled if this trace event was for a subchannel being
-  // created.
-  oneof child_ref {
-    ChannelRef channel_ref = 1;
-    SubchannelRef subchannel_ref = 2;
-  }
-}
-
-message ChannelTraceData {
-  // Number of events ever logged in this tracing object. This can differ from
-  // events.size() because events can be overwritten or garbage collected by
-  // implementations.
-  int64 num_events_logged = 3;
-  // Time that this channel was created.
-  google.protobuf.Timestamp channel_created_timestamp = 4;
-  // List of events that have occurred on this channel.
-  repeated ChannelTraceEvent events = 5;
-}
-
 message ChannelTrace {
-  // Ref to the channel or subchannel this trace refers to.
-  oneof ref {
-    ChannelRef channel_ref = 1;
-    SubchannelRef subchannel_ref = 2;
-  }
-  // All of the data for this channel.
-  ChannelTraceData channel_data = 3;
-  // Optional, only present if this channel has children
-  repeated ChannelTrace child_data = 4;
+  // see the proto in the gRFC for channel tracing:
+  // A3-channel-tracing.md
 }
 
 message ChannelRef {
