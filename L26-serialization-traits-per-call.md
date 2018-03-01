@@ -1,4 +1,4 @@
-Title
+Serialization Mechanism Customizable Per Call
 ----
 * Author(s): ncteisen
 * Approver: vjpai
@@ -20,7 +20,7 @@ Currently, gRPC supports a mechanism for custom serialization. Users must implem
 
 ## Proposal
 
-We propose a new way to inject custom serialization code. Currently call objects are templated request and response type. For example:
+We propose a new way to inject custom serialization code. Currently call objects are templated on request and response type. For example:
 
 ```C++
 template <class W, class R>
