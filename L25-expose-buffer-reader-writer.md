@@ -1,4 +1,4 @@
-Title
+Make GrpcBuffer{Reader|Writer} Public
 ----
 * Author(s): ncteisen
 * Approver: vjpai
