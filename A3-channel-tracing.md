@@ -7,13 +7,6 @@ Channel Tracing
 * Last updated: 2018-03-01
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/WFDj3KeHYTI
 
-## Table of Contents
-
-  * [Abstract](#abstract)
-  * [Background](#background)
-  * [Proposal](#proposal)
-  * [Format of Exported Data](#format-of-exported-data)
-
 ## Terminology
 
 This design uses the same terminology discussed in the [channelz](A14-channelz.md) design. Channels and subchannels will be handled by the same channel tracing code, so for this design, a channel means either a channel or subchannel from the channelz terminology.
