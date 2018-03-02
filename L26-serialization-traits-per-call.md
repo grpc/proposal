@@ -4,7 +4,7 @@ L26: [C++] Make Serialization Mechanism Customizable Call
 * Approver: vjpai
 * Status: Draft
 * Implemented in: n/a
-* Last updated: 02/28/18
+* Last updated: 2018-03-01
 * Discussion at: n/a
 
 ## Abstract
@@ -43,6 +43,63 @@ class ClientAsyncReaderWriterInterface;
 ```
 
 In the default case, nothing will have to change. But this will give greater control to users who would like to supply custom serialization.
+
+## Deeper Examples New API 
+
+After this change, the C++ Async Streaming API would look like:
+
+```C++
+template <class R, class RCodec = SerializationTraits<R, void>>
+class AsyncReaderInterface {
+ public:
+  virtual void Read(R* msg, void* tag) = 0;
+};
+
+template <class W, class WCodec = SerializationTraits<W, void>>
+class AsyncWriterInterface {
+ public:
+  virtual void Write(const W& msg, void* tag) = 0;
+  virtual void Write(const W& msg, WriteOptions options, void* tag) = 0;
+  void WriteLast(const W& msg, WriteOptions options, void* tag) = 0;
+};
+
+template <class R, class RCodec = SerializationTraits<R, void>>
+class ClientAsyncReaderInterface
+    : public internal::ClientAsyncStreamingInterface,
+      public internal::AsyncReaderInterface<R, RCodec> {};
+
+template <class R, class RCodec = SerializationTraits<R, void>>
+class ClientAsyncReaderFactory {
+ public:
+  template <class W, class WCodec = SerializationTraits<W, void>>
+  static ClientAsyncReader<R, RCodec>* Create(ChannelInterface* channel,
+                                      CompletionQueue* cq,
+                                      const ::grpc::internal::RpcMethod& method,
+                                      ClientContext* context, const W& request,
+                                      bool start, void* tag);
+};
+
+template <class R, class RCodec = SerializationTraits<R, void>>
+class ClientAsyncReader final : public ClientAsyncReaderInterface<R, RCodec> {
+  void Read(R* msg, void* tag) override;
+
+ private:
+  friend class internal::ClientAsyncReaderFactory<R>;
+  template <class W, class WCodec = SerializationTraits<W, void>>
+  ClientAsyncReader(::grpc::internal::Call call, ClientContext* context,
+                    const W& request, bool start, void* tag);
+};
+```
+
+The Sync Unary API would look like:
+
+```C++
+template <class InputMessage, class OutputMessage, 
+          class InputCodec, class OutputCodec>
+Status BlockingUnaryCall(ChannelInterface* channel, const RpcMethod& method,
+                         ClientContext* context, const InputMessage& request,
+                         OutputMessage* result);
+```
 
 
 ## Implementation
