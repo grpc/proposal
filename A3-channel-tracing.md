@@ -20,8 +20,8 @@ This design uses the same terminology discussed in the [channelz](A14-channelz.m
 
 In addition, the following terminology will be used:
 
-1.  a "Trace event" is an interesting thing that happens to a channel. Examples include things like creation, address resolution, subchannel creation, connectivity state changes.
-2.  a "Channel trace" is a data structure responsible for holding all data for a single channel. This includes a list of _Trace events_, as well as metadata like the timestamp at which the channel was created. The _Channel trace_ also holds a list of _Channel trace_ object of its child channels (if it has any).
+1.  a "Trace event" is an interesting thing that happens to a channel. Examples include things like creation, address resolution, subchannel creation, connectivity state changes. Some _Trace events_ (like a new subchannel being created), will refer to the ChannelData of the relevant channel or subchannel.
+2.  a "Channel trace" is a data structure responsible for holding all trace data for a single channel. This includes a list of _Trace events_, as well as metadata like the timestamp at which the channel was created. The _Channel trace_ also holds a list of references to the channels or subchannels that are mentioned in the list of _Trace events_.
 
 ## Abstract
 
@@ -33,11 +33,22 @@ Channel connectivity issues are the root cause of a significant portion of user 
 
 ## Proposal
 
-To support channel tracing, implementations will use a dedicated _Channel trace_ that is owned by each channel and subchannel. All of the data will be exposed via the [channelz service](A14-channelz.md). Implementations MAY add an API that allows library users to retrieve all of the _Tracing object's_ data for the channel in a language idiomatic way. Implementations must expose a toggle for this behavior (for example, C++ will add a new channel argument, GRPC_ARG_CHANNEL_TRACING).
+The data from _Channel trace_ will be exposed via the [channelz service](A14-channelz.md).
 
-Since the tracing objects may consume large amounts of space, care must be taken to prevent the _Channel trace_ from using too many resources. gRPC implementations must allow limiting the number of _Trace events_ retained to a per channel or subchannel maximum. Once the maximum is reached, a new _Trace event_ will overwrite the oldest _Trace event_.
+Since the tracing objects may consume large amounts of space, care must be taken to prevent the _Channel trace_ from using too many resources. gRPC implementations must allow limiting the number of _Trace events_ retained to a per channel or subchannel maximum. Once the maximum is reached, adding a new _Trace event_ will cause oldest _Trace event_ to be removed. If the maximum number of trace events is set to zero, then channel tracing will be disabled.
 
 The _Channel trace_ for a given channel or subchannel must be maintained as long as there are any _Trace events_ that refer to the channel or subchannel. After the last _Trace event_ that refers to the channel or subchannel is removed, the _Channel trace_ for that channel or subchannel may be cleaned up.
+
+_Trace events_ should only be added for events that happen relatively infrequently (not at a per RPC basis). An example list of _Trace events_ from a healthy channel might look like:
+```
+... Channel created
+... Address resolved: 8.8.8.8:443
+... Address picked: 8.8.8.8:443
+... Starting TCP connection
+... TCP connection established
+... Auth handshake complete
+... Entering idle mode
+```
 
 
 ## Format of Exported Data
@@ -82,7 +93,5 @@ message ChannelTrace {
   google.protobuf.Timestamp creation_time = 2;
   // List of events that have occurred on this channel.
   repeated ChannelTraceEvent events = 3;
-  // Optional, only present if this channel has children
-  repeated ChannelTrace child_data = 4;
 }
 ```
