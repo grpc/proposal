@@ -14,7 +14,7 @@ This design uses the same terminology discussed in the [channelz](A14-channelz.m
 In addition, the following terminology will be used:
 
 1.  a "Trace event" is an interesting thing that happens to a channel. Examples include things like creation, address resolution, subchannel creation, connectivity state changes. Some _Trace events_ (like a new subchannel being created), will refer to the ChannelData of the relevant channel or subchannel.
-2.  a "Channel trace" is a data structure responsible for holding all trace data for a single channel. This includes a list of _Trace events_, as well as metadata like the timestamp at which the channel was created. The _Channel trace_ also holds a list of references to the channels or subchannels that are mentioned in the list of _Trace events_.
+2.  a "Channel trace" is a data structure responsible for holding all trace data for a single channel. This includes a list of _Trace events_, as well as metadata like the timestamp at which the channel was created.
 
 ## Abstract
 
