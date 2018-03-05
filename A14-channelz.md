@@ -4,7 +4,7 @@ gRPC Channelz
 * Approver: a11r
 * Status: Approved
 * Implemented in: 
-* Last updated: 2/5/18
+* Last updated: 2018-03-01
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/5IYOMVm0Ufs
 
 Abstract
@@ -647,6 +647,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
+import "google/rpc/status.proto";
 
 // Channel is a logical grouping of channels, subchannels, and sockets.
 message Channel {
@@ -695,7 +696,9 @@ message Subchannel {
   repeated SocketRef socket = 5;
 }
 
-message ChannelData {
+// These come from the specified states in this document:
+// https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
+message ChannelConnectivityState {
   enum State {
     UNKNOWN = 0;
     IDLE = 1;
@@ -705,6 +708,11 @@ message ChannelData {
     SHUTDOWN = 5;
   }
   State state = 1;
+}
+
+message ChannelData {
+
+  ChannelConnectivityState state = 1;
 
   // The target this channel originally tried to connect to.  May be absent
   string target = 2;
@@ -723,7 +731,8 @@ message ChannelData {
 }
 
 message ChannelTrace {
-  // TODO: fill this in.
+  // see the proto in the gRFC for channel tracing:
+  // A3-channel-tracing.md
 }
 
 message ChannelRef {
@@ -771,7 +780,7 @@ message Server {
 }
 
 message ServerData {
-  ServerChannelTrace trace = 1;
+  ChannelTrace trace = 1;
   
   // The number of incoming calls started on the server
   int64 calls_started = 2;
@@ -782,10 +791,6 @@ message ServerData {
 
   // The last time a call was started on the server.
   google.protobuf.Timestamp last_call_started_timestamp = 5;
-}
-
-message ServerChannelTrace {
-  // TODO: fill this in.
 }
 
 // Information about an actual connection.  Pronounced "sock-ay".
