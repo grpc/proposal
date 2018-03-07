@@ -647,7 +647,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
-import "google/rpc/status.proto";
 
 // Channel is a logical grouping of channels, subchannels, and sockets.
 message Channel {
