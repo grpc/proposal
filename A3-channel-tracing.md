@@ -53,27 +53,29 @@ The data will be accessed via the channelz service, which sends a ChannelTrace p
 // the definitions of these protos can be found in A14-channelz.md
 message ChannelRef {}
 message SubchannelRef {}
-message ChannelConnectivityState {}
 
 // A trace event is an interesting thing that happened to a channel or
 // subchannel, such as creation, address resolution, subchannel creation, etc.
 message ChannelTraceEvent {
   // High level description of the event.
   string description = 1;
-  // Status/error associated with this event.
-  // Optional, only present is Status != OK. 
-  google.rpc.Status status = 2;
+  // The supported severity levels of trace events.
+  enum Severity {
+    INFO = 1;
+    WARNING = 2;
+    ERROR = 3;
+  }
+  // the severity of the trace event
+  Severity severity = 2;
   // When this event occurred.
   google.protobuf.Timestamp timestamp = 3;
-  // The connectivity state the channel was in when this event occurred.
-  ChannelConnectivityState state = 4;
   // ref of referenced channel or subchannel.
   // Optional, only present if this event refers to a child object. For example,
   // this field would be filled if this trace event was for a subchannel being
   // created.
   oneof child_ref {
-    ChannelRef channel_ref = 1;
-    SubchannelRef subchannel_ref = 2;
+    ChannelRef channel_ref = 4;
+    SubchannelRef subchannel_ref = 5;
   }
 }
 
