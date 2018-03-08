@@ -61,6 +61,7 @@ message ChannelTraceEvent {
   string description = 1;
   // The supported severity levels of trace events.
   enum Severity {
+    UNKNOWN = 0;
     INFO = 1;
     WARNING = 2;
     ERROR = 3;
