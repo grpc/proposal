@@ -275,9 +275,7 @@ The last case is handled by the configurable retry policy that is the main focus
 
 In the first case, in which the RPC never leaves the client, the client library can transparently retry until a success occurs, or the RPC's deadline passes.
 
-If the RPC reaches the gRPC server library, but has never been seen by the server application logic (the second case), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy. This extra caution is needed because this cases involves extra load on the wire.
-
-gRPC implementations must expose information about this second case in the RPC metadata, allowing service owners to see how many RPCs are falling into this category. The header name for exposing this metadata will be `"grpc-transparent-retry-attempts"`. The value for this field will be an integer.
+If the RPC reaches the gRPC server library, but has never been seen by the server application logic (the second case), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy. This extra caution is needed because this case involves extra load on the wire.
 
 Since retry throttling is designed to prevent server application overload, and these transparent retries do not make it to the server application layer, they do not count as failures when deciding whether to throttle retry attempts.
 
