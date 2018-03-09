@@ -668,7 +668,7 @@ message Channel {
   repeated SubchannelRef subchannel_ref = 4;
   
   // There are no ordering guarantees on the order of sockets.
-  repeated SocketRef socket = 5;
+  repeated SocketRef socket_ref = 5;
 }
 
 // Subchannel is a logical grouping of channels, subchannels, and sockets. 
