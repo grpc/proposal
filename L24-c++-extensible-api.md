@@ -5,7 +5,7 @@ L24: C++ Extensible api
 * Status: Draft
 * Implemented in: https://github.com/grpc/grpc/pull/14517
 * Last updated: Feb 26, 2018
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/LVpKsQ4CaFg
 
 ## Abstract
 
