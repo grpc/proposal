@@ -692,7 +692,7 @@ message Subchannel {
   repeated SubchannelRef subchannel_ref = 4;
   
   // There are no ordering guarantees on the order of sockets.
-  repeated SocketRef socket = 5;
+  repeated SocketRef socket_ref = 5;
 }
 
 // These come from the specified states in this document:
