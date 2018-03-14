@@ -82,7 +82,7 @@ fine-grained and comprehensive.
 ## Implementation
 
 This is implemented in C++ in pull-request
-https://github.com/grpc/grpc/pull/14648. Ongoing work will be to
+[14648](https://github.com/grpc/grpc/pull/14648). Ongoing work will be to
 maintain discipline in deciding whether a class or function belongs in
 `grpc` or `grpc::internal` as well as deciding whether a class truly
 needs a public constructor or whether methods should be marked as
