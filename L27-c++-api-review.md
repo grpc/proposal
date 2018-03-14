@@ -30,6 +30,8 @@ the core surface API is inherently less stable than the C++ language API.
 ### Related Proposals:
 
 - [C++ internalization](https://github.com/grpc/proposal/pull/28)
+- [Make serialization classes public](https://github.com/grpc/proposal/pull/62)
+- [Custom serialization per call](https://github.com/grpc/proposal/pull/63)
 
 ## Proposal
 
@@ -48,12 +50,12 @@ three should not be used as such. This will be achieved in various
 ways:
 
 1. Privatize, protect, or remove features that should have never been
-exposed and are not used in application code. In many cases, this
-includes constructors to base classes that should only be invoked
-through their derived classes. In some cases, classes have more than
-one way to get the same information (e.g., `Server::server()` and
-`Server::c_server()` both give the address of the wrapped gRPC core
-server) and such uses should be de-duped.
+   exposed and are not used in application code. In many cases, this
+   includes constructors to base classes that should only be invoked
+   through their derived classes. In some cases, classes have more than
+   one way to get the same information (e.g., `Server::server()` and
+   `Server::c_server()` both give the address of the wrapped gRPC core
+   server) and such uses should be de-duped.
 1. Deprecate features that leak core surface APIs if they can be
    meaningfully substituted with a purely C++ API. Express this with
    detailed comments indicating the deprecation and the preferred choice
