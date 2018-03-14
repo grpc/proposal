@@ -1,10 +1,10 @@
 Continue to separate internal-only and public sections of the C++ API
 ----
 * Author(s): vjpai
-* Approver: abhikumar
+* Approver: a11r
 * Status: Proposed
 * Implemented in: C++
-* Last updated: March 13, 2018
+* Last updated: March 14, 2018
 * Discussion at: 
 
 ## Abstract
@@ -55,11 +55,13 @@ one way to get the same information (e.g., `Server::server()` and
 `Server::c_server()` both give the address of the wrapped gRPC core
 server) and such uses should be de-duped.
 1. Deprecate features that leak core surface APIs if they can be
-meaningfully substituted with a purely C++ API. Express this with
-detailed comments indicating the deprecation and the preferred choice
-1. Co-opt items from the core surface API for which there is no other option, but try to give an alternative and more idiomatically C++ version for those when possible
+   meaningfully substituted with a purely C++ API. Express this with
+   detailed comments indicating the deprecation and the preferred choice
+1. Co-opt items from the core surface API for which there is no other 
+   option, but try to give an alternative and more idiomatically C++
+   version for those when possible
 1. Move classes or functions to `namespace grpc::internal` in some
-cases
+   cases
 1. Mark pieces of the API as being meant only for
    internal/advanced/specialized use as appropriate if typical
    applications are not expected to use them. These are particularly
@@ -84,11 +86,13 @@ https://github.com/grpc/grpc/pull/14648. Ongoing work will be to
 maintain discipline in deciding whether a class or function belongs in
 `grpc` or `grpc::internal` as well as deciding whether a class truly
 needs a public constructor or whether methods should be marked as
-being meant for internal/advanced/specialized use.
+being meant for internal/advanced/specialized use. This discipline
+will be aided by the fact that new API changes (even additions)
+require gRFCs.
 
 ## Open issues (if applicable)
 
 This PR will cause problems for gRPC users that are using the
-interfaces that are intended for internal use. This does not affect
-any bits of code observable to the gRPC team.
+interfaces that are intended for internal use. These changes do
+not affect any bits of application code observable to the gRPC team.
 
