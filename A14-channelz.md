@@ -879,12 +879,14 @@ message Address {
 
 message Security {
   message Tls {
-    // The cipher suite name in the RFC 4346 format:
-    // https://tools.ietf.org/html/rfc4346#appendix-C
-    string cipher_suite_standard_name = 1;
-    // Some other way to describe the cipher suite if
-    // the RFC 4346 name is not available.
-    string cipher_suite_other_name = 2;
+    oneof cipher_suite {
+      // The cipher suite name in the RFC 4346 format:
+      // https://tools.ietf.org/html/rfc4346#appendix-C
+      string standard_name = 1;
+      // Some other way to describe the cipher suite if
+      // the RFC 4346 name is not available.
+      string other_name = 2;
+    }
     // the certificate used by this endpoint.
     bytes local_certificate = 3;
     // the certificate used by the remote endpoint.
