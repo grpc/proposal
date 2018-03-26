@@ -63,14 +63,20 @@ age the server should send GOAWAY with status code NO\_ERROR and ASCII debug dat
 `max_age` and then continue the [graceful connection termination][].
 Specifically, outstanding RPCs should be permitted to complete, and
 implementations are encouraged to initially set the last stream identifier to
-231-1. This option can force the client to periodically reconnect to a L4 LB
-which allows spreading load more quickly. A per-connection random jitter of
-+/-10% will be added to `MAX_CONNECTION_AGE` to spread out connection storms.
+2<sup>31</sup>-1. This option can force the client to periodically reconnect to
+a L4 LB which allows spreading load more quickly. A per-connection random jitter
+of +/-10% will be added to `MAX_CONNECTION_AGE` to spread out connection storms.
 Note that this option without jitter would not create connection storms by
 itself, but if there happened to be a connection storm it could cause it to
-repeat at a fixed period. `MAX_CONNECTION_AGE_GRACE` is an additive period after
-`MAX_CONNECTION_AGE` after which the connection will be forcibly closed. No
-jitter is applied to the grace period.
+repeat at a fixed period.
+
+`MAX_CONNECTION_AGE_GRACE` is the maximum time the connection will be kept alive
+for outstanding RPCs to complete, ideally relative to the second GOAWAY of the
+graceful connection termination. No jitter is applied to the grace period. Note
+that implementations, as general practice, should limit the maximum time between
+the first and second GOAWAY of the graceful connection termination, but it
+should rarely have an impact and so is treated as implementation-specific for
+this specification.
 
 The `KEEPALIVE_*` options solve the dead connection issue by monitoring
 connection health. It should be handled like [Client-side Keepalive][] using
