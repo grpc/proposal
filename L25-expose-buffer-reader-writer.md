@@ -13,10 +13,10 @@ We propose to move two classes, `GrpcProtoBufferWriter` and `GrpcProtoBufferRead
 
 ## Background
 
-We have seen several user complaints that creating custom serializes is not an easy task. For example, TensorFlow [duplicated an internal file](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/distributed_runtime/rpc/grpc_serialization_traits.h), which led to a [nasty bug](https://github.com/grpc/grpc/issues/10161). Another project had to use a hacky workarounds to subtype the `GrpcProtoBuffer{Reader|Writer}` classes in order to implement a zero copy serializer.
+We have seen several user complaints that creating custom serializers is not an easy task. For example, TensorFlow [duplicated an internal file](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/distributed_runtime/rpc/grpc_serialization_traits.h), which led to a [nasty bug](https://github.com/grpc/grpc/issues/10161). Another project had to use a hacky workaround to subtype the `GrpcProtoBuffer{Reader|Writer}` classes in order to implement a zero copy serializer.
 
 ### Related Proposals: 
-* This related to [L26](https://github.com/grpc/proposal/pull/63), in that it is making it easier to customize serialization code.
+* This relates to [L26](https://github.com/grpc/proposal/pull/63), in that it is making it easier to customize serialization code.
 
 ## Proposal
 
