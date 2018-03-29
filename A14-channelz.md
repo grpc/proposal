@@ -629,10 +629,10 @@ if the implementation ever wanted to.   No known implementations do this, but it
 isn't forbidden.  Specifying the full hierarchy in the key would give rise to
 errors about the channel not being found.
 
-[message ref structure]: A14/1.png "Message Reference Structure"
-[channel hierarchy 1]: A14/2.png "Channel Hierarchy"
-[channel hierarchy 2]: A14/3.png "Channel Hierarchy"
-[channel hierarchy 3]: A14/4.svg "Channel Hierarchy"
+[message ref structure]: A14_graphics/1.png "Message Reference Structure"
+[channel hierarchy 1]: A14_graphics/2.png "Channel Hierarchy"
+[channel hierarchy 2]: A14_graphics/3.png "Channel Hierarchy"
+[channel hierarchy 3]: A14_graphics/4.svg "Channel Hierarchy"
 [connectivity-semantics](https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md)
 
 
