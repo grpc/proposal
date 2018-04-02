@@ -244,4 +244,10 @@ abusive usage of TCP keepalive.
 * Java. Basic Keepalive has been available in OkHttp transport since 1.0 by
   @zsurocking in grpc/grpc-java#1992. Full spec completed in OkHttp and Netty
   since grpc-java v1.3.0 or grpc/grpc-java@393ebf7c
+  * The client options can be specified via
+    `ManagedChannelBuilder.keepAliveTime()`, `keepAliveTimeout()`, and
+    `keepAliveWithoutCalls()`.
+  * The server options can be specified via
+    `NettyServerBuilder.permitKeepAliveTime()` and
+    `permitKeepAliveWithoutCalls`.
 * Go. TODO get current progress; close, if not done. Being done by @MakMukhi
