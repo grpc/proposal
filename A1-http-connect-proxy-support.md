@@ -220,7 +220,7 @@ In Go, this functionality is being provided via a custom dialer:
 
 In Java for case 1, Java's `java.net.ProxySelector` is observed and usable
 starting in v1.11.0. `ProxySelector` is generally configured with the Java
-defines `-Dhttps.proxyHost` and related. grpc-java supports HTTP Basic Proxy
+properties `-Dhttps.proxyHost` and related. grpc-java supports HTTP Basic Proxy
 Authentication and credentials can be specified via the default
 `java.net.Authenticator`. The experimental `GRPC_PROXY_EXP=host:port`
 environment variable enabled limited proxy support starting in v1.0.3.

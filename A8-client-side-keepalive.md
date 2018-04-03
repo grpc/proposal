@@ -249,5 +249,5 @@ abusive usage of TCP keepalive.
     `keepAliveWithoutCalls()`.
   * The server options can be specified via
     `NettyServerBuilder.permitKeepAliveTime()` and
-    `permitKeepAliveWithoutCalls`.
+    `permitKeepAliveWithoutCalls()`.
 * Go. TODO get current progress; close, if not done. Being done by @MakMukhi
