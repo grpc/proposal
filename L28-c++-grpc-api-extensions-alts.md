@@ -22,6 +22,8 @@ either to another workload running on GCP or to public Google cloud services.
 
 ALTS whitepaper: https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security/
 
+Notice that ALTS is not ready for public consumption yet and
+is still an experimental feature.
 
 ### Related Proposals:
 N/A
