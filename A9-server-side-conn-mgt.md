@@ -114,5 +114,8 @@ connections with few RPCs on them.
 ## Implementation
 
 * C. TODO get current progress; close, if not done. Being done by @y-zeng
-* Java. Complete since grpc/grpc-java@4a96e259
+* Java. Complete since grpc/grpc-java@4a96e259 in v1.4.0. Bug fix in v1.7.1.
+  * The options can be specified via `NettyServerBuilder.maxConnectionIdle()`,
+    `maxConnectionAge()`, `maxConnectionAgeGrace()`, `keepAliveTime()`, and
+    `keepAliveTimeout()`.
 * Go. TODO get current progress; close, if not done. Being done by @MakMukhi
