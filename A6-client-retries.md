@@ -84,7 +84,7 @@ Retry policies support configuring the maximum number of retries, the parameters
 ```
 "retryPolicy": {  
   "maxAttempts": 4,
-  "initialBackoff": ".1s",
+  "initialBackoff": "0.1s",
   "maxBackoff": "1s",
   "backoffMultiplier": 2,
   "retryableStatusCodes": [  
@@ -125,7 +125,7 @@ Hedged requests are configured with the following parameters:
 ```
 "hedgingPolicy": {  
   "maxAttempts": 4,
-  "hedgingDelay": ".5s",
+  "hedgingDelay": "0.5s",
   "nonFatalStatusCodes": [  
     "UNAVAILABLE",
     "INTERNAL",
@@ -331,7 +331,7 @@ This is an example of a retry policy and its associated configuration. It implem
 ```
 "retryPolicy": {  
   "maxAttempts": 4,
-  "initialBackoff": ".1s",
+  "initialBackoff": "0.1s",
   "maxBackoff": "1s",
   "backoffMultiplier": 2,
   "retryableStatusCodes": [  
@@ -347,7 +347,7 @@ The following example of a hedging policy configuration will issue an original R
 ```
 "hedgingPolicy": {  
   "maxAttempts": 4,
-  "hedgingDelay": ".5s",
+  "hedgingDelay": "0.5s",
   "nonFatalStatusCodes": [  
     "UNAVAILABLE",
     "INTERNAL",
@@ -412,7 +412,8 @@ The retry policy is transmitted to the client through the service config mechani
         //   min(initialBackoff*backoffMultiplier**(n-1), maxBackoff)).
         // The following two fields take their form from:
         // https://developers.google.com/protocol-buffers/docs/proto3#json
-        // They are representations of the proto3 Duration type.
+        // They are representations of the proto3 Duration type. Note that the
+        // numeric portion of the string must be a valid JSON number.
         // They both must be greater than zero.
         "initialBackoff": string,  // Required. Long decimal with "s" appended
         "maxBackoff": string,  // Required. Long decimal with "s" appended
@@ -439,7 +440,8 @@ The retry policy is transmitted to the client through the service config mechani
         // Set this to "0s", or leave unset, to immediately send all maxAttempts RPCs.
         // hedgingDelay takes its form from:
         // https://developers.google.com/protocol-buffers/docs/proto3#json
-        // It is a representation of the proto3 Duration type.
+        // It is a representation of the proto3 Duration type. Note that the
+        // numeric portion of the string must be a valid JSON number.
         "hedgingDelay": string,
 
         // The set of status codes which indicate other hedged RPCs may still
