@@ -3,7 +3,7 @@ gRPC Channelz
 * Author(s): Carl Mastrangelo
 * Approver: a11r
 * Status: Approved
-* Implemented in: 
+* Implemented in:
 * Last updated: 2018-03-01
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/5IYOMVm0Ufs
 
@@ -24,24 +24,24 @@ improve on this useful service.
 
 # Channelz Service
 
-The Channelz Service, hereafter channelz, reports all known channels, 
+The Channelz Service, hereafter channelz, reports all known channels,
 subchannels, servers, and connections that process currently has.  In a process,
 there are multiple clients and servers.  To avoid confusion, a strict
 terminology will be used:
 
 1.  A "channel" represents an abstraction that can start and complete RPCs.  A
-    channel may have channels and subchannels.  A channel is a directed 
+    channel may have channels and subchannels.  A channel is a directed
     acyclic graph (DAG).  Only leaf channels may have
     sockets.  Interior channels may only have channels and subchannels.
-2.  A "subchannel" represents an abstraction that is load balanced over by an 
-    owning channel. A subchannel may have channels and subchannels.  A 
-    subchannel is a directed acyclic graph (DAG).  Only leaf subchannels may 
+2.  A "subchannel" represents an abstraction that is load balanced over by an
+    owning channel. A subchannel may have channels and subchannels.  A
+    subchannel is a directed acyclic graph (DAG).  Only leaf subchannels may
     have sockets.  Interior subchannels may only have channels and subchannels.
 3.  A "descendent channel" is either a channel or subchannel that is logically
     owned by a higher level channel.  Typically these are subchannels, but may
-    be channels themselves. 
+    be channels themselves.
 4.  A "server" represents the entry point for RPCs.  A server may have one or
-    more listening sockets, and has a collection of "services".  Unlike 
+    more listening sockets, and has a collection of "services".  Unlike
     clients, servers are not hierarchical.  A server may only have sockets.
 5.  An "endpoint" is either a channel or a server.  The local and remote
     endpoints may exist within the same process.
@@ -71,7 +71,7 @@ Since protobuf treats the number 0 as the default value, it is unused as an id.
 Along with the id, a human readable name can optionally be associated with each
 the id.  The id and the name together form a "reference".  Thus, Channels,
 Subchannels, Servers and Sockets are identified by their respective references.
-These references are abbreviated ChannelRefs, SubchannelRefs, ServerRefs, and 
+These references are abbreviated ChannelRefs, SubchannelRefs, ServerRefs, and
 SocketRefs.  Note that only the id is necessary to query channelz.
 
 The data representation of each ref:
@@ -84,13 +84,13 @@ The data representation of each ref:
 Channels and Subchannels, or descendent channels, are hierarchically organized
 into a DAG structure.  The union of all channels and subchannels may not contain
 a cycle.  A descendent channel may have any number of descendent channels. Each
-descendent channel may also have any number of sockets.   However, a given 
+descendent channel may also have any number of sockets.   However, a given
 descendent channel cannot have heterogeneous children.  That is, a channel or
 subchannel may have descendent channels, or have sockets, but not both.
 
 A subchannel represents a channel that is load-balanced over.  When a channel
-has both subchannels and channels, the channels are not delegated to by the 
-superchannel.  An example would be a channel that is used by the ancestor 
+has both subchannels and channels, the channels are not delegated to by the
+superchannel.  An example would be a channel that is used by the ancestor
 channel, but does not handle RPCs given by the application.
 
 Each channel has a ChannelRef reference which includes the channel id and an
@@ -98,7 +98,7 @@ optional name.  The name is included for human consumption.  There are no
 restrictions on the name but it should be limited to a reasonable length.
 
 Each subchannel has a SubchannelRef reference which includes the subchannel id
-and an optional name.  The name is included for human consumption.  There are 
+and an optional name.  The name is included for human consumption.  There are
 no restrictions on the name but it should be limited to a reasonable length.
 
 ![channel hierarchy 1][channel hierarchy 1]
@@ -118,9 +118,9 @@ parameters and their call stats.  Currently the data includes:
 In general, each piece of data included is specific to the channel itself and
 NOT of its descendent channels.  This is to say that an ancestor channel
 is not an aggregator for descendent channels.  The target of a descendent channel
-may be different from that of its parent.  The target of a descendent subchannel 
+may be different from that of its parent.  The target of a descendent subchannel
 may not be present.  The channel state may be different from the ancestor channel
-state.   The number of calls started, succeeded, and failed should reflect if 
+state.   The number of calls started, succeeded, and failed should reflect if
 calls were specifically tied to the channel.
 
 The number of calls started, succeeded, and failed on a channel gives insight
@@ -140,18 +140,18 @@ changes, unreachability, etc.  As mentioned earlier, this tracing info is
 specific to the channel, and not an aggregation of descendent channel traces.
 
 The channel traces may include ids pointing to channels and subchannels outside
-of the current DAG.  Since channel traces use the same ids as the channels 
-themselves, this allows a user to query for more information about a channel 
+of the current DAG.  Since channel traces use the same ids as the channels
+themselves, this allows a user to query for more information about a channel
 given its trace.
 
 ### Descendent channels
 
-To keep the size of the Channel message down, only the ChannelRefs and 
+To keep the size of the Channel message down, only the ChannelRefs and
 SubchannelRefs will be included in the channel or subchannel.  These refs can
 be used to walk the hierarchy.  Subchannels are not included in the top level
 channels, and thus do not need to be paginated.  A user may query for all the
-subchannels in parallel. As mentioned above, if there are any Sockets on the 
-channel, there will be no descendent channels.   This invariant exists to 
+subchannels in parallel. As mentioned above, if there are any Sockets on the
+channel, there will be no descendent channels.   This invariant exists to
 simplify the tree structure and more closely match the known implementations of
 gRPC.
 
@@ -168,11 +168,11 @@ are owned by a parent, but do not share its target.
 
 ### Sockets
 
-Like channels and subchannels, only SocketRefs are included on a channel.  This 
+Like channels and subchannels, only SocketRefs are included on a channel.  This
 is done for two main reasons.  The size of the socket message may be large, and
-there may be many sockets for a given channel.  Secondly, it can be CPU 
-intensive to fill in the socket information, even though the information might 
-not be desired.  As mentioned in the section above, if there are any descendent 
+there may be many sockets for a given channel.  Secondly, it can be CPU
+intensive to fill in the socket information, even though the information might
+not be desired.  As mentioned in the section above, if there are any descendent
 channels, there will be no sockets.  This invariant exists to simplify the
 DAG structure, and more closely match the known implementations of gRPC.
 
@@ -193,7 +193,7 @@ group of services roughly defines a server, though services can be shared
 between servers.  A server may be listening on any number of ports, though
 commonly there is only one.  Each server has a ServerRef.  Like a ChannelRef, it
 has a unique id and an optional name.   The id is unique, even among the ids of
-channels, subchannels, and sockets.  This makes it impossible to accidentally 
+channels, subchannels, and sockets.  This makes it impossible to accidentally
 refer to the wrong entity type when querying channelz.
 
 Note that even with no Servers present, channelz data is still collected.  If in
@@ -271,11 +271,14 @@ The stream counts differ slightly than that of the number of calls.  Calls may
 be started before a socket (transport) is available, so the stream counter may
 smaller than the corresponding call counters.  Conversely, if a stream fails and
 the call is retriable, a new stream may be started.  This could make the stream
-counts higher than the call counts.  Streams are considered successful if they
-have the HTTP/2 EoS bit set, or failed if terminated otherwise (usually an
-unexpected HTTP/2 RST_STREAM frame).  The number of successful streams may also 
-be greater than the number of successful calls.  For example, if the stream 
-completes successfully, but the gRPC trailers are invalid.
+counts higher than the call counts.  Channel and Subchannel streams are
+considered successful if they complete receiving an EoS frame. Server streams
+are considered successful if they complete sending an EoS frame.  Channel,
+Subchannel, and Server streams may issue or receive additional cleanup data
+(such as RST_STREAM frames) that do not count toward the success of the stream.
+All other terminations are considered failures.  The number of successful
+streams may also be greater than the number of successful calls.  For example,
+if the stream completes successfully, but the gRPC trailers are invalid.
 
 The message counts represent how many gRPC messages are sent and received.
 Calls may send and receive any number of messages, including zero.
@@ -285,7 +288,7 @@ keep the socket alive.  Generally this is an HTTP/2 PING frame.  However, not
 all PING frames are keep alives.  Specifically, pings that were sent as a reply
 (ACK bit set) or were used for reasons unrelated to keep alives should not count
 towards this.  For example, if pings were used to measure network bandwidth,
-they would not be treated as keep alives.   The intent is to measure how often 
+they would not be treated as keep alives.   The intent is to measure how often
 the local endpoint is doing extra work to keep the connection alive.
 
 
@@ -304,14 +307,14 @@ constantly evolving number, which each endpoint sending chunks of window.  For
 the particular flow control windows in the socket data, they are the windows as
 defined by the underlying transport.  For example, HTTP/2 transports report the
 connection level flow control window.  Implementations that don't support flow
-control may leave this blank, implying the limitation is either unknown or 
-doesn't exist.  Note that only the connection level flow control window is 
-reported, rather than the stream level.  TCP level flow and congestion control 
+control may leave this blank, implying the limitation is either unknown or
+doesn't exist.  Note that only the connection level flow control window is
+reported, rather than the stream level.  TCP level flow and congestion control
 counters are exposed via socket options.
 
 #### Socket Options
 
-At this low level in the gRPC stack, implementation differences become more 
+At this low level in the gRPC stack, implementation differences become more
 significant. Each OS or platform may have differing amounts of socket
 information available.  To address these differences, each socket option name
 and value is expressed as a string.
@@ -342,7 +345,7 @@ UDS, etc.) as well as the the identity used to establish the connection (e.g.
 IP Address, port number, filename, etc.).
 
 Not every socket has a remote address;  listening sockets may only include a
-local address.  Not every socket has a local address; Unix domain sockets may 
+local address.  Not every socket has a local address; Unix domain sockets may
 only include a remote address.
 
 By default, only TCP and UDS addresses are defined.  Because there are many
@@ -638,5 +641,5 @@ errors about the channel not being found.
 
 ## Proto
 
-The canonical proto definition can be found at 
+The canonical proto definition can be found at
 [grpc/channelz/channelz.proto](https://github.com/grpc/grpc-proto/blob/master/grpc/channelz/channelz.proto).
