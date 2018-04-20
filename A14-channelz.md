@@ -271,10 +271,10 @@ The stream counts differ slightly than that of the number of calls.  Calls may
 be started before a socket (transport) is available, so the stream counter may
 smaller than the corresponding call counters.  Conversely, if a stream fails and
 the call is retriable, a new stream may be started.  This could make the stream
-counts higher than the call counts.  Channel and Subchannel streams are
-considered successful if they complete receiving an EoS frame. Server streams
-are considered successful if they complete sending an EoS frame.  Channel,
-Subchannel, and Server streams may issue or receive additional cleanup data
+counts higher than the call counts.  Streams of a Channel's or Subchannel's
+sockets considered successful if they complete receiving an EoS frame. Streams
+of a Server's sockets are considered successful if they complete sending an
+EoS frame.  All streams may issue or receive additional cleanup data
 (such as RST_STREAM frames) that do not count toward the success of the stream.
 All other terminations are considered failures.  The number of successful
 streams may also be greater than the number of successful calls.  For example,
