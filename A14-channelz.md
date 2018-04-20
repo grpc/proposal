@@ -3,7 +3,7 @@ gRPC Channelz
 * Author(s): Carl Mastrangelo
 * Approver: a11r
 * Status: Approved
-* Implemented in: 
+* Implemented in:
 * Last updated: 2018-03-01
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/5IYOMVm0Ufs
 
@@ -24,24 +24,24 @@ improve on this useful service.
 
 # Channelz Service
 
-The Channelz Service, hereafter channelz, reports all known channels, 
+The Channelz Service, hereafter channelz, reports all known channels,
 subchannels, servers, and connections that process currently has.  In a process,
 there are multiple clients and servers.  To avoid confusion, a strict
 terminology will be used:
 
 1.  A "channel" represents an abstraction that can start and complete RPCs.  A
-    channel may have channels and subchannels.  A channel is a directed 
+    channel may have channels and subchannels.  A channel is a directed
     acyclic graph (DAG).  Only leaf channels may have
     sockets.  Interior channels may only have channels and subchannels.
-2.  A "subchannel" represents an abstraction that is load balanced over by an 
-    owning channel. A subchannel may have channels and subchannels.  A 
-    subchannel is a directed acyclic graph (DAG).  Only leaf subchannels may 
+2.  A "subchannel" represents an abstraction that is load balanced over by an
+    owning channel. A subchannel may have channels and subchannels.  A
+    subchannel is a directed acyclic graph (DAG).  Only leaf subchannels may
     have sockets.  Interior subchannels may only have channels and subchannels.
 3.  A "descendent channel" is either a channel or subchannel that is logically
     owned by a higher level channel.  Typically these are subchannels, but may
-    be channels themselves. 
+    be channels themselves.
 4.  A "server" represents the entry point for RPCs.  A server may have one or
-    more listening sockets, and has a collection of "services".  Unlike 
+    more listening sockets, and has a collection of "services".  Unlike
     clients, servers are not hierarchical.  A server may only have sockets.
 5.  An "endpoint" is either a channel or a server.  The local and remote
     endpoints may exist within the same process.
@@ -71,7 +71,7 @@ Since protobuf treats the number 0 as the default value, it is unused as an id.
 Along with the id, a human readable name can optionally be associated with each
 the id.  The id and the name together form a "reference".  Thus, Channels,
 Subchannels, Servers and Sockets are identified by their respective references.
-These references are abbreviated ChannelRefs, SubchannelRefs, ServerRefs, and 
+These references are abbreviated ChannelRefs, SubchannelRefs, ServerRefs, and
 SocketRefs.  Note that only the id is necessary to query channelz.
 
 The data representation of each ref:
@@ -84,13 +84,13 @@ The data representation of each ref:
 Channels and Subchannels, or descendent channels, are hierarchically organized
 into a DAG structure.  The union of all channels and subchannels may not contain
 a cycle.  A descendent channel may have any number of descendent channels. Each
-descendent channel may also have any number of sockets.   However, a given 
+descendent channel may also have any number of sockets.   However, a given
 descendent channel cannot have heterogeneous children.  That is, a channel or
 subchannel may have descendent channels, or have sockets, but not both.
 
 A subchannel represents a channel that is load-balanced over.  When a channel
-has both subchannels and channels, the channels are not delegated to by the 
-superchannel.  An example would be a channel that is used by the ancestor 
+has both subchannels and channels, the channels are not delegated to by the
+superchannel.  An example would be a channel that is used by the ancestor
 channel, but does not handle RPCs given by the application.
 
 Each channel has a ChannelRef reference which includes the channel id and an
@@ -98,7 +98,7 @@ optional name.  The name is included for human consumption.  There are no
 restrictions on the name but it should be limited to a reasonable length.
 
 Each subchannel has a SubchannelRef reference which includes the subchannel id
-and an optional name.  The name is included for human consumption.  There are 
+and an optional name.  The name is included for human consumption.  There are
 no restrictions on the name but it should be limited to a reasonable length.
 
 ![channel hierarchy 1][channel hierarchy 1]
@@ -118,9 +118,9 @@ parameters and their call stats.  Currently the data includes:
 In general, each piece of data included is specific to the channel itself and
 NOT of its descendent channels.  This is to say that an ancestor channel
 is not an aggregator for descendent channels.  The target of a descendent channel
-may be different from that of its parent.  The target of a descendent subchannel 
+may be different from that of its parent.  The target of a descendent subchannel
 may not be present.  The channel state may be different from the ancestor channel
-state.   The number of calls started, succeeded, and failed should reflect if 
+state.   The number of calls started, succeeded, and failed should reflect if
 calls were specifically tied to the channel.
 
 The number of calls started, succeeded, and failed on a channel gives insight
@@ -140,18 +140,18 @@ changes, unreachability, etc.  As mentioned earlier, this tracing info is
 specific to the channel, and not an aggregation of descendent channel traces.
 
 The channel traces may include ids pointing to channels and subchannels outside
-of the current DAG.  Since channel traces use the same ids as the channels 
-themselves, this allows a user to query for more information about a channel 
+of the current DAG.  Since channel traces use the same ids as the channels
+themselves, this allows a user to query for more information about a channel
 given its trace.
 
 ### Descendent channels
 
-To keep the size of the Channel message down, only the ChannelRefs and 
+To keep the size of the Channel message down, only the ChannelRefs and
 SubchannelRefs will be included in the channel or subchannel.  These refs can
 be used to walk the hierarchy.  Subchannels are not included in the top level
 channels, and thus do not need to be paginated.  A user may query for all the
-subchannels in parallel. As mentioned above, if there are any Sockets on the 
-channel, there will be no descendent channels.   This invariant exists to 
+subchannels in parallel. As mentioned above, if there are any Sockets on the
+channel, there will be no descendent channels.   This invariant exists to
 simplify the tree structure and more closely match the known implementations of
 gRPC.
 
@@ -168,11 +168,11 @@ are owned by a parent, but do not share its target.
 
 ### Sockets
 
-Like channels and subchannels, only SocketRefs are included on a channel.  This 
+Like channels and subchannels, only SocketRefs are included on a channel.  This
 is done for two main reasons.  The size of the socket message may be large, and
-there may be many sockets for a given channel.  Secondly, it can be CPU 
-intensive to fill in the socket information, even though the information might 
-not be desired.  As mentioned in the section above, if there are any descendent 
+there may be many sockets for a given channel.  Secondly, it can be CPU
+intensive to fill in the socket information, even though the information might
+not be desired.  As mentioned in the section above, if there are any descendent
 channels, there will be no sockets.  This invariant exists to simplify the
 DAG structure, and more closely match the known implementations of gRPC.
 
@@ -193,7 +193,7 @@ group of services roughly defines a server, though services can be shared
 between servers.  A server may be listening on any number of ports, though
 commonly there is only one.  Each server has a ServerRef.  Like a ChannelRef, it
 has a unique id and an optional name.   The id is unique, even among the ids of
-channels, subchannels, and sockets.  This makes it impossible to accidentally 
+channels, subchannels, and sockets.  This makes it impossible to accidentally
 refer to the wrong entity type when querying channelz.
 
 Note that even with no Servers present, channelz data is still collected.  If in
@@ -271,11 +271,14 @@ The stream counts differ slightly than that of the number of calls.  Calls may
 be started before a socket (transport) is available, so the stream counter may
 smaller than the corresponding call counters.  Conversely, if a stream fails and
 the call is retriable, a new stream may be started.  This could make the stream
-counts higher than the call counts.  Streams are considered successful if they
-have the HTTP/2 EoS bit set, or failed if terminated otherwise (usually an
-HTTP/2 RST_STREAM frame).  The number of successful streams may also be greater
-than the number of successful calls.  For example, if the stream completes 
-successfully, but the gRPC trailers are invalid.
+counts higher than the call counts.  Streams of a Channel's or Subchannel's
+sockets considered successful if they complete receiving an EoS frame. Streams
+of a Server's sockets are considered successful if they complete sending an
+EoS frame.  All streams may issue or receive additional cleanup data
+(such as RST_STREAM frames) that do not count toward the success of the stream.
+All other terminations are considered failures.  The number of successful
+streams may also be greater than the number of successful calls.  For example,
+if the stream completes successfully, but the gRPC trailers are invalid.
 
 The message counts represent how many gRPC messages are sent and received.
 Calls may send and receive any number of messages, including zero.
@@ -285,7 +288,7 @@ keep the socket alive.  Generally this is an HTTP/2 PING frame.  However, not
 all PING frames are keep alives.  Specifically, pings that were sent as a reply
 (ACK bit set) or were used for reasons unrelated to keep alives should not count
 towards this.  For example, if pings were used to measure network bandwidth,
-they would not be treated as keep alives.   The intent is to measure how often 
+they would not be treated as keep alives.   The intent is to measure how often
 the local endpoint is doing extra work to keep the connection alive.
 
 
@@ -304,14 +307,14 @@ constantly evolving number, which each endpoint sending chunks of window.  For
 the particular flow control windows in the socket data, they are the windows as
 defined by the underlying transport.  For example, HTTP/2 transports report the
 connection level flow control window.  Implementations that don't support flow
-control may leave this blank, implying the limitation is either unknown or 
-doesn't exist.  Note that only the connection level flow control window is 
-reported, rather than the stream level.  TCP level flow and congestion control 
+control may leave this blank, implying the limitation is either unknown or
+doesn't exist.  Note that only the connection level flow control window is
+reported, rather than the stream level.  TCP level flow and congestion control
 counters are exposed via socket options.
 
 #### Socket Options
 
-At this low level in the gRPC stack, implementation differences become more 
+At this low level in the gRPC stack, implementation differences become more
 significant. Each OS or platform may have differing amounts of socket
 information available.  To address these differences, each socket option name
 and value is expressed as a string.
@@ -342,7 +345,7 @@ UDS, etc.) as well as the the identity used to establish the connection (e.g.
 IP Address, port number, filename, etc.).
 
 Not every socket has a remote address;  listening sockets may only include a
-local address.  Not every socket has a local address; Unix domain sockets may 
+local address.  Not every socket has a local address; Unix domain sockets may
 only include a remote address.
 
 By default, only TCP and UDS addresses are defined.  Because there are many
@@ -638,420 +641,5 @@ errors about the channel not being found.
 
 ## Proto
 
-```proto
-syntax = "proto3";
-
-package grpc.channelz;
-
-import "google/protobuf/any.proto";
-import "google/protobuf/duration.proto";
-import "google/protobuf/timestamp.proto";
-import "google/protobuf/wrappers.proto";
-
-// Channel is a logical grouping of channels, subchannels, and sockets.
-message Channel {
-  // The identifier for this channel.
-  ChannelRef ref = 1;
-  // Data specific to this channel.
-  ChannelData data = 2;
-  // At most one of 'channel_ref+subchannel_ref' and 'socket' is set.
-  
-  // There are no ordering guarantees on the order of channel refs.
-  // There may not be cycles in the ref graph.
-  // A channel ref may be present in more than one channel or subchannel.
-  repeated ChannelRef channel_ref = 3;
-  
-  // At most one of 'channel_ref+subchannel_ref' and 'socket' is set.
-  // There are no ordering guarantees on the order of subchannel refs.
-  // There may not be cycles in the ref graph.
-  // A sub channel ref may be present in more than one channel or subchannel.
-  repeated SubchannelRef subchannel_ref = 4;
-  
-  // There are no ordering guarantees on the order of sockets.
-  repeated SocketRef socket_ref = 5;
-}
-
-// Subchannel is a logical grouping of channels, subchannels, and sockets. 
-// A subchannel is load balanced over by it's ancestor
-message Subchannel {
-  // The identifier for this channel.
-  SubchannelRef ref = 1;
-  // Data specific to this channel.
-  ChannelData data = 2;
-  // At most one of 'channel_ref+subchannel_ref' and 'socket' is set.
-  
-  // There are no ordering guarantees on the order of channel refs.
-  // There may not be cycles in the ref graph.
-  // A channel ref may be present in more than one channel or subchannel.
-  repeated ChannelRef channel_ref = 3;
-  
-  // At most one of 'channel_ref+subchannel_ref' and 'socket' is set.
-  // There are no ordering guarantees on the order of subchannel refs.
-  // There may not be cycles in the ref graph.
-  // A sub channel ref may be present in more than one channel or subchannel.
-  repeated SubchannelRef subchannel_ref = 4;
-  
-  // There are no ordering guarantees on the order of sockets.
-  repeated SocketRef socket_ref = 5;
-}
-
-// These come from the specified states in this document:
-// https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
-message ChannelConnectivityState {
-  enum State {
-    UNKNOWN = 0;
-    IDLE = 1;
-    CONNECTING = 2;
-    READY = 3;
-    TRANSIENT_FAILURE = 4;
-    SHUTDOWN = 5;
-  }
-  State state = 1;
-}
-
-message ChannelData {
-
-  ChannelConnectivityState state = 1;
-
-  // The target this channel originally tried to connect to.  May be absent
-  string target = 2;
-  
-  ChannelTrace trace = 3;
-
-  // The number of calls started on the channel
-  int64 calls_started = 4;
-  // The number of calls that have completed with an OK status
-  int64 calls_succeeded = 5;
-  // The number of calls that have a completed with a non-OK status
-  int64 calls_failed = 6;
-
-  // The last time a call was started on the channel.
-  google.protobuf.Timestamp last_call_started_timestamp = 7;
-}
-
-message ChannelTrace {
-  // see the proto in the gRFC for channel tracing:
-  // A3-channel-tracing.md
-}
-
-message ChannelRef {
-  // The globally unique id for this channel.  Must be a positive number.
-  int64 channel_id = 1;
-  // An optional name associated with the channel.
-  string name = 2;
-  // Intentionally don't use field numbers from other refs.
-  reserved 3, 4, 5, 6;
-}
-
-message SubchannelRef {
-  // The globally unique id for this subchannel.  Must be a positive number.
-  int64 subchannel_id = 7;
-  // An optional name associated with the subchannel.
-  string name = 8;
-  // Intentionally don't use field numbers from other refs.
-  reserved 1, 2, 3, 4, 5, 6;
-}
-
-message SocketRef {
-  int64 socket_id = 3;
-  // An optional name associated with the socket.
-  string name = 4;
-  // Intentionally don't use field numbers from other refs.
-  reserved 1, 2, 5, 6, 7, 8;
-}
-
-message ServerRef {
-  // A globally unique identifier for this server.   Must be a positive number.
-  int64 server_id = 5;
-  // An optional name associated with the server.
-  string name = 6;
-  // Intentionally don't use field numbers from other refs.
-  reserved 1, 2, 3, 4, 7, 8;
-}
-
-message Server {
-  ServerRef ref = 1;
-  ServerData data = 2;
-
-  // The sockets that the server is listening on.  There are no ordering
-  // guarantees.
-  repeated SocketRef listen_socket = 3;
-}
-
-message ServerData {
-  ChannelTrace trace = 1;
-  
-  // The number of incoming calls started on the server
-  int64 calls_started = 2;
-  // The number of incoming calls that have completed with an OK status
-  int64 calls_succeeded = 3;
-  // The number of incoming calls that have a completed with a non-OK status
-  int64 calls_failed = 4;
-
-  // The last time a call was started on the server.
-  google.protobuf.Timestamp last_call_started_timestamp = 5;
-}
-
-// Information about an actual connection.  Pronounced "sock-ay".
-message Socket {
-  SocketRef ref = 1;
-
-  SocketData data = 2;
-  // The locally bound address.
-  Address local = 3;
-  // The remote bound address.  May be absent.
-  Address remote = 4;
-  Security security = 5;
-
-  // Optional, represents the name of the remote endpoint, if different than
-  // the original target name.
-  string remote_name = 6;
-}
-
-message SocketData {
-  // The number of streams that have been started.
-  int64 streams_started = 1;
-  // The number of streams that have ended successfully with the EoS bit set for
-  //  both end points
-  int64 streams_succeeded = 2;
-  // The number of incoming streams that have a completed with a non-OK status
-  int64 streams_failed = 3;
-
-  // The number of messages successfully sent on this socket.
-  int64 messages_sent = 4;
-  int64 messages_received = 5;
-
-  // The number of keep alives sent.  This is typically implemented with HTTP/2
-  // ping messages.
-  int64 keep_alives_sent = 6;
-
-  // The last time a stream was created by this endpoint.  Usually unset for
-  // servers.
-  google.protobuf.Timestamp last_local_stream_created_timestamp = 7;
-  // The last time a stream was created by the remote endpoint.  Usually unset
-  // for clients.
-  google.protobuf.Timestamp last_remote_stream_created_timestamp = 8;
-
-  // The last time a message was sent by this endpoint.
-  google.protobuf.Timestamp last_message_sent_timestamp = 9;
-  // The last time a message was received by this endpoint.
-  google.protobuf.Timestamp last_message_received_timestamp = 10;
-
-  // The amount of window, granted to the local endpoint by the remote endpoint.
-  // This may be slightly out of date due to network latency.  This does NOT
-  // include stream level or TCP level flow control info.
-  google.protobuf.Int64Value local_flow_control_window = 11;
-
-  // The amount of window, granted to the remote endpoint by the local endpoint.
-  // This may be slightly out of date due to network latency.  This does NOT
-  // include stream level or TCP level flow control info.
-  google.protobuf.Int64Value  remote_flow_control_window = 12;
-
-  repeated SocketOption option = 13;
-}
-
-message Address {
-  message TcpIpAddress {
-    // Either the IPv4 or IPv6 address in bytes.  Will either be 4 bytes or 16
-    // bytes in length.
-    bytes ip_address = 1;
-    // 0-64k, or -1 if not appropriate.
-    int32 port = 2;
-  }
-  // A Unix Domain Socket address.
-  message UdsAddress {
-    string filename = 1;
-  }
-  // An address type not included above.
-  message OtherAddress {
-    // The human readable version of the value.
-    string name = 1;
-    // The actual address message.
-    google.protobuf.Any value = 2;
-  }
-
-  oneof address {
-    TcpIpAddress tcpip_address = 1;
-    UdsAddress uds_address = 2;
-    OtherAddress other_address = 3;
-  }
-}
-
-message Security {
-  message Tls {
-    oneof cipher_suite {
-      // The cipher suite name in the RFC 4346 format:
-      // https://tools.ietf.org/html/rfc4346#appendix-C
-      string standard_name = 1;
-      // Some other way to describe the cipher suite if
-      // the RFC 4346 name is not available.
-      string other_name = 2;
-    }
-    // the certificate used by this endpoint.
-    bytes local_certificate = 3;
-    // the certificate used by the remote endpoint.
-    bytes remote_certificate = 4;
-  }
-  message OtherSecurity {
-    // The human readable version of the value.
-    string name = 1;
-    // The actual security details message.
-    google.protobuf.Any value = 2;
-  }
-  oneof model {
-    Tls tls = 1;
-    OtherSecurity other = 2;
-  }
-}
-
-message SocketOption {
-  string name = 1;
-  // The human readable value of this socket option.  At least one of value or
-  // additional will be set.
-  string value = 2;
-  // Additional data associated with the socket option.  At least one of value
-  // or additional will be set.
-  google.protobuf.Any additional = 3;
-}
-
-// For use with SocketOption's additional field.  This is primarily used for
-// SO_RCVTIMEO and SO_SNDTIMEO
-message SocketOptionTimeout {
-  google.protobuf.Duration duration = 1;
-}
-
-message SocketOptionLinger {
-  bool active = 1;
-  google.protobuf.Duration duration = 2;
-}
-
-// Tcp info for SOL_TCP, TCP_INFO
-message SocketOptionTcpInfo {
-  uint32 tcpi_state = 1;
-
-  uint32 tcpi_ca_state = 2;
-  uint32 tcpi_retransmits = 3;
-  uint32 tcpi_probes = 4;
-  uint32 tcpi_backoff = 5;
-  uint32 tcpi_options = 6;
-  uint32 tcpi_snd_wscale = 7;
-  uint32 tcpi_rcv_wscale = 8;
-
-  uint32 tcpi_rto = 9;
-  uint32 tcpi_ato = 10;
-  uint32 tcpi_snd_mss = 11;
-  uint32 tcpi_rcv_mss = 12;
-
-  uint32 tcpi_unacked = 13;
-  uint32 tcpi_sacked = 14;
-  uint32 tcpi_lost = 15;
-  uint32 tcpi_retrans = 16;
-  uint32 tcpi_fackets = 17;
-
-  uint32 tcpi_last_data_sent = 18;
-  uint32 tcpi_last_ack_sent = 19;
-  uint32 tcpi_last_data_recv = 20;
-  uint32 tcpi_last_ack_recv = 21;
-
-  uint32 tcpi_pmtu = 22;
-  uint32 tcpi_rcv_ssthresh = 23;
-  uint32 tcpi_rtt = 24;
-  uint32 tcpi_rttvar = 25;
-  uint32 tcpi_snd_ssthresh = 26;
-  uint32 tcpi_snd_cwnd = 27;
-  uint32 tcpi_advmss = 28;
-  uint32 tcpi_reordering = 29;
-}
-
-service Channelz {
-  // Gets all root channels (e.g. channels the application has directly
-  // created). This does not include subchannels nor non-top level channels.
-  rpc GetTopChannels(GetTopChannelsRequest) returns (GetTopChannelsResponse);
-  // Gets all servers that exist in the process.
-  rpc GetServers(GetServersRequest) returns (GetServersResponse);
-  // Gets all server sockets that exist in the process.
-  rpc GetServerSockets(GetServerSocketsRequest) returns (GetServerSocketsResponse);
-  // Returns a single Channel, or else a NOT_FOUND code.
-  rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
-  // Returns a single Subchannel, or else a NOT_FOUND code.
-  rpc GetSubchannel(GetSubchannelRequest) returns (GetSubchannelResponse);
-  // Returns a single Socket or else a NOT_FOUND code.
-  rpc GetSocket(GetSocketRequest) returns (GetSocketResponse);
-}
-
-message GetServersRequest {
-  // start_server_id indicates that only servers at or above this id should be
-  // included in the results.
-  int64 start_server_id = 1;
-}
-
-message GetServersResponse {
-  // list of servers that the connection detail service knows about.  Sorted in
-  // ascending server_id order.
-  repeated Server server = 1;
-  // If set, indicates that the list of servers is the final list.  Requesting
-  // more servers will only return more if they are created after this RPC
-  // completes.
-  bool end = 2;
-}
-
-message GetServerSocketsRequest {
-  int64 server_id = 1;
-  // start_socket_id indicates that only sockets at or above this id should be
-  // included in the results.
-  int64 start_socket_id = 2;
-}
-
-message GetServerSocketsResponse {
-  // list of socket refs that the connection detail service knows about.  Sorted in
-  // ascending socket_id order.
-  repeated SocketRef socket_ref = 1;
-  // If set, indicates that the list of sockets is the final list.  Requesting
-  // more sockets will only return more if they are created after this RPC
-  // completes.
-  bool end = 2;
-}
-
-message GetTopChannelsRequest {
-  // start_channel_id indicates that only channels at or above this id should be
-  // included in the results.
-  int64 start_channel_id = 1;
-}
-
-message GetTopChannelsResponse {
-  // list of channels that the connection detail service knows about.  Sorted in
-  // ascending channel_id order.
-  repeated Channel channel = 1;
-  // If set, indicates that the list of channels is the final list.  Requesting
-  // more channels can only return more if they are created after this RPC
-  // completes.
-  bool end = 2;
-}
-
-message GetChannelRequest {
-  int64 channel_id = 1;
-}
-
-message GetChannelResponse {
-  Channel channel = 1;
-}
-
-message GetSubchannelRequest {
-  int64 subchannel_id = 1;
-}
-
-message GetSubchannelResponse {
-  Subchannel subchannel = 1;
-}
-
-message GetSocketRequest {
-  int64 socket_id = 1;
-}
-
-message GetSocketResponse {
-  Socket socket = 1;
-}
-```
-
-
-
+The canonical proto definition can be found at
+[grpc/channelz/channelz.proto](https://github.com/grpc/grpc-proto/blob/master/grpc/channelz/channelz.proto).
