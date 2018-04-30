@@ -4,7 +4,7 @@ Standalone Node.js gRPC+Protobuf.js Library API
 * Approver: wenbozhu
 * Status: Ready for Implementation
 * Implemented in: Node.js
-* Last updated: 2018-03-07
+* Last updated: 2018-04-30
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/t7XFE7Wevow
 
 ## Abstract
@@ -60,7 +60,7 @@ The `options` parameter of those functions is the union of Protobuf.js's [`IPars
  - `objects`: a boolean indicating that empty objects should be set for missing object values even if `defaults` is `false`.
  - `oneofs`: a boolean indicating that virtual oneof properties should be set to the present field's name.
  - `json`: a boolean indicating that additional JSON compatibility conversions should be performed.
- - `include`: an array of strings listing paths in which to search for imported `.proto` files.
+ - `includeDirs`: an array of strings listing paths in which to search for imported `.proto` files.
 
 ## Rationale
 
