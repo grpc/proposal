@@ -636,10 +636,10 @@ errors about the channel not being found.
 [channel hierarchy 1]: A14_graphics/2.png "Channel Hierarchy"
 [channel hierarchy 2]: A14_graphics/3.png "Channel Hierarchy"
 [channel hierarchy 3]: A14_graphics/4.svg "Channel Hierarchy"
-[connectivity-semantics](https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md)
+[connectivity-semantics]: https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
 
 
 ## Proto
 
 The canonical proto definition can be found at
-[grpc/channelz/channelz.proto](https://github.com/grpc/grpc-proto/blob/master/grpc/channelz/channelz.proto).
+[grpc/channelz/v1/channelz.proto](https://github.com/grpc/grpc-proto/blob/master/grpc/channelz/v1/channelz.proto).
