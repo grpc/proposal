@@ -86,7 +86,7 @@ message ChannelTrace {
   // implementations.
   int64 num_events_logged = 1;
   // Time that this channel was created.
-  google.protobuf.Timestamp creation_time = 2;
+  google.protobuf.Timestamp creation_timestamp = 2;
   // List of events that have occurred on this channel.
   repeated ChannelTraceEvent events = 3;
 }
