@@ -1,6 +1,6 @@
 Title
 ----
-* Author(s): [Jim King, Emil Mukilic]
+* Author(s): Jim King, Emil Mukilic
 * Approver: Mark Roth, Nicolas Noble
 * Status: In Review
 * Implemented in: C++
@@ -25,8 +25,10 @@ N/A
 ## Proposal
 
 We propose that the OpenCensus filter (C++ grpc filter) which currently resides in the OpenCensus repository (https://github.com/census-instrumentation/opencensus-cpp)
-be moved to the grpc repository (src/cpp/ext/filters/census/). The OpenCensus filter will be setup as an optional build target which users can include.  There is not
-viable way to allow it to be included by default with grpc builds due to dependency conflicts.
+be moved to the grpc repository (src/cpp/ext/filters/census/). The OpenCensus filter will be setup as an optional build target which users can include.  There no
+viable way to include it by default with the default grpc build due to dependency conflicts. Users will have to manually enable the filter by using a filter registration
+call. This method was chosen, as the only other way to enable it by default would be to have it built together with grpc.  Not all platforms (namely Windows) support weak symbols
+or other tricks that would allow for dynamic initialization when the OpenCensus library is linked in.
 
 ## Rationale
 
