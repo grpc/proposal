@@ -1,7 +1,7 @@
 Title
 ----
 * Author(s): Jim King, Emil Mukilic
-* Approver: Mark Roth, Nicolas Noble
+* Approver:
 * Status: In Review
 * Implemented in: C++
 * Last updated: 5-14-2018
