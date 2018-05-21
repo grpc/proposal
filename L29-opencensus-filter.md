@@ -5,7 +5,7 @@ Title
 * Status: In Review
 * Implemented in: C++
 * Last updated: 5-14-2018
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/ft8UHY0EUz0
 
 ## Abstract
 
