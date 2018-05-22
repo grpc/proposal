@@ -1,15 +1,15 @@
-Title
+C++ API Changes for OpenCensus Integration
 ----
-* Author(s): Jim King, Emil Mukilic
-* Approver:
+* Author(s): Vizerai
+* Approver: markdroth, vjpai
 * Status: In Review
 * Implemented in: C++
-* Last updated: 5-14-2018
+* Last updated: 2018-05-14
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/ft8UHY0EUz0
 
 ## Abstract
 
-The OpenCensus filter allows grpc to itegrate and collect stats and tracing data with OpenCensus (https://github.com/census-instrumentation/opencensus-cpp). The Opencensus filter uses a number of internal APIs (src/core/lib/slice/slice_internal.h, src/cpp/common/channel_filter.h, src/core/lib/gprpp/orphanable.h, src/core/lib/surface/call.h). Since these internal APIs are subject to change, in order to ease maintenance of the filter, we propose that the filter be moved to the grpc repository (src/cpp/ext/filters/census/). This will introduce an API change for grpc++ when OpenCensus is used, which will require the user to register the OpenCensus filter with grpc.  This is in addition to any views and exporters that would need to be registered to use OpenCensus.
+The OpenCensus filter allows grpc to integrate and collect stats and tracing data with OpenCensus (https://github.com/census-instrumentation/opencensus-cpp). The OpenCensus filter uses a number of internal APIs (src/core/lib/slice/slice_internal.h, src/cpp/common/channel_filter.h, src/core/lib/gprpp/orphanable.h, src/core/lib/surface/call.h). Since these internal APIs are subject to change, in order to ease maintenance of the filter, we propose that the filter be moved to the grpc repository (src/cpp/ext/filters/census/). This will introduce an API change for grpc++ when OpenCensus is used, which will require the user to register the OpenCensus filter with grpc.  This is in addition to any views and exporters that would need to be registered to use OpenCensus.
 
 ## Background
 
@@ -24,7 +24,12 @@ We propose that the OpenCensus filter (C++ grpc filter) which currently resides 
 
 The major changes introduced by this are as follows:
   1) A new optional dependency on OpenCensus for bazel builds. This will be a new build target in the Bazel build file. Currently only the Bazel build will be supported.  There will be no git submodule for OpenCensus, and no make/cmake support (this may be added at a later time).
-  2) A new API call will be introduced to enable the OpenCensus filter for tracing and stats collection. This must be called to register the plugin mechanism and initialize OpenCensus. RegisterOpenCensusPlugin() will reside in src/cpp/ext/filters/census/grpc_plugin.h.  There will also be an optional API call to register default views for OpenCensus.
+  2) Two new public API calls will be introduced to enable the OpenCensus filter for tracing and stats collection and register default views. The registration call must be made to register the plugin mechanism and initialize OpenCensus. The call to register default views is optional and does not need to be used if the user will be registering their own views.
+
+  * The public API calls will reside in include/grpcpp/opencensus.h :
+
+        void RegisterOpenCensusPlugin();
+        void RegisterGrpcViewsForExport();
 
 ## Rationale
 
