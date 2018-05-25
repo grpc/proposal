@@ -29,7 +29,7 @@ The major changes introduced by this are as follows:
   * The public API calls will reside in include/grpcpp/opencensus.h :
 
         void RegisterOpenCensusPlugin();
-        void RegisterGrpcViewsForExport();
+        void RegisterOpenCensusViewsForExport();
 
 ## Rationale
 
