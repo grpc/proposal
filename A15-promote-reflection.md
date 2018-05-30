@@ -5,7 +5,7 @@ Promote Reflection
 * Status: Draft
 * Implemented in:
 * Last updated: 2018-05-30
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/AOgFISlAgxk
 
 ## Abstract
 
