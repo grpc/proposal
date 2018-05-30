@@ -44,7 +44,7 @@ implementation of gRPC and has not changed in two years.
 ## Implementation
 
 1.  Copy grpc/reflection/v1alpha/reflection.proto to
-    grpc/reflection/v1/reflection.proto
+    grpc/reflection/v1/reflection.proto and update package name.
 2.  Update existing service implementations in each repo to support the new
     location in addition to the old location.
 3.  The old reflection.proto will be marked deprecated and for removal.
