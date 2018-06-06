@@ -4,7 +4,7 @@ Title
 * Approver: jtattermusch
 * Status: In Review
 * Implemented in: C#
-* Last updated: October 16, 2017
+* Last updated: June 6, 2018
 * Discussion at: https://groups.google.com/d/topic/grpc-io/GKcnFC3oxhk/discussion
 
 ## Abstract
@@ -18,10 +18,10 @@ composed flexibly as users wish.
 ## Background
 
 gRPC C# does not have an interceptor API.  Functionality can be partially
-simulated on the client side by extending the `CallInvoker` class. However, this
-has some limitations in composition and the ability to decouple `CallInvoker`
-from each other.  On the server side, similar or replacement functionality was
-basically non-existent.
+simulated on the client side by extending the `CallInvoker` class. However,
+this has some limitations in composition and the ability to decouple
+`CallInvoker` from each other.  On the server side, similar or replacement
+functionality is effectively non-existent.
 
 
 ### Related Proposals:
@@ -40,68 +40,88 @@ namespace in `Grpc.Core` assembly.
 
 While client and server interceptors use different hooks to intercept on RPC
 invocations, they share the abstract base class `Interceptor` without any
-abstract methods.  The rationale for this is it enables a single class to act
-both as a server interceptor and a client interceptor.  An alternative
-considered were using an `interface` instead of an abstract base class, but were
-ruled out due to potential future versioning issues (adding a method to an
-interface would be a breaking API change, whereas adding an additional method to
-an abstract base should be fine as long as it is not marked `abstract`). Another
-alternative that was ruled out was to separate it out to `ClientInterceptor` and
-`ServerInterceptor` classes.  This may have made each class look slightly more
-lightweight,  but realistically, it would be just as easy to implement just the
-client methods and not the server methods on an interceptor.
+abstract methods.  An alternative was initially considered where two separate
+base classes supported client and server interceptors. The rationale for
+settling on a single base class was to enable a single class to be able to get
+registered both as a server interceptor and a client interceptor, making
+libraries providing generic interceptors nicer to use, and the cost of having
+several additional virtual methods in the same class was minimal should one
+want to implement only one side of the interceptor.  Another alternative
+considered was using an `interface` instead of an abstract base class, but that
+was ruled out since interfaces are less amenable to non-breaking changes than
+abstract classes across future versions (adding a method to an interface would
+be a breaking change for existing users, whereas adding an additional method to
+an abstract base class should be fine as long as it is not marked `abstract`).
+
+### Abstract Base Class
+
+All interceptors must derive, directly or indirectly, from the abstract base
+class `Grpc.Core.Interceptors.Interceptor` and can choose to override zero or
+more of its methods.
 
 ### Client Interceptors
 
-Client interceptors derive from the new abstract base class
-`Grpc.Core.Interceptors.Interceptor`.  This abstract class defines five
-different virtual methods to hook into various RPC invocation types, namely
-`BlockingUnaryCall`, `AsyncUnaryCall`, `AsyncClientStreamingCall`,
-`AsyncServerStreamingCall`, and `AsyncDuplexStreamingCall`.
-
-The request-unary interceptor hooks take a request value as their first
-argument, followed by the common arguments for all of the methods:
-
-1. A `context` argument of a new type `ClientInterceptorContext<TRequest,
-   TResponse>` that encapsulates the context of the call.  An older alternative
-   design used a similar signature to the corresponding method in the
-   `CallInvoker` class, but that would limit the ability to add new contextual
-   information to pass along without changing the signature and thus breaking
-   API compatibility.
-
-2. A `continuation` argument, which is a delegate that invokes the next step in
-   the interceptor chain or the actual underlying `CallInvoker` handler for the
-   final interceptor in the chain and returns a value of the same type as the
-   interceptor method.  For unary requests, it takes the `request` value as its
-   first argument, followed by the `context` to proceed the invocation with. The
-   interceptor method is allowed to pass in a new or modified `context` along
-   and that is what the RPC continues with.  For client-streaming RPCs, only the
-   `context` argument should be passed along to the `continuation`.
+The `Interceptor` class defines the following virtual methods to hook into RPC
+invocations of various types on the client side:
 
 ```csharp
-TResponse BlockingUnaryCall<TRequest, TResponse>(
-    TRequest request,
-    ClientInterceptorContext<TRequest, TResponse> context,
-    BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
-
-AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(
-    TRequest request,
-    ClientInterceptorContext<TRequest, TResponse> context,
-    AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
-
-AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(
-    TRequest request,
-    ClientInterceptorContext<TRequest, TResponse> context,
-    AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
-
-AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(
-    ClientInterceptorContext<TRequest, TResponse> context,
-    AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation)
+TResponse BlockingUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, BlockingUnaryCallContinuation<TRequest, TResponse> continuation);
+AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, AsyncUnaryCallContinuation<TRequest, TResponse> continuation);
+AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation);
+AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context, AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation);
+AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context, AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation);
 ```
-AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(
-    ClientInterceptorContext<TRequest, TResponse> context,
-    AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation)
-```
+
+Four of these methods correspond to the asynchronous invocations of the four
+different possible RPC types supported by gRPC: unary, server-streaming,
+client-streaming, and duplex-streaming; the fifth, `BlockingUnaryCall` is
+provided for performance reasons for non-asynchronous unary-unary invocations.
+The API is designed to directly correspond to the methods supported by
+`CallInvoker`.  An interceptor implementation interested in intercepting each
+RPC type needs to override and customize the implementation of each of the
+respective methods. Once again, blocking and asynchronous code paths for unary
+invocations are separate and both need to be implemented and overriding one
+does not automatically apply to the other.
+
+Of the aformentioned methods, the ones that intercpet request-unary RPCs take
+an instance of the unary request object.  All methods take a context class of
+type `Grpc.Core.Interceptors.ClientInterceptorContext` and a `continuation`
+delegate to invoke to continue with the RPC chain.
+
+#### The `ClientInterceptorContext` class
+
+A new class, `Grpc.Core.Interceptors.ClientInterceptorContext` is introduced
+to encapsulate the details of the invocation, namely the following properties,
+but is flexible to support the addition of new properties in the future:
+
+- `Method` of type `Method<TRequest, TResponse>` representing the current
+  method to be invoked.
+- `Host`, a string representing the host name of the current invocation.
+- `Options`, the `CallOptions` for the current invocation.
+
+A `context` instance is passed to the interceptor to describe the invocation.
+The interceptor is free to propagate the same object or create its own context
+object and pass it to the next continuation to control how the invocation is
+going to proceed.
+
+An alternative was considered to pass such properties in-line as arguments
+to the interceptor and have the interceptor invoke the continuation listing
+them as arguments, but in addition to usability hurdles due to verboseness,
+having a class makes adding properties more seamless and future-proof than
+adding a parameter to method signatures, thus that alternative was
+eliminated.
+
+#### The `continuation` delegate
+
+The invocation-side interceptors get control over an RPC invocation and can
+read and optionally modify aspects of the invocation they are interested in.
+Such properties are passed via the request value argument for the unary RPCs
+and the context object specified above.  In order to proceed with the
+execution of the RPC, the interceptor can choose to call the `continuation`
+and pass it a new request instance (for request-unary RPCs only) and a context
+instance.  The interceptor is allowed to invoke `continuation` zero (useful
+for a caching interceptor, for example) or more times (e.g. useful for a retry
+interceptor) and return a value as it sees fit.
 
 In the general case, the interceptors are not obligated to invoke `continuation`
 just once.  They might choose to not continue with the call chain and terminate
@@ -119,6 +139,16 @@ implementation chains interceptors together and ultimately with the underlying
 could have been implemented as an external library, and does not change the
 non-intercepted code path at all, therefore should not have any negative
 performance impact when no interceptor is used.
+
+#### Return values
+
+The return value of each method is of the same type as the corresponding
+method in the `CallInvoker` object for that RPC type and is documented in
+that class.  For asynchronous and streaming invocations, intercepting the
+entire call would entail returning a custom instance of the `Async***Call`
+value that wraps the value returned from `continuation`.
+
+#### Registration
 
 Client interceptors are registered on a `Channel` or `CallInvoker` via extension
 methods named `Intercept` defined in `ChannelExtensions` and
@@ -150,26 +180,132 @@ var greeterClient = new GreeterClient(interceptedChannel);
 A higher-level, more user-friendly, canonical base class for common interceptor
 functionality can be provided by deriving from `Interceptor` and adding unified
 hooks (e.g. `BeginCall`, `EndCall`) that can be overridden once but operate on
-all types of RPC invocations.
+all types of RPC invocations.  Additionally, a pipeline-builder style of
+registration can be added in the future.  Since this gRFC does not preclude
+addition of those, and in the interest of not adding APIs that would be set
+in stone, the scope of this gRFC is limited to the core interceptor hooks and
+external libraries can provide such functionality for now.
+
+#### Order of execution
+
+Registering an interceptor on a `Channel`-like object is to be thought of as
+treating the underlying object as a black box and intercept methods before
+they are handed over to the underlying object.  Thus, intercepting an
+intercepted channel will result in the last interceptor being run first:
+
+```csharp
+var chan = newChannel();
+var interceptedOnce = chan.Intercept(interceptor1);
+var interceptedTwice = interceptedOnce.Intercept(interceptor2);
+// interceptor2 will take control first, and calling continuation
+// from interceptor2 will invoke interceptor1. continuation passed
+// to interceptor1 will invoke the call invoker which invokes
+// the channel.
+```
+
+However, a helper API is provided to register multiple interceptors
+at once on a `Channel` or `CallInvoker`, in which case, the order
+of execution is in the order listed.
+
+```csharp
+var interceptedChannel = chan.Intercept(interceptor1, interceptor2);
+// interceptor1 will take control before interceptor2.
+```
+
+#### Simple client interceptor example
+
+```csharp
+// Invokes the specified callback before each RPC gets invoked.
+class CallbackInterceptor : Interceptor
+{
+    readonly Action callback;
+    public CallbackInterceptor(Action callback)
+    {
+        this.callback = GrpcPreconditions.CheckNotNull(callback, nameof(callback));
+    }
+    public override TResponse BlockingUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
+    {
+        callback();
+        return continuation(request, context);
+    }
+    public override AsyncUnaryCall<TResponse> AsyncUnaryCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, AsyncUnaryCallContinuation<TRequest, TResponse> continuation)
+    {
+        callback();
+        return continuation(request, context);
+    }
+    public override AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(TRequest request, ClientInterceptorContext<TRequest, TResponse> context, AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
+    {
+        callback();
+        return continuation(request, context);
+    }
+    public override AsyncClientStreamingCall<TRequest, TResponse> AsyncClientStreamingCall<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context, AsyncClientStreamingCallContinuation<TRequest, TResponse> continuation)
+    {
+        callback();
+        return continuation(context);
+    }
+    public override AsyncDuplexStreamingCall<TRequest, TResponse> AsyncDuplexStreamingCall<TRequest, TResponse>(ClientInterceptorContext<TRequest, TResponse> context, AsyncDuplexStreamingCallContinuation<TRequest, TResponse> continuation)
+    {
+        callback();
+        return continuation(context);
+    }
+}
+```
 
 
 ### Server Interceptors
 
-Server-side interceptors derive from the new `Interceptor` class implemented in
-`Grpc.Core.Interceptors` namespace.  Server interceptors are registered on
-individual service definitions as opposed to an entire server, though it might
-be sensible to provide a mechanism for adding an interceptor chain to all
-services served by a `Server` instance in the future.
+Server-side interceptors derive from the `Interceptor` class and optionally
+override the four relevant methods to intercepting different kinds of
+incoming RPCs.  All of these methods are expected to return a `Task` object
+and thus can be asynchronous in nature.
 
-In particular, an instance of a class derived from `Interceptor` is registered
-on a `ServerServiceDefinition` instance via its new `Intercept` method, which
-returns a new `ServerServiceDefinition` whose handlers are intercepted through
-the given interceptor.  An alternate design was considered in which `Intercept`
-was an extension method on `ServerServiceDefinition` and reached out to an
-internal `SubstituteHandlers` method on the object for minimal disruption to
-`ServerServiceDefinition`.  However, the benefits of decoupling it was unclear,
-since the class defining that extension method would have needed to access the
-internals of `ServerServiceDefinition` nevertheless.
+```csharp
+Task<TResponse> UnaryServerHandler<TRequest, TResponse>(TRequest request, ServerCallContext context, UnaryServerMethod<TRequest, TResponse> continuation);
+Task<TResponse> ClientStreamingServerHandler<TRequest, TResponse>(IAsyncStreamReader<TRequest> requestStream, ServerCallContext context, ClientStreamingServerMethod<TRequest, TResponse> continuation);
+Task ServerStreamingServerHandler<TRequest, TResponse>(TRequest request, IServerStreamWriter<TResponse> responseStream, ServerCallContext context, ServerStreamingServerMethod<TRequest, TResponse> continuation);
+Task DuplexStreamingServerHandler<TRequest, TResponse>(IAsyncStreamReader<TRequest> requestStream, IServerStreamWriter<TResponse> responseStream, ServerCallContext context, DuplexStreamingServerMethod<TRequest, TResponse> continuation);
+```
+
+Of these four, the two that return unary values are expected to return a
+a `TResponse` value asynchronously (via `Task<TResponse>`) whereas the
+response-streaming RPCs are expected to write the return values to the
+`responseStream` stream.  Additionally, for unary requests, the request
+value is passed as an argument to the intercepting method directly,
+whereas for client-streaming RPCs, they should be read from the
+`requestStream` given to the interceptor.
+
+#### The RPC context
+
+The interceptor is passed a `context` object representing the
+context of the current RPC.  This is the same object passed to
+RPC handlers and the interceptor is in a position to treat
+itself as if it were the actual RPC handler.
+
+#### The `continuation` delegate
+
+A `continuation` delegate is passed to the server-side interceptor
+method that matches the signature of the actual RPC handler (depending
+on the RPC kind), and its purpose is to carry-on with RPC processing.
+
+The `continuation` takes the same parameters as the interceptor method,
+with the exception of the `continuation` itself, and returns a value of
+the same type as the intercepting method.
+
+#### Intercepting requests and responses
+
+The intercepting method can choose to inspect and modify
+the request value as it passes it to the `continuation` (for the
+request-unary RPCs), optionally inspect and modify the response
+value returned from `continuation` invocation (for response-unary RPCs).
+Additionally, it can do sophisticated interception over the lifecycle
+of streaming RPCs by wrapping the `requestStream` (for client-streaming
+RPCs) and/or `responseStream` (for server-streaming RPCs).
+
+#### Registration
+
+Server interceptors are registered on `ServerServiceDefinition` objects
+via the `Intercept` extension method provided by `ServerSeviceDefinition`
+method.
 
 ```csharp
 Server server = new Server
@@ -180,63 +316,59 @@ Server server = new Server
 server.Start();
 ```
 
-The handler substitution process operates on each of the four RPC handler types,
-and registers the interceptor on them.  The RPC handler dispatch code is changed
-so that if at least one interceptor is registered on the handler, the
-interceptor chain is invoked and is given the call context.  This singular
-check, i.e. whether or not at least one interceptor is registered for a handler,
-is the only additional work needed be done on the fast path, where no
-interceptor is registered, so the performance impact should be minimal and
-contained to one additional `interceptor == null` check for each RPC invocation.
-If an interceptor chain exists, it is then given control and is allowed to
-substitute the call handler with an arbitrary continuation, which is invoked
-instead of the handler and can intercept the call during its full duration.  The
-first interceptor invocation is also allowed to return the original handler
-intact, indicating it not being interested to do any additional processing or
-observation on the call, or throw an exception and terminate the RPC
-immediately.  Throwing an exception from an interceptor is semantically
-equivalent to throwing an exception from a server handler.
+#### Order of execution
 
-The method signatures for the server side interceptor hooks are as follows:
+Server interceptors operate identically to the client interceptors in
+terms of order of execution.  Please consult the section above for details.
+
+
+#### Simple server-side interceptor example
 
 ```csharp
-// THandler is one of:
-// Grpc.Core.UnaryServerMethod<TRequest, TResponse>,
-// Grpc.Core.ClientStreamingServerMethod<TRequest, TResponse>,
-// Grpc.Core.ServerStreamingServerMethod<TRequest, TResponse>, or
-// Grpc.Core.DuplexStreamingServerMethod<TRequest, TResponse>,
-// depending on the RPC type.
-delegate Task<THandler> ServerHandlerInterceptor<THandler>(ServerCallContext context, THandler handler);
+// The interceptor invokes the registered callback on every RPC
+// and passes the context value of the current call to it
+class ServerCallContextInterceptor : Interceptor
+{
+    readonly Action<ServerCallContext> interceptor;
 
-ServerHandlerInterceptor<UnaryServerMethod<TRequest, TResponse>> GetUnaryServerHandlerInterceptor<TRequest, TResponse>()
-ServerHandlerInterceptor<ServerStreamingServerMethod<TRequest, TResponse>> GetServerStreamingServerHandlerInterceptor<TRequest, TResponse>()
-ServerHandlerInterceptor<ClientStreamingServerMethod<TRequest, TResponse>> GetClientStreamingServerHandlerInterceptor<TRequest, TResponse>()
-ServerHandlerInterceptor<DuplexStreamingServerMethod<TRequest, TResponse>> GetDuplexStreamingServerHandlerInterceptor<TRequest, TResponse>()
+    public ServerCallContextInterceptor(Action<ServerCallContext> interceptor)
+    {
+        GrpcPreconditions.CheckNotNull(interceptor, nameof(interceptor));
+        this.interceptor = interceptor;
+    }
+
+    public override Task<TResponse> UnaryServerHandler<TRequest, TResponse>(TRequest request, ServerCallContext context, UnaryServerMethod<TRequest, TResponse> continuation)
+    {
+        interceptor(context);
+        return continuation(request, context);
+    }
+
+    public override Task<TResponse> ClientStreamingServerHandler<TRequest, TResponse>(IAsyncStreamReader<TRequest> requestStream, ServerCallContext context, ClientStreamingServerMethod<TRequest, TResponse> continuation)
+    {
+        interceptor(context);
+        return continuation(requestStream, context);
+    }
+
+    public override Task ServerStreamingServerHandler<TRequest, TResponse>(TRequest request, IServerStreamWriter<TResponse> responseStream, ServerCallContext context, ServerStreamingServerMethod<TRequest, TResponse> continuation)
+    {
+        interceptor(context);
+        return continuation(request, responseStream, context);
+    }
+
+    public override Task DuplexStreamingServerHandler<TRequest, TResponse>(IAsyncStreamReader<TRequest> requestStream, IServerStreamWriter<TResponse> responseStream, ServerCallContext context, DuplexStreamingServerMethod<TRequest, TResponse> continuation)
+    {
+        interceptor(context);
+        return continuation(requestStream, responseStream, context);
+    }
+}
 ```
-
-By default, the implementation is a no-op:
-
-```csharp
-return (context, handler) => Task.FromResult(handler);
-```
-
-The design in which all four server interceptor methods were combined into one
-was considered, but dismissed in favor of this one because eventually, the
-interceptor hook needed to return an object of the same type as the handler
-passed to it, and it would have needed to reflect over it to reconstruct the
-type.  Instead, under this design, such unification is still an option, simply
-by deriving a class that implements all four functions and calls a shared method
-to minimize the code written, should that style fits that particular application
-better.
-
 
 ## Rationale
 
 A primary design goal is not breaking the existing API at all.  In addition,
 flexibility, decoupling and non-disruption to existing code, and keeping the
-"fast path", where no interceptor is registered, fast. Some design trade-offs to
-accomplish these goals were discussed in-line with the decision.
-
+"fast path", where no interceptor is registered, fast. Some design trade-offs
+to accomplish these goals were discussed in-line with the decision.
 
 ## Implementation
 
