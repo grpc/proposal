@@ -83,7 +83,7 @@ respective methods. Once again, blocking and asynchronous code paths for unary
 invocations are separate and both need to be implemented and overriding one
 does not automatically apply to the other.
 
-Of the aformentioned methods, the ones that intercpet request-unary RPCs take
+Of the aformentioned methods, the ones that intercept request-unary RPCs take
 an instance of the unary request object.  All methods take a context class of
 type `Grpc.Core.Interceptors.ClientInterceptorContext` and a `continuation`
 delegate to invoke to continue with the RPC chain.
