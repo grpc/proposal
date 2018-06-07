@@ -3,7 +3,7 @@
 * Status: In Review
 * Implemented in: C++
 * Last updated: June 6, 2018
-* Discussion at: 
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/YQQY0pGG9MI
 
 ## Abstract
 C++ `ThreadManager` is a specialized thread pool used to implement the C++ Synchronous server. 
