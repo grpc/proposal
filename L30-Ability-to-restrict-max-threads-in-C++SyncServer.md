@@ -43,11 +43,11 @@ class ResourceQuota final : private GrpcLibraryCodegen {
   ...     
 ```
 * Max threads are set to INT_MAX by default
-* In the initial implementation, I plan to divide the max_threads equally among multiple `ThreadManager` objects (there are as many `ThreadManager` objects as the number of server completion queues). It is not clear on which strategy is better at this point 
+* There are two choices on how to implement this:
   - (1) Have all thread managers create threads from a common pool (but potentially starving some thread managers and also making the quota-check a potential global contention point)
   - (2) Divide the max_threads equally among thread managers (with the downside that some thread managers are "over provisioned" while some might be "under provisioned").
   
-  I am going with option (2) for now and this may change in future. 
+  I am going with option (1) for now and this may change in future.
 
 ### 2. New *public* Core-Surface API: `grpc_resource_quota_set_max_threads`
 
