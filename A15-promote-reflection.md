@@ -23,9 +23,12 @@ reflection service have not changed for a long time.
 It is proposed that the package name (and corresponding directory structure)
 for [reflection.proto](
 https://github.com/grpc/grpc/blob/v1.12.x/src/proto/grpc/reflection/v1alpha/reflection.proto)
-be changed from `grpc.reflection.v1alpha` to `grpc.reflection.v1`.  Java and Go
-implementations of the gRPC reflection service should also be updated to match.
-Additionally, the canonical proto definition should be created in the
+be changed from `grpc.reflection.v1alpha` to `grpc.reflection.v1`.  The C++
+reflection implementation will be copied with the new package path, while the
+old one will be deprecated.  C# will also be copied with the new package path,
+deprecating the old version. Java and Go implementations of the gRPC
+reflection service should also be updated to match.  Additionally, the
+canonical proto definition should be created in the
 [grpc-proto](https://github.com/grpc/grpc-proto) repository to serve as a source
 of truth.
 
@@ -34,6 +37,8 @@ proto will be created.  This will involve copying the existing proto file to
 the new destination.  All clients will be adapted to prefer the new service
 name.  All servers will dual support both services for a release.  Lastly, the
 old service will be deprecated and marked for removal in the near future.
+
+As of this writing, the only known users of refle
 
 ## Rationale
 
