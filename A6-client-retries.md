@@ -483,7 +483,8 @@ The retry policy is transmitted to the client through the service config mechani
     // The number of tokens starts at maxTokens. The token_count will always be
     // between 0 and maxTokens.
     //
-    // This field is required and must be greater than zero.
+    // This field is required and must be in the range (0, 1000].  Up to 3
+    // decimal places are supported
     "maxTokens": number,
 
     // The amount of tokens to add on each successful RPC. Typically this will
