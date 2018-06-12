@@ -82,12 +82,12 @@ Lastly, information about number of retry attempts will be exposed to the client
 Retry policies support configuring the maximum number of retries, the parameters for exponential backoff, and the set of retryable status codes, as follows:
 
 ```
-"retryPolicy": {  
+"retryPolicy": {
   "maxAttempts": 4,
   "initialBackoff": "0.1s",
   "maxBackoff": "1s",
   "backoffMultiplier": 2,
-  "retryableStatusCodes": [  
+  "retryableStatusCodes": [
     "UNAVAILABLE"
   ]
 }
@@ -123,10 +123,10 @@ Hedging enables aggressively sending multiple copies of a single request without
 Hedged requests are configured with the following parameters:
 
 ```
-"hedgingPolicy": {  
+"hedgingPolicy": {
   "maxAttempts": 4,
   "hedgingDelay": "0.5s",
-  "nonFatalStatusCodes": [  
+  "nonFatalStatusCodes": [
     "UNAVAILABLE",
     "INTERNAL",
     "ABORTED"
@@ -157,7 +157,7 @@ Hedged requests should be sent to distinct backends, if possible. To facilitate 
 gRPC prevents server overload due to retries and hedged RPCs by disabling these policies when the client’s ratio of failures to successes passes a certain threshold. The throttling is done per server name. Retry throttling may be configured as follows:
 
 ```
-"retryThrottling": {  
+"retryThrottling": {
   "maxTokens": 10,
   "tokenRatio": 0.1
 }
@@ -184,6 +184,8 @@ Servers may explicitly pushback by setting metadata in their response to the cli
 Pushback may also be received to a hedged request. If the pushback says not to retry, no further hedged requests will be sent. If the pushback says to retry after a given delay, the next hedged request (if any) will be issued after the given delay has elapsed.
 
 A new metadata key, `"grpc-retry-pushback-ms"`, will be added to support server pushback. The value is to be an ASCII encoded signed 32-bit integer with no unnecessary leading zeros that represents how many milliseconds to wait before sending a retry. If the value for pushback is negative or unparseble, then it will be seen as the server asking the client not to retry at all.
+
+When a client receives an explicit pushback response from a server, and it is appropriate to retry the RPC, it will retry after exactly that delay.  For subsequent retries, the delay period will be reset to the `initialBackoff` setting and scale according to the [Exponential Backoff](#exponential-backoff) section above, unless an explicit pushback response is received again.
 
 #### Limits on Retries and Hedges
 
@@ -329,12 +331,12 @@ The parameters for throttling retry attempts and hedged RPCs when failures excee
 This is an example of a retry policy and its associated configuration. It implements exponential backoff with a maximum of four RPC attempts (1 original RPC, and 3 retries), only retrying RPCs when an `UNAVAILABLE` status code is received.
 
 ```
-"retryPolicy": {  
+"retryPolicy": {
   "maxAttempts": 4,
   "initialBackoff": "0.1s",
   "maxBackoff": "1s",
   "backoffMultiplier": 2,
-  "retryableStatusCodes": [  
+  "retryableStatusCodes": [
     "UNAVAILABLE"
   ]
 }
@@ -345,10 +347,10 @@ This is an example of a retry policy and its associated configuration. It implem
 The following example of a hedging policy configuration will issue an original RPC, then up to three hedged requests for each RPC, spaced out at 500ms intervals, until either: one of the requests receives a valid response, all fail, or the overall call deadline is reached. Analogously to `retryableStatusCodes` for the retry policy, `nonFatalStatusCodes` determines how hedging behaves when a non-OK response is received.
 
 ```
-"hedgingPolicy": {  
+"hedgingPolicy": {
   "maxAttempts": 4,
   "hedgingDelay": "0.5s",
-  "nonFatalStatusCodes": [  
+  "nonFatalStatusCodes": [
     "UNAVAILABLE",
     "INTERNAL",
     "ABORTED"
@@ -359,10 +361,10 @@ The following example of a hedging policy configuration will issue an original R
 The following example issues four RPCs simultaneously:
 
 ```
-"hedgingPolicy": {  
+"hedgingPolicy": {
   "maxAttempts": 4,
   "hedgingDelay": "0s",
-  "nonFatalStatusCodes": [  
+  "nonFatalStatusCodes": [
     "UNAVAILABLE",
     "INTERNAL",
     "ABORTED"
@@ -374,7 +376,7 @@ The following example issues four RPCs simultaneously:
 Throttling configuration applies to all services and methods on a given server, and so can only be set per-server name. The following configuration throttles retry attempts and hedged RPCs when the client's ratio of failures to successes exceeds ~10%.
 
 ```
-"retryThrottling": {  
+"retryThrottling": {
   "maxTokens": 10,
   "tokenRatio": 0.1
 }
@@ -407,8 +409,8 @@ The retry policy is transmitted to the client through the service config mechani
         "maxAttempts": number,
 
         // Exponential backoff parameters. The initial retry attempt will occur at
-        // random(0, initialBackoff). In general, the nth attempt will occur at
-        // random(0,
+        // random(0, initialBackoff). In general, the nth attempt since the last
+        // server pushback response (if any), will occur at random(0,
         //   min(initialBackoff*backoffMultiplier**(n-1), maxBackoff)).
         // The following two fields take their form from:
         // https://developers.google.com/protocol-buffers/docs/proto3#json
@@ -435,8 +437,8 @@ The retry policy is transmitted to the client through the service config mechani
         // This field is required and must be two or greater.
         "maxAttempts": number,
 
-        // The original RPC will be sent immediately, but the maxAttempts-1 
-        // subsequent hedged RPCs will be sent at intervals of every hedgingDelay. 
+        // The original RPC will be sent immediately, but the maxAttempts-1
+        // subsequent hedged RPCs will be sent at intervals of every hedgingDelay.
         // Set this to "0s", or leave unset, to immediately send all maxAttempts RPCs.
         // hedgingDelay takes its form from:
         // https://developers.google.com/protocol-buffers/docs/proto3#json
