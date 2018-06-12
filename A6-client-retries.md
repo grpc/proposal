@@ -198,15 +198,15 @@ There are five possible types of server responses. The list below enumerates the
     1. Retry policy: Successful response, return success to client application
     2. Hedging policy: Successful response, cancel previous and pending hedges
 
-2. Retryable/Non-Fatal Status Code
-    1. Retry policy: Retry according to policy
-    2. Hedging policy: Immediately send next scheduled hedged request, if any. Subsequent hedged requests will resume at `hedgingDelay`
-
-3. Fatal Status Code
+2. Fatal Status Code
     1. Retry policy: Don't retry, return failure to client application
     2. Hedging policy: Cancel previous and pending hedges
 
-4. Pushback: Don't retry
+3. Retryable/Non-Fatal Status Code without Server Pushback
+    1. Retry policy: Retry according to policy
+    2. Hedging policy: Immediately send next scheduled hedged request, if any. Subsequent hedged requests will resume at `hedgingDelay`
+
+4. Pushback: Don't Retry
     1. Retry policy: Don't retry, return failure to client application
     2. Hedging policy: Don’t send any more hedged requests.
 
