@@ -2,9 +2,9 @@ Promote Reflection
 ----
 * Author(s): Carl Mastrangelo (carl-mastrangelo)
 * Approver: a11r
-* Status: Draft
+* Status: Approved
 * Implemented in:
-* Last updated: 2018-05-30
+* Last updated: 2018-06-13
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/AOgFISlAgxk
 
 ## Abstract
