@@ -12,12 +12,12 @@ Currently, `ThreadManager` can be configured to have minimum and maximum number 
 
 The proposal here is to add a notion of 'thread quota' to the `resource_quota` object. Currently, a resource quota object can be attached to the server (via `ServerBuilder::SetResourceQuota`). The idea here is to set a maximum number of threads on that resource quota object.
 
-Each of the `ThreadManager` objects in a given server check with the Server's resource quota object when creating new threads and will not create new threads if no quota is available.
+Each `ThreadManager` object checks with the Server's resource quota before creating new threads. No new threads are created if the quota is exhausted.
 
 ## Details
 More concretely, the following API changes are being proposed
 
-### 1. New *public* C++ API: `ServerBuilder::SetMaxThreads`
+### 1. New *public* C++ API: `ResourceQuota::SetMaxThreads`
  
 ```C++
 // File: include/grpcpp/resource_quota.h
