@@ -42,7 +42,7 @@ class ResourceQuota final : private GrpcLibraryCodegen {
   ResourceQuota& SetMaxThreads(int new_max_threads);
   ...     
 ```
-* Max threads are set to INT_MAX by default
+* Max threads are set to 1500 by default. This was based on some tests I did on my machine (32G ram, 12 cores) in the past and found that ~1500 threads is the inflection point after which things escalate to thread-avalanche very quickly.
 * There are two choices on how to implement this:
   - (1) Have all thread managers create threads from a common pool (but potentially starving some thread managers and also making the quota-check a potential global contention point)
   - (2) Divide the max_threads equally among thread managers (with the downside that some thread managers are "over provisioned" while some might be "under provisioned").
