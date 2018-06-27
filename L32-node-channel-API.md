@@ -15,10 +15,6 @@ Expose the `Channel` class in the Node API, along with APIs for overriding the c
 
 In the past, some users have requested the ability to explicitly create channels and share them among clients. In addition, another library needs to be able to intercept some channel functionality.
 
-
-### Related Proposals: 
-* A list of proposals this proposal builds on or supersedes.
-
 ## Proposal
 
 We will add to the API a `Channel` class and two `Client` construction options.
