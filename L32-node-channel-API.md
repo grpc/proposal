@@ -5,7 +5,7 @@ Node.js Channel API
 * Status: Draft
 * Implemented in: Node.js
 * Last updated: 
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/VR0C7DiG7bs
 
 ## Abstract
 
