@@ -70,7 +70,9 @@ class Channel {
     watchConnectivityState(currentState: ConnectivityState, deadline: Date|number, callback: (error?: Error) => void);
     /**
      * Create a call object. Call is an opaque type that is used by the Client
-     * class.
+     * class. This function is called by the gRPC library when starting a
+     * request. Implementers should return an instance of Call that is returned
+     * from calling createCall on an instance of the provided Channel class.
      * @param method The full method string to request.
      * @param deadline The call deadline
      * @param host A host string override for making the request
