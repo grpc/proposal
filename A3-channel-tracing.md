@@ -43,6 +43,17 @@ _Trace events_ should only be added for events that happen relatively infrequent
 ... Entering idle mode
 ```
 
+## Minimal Set of Data
+
+Channel tracing is a language agnostic feature, and while each implementation will vary, it is useful to define a minimal set of events that must be traced in order to consider the channel tracing feature as complete.
+
+All of these events must be traced:
+- Channel creation and deletion
+- Subchannel creation and deletion
+- Address resolution
+- Channel and subchannel state changes
+
+Language specific implementations may add any additional trace that is deemed useful, as long as the trace is not expected to happen at a per-RPC frequency.
 
 ## Format of Exported Data
 
