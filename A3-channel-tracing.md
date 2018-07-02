@@ -4,7 +4,7 @@ Channel Tracing
 * Approver: markdroth
 * Status: Draft
 * Implemented in: N/A
-* Last updated: 2018-03-01
+* Last updated: 2018-07-01
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/WFDj3KeHYTI
 
 ## Terminology
