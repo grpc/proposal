@@ -4,7 +4,7 @@ Channel Tracing
 * Approver: markdroth
 * Status: Draft
 * Implemented in: N/A
-* Last updated: 2018-03-01
+* Last updated: 2018-07-01
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/WFDj3KeHYTI
 
 ## Terminology
@@ -43,6 +43,24 @@ _Trace events_ should only be added for events that happen relatively infrequent
 ... Entering idle mode
 ```
 
+## Minimal Set of Data
+
+We define a minimal set of events that must be traced, in order to consider the channel tracing feature as complete.
+
+All of these events must be traced:
+- Channel creation and deletion
+- Subchannel creation and deletion
+- Channel connectivity state changes
+- Subchannel connectivity state changes
+- Interesting address resolution events (see below for details)
+
+Address resolution is special case. We want to track resolution events, but we do not want to flood the trace buffer with them. This will occur in environments with push based resolvers and dynamically scheduled backends (as is the case internally at Google). So we define several types of "interesting" resolution events that must be traced:
+- Address resolution resulting in service config change
+- Address resolution that causes number of backends to go from zero to non-zero
+- Address resolution that causes number of backends to go from non-zero to zero
+- Address resolution that causes a new LB policy to be created
+
+Language specific implementations may add any additional trace that is deemed useful, as long as the trace is not expected to happen at a per-RPC frequency.
 
 ## Format of Exported Data
 
