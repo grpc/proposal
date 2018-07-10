@@ -54,7 +54,7 @@ All of these events must be traced:
 - Subchannel connectivity state changes
 - Interesting address resolution events (see below for details)
 
-Address resolution is special case. We want to track resolution events, but we do not want to flood the trace buffer with them. So we define several types of "interesting" resolution events that must be traced:
+Address resolution is special case. We want to track resolution events, but we do not want to flood the trace buffer with them. This will occur in environments with push based resolvers and dynamically scheduled backends (as is the case internally at Google). So we define several types of "interesting" resolution events that must be traced:
 - Address resolution resulting in service config change
 - Address resolution that causes number of backends to go from zero to non-zero
 - Address resolution that causes number of backends to go from non-zero to zero
