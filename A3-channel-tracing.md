@@ -50,8 +50,10 @@ We define a minimal set of events that must be traced, in order to consider the 
 All of these events must be traced:
 - Channel creation and deletion
 - Subchannel creation and deletion
-- Address resolution
-- Connectivity state changes
+- Address resolution resulting from service config change
+- Address resolution that causes number of backends to go from zero to non-zero
+- Channel connectivity state changes
+- Subchannel connectivity state changes
 
 Language specific implementations may add any additional trace that is deemed useful, as long as the trace is not expected to happen at a per-RPC frequency.
 
