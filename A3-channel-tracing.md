@@ -50,10 +50,15 @@ We define a minimal set of events that must be traced, in order to consider the 
 All of these events must be traced:
 - Channel creation and deletion
 - Subchannel creation and deletion
-- Address resolution resulting from service config change
-- Address resolution that causes number of backends to go from zero to non-zero
 - Channel connectivity state changes
 - Subchannel connectivity state changes
+- Interesting address resolution events (see below for details)
+
+Address resolution is special case. We want to track resolution events, but we do not want to flood the trace buffer with them. So we define several types of "interesting" resolution events that must be traced:
+- Address resolution resulting in service config change
+- Address resolution that causes number of backends to go from zero to non-zero
+- Address resolution that causes number of backends to go from non-zero to zero
+- Address resolution that causes a new LB policy to be created
 
 Language specific implementations may add any additional trace that is deemed useful, as long as the trace is not expected to happen at a per-RPC frequency.
 
