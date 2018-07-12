@@ -241,6 +241,17 @@ abusive usage of TCP keepalive.
 ## Implementation
 
 * C. TODO get current progress; close, if not done. Being done by @y-zeng
+  * Client options, mapping from the option name in this spec to the C core
+    option name:
+    * `KEEPALIVE_TIME`: `GRPC_ARG_KEEPALIVE_TIME_MS`
+    * `KEEPALIVE_TIMEOUT`: `GRPC_ARG_KEEPALIVE_TIMEOUT_MS`
+    * `KEEPALIVE_WITHOUT_CALLS`: `GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS`
+  * Server options, mapping from the option name in this spec to the C core
+    option name:
+    * `PERMIT_KEEPALIVE_TIME`:
+      `GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS`
+    * `PERMIT_KEEPALIVE_WITHOUT_CALLS`:
+      `GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS`
 * Java. Basic Keepalive has been available in OkHttp transport since 1.0 by
   @zsurocking in grpc/grpc-java#1992. Full spec completed in OkHttp and Netty
   since grpc-java v1.3.0 or grpc/grpc-java@393ebf7c
