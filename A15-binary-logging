@@ -181,7 +181,6 @@ message Peer {
     PEER_UNIX = 3;
   };
   PeerType peer_type = 1;
-  bytes peer = 2; // will be removed: do not use
   string address = 3;
   // only for PEER_IPV4 and PEER_IPV6
   uint32 ip_port = 4;
