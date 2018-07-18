@@ -1,6 +1,6 @@
 # gRPC Binary Logging
 
-*   Author(s): Yuchen Zeng
+*   Author(s): Yuchen Zeng, Spencer Fang
 *   Approver: a11r
 *   Status: In Review
 *   Implemented in:
@@ -18,7 +18,7 @@ production traffic will be useful in the following cases:
 
 -   Troubleshooting services, find exceptions
 -   Loadtesting
--   Reply RPCs from production
+-   Replay RPCs from production
 
 This functionality should be added in each of our supported languages. The ease
 of adoption should also be considered.
@@ -27,9 +27,14 @@ of adoption should also be considered.
 
 The proposed design is adding binary logging as a built-in functionality in
 gRPC. Users can turn it on/off by setting the `GRPC_BINARY_LOG_FILTER`
-environment variable. It's not required to modify application code to generate
-logs. The control interface should allow users to change the amount and contents
-of logs.
+environment variable in C. Other language implementations are free to use a
+similarly named flag or option string. Turning on binary logging should be a
+configuration setting and require no code changes. The control interface should
+allow users to change the amount and contents of logs.
+
+The logged events correspond to what is visible at the application
+level, and as a result they exclude things like [hedging and
+retries](./A6-client-retries.md).
 
 ### Log Format
 
@@ -37,28 +42,46 @@ gRPC logs each RPC in the format defined by proto GrpcLogEntry. Initial/trailing
 metadata and messages are logged separately to match the on-the-wire
 representation.
 
+The format is intentionally flat so that it is possible to craft the
+message without code generation. This allows the possibility of hand
+optimized serialization if needed.
+
 The proto of GrpcLogEntry:
 
 ```
 // Log entry we store in binary logs
 message GrpcLogEntry {
-  // Enumerates the type of logs
-  enum Type {
-    SEND_INITIAL_METADATA = 0;
-    SEND_TRAILING_METADATA = 1;
-    SEND_MESSAGE = 2;
-    RECV_INITIAL_METADATA = 3;
-    RECV_TRAILING_METADATA = 4;
-    RECV_MESSAGE = 5;
-  };
+  // Enumerates the type of event
+  enum EventType {
+    EVENT_TYPE_UNKNOWN = 0;
+    // Headers sent from client to server
+    EVENT_TYPE_CLIENT_HEADER = 1;
+    // Headers sent from server to client
+    EVENT_TYPE_SERVER_HEADER = 2;
+    // Message sent from client to server
+    EVENT_TYPE_CLIENT_MESSAGE = 3;
+    // message sent from server to client
+    EVENT_TYPE_SERVER_MESSAGE = 4;
+    // Signal that client is done sending
+    EVENT_TYPE_CLIENT_HALF_CLOSE = 5;
+    // Trailers sent from server to client.
+    // On client side, this is the last network event.
+    // On server side, a EVENT_TYPE_CANCEL can still happen after this.
+    EVENT_TYPE_SERVER_TRAILER = 6;
+    // Signal that the RPC should be cancelled
+    EVENT_TYPE_CANCEL = 7;
+    // A special marker to indicate that the RPC is done.
+    EVENT_TYPE_END_MARKER = 8;
+  }
 
   // Enumerates the entity that generates the log entry
   enum Logger {
-    CLIENT = 0;
-    SERVER = 1;
+    UNKNOWN_LOGGER = 0;
+    CLIENT = 1;
+    SERVER = 2;
   }
 
-  Type type = 1;      // One of the above Type enum
+  EventType type = 1;
   Logger logger = 2;  // One of the above Logger enum
 
   // Uniquely identifies a call. Each call may have several log entries, they
@@ -68,54 +91,100 @@ message GrpcLogEntry {
   // The logger uses one of the following fields to record the payload,
   // according to the type of the log entry.
   oneof payload {
-    // Used by CLIENT_INIT_METADATA, SERVER_INIT_METADATA and TRAILING_METADATA
+    // Used by EVENT_TYPE_CLIENT_HEADER, EVENT_TYPE_SERVER_HEADER and
+    // EVENT_TYPE_SERVER_TRAILER. This contains only the metadata
+    // from the application.
     Metadata metadata = 4;
-    // Used by REQUEST and RESPONSE
+    // Used by EVENT_TYPE_CLIENT_MESSAGE, EVENT_TYPE_SERVER_MESSAGE
     Message message = 5;
   }
 
-  // Peer address information, will only be recorded in SEND_INITIAL_METADATA
-  // and RECV_INITIAL_METADATA entries.
+  // Peer address information, will only be recorded in
+  // EVENT_TYPE_CLIENT_HEADER or EVENT_TYPE_SERVER_HEADER
   Peer peer = 6;
+
+  // true if payload does not represent the full message or metadata.
+  bool truncated = 7;
+
+  // The method name. Logged for EVENT_TYPE_CLIENT_HEADER
+  string method_name = 8;
+
+  // status_code and status_message:
+  // Only present for EVENT_TYPE_SERVER_TRAILER.
+  uint32 status_code = 9;
+
+  // An original status message before any transport specific
+  // encoding.
+  string status_message = 10;
+
+  // The value of the 'grpc-status-details-bin' metadata key. If
+  // present, this is always an encoded 'google.rpc.Status' message.
+  bytes status_details = 11;
+
+  // the RPC timeout
+  google.protobuf.Duration timeout = 12;
+
+  // The entry sequence id for this call. The first GrpcLogEntry has a
+  // value of 1, to disambiguate from an unset value. The purpose of
+  // this field is to detect missing entries in environments where
+  // durability or ordering is not guaranteed.
+  uint32 sequence_id_within_call = 13;
 };
 
-// Message payload, used by REQUEST and RESPONSE
+// Message payload, used by CLIENT_MESSAGE and SERVER_MESSAGE
 message Message {
   // This flag is currently used to indicate whether the payload is compressed,
   // it may contain other semantics in the future. Value of 1 indicates that the
   // binary octet sequence of Message is compressed using the mechanism declared
   // by the Message-Encoding header. A value of 0 indicates that no encoding of
   // Message bytes has occurred.
-  uint8 flags = 1;
+  uint32 flags = 1; // TODO(zpencer): this is changed because there is no uint8
   // Length of the message. It may not be the same as the length of the
   // data field, as the logging payload can be truncated or omitted.
-  uint32 length = 1;
-  // Binary payload, post compression (depends on the flags field), may be
-  // truncated or omitted.
-  bytes data = 2;
+  uint32 length = 2;
+  // May be truncated or omitted.
+  bytes data = 3;
 }
 
-// A list of metadata pairs, used in the payload of CLIENT_INIT_METADATA,
-// SERVER_INIT_METADATA and TRAILING_METADATA
+// A list of metadata pairs, used in the payload of CLIENT_HEADER,
+// SERVER_HEADER and SERVER_TRAILER.
+// Implementations may omit some entries to honor the header limits
+// of GRPC_BINARY_LOG_CONFIG.
+// 
+// Implementations will not log the following entries, and this is
+// not to be treated as a truncation:
+// - entries handled by grpc that are not user visible, such as those
+//   that begin with 'grpc-' or keys like 'lb-token'
+// - transport specific entries, including but not limited to:
+//   ':path', ':authority', 'content-encoding', 'user-agent', 'te', etc
+// - entries added for call credentials
 message Metadata {
   repeated MetadataEntry entry = 1;
 }
 
 // A metadata key value pair
 message MetadataEntry {
-  string key = 1;
+  bytes key = 1;
   bytes value = 2;
 }
 
 // Peer information
 message Peer {
   enum PeerType {
-    PEER_IPV4 = 0;  // peer is struct sockaddr_in
-    PEER_IPV6 = 1;  // peer is struct sockaddr_in6
-    PEER_UNIX = 2;  // peer is struct sockaddr_un
+    UNKNOWN_PEERTYPE = 0;
+    // address is the address in 1.2.3.4 form
+    PEER_IPV4 = 1;
+    // address the address in canonical form (RFC5952 section 4)
+    // The scope is NOT included in the peer string.
+    PEER_IPV6 = 2;
+    // address is UDS string
+    PEER_UNIX = 3;
   };
   PeerType peer_type = 1;
-  bytes peer = 2;  // value depends on peer_type
+  bytes peer = 2; // will be removed: do not use
+  string address = 3;
+  // only for PEER_IPV4 and PEER_IPV6
+  uint32 ip_port = 4;
 }
 
 // Used to record call_id.
@@ -125,16 +194,11 @@ message Uint128 {
 };
 ```
 
-A call id should be enclosed in each log record, so that the analyzer can use it
-to group records generated by the same call. The generation of call id can be
-separated from the log generation code, and provided as an interface. In the
-open source version, we can generate and assign call id according to the channel
-and stream information. At the beginning of each RPC, the gRPC client generates
-a call id and sends it to the server in the client initial metadata. This call
-id and the client/server address will be enclosed in each log entry on both the
-server and client sides. The call id should be unique in each client. The
-analyzer can later use the call id and the client/server address to match the
-log records generated by the same call.
+A call id must be enclosed in each log record, so that the analyzer can use it
+to group records generated by the same call. The generation of call id should be
+separated from the log generation code, and provided as an interface. Call ids
+should be unique across the calls of a log instance. A simple implementation
+may be an atomically incremented integer.
 
 ### Control Interface
 
@@ -156,6 +220,8 @@ entry will be logged.
 *   If the pattern is "*", it specifies the defaults for all the services.
 *   If the pattern is `<package>.<service>/*`, it specifies the defaults for all
     methods in the specified service `<package>.<service>`
+*   If the pattern is `-<package>.<service>/<method>`, then the specified method
+    must not be logged.
 *   Specifying a method while wildcarding the service is not supported, i.e.
     `*/<method>` is not supported.
 
@@ -202,19 +268,16 @@ checks the `GRPC_BINARY_LOG_FILTER` environment variable, and decides whether
 the log should be generated. If the flag has been turned on, the filter should
 wrap the metadata/message with some system and peer information, and then send
 them to the logging interface (remote logging service on diskless servers, or
-file based logging in the open source version). As the binary logging filter
-will be working with gRPC C core, gRPC wrapped languages do not need to
-implement the log generation by itself.
+file based logging in the open source version). 
 
 ### Pluggability
 
 gRPC binary logging should serve as a separate library, making it convenient to
 be changed or even replaced. Configuration knobs should be exposed directly via
 this binary logging library. The production target can remove this library
-according to its need to minimize the target size. In the built-in approach,
-this library should be glued inside the gRPC target, and should be transparent
-to users. Other parts of gRPC code should not depend on this library, so that it
-could be removed without any trouble.
+according to its need to minimize the target size.  Other parts of gRPC code
+hould not depend on this library, so that it could be removed without any
+trouble.
 
 ## Future Work
 
@@ -222,7 +285,7 @@ could be removed without any trouble.
 
 As the RPC content may have sensitive data (e.g. encryption keys) that must not
 be logged for any period of time, gRPC Binary logging should provide content
-filter APIs to help filter out these data. With the content filter, users can
+filtering APIs to help filter out these data. With the content filter, users can
 enable gRPC binary logging on methods that may contain sensitive data.
 
 Two types of filter APIs should be provided, one for headers, one for messages.
