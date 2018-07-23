@@ -1,11 +1,11 @@
 Exposing the checkServerIdentity callback in Node
 ----
 * Author(s): Ian Haken
-* Approver: a11r
+* Approver: murgatroid99
 * Status: Draft
 * Implemented in: Node
-* Last updated: July 29, 2018
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: July 23, 2018
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/ucorPSDGIIo
 
 ## Abstract
 
