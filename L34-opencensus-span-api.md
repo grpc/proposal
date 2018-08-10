@@ -5,7 +5,7 @@ OpenCensus C++ Span API changes
 * Status: Draft
 * Implemented in: C++
 * Last updated: 2018-07-17
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/ZpXeFinzl5A
 
 ## Abstract
 
