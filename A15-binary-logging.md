@@ -27,10 +27,10 @@ of adoption should also be considered.
 
 The proposed design is adding binary logging as a built-in functionality in
 gRPC. Users can turn it on/off by setting the `GRPC_BINARY_LOG_FILTER`
-environment variable in C. Other language implementations are free to use a
-similarly named flag or option string. Turning on binary logging should be a
-configuration setting and require no code changes. The control interface should
-allow users to change the amount and contents of logs.
+environment variable or a similarly named flag or option string.
+Turning on binary logging should be a configuration setting and require no
+code changes. The control interface should allow users to change the amount
+and contents of logs.
 
 The logged events correspond to what is visible at the application
 level, and as a result they exclude things like [hedging and
@@ -205,31 +205,51 @@ The control interface of gRPC binary logging should express the amount and
 contents of logs clearly and directly.
 
 gRPC binary logging is turned off by default. Setting the
-`GRPC_BINARY_LOG_FILTER` environment variable to a filter string can turn on
+`GRPC_BINARY_LOG_FILTER` env var or flag to a filter string can turn on
 binary logging for methods whose full names (in the form of
-`/<package>.<service>/<method>`) match the filter.
+`/<service>/<method>`) match the filter.
 
 The format of a filter is a ','-separated list of method patterns. A pattern is
-in the form of `<package>.<service>/<method>` or just a character "*". It can be
+in the form of `<service>/<method>` or just a character "*". It can be
 optionally followed by a "`{[h:<header_length>],[m:<message_length>]}`" string.
 By default, the full header or message will be logged. If a header or message
 length is given and the entry size is larger than the given length, a truncated
 entry will be logged.
 
 *   If the pattern is "*", it specifies the defaults for all the services.
-*   If the pattern is `<package>.<service>/*`, it specifies the defaults for all
-    methods in the specified service `<package>.<service>`
-*   If the pattern is `-<package>.<service>/<method>`, then the specified method
-    must not be logged.
+*   If the pattern is `<service>/*`, it specifies the defaults for all
+    methods in the specified service `<service>`
+*   If the pattern is `-<service>/<method>`, then the specified method
+    must not be logged. The "*" wildcard must not be used for negations,
+    i.e. `-<service>/*` is not supported.
 *   Specifying a method while wildcarding the service is not supported, i.e.
     `*/<method>` is not supported.
+*   If a pattern is malformed, the gRPC process must refuse to start up
+
+ABNF definition of the filter pattern:
+
+```
+Full-Method-Name -> {IDL-specific service name} "/" {method name}
+Service-Wildcard -> {IDL-specific service name} "/*"
+
+Header-Config -> "h" [ ":"  *DIGIT]    ; Max length of each header that should be logged
+Message-Config -> "m" [":"  *DIGIT]    ; Max length of each message that should be logged
+Pattern-Config -> "{" Message-Config / ( Header-Config [";" Message-Config] ) "}"
+
+Global-Default-Pattern -> "*"  [Pattern-Config]
+Per-Service-Pattern -> Service-Wildcard [Pattern-Config]
+Per-Method-Pattern -> Full-Method-Name [Pattern-Config]
+Excluded-Method -> "-" Full-Method-Name
+
+Config-String -> *1( Global-Default-Pattern ) *( "," ( Per-Service-Pattern / Per-Method-Pattern / Excluded-Method ) )
+```
 
 If the full name of a method can match several patterns in the filter string,
 the most exact match will be used. For example, let's say we have a filter
 string with two patterns:
 
 ```
-    GRPC_BINARY_LOG_FILTER=Foo/*{h},Foo/Bar{m:256}
+    GRPC_BINARY_LOG_FILTER=Foo/*{h};Foo/Bar{m:256}
 ```
 
 For an RPC for Foo/Bar, we will use the second pattern, because it exactly
