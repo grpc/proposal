@@ -211,7 +211,7 @@ binary logging for methods whose full names (in the form of
 
 The format of a filter is a ','-separated list of method patterns. A pattern is
 in the form of `<service>/<method>` or just a character "*". It can be
-optionally followed by a "`{[h:<header_length>],[m:<message_length>]}`" string.
+optionally followed by a "`{[h:<header_length>];[m:<message_length>]}`" string.
 By default, the full header or message will be logged. If a header or message
 length is given and the entry size is larger than the given length, a truncated
 entry will be logged.
