@@ -1,7 +1,7 @@
 OpenCensus C++ Span API changes
 ----
 * Author(s): @g-easy
-* Approver: a11r
+* Approver: vjpai
 * Status: Draft
 * Implemented in: C++
 * Last updated: 2018-07-17
