@@ -5,7 +5,7 @@ Exposing the per-call authentication context data in Node
 * Status: Draft
 * Implemented in: Node
 * Last updated: August 21, 2018
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/yVnvHDGxTME
 
 ## Abstract
 
