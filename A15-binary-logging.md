@@ -42,16 +42,22 @@ gRPC logs each RPC in the format defined by proto GrpcLogEntry. Initial/trailing
 metadata and messages are logged separately to match the on-the-wire
 representation.
 
-The format is intentionally flat so that it is possible to craft the
-message without code generation. This allows the possibility of hand
-optimized serialization if needed.
-
 The proto of GrpcLogEntry:
 
 ```
+syntax = "proto3";
+
+package grpc.binarylog.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+
 // Log entry we store in binary logs
 message GrpcLogEntry {
   // Enumerates the type of event
+  // Note the terminology is different from the RPC semantics
+  // definition, but the same meaning is expressed here.
   enum EventType {
     EVENT_TYPE_UNKNOWN = 0;
     // Headers sent from client to server
@@ -65,28 +71,31 @@ message GrpcLogEntry {
     // Signal that client is done sending
     EVENT_TYPE_CLIENT_HALF_CLOSE = 5;
     // Trailers sent from server to client.
-    // On client side, this is the last network event.
-    // On server side, a EVENT_TYPE_CANCEL can still happen after this.
+    // This marks the end of the RPC. Events may arrive after
+    // this due to races. The extra events are not considered
+    // a part of the RPC and may be safely ignored.
     EVENT_TYPE_SERVER_TRAILER = 6;
-    // Signal that the RPC should be cancelled
+    // Signal that the RPC is cancelled.
+    // This marks the end of the RPC. Events may arrive after
+    // this due to races. The extra events are not considered
+    // a part of the RPC and may be safely ignored.
     EVENT_TYPE_CANCEL = 7;
-    // A special marker to indicate that the RPC is done.
-    EVENT_TYPE_END_MARKER = 8;
   }
 
   // Enumerates the entity that generates the log entry
   enum Logger {
-    UNKNOWN_LOGGER = 0;
-    CLIENT = 1;
-    SERVER = 2;
+    LOGGER_UNKNOWN = 0;
+    LOGGER_CLIENT = 1;
+    LOGGER_SERVER = 2;
   }
 
   EventType type = 1;
   Logger logger = 2;  // One of the above Logger enum
 
   // Uniquely identifies a call. Each call may have several log entries, they
-  // will share the same call_id. 128 bits split into 2 64-bit parts.
-  Uint128 call_id = 3;
+  // will all have the same call_id. Nothing is guaranteed about their values
+  // other than they are unique across different RPCs in the same gRPC process.
+  int64 call_id = 3;
 
   // The logger uses one of the following fields to record the payload,
   // according to the type of the log entry.
@@ -129,21 +138,18 @@ message GrpcLogEntry {
   // this field is to detect missing entries in environments where
   // durability or ordering is not guaranteed.
   uint32 sequence_id_within_call = 13;
+
+  // The timestamp of the binary log message
+  google.protobuf.Timestamp timestamp = 14;
 };
 
 // Message payload, used by CLIENT_MESSAGE and SERVER_MESSAGE
 message Message {
-  // This flag is currently used to indicate whether the payload is compressed,
-  // it may contain other semantics in the future. Value of 1 indicates that the
-  // binary octet sequence of Message is compressed using the mechanism declared
-  // by the Message-Encoding header. A value of 0 indicates that no encoding of
-  // Message bytes has occurred.
-  uint32 flags = 1;
   // Length of the message. It may not be the same as the length of the
   // data field, as the logging payload can be truncated or omitted.
-  uint32 length = 2;
+  uint32 length = 1;
   // May be truncated or omitted.
-  bytes data = 3;
+  bytes data = 2;
 }
 
 // A list of metadata pairs, used in the payload of CLIENT_HEADER,
@@ -154,10 +160,14 @@ message Message {
 // Implementations will not log the following entries, and this is
 // not to be treated as a truncation:
 // - entries handled by grpc that are not user visible, such as those
-//   that begin with 'grpc-' or keys like 'lb-token'
+//   that begin with 'grpc-' (with exception of grpc-trace-bin)
+//   or keys like 'lb-token'
 // - transport specific entries, including but not limited to:
 //   ':path', ':authority', 'content-encoding', 'user-agent', 'te', etc
 // - entries added for call credentials
+//
+// Implementations must always log grpc-trace-bin if it is present.
+// The pair will count towards the size limit, 
 message Metadata {
   repeated MetadataEntry entry = 1;
 }
@@ -171,14 +181,14 @@ message MetadataEntry {
 // Peer information
 message Peer {
   enum PeerType {
-    UNKNOWN_PEERTYPE = 0;
+    PEER_TYPE_UNKNOWN = 0;
     // address is the address in 1.2.3.4 form
-    PEER_IPV4 = 1;
+    PEER_TYPE_IPV4 = 1;
     // address the address in canonical form (RFC5952 section 4)
     // The scope is NOT included in the peer string.
-    PEER_IPV6 = 2;
+    PEER_TYPE_IPV6 = 2;
     // address is UDS string
-    PEER_UNIX = 3;
+    PEER_TYPE_UNIX = 3;
   };
   PeerType peer_type = 1;
   string address = 3;
@@ -186,11 +196,6 @@ message Peer {
   uint32 ip_port = 4;
 }
 
-// Used to record call_id.
-message Uint128 {
-  fixed64 high = 1;
-  fixed64 low = 2;
-};
 ```
 
 A call id must be enclosed in each log record, so that the analyzer can use it
@@ -214,7 +219,8 @@ in the form of `<service>/<method>` or just a character "*". It can be
 optionally followed by a "`{[h:<header_length>];[m:<message_length>]}`" string.
 By default, the full header or message will be logged. If a header or message
 length is given and the entry size is larger than the given length, a truncated
-entry will be logged.
+entry will be logged. However gRPC may choose to ignore the header limit in
+order to log certain required headers.
 
 *   If the pattern is "*", it specifies the defaults for all the services.
 *   If the pattern is `<service>/*`, it specifies the defaults for all
