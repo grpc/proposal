@@ -5,7 +5,7 @@ TCP User Timeout
 * Status: Draft
 * Implemented in: 
 * Last updated: 2018-8-22
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/6VZYCFZpyTI
 
 ## Abstract
 
