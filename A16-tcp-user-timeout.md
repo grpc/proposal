@@ -24,7 +24,7 @@ N/A
 
 For all Linux platforms running Linux 2.6.37 and later, gRPC will set the socket option TCP_USER_TIMEOUT for TCP sockets to a default value of 20 seconds. (The system defaults might be as high as 20 minutes.)
 
-gRPC will also provide a configuration option for both channels and servers to set the TCP_USER_TIMEOUT value.
+gRPC will also provide a configuration option for both channels and servers to set the TCP_USER_TIMEOUT value. This configuration option will have millisecond accuracy and will have the same semantics as the socket option. Setting it to 0 will configure TCP_USER_TIMEOUT with the system default and not the gRPC default of 20 seconds. No minimum value to this option will be enforced by gRPC. It will be the responsibilty of the application to be prudent while setting this option. A very small TCP_USER_TIMEOUT value can affect TCP transmissions over paths with a high latency or packet loss. If the timeout occurs before the acknowledgement arrives, then the connection will be dropped.
 
 ## Rationale
 
@@ -41,10 +41,10 @@ Other than solving the two described issues, TCP_USER_TIMEOUT would also provide
 
 ## Implementation
 
-C-Core - [#16419](https://github.com/grpc/grpc/issues/16419) sets the TCP_USER_TIMEOUT socket option.
-A new channel argument, GRPC_ARG_TCP_USER_TIMEOUT_MS will be introduced to configure the value. The channel argument value will be passed as the socket option value. The minimum value, 0, would result in setting TCP_USER_TIMEOUT to the system default. The maximum value will be capped at 20 minutes (system default).
+C-Core - [#16419](https://github.com/grpc/grpc/issues/16419) sets the TCP_USER_TIMEOUT socket option. The same pull request will be modified to add the new channel argument too.
+A new channel argument, GRPC_ARG_TCP_USER_TIMEOUT_MS will be introduced to configure the value. The channel argument value will be forwarded as the socket option value.
 
-JAVA - For JAVA, the support would be currently restricted to netty. The OkHttp library we use does not support setting such an option.
+JAVA - For JAVA, the OkHttp library we use does not support setting such an option. Netty with NIO also does not support this. Netty with epoll/kqueue allows setting this option and the user is already capable of configuring this.
 
 Go -
 
