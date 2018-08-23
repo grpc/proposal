@@ -52,8 +52,12 @@ type CertificateConfigType = {
   ca?: Buffer,
   keyCertPairs?: KeyCertPair | KeyCertPair[],
 }
+type CertificateReload = {
+  status: ssl.certificateConfigReload,
+  certificateConfig: CertificateConfigType
+}
 type ServerSslOptions = {
-  certificateConfig?: CertificateConfigType | function(): CertificateConfigType,
+  certificateConfig?: CertificateConfigType | function(): CertificateReload,
   checkClientCertificate?: ssl.clientCertificateRequest
 }
 type ClientSslOptions = {
