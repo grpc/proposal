@@ -44,7 +44,7 @@ Other than solving the two described issues, TCP_USER_TIMEOUT would also provide
 C-Core - [#16419](https://github.com/grpc/grpc/issues/16419) sets the TCP_USER_TIMEOUT socket option.
 A new channel argument, GRPC_ARG_TCP_USER_TIMEOUT_MS will be introduced to configure the value. The channel argument value will be passed as the socket option value. The minimum value, 0, would result in setting TCP_USER_TIMEOUT to the system default. The maximum value will be capped at 20 minutes (system default).
 
-JAVA -
+JAVA - For JAVA, the support would be currently restricted to netty. The OkHttp library we use does not support setting such an option.
 
 Go -
 
