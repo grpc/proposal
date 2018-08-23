@@ -31,12 +31,6 @@ The first argument to `createSsl` is always the optional CA certificate, so it c
 
 First, we propose to add a few more constants:
 ```
-enum ssl.certificateConfigReload {
-  UNCHANGED = 0,
-  NEW = 1,
-  FAIL = 2,
-}
-
 enum ssl.clientCertificateRequest {
   DONT_REQUEST_CLIENT_CERTIFICATE = 0,
   REQUEST_CLIENT_CERTIFICATE_BUT_DONT_VERIFY = 1,
@@ -52,12 +46,8 @@ type CertificateConfigType = {
   ca?: Buffer,
   keyCertPairs?: KeyCertPair | KeyCertPair[],
 }
-type CertificateReload = {
-  status: ssl.certificateConfigReload,
-  certificateConfig: CertificateConfigType
-}
 type ServerSslOptions = {
-  certificateConfig?: CertificateConfigType | function(): CertificateReload,
+  certificateConfig?: CertificateConfigType | function(): null | CertificateConfigType | Error,
   checkClientCertificate?: ssl.clientCertificateRequest
 }
 type ClientSslOptions = {
