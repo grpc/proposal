@@ -5,7 +5,7 @@ Enhance createSsl's arguments
 * Status: Draft
 * Implemented in: Node
 * Last updated: August 22, 2018
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/YwCF1bKgiXc
 
 ## Abstract
 The arguments to gRPC-node's `createSsl` have gotten in a state with too much optional parameters, where a plain old javascript object would be more desirable.
