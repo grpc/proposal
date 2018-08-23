@@ -47,7 +47,7 @@ type CertificateConfigType = {
   keyCertPairs?: KeyCertPair | KeyCertPair[],
 }
 type ServerSslOptions = {
-  certificateConfig?: CertificateConfigType | function(): null | CertificateConfigType | Error,
+  certificateConfig?: CertificateConfigType | function() => (null | CertificateConfigType | Error),
   checkClientCertificate?: ssl.clientCertificateRequest
 }
 type ClientSslOptions = {
