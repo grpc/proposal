@@ -95,9 +95,11 @@ message GrpcLogEntry {
   // The timestamp of the binary log message
   google.protobuf.Timestamp timestamp = 1;
 
-  // Uniquely identifies a call. Each call may have several log entries, they
-  // will all have the same call_id. Nothing is guaranteed about their values
-  // other than they are unique across different RPCs in the same gRPC process.
+  // Uniquely identifies a call. The value must not be 0 in order to disambiguate
+  // from an unset value.
+  // Each call may have several log entries, they will all have the same call_id.
+  // Nothing is guaranteed about their value other than they are unique across
+  // different RPCs in the same gRPC process.
   int64 call_id = 2;
 
   // The entry sequence id for this call. The first GrpcLogEntry has a
