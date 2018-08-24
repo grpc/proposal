@@ -32,9 +32,9 @@ Turning on binary logging should be a configuration setting and require no
 code changes. The control interface should allow users to change the amount
 and contents of logs.
 
-The logged events correspond to what is visible at the application
-level, and as a result they exclude things like [hedging and
-retries](./A6-client-retries.md).
+The logged events correspond to events that may be delivered to the
+application. In the cases of [hedging and
+retries](./A6-client-retries.md), events from uncommitted streams are not logged.
 
 ### Log Format
 
@@ -106,7 +106,7 @@ message GrpcLogEntry {
   // value of 1, to disambiguate from an unset value. The purpose of
   // this field is to detect missing entries in environments where
   // durability or ordering is not guaranteed.
-  uint32 sequence_id_within_call = 3;
+  uint64 sequence_id_within_call = 3;
 
   EventType type = 4;
   Logger logger = 5;  // One of the above Logger enum
@@ -138,8 +138,16 @@ message ClientHeader {
   // This contains only the metadata from the application.
   Metadata metadata = 1;
 
+  // The name of the RPC method, which looks something like:
+  // /<service>/<method>
+  // Note the leading "/" character.
   string method_name = 2;
 
+  // A backend machine may be used to run multiple services
+  // each with a different identity.
+  // The authority is the name of such a service.
+  // It is typically a portion of the URI in the form of
+  // <host> or <host>:<port> .
   string authority = 3;
 
   // the RPC timeout
@@ -149,21 +157,24 @@ message ClientHeader {
 
 message ServerHeader {
   // This contains only the metadata from the application.
-  Metadata metadata = 3;
+  Metadata metadata = 1;
 }
 
 message Trailer {
+  // This contains only the metadata from the application.
+  Metadata metadata = 1;
+
   // status_code and status_message:
   // Only present for EVENT_TYPE_SERVER_TRAILER.
-  uint32 status_code = 1;
+  uint32 status_code = 2;
 
   // An original status message before any transport specific
   // encoding.
-  string status_message = 2;
+  string status_message = 3;
 
   // The value of the 'grpc-status-details-bin' metadata key. If
   // present, this is always an encoded 'google.rpc.Status' message.
-  bytes status_details = 3;
+  bytes status_details = 4;
 }
 
 // Message payload, used by CLIENT_MESSAGE and SERVER_MESSAGE
@@ -198,25 +209,25 @@ message Metadata {
 
 // A metadata key value pair
 message MetadataEntry {
-  bytes key = 1;
+  string key = 1;
   bytes value = 2;
 }
 
 // Peer information
 message Peer {
-  enum PeerType {
-    PEER_TYPE_UNKNOWN = 0;
-    // address is the address in 1.2.3.4 form
-    PEER_TYPE_IPV4 = 1;
-    // address the address in canonical form (RFC5952 section 4)
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    // address is in 1.2.3.4 form
+    TYPE_IPV4 = 1;
+    // address is in IPv6 canonical form (RFC5952 section 4)
     // The scope is NOT included in the peer string.
-    PEER_TYPE_IPV6 = 2;
+    TYPE_IPV6 = 2;
     // address is UDS string
-    PEER_TYPE_UNIX = 3;
+    TYPE_UNIX = 3;
   };
   PeerType peer_type = 1;
   string address = 3;
-  // only for PEER_IPV4 and PEER_IPV6
+  // only for TYPE_IPV4 and TYPE_IPV6
   uint32 ip_port = 4;
 }
 ```
@@ -324,7 +335,7 @@ gRPC binary logging should serve as a separate library, making it convenient to
 be changed or even replaced. Configuration knobs should be exposed directly via
 this binary logging library. The production target can remove this library
 according to its need to minimize the target size.  Other parts of gRPC code
-hould not depend on this library, so that it could be removed without any
+should not depend on this library, so that it could be removed without any
 trouble.
 
 ## Future Work
