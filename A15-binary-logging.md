@@ -100,7 +100,7 @@ message GrpcLogEntry {
   // Each call may have several log entries, they will all have the same call_id.
   // Nothing is guaranteed about their value other than they are unique across
   // different RPCs in the same gRPC process.
-  int64 call_id = 2;
+  uint64 call_id = 2;
 
   // The entry sequence id for this call. The first GrpcLogEntry has a
   // value of 1, to disambiguate from an unset value. The purpose of
