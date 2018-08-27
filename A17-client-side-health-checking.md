@@ -5,7 +5,7 @@ Client-Side Health Checking
 * Status: Draft
 * Implemented in: 
 * Last updated: 2018-08-27
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/d/topic/grpc-io/rwcNF4IQLlQ/discussion
 
 ## Abstract
 
