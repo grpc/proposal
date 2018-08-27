@@ -51,12 +51,12 @@ single switch.
 
 The current health-checking protocol is a unary API, where the client is
 expected to periodically poll the server.  That was sufficient for use
-via UHC, where the health checks come from a small number of centralized
-clients and where there is existing infrastructure to periodically
-poll each client.  However, if we are going to have large numbers of
-clients issuing health-check requests, then we will need to convert the
-health-checking protocol to a streaming Watch-based API for scalability
-and bandwidth-usage reasons.
+via centralized health checking via a look-aside load balancer, where
+the health checks come from a small number of clients and where there
+is existing infrastructure to periodically poll each client.  However,
+if we are going to have large numbers of clients issuing health-check
+requests, then we will need to convert the health-checking protocol to
+a streaming Watch-based API for scalability and bandwidth-usage reasons.
 
 Note that one down-side of this approach is that it could conceivably
 be possible that the server-side health-checking code somehow fails
@@ -130,8 +130,8 @@ CONNECTING in between.  This is a new transition that was not [previously
 supported](https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md), although it is unlikely to be a problem for applications,
 because (a) it won't affect the overall state of the parent channel
 unless all subchannels are in the same state at the same time and (b)
-because the connectivity state API can drop states anyway, the application
-won't be able to tell that we didn't stop in `CONNECTING` in between anyway.
+because the connectivity state API can drop states, the application won't
+be able to tell that we didn't stop in `CONNECTING` in between anyway.
 
 If the `Watch()` call fails with status `UNIMPLEMENTED`, the client will
 act as if health checking is disabled.  That is, it will not retry
@@ -149,7 +149,7 @@ reset, so the next attempt will occur immediately, but any subsequent
 attempt will be subject to exponential backoff.  When the next attempt
 starts, the subchannel will transition to state `CONNECTING`.
 
-When the client channel is shutting down or when the backend sends a
+When the client subchannel is shutting down or when the backend sends a
 GOAWAY, the client will cancel the `Watch()` call.  There is no need to
 wait for the final status from the server in this case.
 
@@ -157,17 +157,20 @@ wait for the final status from the server in this case.
 
 Note that because of the inherently asynchronous nature of the network,
 whenever a backend transitions from healthy to unhealthy, it may still
-receive a small number of RPCs that were already in flight from the
+receive some number of RPCs that were already in flight from the
 client before the client received the notification that the backend is
-unhealthy.  This race condition lasts approximately the one-way network
-trip time (i.e., the time between when the backend sends the unhealthy
-notification and when the client receives it).
+unhealthy.  This race condition lasts approximately the network round
+trip time (it includes the one-way trip time for RPCs that were already
+sent by the client but not yet received by the server when the server
+goes unhealthy, plus the one-way trip time for RPCs sent by the client
+between when the server sends the unhealthy notification and when the
+client receives it).
 
-When the connection is first established, however, the problem is more
-severe, because the client has not yet started the `Watch()` call, the race
-condition actually lasts twice as long: it's not just the one-way network
-trip time, but actually a full round trip (the client needs to start
-the `Watch()` call, and the backend needs to send its initial response).
+When the connection is first established, however, the problem could
+affect a larger number of RPCs, because there could be a number of RPCs
+queued up waiting for the channel to become connected, which would all
+be sent at once.  And unlike an already-established connection, the race
+condition is avoidable for newly established connections.
 
 To avoid this, the client will wait for the initial health-checking
 response before the subchannel goes into state `READY`.  However, this
@@ -207,29 +210,29 @@ later if needed.
 
 ### Defaults
 
-Client-side health checking will be disabled by default; users
+Client-side health checking will be disabled by default; service owners
 will need to explicitly enable it via the service config when desired.
+
+There will be a channel argument that can be used on the client to
+disable health checking even if it is enabled in the service config.
 
 ### LB Policies Can Disable Health Checking When Needed
 
 There are some cases where an LB policy may want to disable client-side
-health-checking.  To allow this, we will provide a channel arg that
-inhibits client-side health checks if it is enabled in the service config.
+health-checking.  To allow this, LB policies will be able to set the
+channel argument mentioned above to inhibit health checking.
 
 This section details how each of our existing LB policies will interact
 with health checking.
 
 #### `pick_first`
 
-We do not plan to support health checking with `pick_first`, for two
-reasons.  First, if you are only connecting to a single backend, you
-probably don't want health-checking anyway, because if we don't send
-RPCs to that backend, there's no where else for them to go, so they will
-ultimately fail anyway.  And second, it is not clear what the behavior
-of `pick_first` would be for unhealthy channels; the naive approach of
-treating an unhealthy channel as having failed and disconnecting would
-both result in expensive reconnection attempts and might not actually
-cause us to select a different backend after re-resolving.
+We do not plan to support health checking with `pick_first`, because it
+is not clear what the behavior of `pick_first` would be for unhealthy
+channels.  The naive approach of treating an unhealthy channel as having
+failed and disconnecting would both result in expensive reconnection
+attempts and might not actually cause us to select a different backend
+after re-resolving.
 
 The `pick_first` LB policy will unconditionally set the channel arg to
 inhibit health checking.
@@ -303,6 +306,7 @@ and reestablished.
 - May need yet another runtime registry to find client health checking
   implementation. Alternatively may hand-roll the protobuf
   serialization.
+- Will need plumbing to allow creating a trace event.
 
 ### Go
 
