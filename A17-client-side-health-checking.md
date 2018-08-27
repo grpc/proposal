@@ -124,7 +124,7 @@ When a client receives a health-checking response from the backend,
 if the health check response indicates that the backend is healthy, the
 subchannel will transition to state READY; otherwise, it will transition
 to state `TRANSIENT_FAILURE`.  Note that this means that when a backend
-transitions from healthy to unhealthy, the subchannel's connectivity state
+transitions from unhealthy to healthy, the subchannel's connectivity state
 will transition from `TRANSIENT_FAILURE` directly to `READY`, with no stop at
 CONNECTING in between.  This is a new transition that was not [previously
 supported](https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md), although it is unlikely to be a problem for applications,
