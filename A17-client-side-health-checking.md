@@ -194,7 +194,7 @@ We will add the following new message to the service config:
 ```
 message HealthCheckConfig {
   // Service name to use in the health-checking request.
-  string service_name = 1;
+  google.protobuf.StringValue service_name = 1;
 }
 ```
 
