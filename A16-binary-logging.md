@@ -141,7 +141,7 @@ message ClientHeader {
   // Note the leading "/" character.
   string method_name = 2;
 
-  // A backend machine may be used to run multiple virtual
+  // A single process may be used to run multiple virtual
   // servers with different identities.
   // The authority is the name of such a server identitiy.
   // It is typically a portion of the URI in the form of
