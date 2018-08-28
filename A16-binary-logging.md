@@ -185,7 +185,7 @@ message Message {
 }
 
 // A list of metadata pairs, used in the payload of client header,
-// server header and trailer.
+// server header, and server trailer.
 // Implementations may omit some entries to honor the header limits
 // of GRPC_BINARY_LOG_CONFIG.
 //
