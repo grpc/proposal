@@ -124,13 +124,11 @@ message GrpcLogEntry {
   // true if payload does not represent the full message or metadata.
   bool payload_truncated = 10;
 
-  // Peer address information, will only be recorded in
-  // EVENT_TYPE_SERVER_HEADER for client side or
-  // EVENT_TYPE_CLIENT_HEADER for server side.
-  // On client side, the remote peer is not yet known when the header
-  // is sent because load balancing has not yet happened.
-  // On server side, it is possible that the RPC is cancelled before
-  // it sends the header.
+  // Peer address information, will only be recorded on the first
+  // incoming event. On client side, peer is logged on
+  // EVENT_TYPE_SERVER_HEADER normally or EVENT_TYPE_SERVER_TRAILER in
+  // the case of trailers-only. On server side, peer is always
+  // logged on EVENT_TYPE_CLIENT_HEADER.
   Peer peer = 11;
 };
 
@@ -143,9 +141,9 @@ message ClientHeader {
   // Note the leading "/" character.
   string method_name = 2;
 
-  // A backend machine may be used to run multiple services
-  // each with a different identity.
-  // The authority is the name of such a service.
+  // A backend machine may be used to run multiple virtual
+  // servers with different identities.
+  // The authority is the name of such a server identitiy.
   // It is typically a portion of the URI in the form of
   // <host> or <host>:<port> .
   string authority = 3;
