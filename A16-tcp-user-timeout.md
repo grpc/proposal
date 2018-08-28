@@ -27,7 +27,8 @@ gRPC already has a mechanism to detect connection failures, called [keepalive](h
 
 Reusing the KEEPALIVE_TIMEOUT configuration has a few repercussions.
 * The keepalive timeout value will also take affect on all bytes sent via TCP and not just the HTTP/2 ping.
-* TCP_USER_TIMEOUT will have the same default value and minimum value limitation as the keepalive timeout.
+* A KEEPALIVE_TIME configuration of infinite disables keepalive and TCP_USER_TIMEOUT will also not be set. The system default will continue to be in effect.
+* TCP_USER_TIMEOUT will have the same default value of 20 seconds as the keepalive timeout, if keepalive is enabled (KEEPALIVE_TIME is not infinite).
 
 A very small TCP_USER_TIMEOUT value can affect TCP transmissions over paths with a high latency or packet loss. If the timeout occurs before the acknowledgement arrives, then the connection will be dropped. A very large value, on the other hand. will increase the time it takes gRPC to detect broken connections. Hence, it will be the responsibility of the application to be prudent while setting this option.
 
