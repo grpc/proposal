@@ -1,11 +1,11 @@
 # gRPC Binary Logging
 
-*   Author(s): Yuchen Zeng, Spencer Fang
-*   Approver: a11r
+*   Author(s): Spencer Fang, Yuchen Zeng
+*   Approver: markdroth
 *   Status: In Review
 *   Implemented in:
-*   Last updated: 07/18/2018
-*   Discussion at:
+*   Last updated: 08/28/2018
+*   Discussion at: https://groups.google.com/forum/#!topic/grpc-io/URLb-bTEi1k
 
 ## Abstract
 
