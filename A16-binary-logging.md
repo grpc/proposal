@@ -162,8 +162,7 @@ message Trailer {
   // This contains only the metadata from the application.
   Metadata metadata = 1;
 
-  // status_code and status_message:
-  // Only present for EVENT_TYPE_SERVER_TRAILER.
+  // The gRPC status code.
   uint32 status_code = 2;
 
   // An original status message before any transport specific
