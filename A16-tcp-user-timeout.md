@@ -18,13 +18,18 @@ TCP_USER_TIMEOUT is a socket option that has been available on Linux since kerne
 At the time this proposal was written, gRPC Core faced an issue where data could be stuck for a very long time at the gRPC TCP layer. For cases where the network goes down, and the socket cannot accept more data for writing, an RPC could be blocked for a very long time. Even if the deadline expired on such an RPC, gRPC Core was incapable of shutting down the RPC, because the TCP layer would still have references to user data. Setting TCP_USER_TIMEOUT to a reasonable value would put a bound on the maximum time the TCP layer would wait for TCP packets to be acknowledged, and close the connection if the packets are not acknowledged in time. This would end up releasing references to user data at the gRPC TCP layer, thereby allowing the RPC to fail in a timely manner.
 
 ### Related Proposals:
-N/A
+[Client-side Keepalive](https://github.com/grpc/proposal/blob/master/A8-client-side-keepalive.md)
+[Server-side Connection Management](https://github.com/grpc/proposal/blob/master/A9-server-side-conn-mgt.md)
 
 ## Proposal
 
-For all Linux platforms running Linux 2.6.37 and later, gRPC will set the socket option TCP_USER_TIMEOUT for TCP sockets to a default value of 20 seconds. (The system defaults might be as high as 20 minutes.)
+gRPC already has a mechanism to detect connection failures, called [keepalive](https://github.com/grpc/proposal/blob/master/A8-client-side-keepalive.md). The KEEPALIVE_TIMEOUT configuration option controls the amount of time, gRPC waits for a HTTP/2 ping to be acknowledged. Since the effective aim of KEEPALIVE_TIMEOUT is similar to TCP_USER_TIMEOUT, the proposal is to reuse this configuration option to set the socket option TCP_USER_TIMEOUT. Since, TCP_USER_TIMEOUT is only available on Linux kernels 2.6.37 and later, this proposal is limited to those platforms.
 
-gRPC will also provide a configuration option for both channels and servers to set the TCP_USER_TIMEOUT value. This configuration option will have millisecond accuracy and will have the same semantics as the socket option. Setting it to 0 will configure TCP_USER_TIMEOUT with the system default and not the gRPC default of 20 seconds. No minimum value to this option will be enforced by gRPC. It will be the responsibilty of the application to be prudent while setting this option. A very small TCP_USER_TIMEOUT value can affect TCP transmissions over paths with a high latency or packet loss. If the timeout occurs before the acknowledgement arrives, then the connection will be dropped.
+Reusing the KEEPALIVE_TIMEOUT configuration has a few repercussions.
+* The keepalive timeout value will also take affect on all bytes sent via TCP and not just the HTTP/2 ping.
+* TCP_USER_TIMEOUT will have the same default value and minimum value limitation as the keepalive timeout.
+
+A very small TCP_USER_TIMEOUT value can affect TCP transmissions over paths with a high latency or packet loss. If the timeout occurs before the acknowledgement arrives, then the connection will be dropped. A very large value, on the other hand. will increase the time it takes gRPC to detect broken connections. Hence, it will be the responsibility of the application to be prudent while setting this option.
 
 ## Rationale
 
@@ -37,12 +42,11 @@ Note that both issues occurred when a network was lost. The first issue mentione
 
 Even by doing one of the two currently known solutions, the issue mentioned in #15871 would still remain, since we require sending the HTTP2 GOAWAY frame before closing the connection in certain scenarios.
 
-Other than solving the two described issues, TCP_USER_TIMEOUT would also provide a fairly reliable way to detect TCP connection breakage without any additional cost.
+Other than solving the two described issues, TCP_USER_TIMEOUT would also provide a fairly reliable way to detect TCP connection breakage without any additional cost, or need to introduce another configurable option.
 
 ## Implementation
 
-C-Core - [#16419](https://github.com/grpc/grpc/issues/16419) sets the TCP_USER_TIMEOUT socket option. The same pull request will be modified to add the new channel argument too.
-A new channel argument, GRPC_ARG_TCP_USER_TIMEOUT_MS will be introduced to configure the value. The channel argument value will be forwarded as the socket option value.
+C-Core - [#16419](https://github.com/grpc/grpc/issues/16419) sets the TCP_USER_TIMEOUT socket option.
 
 JAVA - For JAVA, the OkHttp library we use does not support setting such an option. Netty with NIO also does not support this. Netty with epoll/kqueue allows setting this option and the user is already capable of configuring this.
 
