@@ -69,19 +69,24 @@ message GrpcLogEntry {
     EVENT_TYPE_SERVER_HEADER = 2;
     // Message sent from client to server
     EVENT_TYPE_CLIENT_MESSAGE = 3;
-    // message sent from server to client
+    // Message sent from server to client
     EVENT_TYPE_SERVER_MESSAGE = 4;
-    // Signal that client is done sending
+    // A signal that client is done sending
     EVENT_TYPE_CLIENT_HALF_CLOSE = 5;
-    // Trailers sent from server to client.
-    // This marks the end of the RPC. Events may arrive after
-    // this due to races. The extra events are not considered
-    // a part of the RPC and may be safely ignored.
+    // Trailer indicates the end of the RPC.
+    // On client side, this event means a trailer was either received
+    // from the network or the gRPC library locally generated a status
+    // to inform the application about a failure.
+    // On server side, this event means the server application requested
+    // to send a trailer. Note: a EVENT_TYPE_CANCEL may still arrive after
+    // this due to races on server side.
     EVENT_TYPE_SERVER_TRAILER = 6;
-    // Signal that the RPC is cancelled.
-    // This marks the end of the RPC. Events may arrive after
-    // this due to races. The extra events are not considered
-    // a part of the RPC and may be safely ignored.
+    // A signal that the RPC is cancelled. On client side, this
+    // indicates the client application requests a cancellation.
+    // On server side, this indicates that cancellation was detected.
+    // Note: This marks the end of the RPC. Events may arrive after
+    // this due to races. For example, on client side a trailer
+    // may arrive even though the application requested to cancel the RPC.
     EVENT_TYPE_CANCEL = 7;
   }
 
