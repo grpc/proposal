@@ -78,7 +78,7 @@ message GrpcLogEntry {
     // from the network or the gRPC library locally generated a status
     // to inform the application about a failure.
     // On server side, this event means the server application requested
-    // to send a trailer. Note: a EVENT_TYPE_CANCEL may still arrive after
+    // to send a trailer. Note: EVENT_TYPE_CANCEL may still arrive after
     // this due to races on server side.
     EVENT_TYPE_SERVER_TRAILER = 6;
     // A signal that the RPC is cancelled. On client side, this
