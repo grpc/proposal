@@ -134,7 +134,7 @@ message GrpcLogEntry {
   // EVENT_TYPE_SERVER_HEADER normally or EVENT_TYPE_SERVER_TRAILER in
   // the case of trailers-only. On server side, peer is always
   // logged on EVENT_TYPE_CLIENT_HEADER.
-  Peer peer = 11;
+  Address peer = 11;
 };
 
 message ClientHeader {
@@ -215,22 +215,22 @@ message MetadataEntry {
   bytes value = 2;
 }
 
-// Peer information
-message Peer {
+// Address information
+message Address {
   enum Type {
     TYPE_UNKNOWN = 0;
     // address is in 1.2.3.4 form
     TYPE_IPV4 = 1;
     // address is in IPv6 canonical form (RFC5952 section 4)
-    // The scope is NOT included in the peer string.
+    // The scope is NOT included in the address string.
     TYPE_IPV6 = 2;
     // address is UDS string
     TYPE_UNIX = 3;
   };
-  PeerType peer_type = 1;
-  string address = 3;
+  Type type = 1;
+  string address = 2;
   // only for TYPE_IPV4 and TYPE_IPV6
-  uint32 ip_port = 4;
+  uint32 ip_port = 3;
 }
 ```
 
