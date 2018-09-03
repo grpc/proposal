@@ -113,7 +113,13 @@ connections with few RPCs on them.
 
 ## Implementation
 
-* C. TODO get current progress; close, if not done. Being done by @y-zeng
+* C. TODO get current progress; close, if not done. Being done by @y-zeng.
+  Mapping from the option name in this spec to the C core option name:
+  * `MAX_CONNECTION_IDLE`: `GRPC_ARG_MAX_CONNECTION_IDLE_MS`
+  * `MAX_CONNECTION_AGE`: `GRPC_ARG_MAX_CONNECTION_AGE_MS`
+  * `MAX_CONNECTION_AGE_GRACE`: `GRPC_ARG_MAX_CONNECTION_AGE_GRACE_MS`
+  * `KEEPALIVE_TIME`: `GRPC_ARG_KEEPALIVE_TIME_MS`
+  * `KEEPALIVE_TIMEOUT`: `GRPC_ARG_KEEPALIVE_TIMEOUT_MS`
 * Java. Complete since grpc/grpc-java@4a96e259 in v1.4.0. Bug fix in v1.7.1.
   * The options can be specified via `NettyServerBuilder.maxConnectionIdle()`,
     `maxConnectionAge()`, `maxConnectionAgeGrace()`, `keepAliveTime()`, and

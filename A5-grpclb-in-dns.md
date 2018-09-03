@@ -54,6 +54,11 @@ specified by the SRV record.  It will then return each of the resulting
 addresses with the extra fields indicating that the addresses are
 balancer addresses and the name from the SRV record.
 
+Since the SRV service name is the same for plain text and encrypted, there is
+not a way to provide different ports depending on the presence of encryption. If
+simultaneous support for http+https is necessary, we recommend using different
+DNS host names for insecure vs secure.
+
 Note that the gRPC library will ignore the values of the `priority` and
 `weight` fields.  Instead, it will put all balancer addresses into a
 single list (in whatever order the DNS server returns them) and use the
