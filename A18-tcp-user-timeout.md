@@ -2,7 +2,7 @@ TCP User Timeout
 ----
 * Author(s): Yash Tibrewal
 * Approver: a11r
-* Status: Draft
+* Status: Final
 * Implemented in:
 * Last updated: 2018-8-22
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/6VZYCFZpyTI
