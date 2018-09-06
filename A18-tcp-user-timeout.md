@@ -1,7 +1,7 @@
 TCP User Timeout
 ----
 * Author(s): Yash Tibrewal
-* Approver:
+* Approver: a11r
 * Status: Draft
 * Implemented in:
 * Last updated: 2018-8-22
