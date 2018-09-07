@@ -208,7 +208,7 @@ message Message {
 // grpc-trace-bin is managed by low level client side mechanisms
 // inaccessible from the application level. On server side, the
 // header is just a normal metadata key.
-// The pair will not count towards the size limit,
+// The pair will not count towards the size limit.
 message Metadata {
   repeated MetadataEntry entry = 1;
 }
