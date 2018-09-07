@@ -204,7 +204,11 @@ message Message {
 // - entries added for call credentials
 //
 // Implementations must always log grpc-trace-bin if it is present.
-// The pair will count towards the size limit,
+// Practically speaking it will only be visible on server side because
+// grpc-trace-bin is managed by low level client side mechanisms
+// inaccessible from the application level. On server side, the
+// header is just a normal metadata key.
+// The pair will not count towards the size limit,
 message Metadata {
   repeated MetadataEntry entry = 1;
 }
