@@ -54,6 +54,12 @@ GRPCAPI void grpc_tls_credentials_options_set_cert_request_type(
                                grpc_tls_credentials_options* options,
                                grpc_ssl_client_certificate_request_type type);
 
+/** Set grpc_tls_key_materials_config field in credentials options
+    with the provided config struct whose ownership is transferred. */
+GRPCAPI void grpc_tls_credentials_options_set_key_materials_config(
+    grpc_tls_credentials_options* options,
+    grpc_tls_key_materials_config* config);
+
 /** Set grpc_tls_credential_reload_config field in credentials options
     with the provided config struct whose ownership is transferred. */
 GRPCAPI void grpc_tls_credentials_options_set_credential_reload_config(
@@ -113,14 +119,10 @@ typedef struct grpc_tls_key_materials {
   const char* pem_root_certs;
 } grpc_tls_key_materials;
 
-/** Create an empty grpc_tls_key_materials_config instance. */
-GRPCAPI grpc_tls_key_materials_config* grpc_tls_key_materials_config_create();
-
-/** Add a grpc_tls_key_materials instance to a grpc_tls_key_materials_config
- *  instance. */
-GRPCAPI void grpc_tls_key_materials_config_add(
-    grpc_tls_key_materials_config* config,
-    grpc_tls_key_materials* key_materials);
+/** Create a grpc_tls_key_materials_config instance. */
+GRPCAPI grpc_tls_key_materials_config* grpc_tls_key_materials_config_create(
+    grpc_ssl_pem_key_cert_pair* key_cert_pair_set, const char** root_certs_set,
+    size_t num);
 
 /** Destroy a grpc_tls_key_materials_config instance. */
 GRPCAPI void grpc_tls_key_materials_config_destroy(
@@ -172,11 +174,11 @@ struct grpc_tls_credential_reload_arg {
 GRPCAPI grpc_tls_credential_reload_config*
                           grpc_tls_credential_reload_config_create(
                               const void* config_user_data, 
-                              int (*schedule)(const void* config_user_data,
+                              int (*schedule)(void* config_user_data,
                                     grpc_tls_credential_reload_arg* arg), 
-                              void (*cancel)(const void* config_user_data,
+                              void (*cancel)(void* config_user_data,
                                      grpc_tls_credential_reload_arg* arg),
-                              void (*destruct)(const void* config_user_data));
+                              void (*destruct)(void* config_user_data));
 
 
 /** Destroy a grpc_tls_credential_reload_config instance. */
@@ -206,9 +208,9 @@ typedef struct {
 */
 GRPCAPI grpc_tls_ctx_customize_config* grpc_tls_ctx_customize_config_create(
                                       const void* config_user_data,
-                                      void (*schedule)(const void* config_user_data,
+                                      void (*schedule)(void* config_user_data,
                                             grpc_tls_ctx_customize_arg* arg),
-                                      void (*destruct)(const void* config_user_data));
+                                      void (*destruct)(void* config_user_data));
 
 /** Destroy a grpc_tls_ctx_customize_config instance. */
 GRPCAPI void grpc_tls_ctx_customize_config_destroy(grpc_tls_ctx_customize_config* config);
@@ -262,11 +264,11 @@ struct grpc_tls_server_authorization_check_arg {
 GRPCAPI grpc_tls_server_authorization_check_config*
                                       grpc_tls_server_authorization_check_config_create(
                                       const void* config_user_data, 
-                                      int (*schedule)(const void* config_user_data,
+                                      int (*schedule)(void* config_user_data,
                                            grpc_tls_server_authorization_check_arg* arg), 
-                                      void (*cancel)(const void* config_user_data,
+                                      void (*cancel)(void* config_user_data,
                                             grpc_tls_server_authorization_check_arg* arg),
-                                      void (*destruct)(const void* config_user_data));
+                                      void (*destruct)(void* config_user_data));
 
 /** Destroy a grpc_tls_server_authorization_check_config instance. */
 GRPCAPI void grpc_tls_server_authorization_check_config_destroy(grpc_tls_server_authorization_check_config* config);
