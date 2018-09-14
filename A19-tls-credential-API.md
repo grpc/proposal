@@ -109,19 +109,14 @@ The second part of proposal introduces API's related to configs of TLS-related f
 ```c++
 /** --- TLS key materials config. --- */
 
-/** A struct containing TLS credential key materials in a PEM format.
- *  pem_root_certs is the NULL-terminated string containing the PEM encoding of
- *  root certificates. If it is NULL, a default system root certificate or the
- *  one shipped with gRPC package will be used.
- */
-typedef struct grpc_tls_key_materials {
-  grpc_ssl_pem_key_cert_pair* pem_key_cert_pair;
-  const char* pem_root_certs;
-} grpc_tls_key_materials;
+/** Create an empty grpc_tls_key_materials_config instance. */
+GRPCAPI grpc_tls_key_materials_config* grpc_tls_key_materials_config_create();
 
-/** Create a grpc_tls_key_materials_config instance. */
-GRPCAPI grpc_tls_key_materials_config* grpc_tls_key_materials_config_create(
-    grpc_ssl_pem_key_cert_pair* key_cert_pair_set, const char** root_certs_set,
+/** Set grpc_tls_key_materials_config instance with a provided TLS certificate.
+ */
+GRPCAPI void grpc_tls_key_materials_config_set_certificate(
+    grpc_tls_key_materials_config* config,
+    grpc_ssl_pem_key_cert_pair* pem_key_cert_pairs, const char* pem_root_certs,
     size_t num);
 
 /** Destroy a grpc_tls_key_materials_config instance. */
@@ -147,7 +142,7 @@ typedef void (*grpc_tls_on_credential_reload_done_cb)(
 struct grpc_tls_credential_reload_arg {
   grpc_tls_on_credential_reload_done_cb cb;
   void *cb_user_data;
-  grpc_tls_key_materials *key_materials;
+  grpc_tls_key_materials_config *key_materials_config;
   grpc_status_code *status;
   const char **error_details;
 };
