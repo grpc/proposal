@@ -4,7 +4,7 @@
 *   Approver: markdroth
 *   Status: In Review
 *   Implemented in:
-*   Last updated: 08/28/2018
+*   Last updated: 2018/09/17
 *   Discussion at: https://groups.google.com/forum/#!topic/grpc-io/URLb-bTEi1k
 
 ## Abstract
