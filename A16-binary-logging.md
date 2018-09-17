@@ -2,7 +2,7 @@
 
 *   Author(s): Spencer Fang, Yuchen Zeng
 *   Approver: markdroth
-*   Status: In Review
+*   Status: Final
 *   Implemented in:
 *   Last updated: 2018-09-17
 *   Discussion at: https://groups.google.com/forum/#!topic/grpc-io/URLb-bTEi1k
