@@ -24,7 +24,7 @@ certain parts.
 
 
 ### Related Proposals:
-* [A2-Service Config via DNS](A2-service-configs-in-dins.md)
+* [A2-Service Config via DNS](A2-service-configs-in-dns.md)
 
 ## Proposal
 
