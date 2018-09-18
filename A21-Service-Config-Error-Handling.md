@@ -5,7 +5,7 @@ Service Config Error Handling
 * Status: Draft
 * Implemented in:
 * Last updated: 09-17-2018
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/bAxyse6c2eI
 
 ## Abstract
 
