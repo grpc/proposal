@@ -5,7 +5,7 @@ True Binary Metadata
 * Status: Draft
 * Implemented in: POC in https://github.com/grpc/grpc/pull/16618
 * Last updated: 9/19/18
-* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/Ww8waYz_Nes
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/c9-xD4itERI
 
 ## Abstract
 
