@@ -23,8 +23,7 @@ This transformation is costly in terms of CPU, and there exist use cases where
 this transformation can become the CPU bottleneck for gRPC.
 
 ### Related Proposals:
-
-n/a
+* This relates to [G2: HFAST](G2-hfast.md)
 
 ## Proposal
 
