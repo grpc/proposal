@@ -6,7 +6,7 @@ Add Optional GSSAPI call credentials implementation
 * Status: Draft
 * Implemented in: C++
 * Last updated: 2018/09/19
-* Discussion at: N/A
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/8ox3Nu-4b4o
 
 ## Abstract
 
