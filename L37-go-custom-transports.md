@@ -5,7 +5,7 @@ L37: Go Custom Transports
 * Status: Draft
 * Implemented in: Go
 * Last updated: 2018-09-20
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/TIGVcfQ_Ipg
 
 ## Abstract
 
