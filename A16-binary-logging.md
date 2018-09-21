@@ -270,6 +270,8 @@ order to log certain required headers.
     i.e. `-<service>/*` is not supported.
 *   Specifying a method while wildcarding the service is not supported, i.e.
     `*/<method>` is not supported.
+*   Conflicting rules are not supported, i.e. an exact method match and
+    a negation for the same method "/m{h:12;m:23},-s/m".
 *   If a pattern is malformed, the gRPC process must refuse to start up
 
 ABNF definition of the filter pattern:
