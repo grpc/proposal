@@ -270,7 +270,7 @@ order to log certain required headers.
     i.e. `-<service>/*` is not supported.
 *   Specifying a method while wildcarding the service is not supported, i.e.
     `*/<method>` is not supported.
-*   Conflicting rules are not supported, i.e. duplicate exact method matchs for
+*   Duplicate rules are not supported, i.e. same exact method matches for
     the same method (`"service1/method1{h:1,m:1},service1/method1{h:m}"`, or
     `"service1/method1{h:1;m:2},service1/method1{h:1,m:2}"`), or an exact method
     match and a negation for the same method
