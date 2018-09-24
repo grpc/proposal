@@ -43,7 +43,7 @@ In current gRPC Objective-C library, if two calls are to the same remote host, t
 The objective of the proposed API is to introduce a new set of Objective-C APIs that
 * Isolate configurations between gRPC calls
 * Allow inheritance of default configuration from service (GRPCProtoService) to call
-* Allow users to overwrite the default service configs for each call
+    * The users should be allowed to overwrite the default service configs for each call
 * Does not require user to use GRXLibrary, but rather using the call itself to send/receive message
 * Allow the old APIs to continue working so that current users do not get broken
 * Continue to support both proto and non-proto usage of the library
