@@ -5,7 +5,7 @@ Remove grpc_use_signal from core surface API
 * Status: Proposed
 * Implemented in: https://github.com/grpc/grpc/pull/16706
 * Last updated: 2018-09-26
-* Discussion at: 
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/a1ScqicqKQk
 
 ## Abstract
 
