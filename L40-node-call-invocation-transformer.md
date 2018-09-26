@@ -5,7 +5,7 @@ gRPC Node Call Invocation Transformer API
 * Status: Draft
 * Implemented in: Node
 * Last updated: 26-09-2018
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/f3v4SBvj7L4
 
 ## Abstract
 
