@@ -36,16 +36,18 @@ N/A
 
 ## Proposal
 
-The gRPC client will be configured to send health-checking RPCs to
-each backend that it is connected to.  Whenever a backend responds as
-unhealthy, the client's LB policy will stop sending requests to that
+The gRPC client will be able to be configured to send health-checking RPCs
+to each backend that it is connected to.  Whenever a backend responds
+as unhealthy, the client's LB policy will stop sending requests to that
 backend until it reports healthy again.
 
 Note that because the health-checking service requires a service name, the
 client will need to be configured with a service name to use.  However,
 by default, it can use the empty string, which would mean that the
 health of all services on a given host/port would be controlled with a
-single switch.
+single switch.  Semantically, the empty string is used to represent the
+overall health of the server, as opposed to the health of any individual
+services running on the server.
 
 ### Watch-Based Health Checking Protocol
 
@@ -66,9 +68,6 @@ by keepalives, at which point the client would disconnect.  But if the
 problem is caused by a bug in the health-checking service, then it's
 possible that a server could still be responding but has failed to notify
 the client that it is unhealthy.
-
-We can consider changing UHC to use this new streaming API, but that's
-out of scope of this document.
 
 #### API Changes
 
@@ -98,6 +97,12 @@ existing `Check()` unary method fails with status `NOT_FOUND` in this case,
 and we are not proposing to change that behavior.
 
 ### Client Behavior
+
+Client-side health checking will be disabled by default;
+service owners will need to explicitly enable it via the [service
+config](#service-config-changes) when desired.  There will be a channel
+argument that can be used on the client to disable health checking even
+if it is enabled in the service config.
 
 The health checking client code will be built into the subchannel,
 so that individual LB policies do not need to explicitly add support
@@ -138,7 +143,8 @@ act as if health checking is disabled.  That is, it will not retry
 the health-checking call, but it will treat the channel as healthy
 (connectivity state `READY`).  However, the client will record a [channel
 trace](https://github.com/grpc/proposal/blob/master/A3-channel-tracing.md)
-event indicating that this has happened.
+event indicating that this has happened.  It will also log a message at
+priority ERROR.
 
 If the `Watch()` call returns any other status, the subchannel will
 transition to connectivity state `TRANSIENT_FAILURE` and will retry the
@@ -207,14 +213,6 @@ HealthCheckConfig health_check_config = 4;
 Note that we currently need only this one parameter, but we are putting
 it in its own message so that we have the option of adding more parameters
 later if needed.
-
-### Defaults
-
-Client-side health checking will be disabled by default; service owners
-will need to explicitly enable it via the service config when desired.
-
-There will be a channel argument that can be used on the client to
-disable health checking even if it is enabled in the service config.
 
 ### LB Policies Can Disable Health Checking When Needed
 
