@@ -30,15 +30,15 @@ class Server {
    * @param creds Server credentials object to be used for SSL.
    * @param callback Callback to be called asynchronously with the result of binding the port
    */
-  bindAsync(port: string, creds: ServerCredentials, callback: (port: number)=>void): void;
+  bindAsync(port: string, creds: ServerCredentials, callback: (error: Error, port: number)=>void): void;
 }
 ```
 
-The semantics of the arguments are exactly the same as with the existing `bind` method, and the semantics of the port passed to the callback are identical to the semantics of the return value of the existing `bind` method: a negative number indicates failure, and a positive number indicates success binding to that port number.
+The semantics of the arguments are exactly the same as with the existing `bind` method, and the semantics of the port passed to the callback are identical to the semantics of the return value of the existing `bind` method: a negative number indicates failure, and a positive number indicates success binding to that port number. An error will also be passed to the callback if `port` is negative.
 
 ## Rationale
 
-The semantics of `bindAsync` would be identical to the semantics of `bind` except it is asynchronous, so the name communicates that. Keeping the semantics and API as similar as possible minimizes the work need to transition between the two. We could also implement the asynchrony using promises, but a callback based API is more consistent with the rest of the existing API. In the future, promise support could be added, perhaps by returning a promise when no callback is provided.
+The semantics of `bindAsync` would be identical to the semantics of `bind` except it is asynchronous, so the name communicates that. Keeping the semantics and API as similar as possible minimizes the work need to transition between the two. The semantically redundant `error` is passed to the callback for greater consistency with other Node APIs, so that it can be used with functions such as `util.promisify()`. We could also implement the asynchrony using promises, but a callback based API is more consistent with the rest of the existing API. In the future, promise support could be added, perhaps by returning a promise when no callback is provided.
 
 
 ## Implementation
