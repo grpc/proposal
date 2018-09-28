@@ -5,7 +5,7 @@ Asynchronous port binding method in Node Server API
 * Status: Draft
 * Implemented in: Node
 * Last updated: 28-09-2018
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/Uio1Ja6GRHI
 
 ## Abstract
 
