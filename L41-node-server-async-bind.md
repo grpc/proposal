@@ -13,7 +13,7 @@ Add a method to the Node gRPC `Server` class that binds a port as an asynchronou
 
 ## Background
 
-In the initial development of the Node gRPC library, the `Server` class method to bind a port, called `bind`, was implemented as a synchronous operation because it was available as an asynchronous operation in the underlying core library. In contrast, in the Node built in `net` module, the `Server` class's `listen` method, which performs a similar function, is asynchronous. In the new pure JavaScript Node gRPC library, the underlying network operations use the `net` module, so it is impossible to implement the `bind` method as a synchronous operation.
+In the initial development of the Node gRPC library, the `Server` class method to bind a port, called `bind`, was implemented as a synchronous operation because it was available as a synchronous operation in the underlying core library. In contrast, in the Node built in `net` module, the `Server` class's `listen` method, which performs a similar function, is asynchronous. In the new pure JavaScript Node gRPC library, the underlying network operations use the `net` module, so it is impossible to implement the `bind` method as a synchronous operation.
 
 
 ## Proposal
@@ -38,9 +38,9 @@ The semantics of the arguments are exactly the same as with the existing `bind` 
 
 ## Rationale
 
-The sematics of `bindAsync` would be identical to the semantics of `bind` except it is asynchronous, so the name communicates that. Keeping the semantics and API as similar as possible minimizes the work need to transition between the two. We could also implement the asynchrony using promises, but a callback based API is more consistent with the rest of the existing API. In the future, promise support could be added, perhaps by returning a promise when no callback is provided.
+The semantics of `bindAsync` would be identical to the semantics of `bind` except it is asynchronous, so the name communicates that. Keeping the semantics and API as similar as possible minimizes the work need to transition between the two. We could also implement the asynchrony using promises, but a callback based API is more consistent with the rest of the existing API. In the future, promise support could be added, perhaps by returning a promise when no callback is provided.
 
 
 ## Implementation
 
-I (@murgatroid99) will implement this in the grpc library as soon as this proposal is accpeted, and in the @grpc/grpc-js library as part of the server implementation.
+I (@murgatroid99) will implement this in the grpc library as soon as this proposal is accepted, and in the @grpc/grpc-js library as part of the server implementation.
