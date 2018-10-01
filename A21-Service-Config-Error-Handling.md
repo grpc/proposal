@@ -38,6 +38,31 @@ service config update from the resolver. On the other hand, if it is a new
 client, then the client should fail to start, i.e., not act on the resolution
 result till a valid service config is received.
 
+If a default service config is provided (as a channel argument), service config
+resolution is enabled and the received service config is invalid, the client
+should NOT fall back on the default service config. It should as before, fail to
+start if it has not received a valid service config. On the other hand, if
+service config resolution is disabled, then the client should use the default
+service config.
+
+Based on this proposal, if new load balancing policies are to be introduced and
+the rollout is not controlled, then older clients will start discarding entire
+service configs due to the load balancing policy being unknown. To make this
+rollout process easier, load balancing policy could be changed into a list of
+policies. The clients would iterate through the list and use the first policy
+that it knows. If none of the policies are known, the client would treat the
+service config as invalid.
+
+For example,
+
+“loadBalancingPolicy” : [
+    “NewUnknownPolicy”,
+    “RoundRobin”
+  ]
+
+In this case, since the client does not understand the first policy, it would
+use RoundRobin.
+
 ## Rationale
 
 By discarding invalid service configs instead of ignoring fields that have
