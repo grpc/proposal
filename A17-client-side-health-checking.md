@@ -195,7 +195,8 @@ provide a way for the client to explicitly add call credentials for the
 
 ### Service Config Changes
 
-We will add the following new message to the service config:
+We will add the following new message to the [service
+config](https://github.com/grpc/grpc/blob/master/doc/service_config.md):
 
 ```
 message HealthCheckConfig {
@@ -213,6 +214,13 @@ HealthCheckConfig health_check_config = 4;
 Note that we currently need only this one parameter, but we are putting
 it in its own message so that we have the option of adding more parameters
 later if needed.
+
+Here is an example of how one would set the health checking service name
+to "foo" in the service config in JSON form:
+
+```
+"healthCheckConfig": {"serviceName": "foo"}
+```
 
 ### LB Policies Can Disable Health Checking When Needed
 
