@@ -39,9 +39,6 @@ typedef struct grpc_tls_credential_reload_config grpc_tls_credential_reload_conf
 /** Config for TLS server authorization check. */
 typedef struct grpc_tls_server_authorization_check_config grpc_tls_server_authorization_check_config;
 
-/** Config for TLS context customization. */
-typedef struct grpc_tls_ctx_customize_config grpc_tls_ctx_customize_config;
-
 /** TLS credentials options. */
 typedef struct grpc_tls_credentials_options grpc_tls_credentials_options;
 
@@ -66,12 +63,6 @@ GRPCAPI void grpc_tls_credentials_options_set_credential_reload_config(
                                grpc_tls_credentials_options* options,
                                grpc_tls_credential_reload_config* config);
 
-
-/** Set grpc_tls_ctx_customize_config field in credentials options
-    with the provided config struct whose ownership is transferred. */
-GRPCAPI void grpc_tls_credentials_options_set_tls_ctx_customize_config(
-                               grpc_tls_credentials_options* options,
-                               grpc_tls_ctx_customize_config* config);
 
 /** Set grpc_tls_server_authorization_check_config field in credentials options
     with the provided config struct whose ownership is transferred. */
@@ -180,36 +171,6 @@ GRPCAPI grpc_tls_credential_reload_config*
 GRPCAPI void grpc_tls_credential_reload_config_destroy(
                                grpc_tls_credential_reload_config* config);
 
-/** --- TLS context customization config. --- */
-
-/** A struct containing all information necessary to customize a TLS context.
-    context represents the underlying TLS context whose ownership is not transferred.
-    status and error_details are used to hold information about errors occurred
-    when scheduling a TLS context customize request.
-*/
-typedef struct {
-  void* context;
-  grpc_status_code* status;
-  const char** error_details;
-} grpc_tls_ctx_customize_arg;
-
-/** Create a grpc_tls_ctx_customize_config instance.
-    - config_user_data is config-specific, read-only user data
-      that works for all channels created with a credential using the config.
-    - schedule is a pointer to an application-provided callback used to invoke
-      TLS context customization API. This method should be implemented synchronously.
-    - destruct is a pointer to an application-provided callback used to clean up
-      any data associated with the config.
-*/
-GRPCAPI grpc_tls_ctx_customize_config* grpc_tls_ctx_customize_config_create(
-                                      const void* config_user_data,
-                                      void (*schedule)(void* config_user_data,
-                                            grpc_tls_ctx_customize_arg* arg),
-                                      void (*destruct)(void* config_user_data));
-
-/** Destroy a grpc_tls_ctx_customize_config instance. */
-GRPCAPI void grpc_tls_ctx_customize_config_destroy(grpc_tls_ctx_customize_config* config);
-
 /** --- TLS server authorization check config. --- */
 
 typedef struct grpc_tls_server_authorization_check_arg
@@ -268,14 +229,6 @@ GRPCAPI grpc_tls_server_authorization_check_config*
 /** Destroy a grpc_tls_server_authorization_check_config instance. */
 GRPCAPI void grpc_tls_server_authorization_check_config_destroy(grpc_tls_server_authorization_check_config* config);
 ```
-
-## Rationale
-
-Regarding grpc_tls_ctx_customize_config, the config is used when a caller wants to
-configure an underlying TLS context with customized primitives. For example, there could
-be a use case in which raw private keys are not directly accessible (e.g., hardware-backed) to a caller,
-but private key methods (e.g., “Sign” functions) are, in which case the config provides a means
-to customize an TLS context with an SSL_PRIVATE_KEY_METHOD object and associated signing algorithms.
 
 ## Implementation
 
