@@ -30,7 +30,7 @@ The data from _Channel trace_ will be exposed via the [channelz service](A14-cha
 
 Since the tracing objects may consume large amounts of space, care must be taken to prevent the _Channel trace_ from using too many resources. gRPC implementations must allow limiting the number of _Trace events_ retained to a per channel or subchannel maximum. Once the maximum is reached, adding a new _Trace event_ will cause oldest _Trace event_ to be removed. If the maximum number of trace events is set to zero, then channel tracing will be disabled.
 
-Implementations MAY choose to restrict _Channel trace_ further. For example, a memory sensitive implementation can additionally provide a configurable maximum for the amount of memory used by the _Trace events_.
+Implementations MAY choose to restrict _Channel trace_ more strictly. For example, a memory sensitive implementation can provide a configurable maximum for the amount of memory used by the _Trace events_. If a stricter configuration is used, there is no need to also limit the number of _Trace events_.
 
 The _Channel trace_ for a given channel or subchannel must be maintained as long as there are any _Trace events_ that refer to the channel or subchannel. After the last _Trace event_ that refers to the channel or subchannel is removed, the _Channel trace_ for that channel or subchannel may be cleaned up.
 
