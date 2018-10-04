@@ -28,9 +28,7 @@ Channel connectivity issues are the root cause of a significant portion of user 
 
 The data from _Channel trace_ will be exposed via the [channelz service](A14-channelz.md).
 
-Since the tracing objects may consume large amounts of space, care must be taken to prevent the _Channel trace_ from using too many resources. gRPC implementations must allow limiting the number of _Trace events_ retained to a per channel or subchannel maximum. Once the maximum is reached, adding a new _Trace event_ will cause oldest _Trace event_ to be removed. If the maximum number of trace events is set to zero, then channel tracing will be disabled.
-
-Implementations MAY choose to restrict _Channel trace_ more strictly. For example, a memory sensitive implementation can provide a configurable maximum for the amount of memory used by the _Trace events_. If a stricter configuration is used, there is no need to also limit the number of _Trace events_.
+Since the tracing objects may consume large amounts of space, care must be taken to prevent the _Channel trace_ from using too many resources. Implementations MUST provide some control for limiting the amount of memory used for channel trace events, such as a max number of trace events per node or the max amount of memory used. Once that maximum is reached, adding a new _Trace event_ will cause oldest _Trace event_ to be removed until the invariant is reestablished.
 
 The _Channel trace_ for a given channel or subchannel must be maintained as long as there are any _Trace events_ that refer to the channel or subchannel. After the last _Trace event_ that refers to the channel or subchannel is removed, the _Channel trace_ for that channel or subchannel may be cleaned up.
 
