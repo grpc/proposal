@@ -38,12 +38,10 @@ service config update from the resolver. On the other hand, if it is a new
 client, then the client should fail to start, i.e., not act on the resolution
 result till a valid service config is received.
 
-If a default service config is provided (as a channel argument), service config
-resolution is enabled and the received service config is invalid, the client
-should NOT fall back on the default service config. It should as before, fail to
-start if it has not received a valid service config. On the other hand, if
-service config resolution is disabled, then the client should use the default
-service config.
+If a default service config is provided (as a channel argument), and the
+received service config is invalid, the client should fall back on the default
+service config if there was no previously accepted service config. It should as
+before, fail to start if the default service config has not been set.
 
 Based on this proposal, if new load balancing policies are to be introduced and
 the rollout is not controlled, then older clients will start discarding entire
