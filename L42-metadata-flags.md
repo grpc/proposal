@@ -1,4 +1,4 @@
-Title
+Utilize Metadata Flags -- Adding "Wait For Ready" Semantics
 ----
 * Author(s): lidizheng
 * Approver: a11r
