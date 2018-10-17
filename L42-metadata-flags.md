@@ -5,7 +5,7 @@ Utilize Metadata Flags -- Adding "Wait For Ready" Semantics
 * Status: Draft
 * Implemented in: Python
 * Last updated: October 16, 2018
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/Q6fgbn0RZLs
 
 ## Abstract
 
