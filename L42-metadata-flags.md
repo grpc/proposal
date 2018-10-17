@@ -121,7 +121,7 @@ stub.important_transaction_4(...)
 
 ## Implementation
 
-Please refer to PR #16915
+Please refer to PR #16919
 
 ### Testing Plan
 The testing will be similar to the unit test of _ChannelReadyFuture. It will contain three parts:
