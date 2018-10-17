@@ -43,7 +43,7 @@ After setting “Wait For Ready” option to the channel construction method, th
 
 Also, by adding per RPC variable, the client can customize each RPC call to leverage the “Wait For Ready” mechanism. This can give Python a little advantage over other languages.
 
-### The 2-bits 3-states switch of “Wait For Ready”
+### The 3-states switch of “Wait For Ready” in C-Core
 The implementation of “Wait For Ready” flags is not as simple as a one bit switch. It contains two bits one is `GRPC_INITIAL_METADATA_WAIT_FOR_READY` another one is `GRPC_INITIAL_METADATA_WAIT_FOR_READY_EXPLICITLY_SET`. Although two bits can represent four states, three of them are valid.
 
 Assume `flag` is the flag variable we are manipulating.
@@ -60,13 +60,46 @@ N/A
 
 ## Proposal
 
-* Add an optional `wait_for_ready` variable to `Channel` class initialization method. Default `None`, accept `bool`.
 * Add an optional `wait_for_ready` variable to `MultiCallable` classes initialization methods. Default `None`, accept `bool`.
-* Use a new private member variable in `Channel` class to held `initial_metadata_flags`.
 * Per RPC level `wait_for_ready` variable can override upper level.
 * Import initial metadata flags constants from `grpc_types.h` to `grpc.pxi`.
+* (Suggesting) Add an optional `wait_for_ready` variable to `Channel` class initialization method. Default `None`, accept `bool`.
+
+### DEMO snippets 
+
+```Python
+# Per RPC level
+stub = ...Stub(...)
+
+stub.initial_rpc_call(..., wait_for_ready=True)
+stub.important_transaction_1(..., wait_for_ready=True)
+stub.unimportant_transaction_2(...)
+stub.important_transaction_3(..., wait_for_ready=True)
+stub.unimportant_transaction_4(...)
+# The unimportant transactions can be status report, or health check, etc.
+```
+
+```Python
+# Channel level
+channel = grpc.insecure_channel(..., wait_for_ready=True)
+stub = ...Stub(channel)
+
+stub.important_transaction_1(...)
+stub.important_transaction_2(...)
+stub.unimportant_transaction_3(...) # This will wait as well
+stub.important_transaction_4(...)
+```
 
 ## Rationale
+
+### Default `None`, accept `bool` value
+* The `None` state defined that this value haven't been touched
+* It might be useful in some scenarios that interceptors wants to read its value and make changes
+
+### Whether to add channel level variable or not
+* The channel level variable is convenient and Pythonic
+* But it may create extra burden for future API evolution
+* **Please** comment about whether you feel like this design works for you or not
 
 ### Separate variable vs. Add an option
 * Separate variable provides easy-to-use interface; just add an option can be done quickly and remove easily if needed.
@@ -81,23 +114,26 @@ N/A
 * It only be called for asynchronous calls. 
 * I prefer to implement it separately, with another private member variable.
 
+### Put the new variable in middle or tail
+* If this optional separate variable is right after mandatory variables, then developers can set it right away without typing extra variable name
+* But this will break if the existing program is using lazy position argument
+* So, put it in the tail sacrifices a little bit convenience to exchange the stability of API
 
 ## Implementation
 
-Please refer to PR #TODO
+Please refer to PR #16915
 
 ### Testing Plan
 The testing will be similar to the unit test of _ChannelReadyFuture. It will contain three parts:
 
 1. Validate the options are set properly, and make sure the C-Core receives correct flags.
 2. Validate the behavior of client failed connect to an unexisting server without “Wait For Ready” option.
-1. Validate the behavior of client successfully connect to a later-spawned server with “Wait For Ready” option.
+3. Validate the behavior of client successfully connect to a later-spawned server with “Wait For Ready” option.
 
 ### “Wait For Ready” doesn’t cover all UNAVAILABLE status.
 As mentioned in the definition, during my experiments, the “Wait For Ready” works to handle “Connect Failed” but not “Socket Closed”, which means if the server crashes while handling a request, the request will still be failed without retry or wait.
 
 This behavior makes sense if the request is not idempotent, then it is possible that the server starts to handle the request and conduct some write operation to databases already. In this special cases, developers need to solve failed requests themselves.
-
 
 ## Open issues
 
