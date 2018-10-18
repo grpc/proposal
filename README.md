@@ -20,9 +20,9 @@ Changes that are considered significant can be:
 1. Fork the repo and copy the template [GRFC-TEMPLATE.md](GRFC-TEMPLATE.md).
 1. Rename it to ``$CategoryName-$Summary``, eg.: ``A6-client-retries.md`` (see
   category definitions below)
-  - For language-specific proposals, include the name of the project:
-    ``L##-$Language-$Summary``.  Canonical names: `c++`, `core`, `csharp`, `go`,
-    `java`, `node`, `objc`, `php`, `python`, `ruby`.
+   - For language-specific proposals, include the name of the project:
+     ``L##-$Language-$Summary``.  Canonical names: `c++`, `core`, `csharp`, `go`,
+     `java`, `node`, `objc`, `php`, `python`, `ruby`.
 1. Write up the RFC.
 1. Submit a Pull Request.
 1. Someone from gRPC team will be assigned as an APPROVER as part of this
