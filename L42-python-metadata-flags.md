@@ -1,8 +1,8 @@
 Surface 'wait-for-ready' setting in Python client
 ----
 * Author(s): lidizheng
-* Approver: a11r
-* Status: Draft
+* Approver: srini100
+* Status: In Review
 * Implemented in: Python
 * Last updated: October 16, 2018
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/Q6fgbn0RZLs
