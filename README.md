@@ -21,7 +21,7 @@ Changes that are considered significant can be:
 1. Rename it to ``$CategoryName-$Summary``, eg.: ``A6-client-retries.md`` (see
   category definitions below)
    - For language-specific proposals, include the name of the language:
-     ``L##-$Language-$Summary``.  Canonical names: `c++`, `core`, `csharp`, `go`,
+     ``L##-$Language-$Summary``.  Canonical names: `core`, `cpp`, `csharp`, `go`,
      `java`, `node`, `objc`, `php`, `python`, `ruby`.
 1. Write up the RFC.
 1. Submit a Pull Request.
