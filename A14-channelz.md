@@ -424,8 +424,12 @@ the previous results in the subsequent query.
 
 This method returns all servers in the process.  The usage is identical to GetTop
 Channels, except that servers are returned.  Users are expected to make this
-query first when investigating servers.  Since servers are not hierarchical,
-there is no GetServer method.
+query first when investigating servers.
+
+## GetServer
+
+This method returns a single Server request by its id.  If the server is not
+present, a `NOT_FOUND` status is returned.
 
 ## GetChannel
 
