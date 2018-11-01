@@ -60,14 +60,17 @@ service-configs-in-DNS for such targets.
 
 ## Rationale
 
-The problem is likely to be noticeable
+The latency problem is likely to be noticeable
 only for "localhost" and ipv4/ipv6 literal targets, because grpc clients
 connecting to targets which are not in a machine's "hosts" file and/or parseable as
 an ip literal need to reach out to DNS servers and wait for A/AAAA lookup time anyways
-(unless the grpc client is using a resolver that does client-side caching).
+(unless the grpc client is using a resolver that does client-side caching). This
+problem could perhaps be fixed by implementing DNS caches within grpc clients, but
+that would be more complex.
 
-This could perhaps be fixed by implementing DNS caches within grpc
-clients, but that would be more complex.
+The problem related to Java error handling in certain environments only practically
+affects gRPC-Java clients which target "localhost" or ip literals, and so this
+problem only needs to be dealt with for "localhost" and ip literals.
 
 Also note that while special-casing "localhost" seems wrong in principle
 because its special status is really a convention rather than an
