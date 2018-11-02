@@ -80,7 +80,21 @@ stub.unimportant_transaction_4(...)
 ```
 
 ```Python
-# Channel level
+# Per RPC level with configuration for subsets
+stub = ...Stub(...)
+
+important_call_options = {'wait_for_ready': True, 'timeout': 4000}
+failfast_call_options = {'wait_for_ready': False}
+
+stub.initial_rpc_call(..., **important_call_options)
+stub.important_transaction_1(..., **important_call_options)
+stub.unimportant_transaction_2(..., **failfast_call_options)
+stub.important_transaction_3(..., **important_call_options)
+stub.unimportant_transaction_4(..., **failfast_call_options)
+```
+
+```Python
+# Channel level - Invalid Design
 channel = grpc.insecure_channel(..., wait_for_ready=True)
 stub = ...Stub(channel)
 
