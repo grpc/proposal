@@ -93,6 +93,8 @@ stub.important_transaction_3(..., **important_call_options)
 stub.unimportant_transaction_4(..., **failfast_call_options)
 ```
 
+### Unsupported Design
+
 ```Python
 # Channel level - Invalid Design
 channel = grpc.insecure_channel(..., wait_for_ready=True)
@@ -100,8 +102,9 @@ stub = ...Stub(channel)
 
 stub.important_transaction_1(...)
 stub.important_transaction_2(...)
-stub.unimportant_transaction_3(...) # This will wait as well
-stub.important_transaction_4(...)
+stub.unimportant_transaction_3(...) # This will wait as well; user might get confused
+# --- A lot of code here ---
+stub.yet_another_transaction_500(...) # User might forget the channel setting
 ```
 
 ## Rationale
