@@ -22,7 +22,7 @@ Surface 'wait-for-ready' configuration in gRPC Python client that will use the m
 
 ### Use cases for 'wait-for-ready'
 
-When developers spin up gRPC clients and servers in the same time, it is very like to fail first couple RPC calls due to unavailability of the server. If developers failed to prepare for this situation, the result can be catastrophic. But with 'wait-for-ready' semantics, developers can initialize the client and server in any order, especially useful in testing.
+When developers spin up gRPC clients and servers at the same time, it is very like to fail first couple RPC calls due to unavailability of the server. If developers failed to prepare for this situation, the result can be catastrophic. But with 'wait-for-ready' semantics, developers can initialize the client and server in any order, especially useful in testing.
 
 Also, developers may ensure the server is up before starting client. But in some cases like transient network failure may result in a temporary unavailability of the server. With 'wait-for-ready' semantics, those RPC calls will automatically wait until the server is ready to accept incoming requests.
 
@@ -42,7 +42,7 @@ Strictly speaking, the `_ChannelReadyFuture` works in most cases. Though it is f
 
 The desired behavior will be able to config each RPC call with different settings. Currently, Python is using keyword argument for call level configuration, so this feature will use keyword argument as well. The keyword argument mechanism also enables developers to configure certain calls with one setting in many ways (like expand a dictionary-like object every time).
 
-In other languages, there is a few difference in implementation. They prefer to have a separate class for call configuration ('ClientContext' in C++, 'CallOptions' in Java & Go), then pass it to every RPC invocation. The new design can be equivalence in behavior.
+In other languages, there is a few difference in implementation. They prefer to have a separate class for call configuration ('ClientContext' in C++, 'CallOptions' in Java & Go), then pass it to every RPC invocation. The new design can be equivalent in behavior.
 
 ### The 3-states switch of 'wait-for-ready' in C-Core
 
@@ -93,20 +93,6 @@ stub.important_transaction_3(..., **important_call_options)
 stub.unimportant_transaction_4(..., **failfast_call_options)
 ```
 
-### Unsupported Design
-
-```Python
-# Channel level - Invalid Design
-channel = grpc.insecure_channel(..., wait_for_ready=True)
-stub = ...Stub(channel)
-
-stub.important_transaction_1(...)
-stub.important_transaction_2(...)
-stub.unimportant_transaction_3(...) # This will wait as well; user might get confused
-# --- A lot of code here ---
-stub.yet_another_transaction_500(...) # User might forget the channel setting
-```
-
 ## Rationale
 
 ### Default `None`, accept `bool` value
@@ -116,9 +102,9 @@ stub.yet_another_transaction_500(...) # User might forget the channel setting
 ### Whether to add channel level variable or not
 * The channel level variable is convenient and Pythonic
 * But it may create extra burden for future API evolution
-* **Please** comment about whether you feel like this design works for you or not
-* > Users "pay" for the complexity even if they don't use the feature.  --Eric Anderson
-* > We should be conservative when adding APIs, as we can easily add but cannot remove APIs. --Mehrdad Afshari
+* Comments supporting the decision not to support channel-level configuration:
+    * > Users "pay" for the complexity even if they don't use the feature.  --Eric Anderson
+    * > We should be conservative when adding APIs, as we can easily add but cannot remove APIs. --Mehrdad Afshari
 
 ### Why not integrate with `_channel_managed_call_management`?
 * Currently, we have a `managed_call` mechanism which works similar to call context in other languages.
@@ -144,7 +130,7 @@ The testing will be similar to the unit test of _ChannelReadyFuture. It will con
 3. Validate the behavior of client successfully connect to a later-spawned server with 'wait-for-ready' option.
 
 ### 'wait-for-ready' doesn’t cover all UNAVAILABLE status.
-As mentioned in the definition, during my experiments, the 'wait-for-ready' works to handle 'wait-for-ready' not 'wait-for-ready' which means if the server crashes while handling a request, the request will still be failed without retry or wait.
+As mentioned in the definition, during my experiments, the 'wait-for-ready' works to handle "Connect Failed" but not "Socket Closed", which means if the server crashes while handling a request, the request will still be failed without retry or wait.
 
 This behavior makes sense if the request is not idempotent, then it is possible that the server starts to handle the request and conduct some write operation to databases already. In this special cases, developers need to solve failed requests themselves.
 
