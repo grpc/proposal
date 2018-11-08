@@ -30,7 +30,7 @@ Also, developers may ensure the server is up before starting client. But in some
 
 By default, the client RPC call will fail immediately if the server is unavailable.
 
-But there is a Python-only function to simulate the 'wait-for-ready' mechanism. It is a class named `_ChannelReadyFuture` in `_utilities.py`. It will create a `Future` object to enable the client to block till the channel is ready. It works just like the 'wait-for-ready' mechanism with Pythonic handling approach, but it has three drawbacks:
+But there is a Python-only function to simulate the 'wait-for-ready' mechanism. It is a class named `_ChannelReadyFuture` in `_utilities.py`. It will create a `Future` object to enable the client to block till the channel is ready. It works similarly to the 'wait-for-ready' mechanism with Pythonic handling approach, but it has three drawbacks:
 
 1. Usage is different from other languages like C++, Golang, Java. It may create inconsistent usage across language and additional cognitive cost for migrating from/to Python.
 2. Considered technical debt. More than 100 lines of code implementing the same function which C-Core already provided.
