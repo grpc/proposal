@@ -97,7 +97,8 @@ JAVA - For JAVA, the OkHttp library we use does not support setting such an
 option. Netty with NIO also does not support this. Netty with epoll/kqueue
 allows setting this option and the user is already capable of configuring this.
 
-Go -
+Go - [#2307](https://github.com/grpc/grpc-go/pull/2307) sets the
+TCP_USER_TIMEOUT socket option.
 
 For non-Linux kernels and Linux kernels before 2.6.37, we do not yet have an
 alternative that works for all.
