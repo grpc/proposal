@@ -5,7 +5,7 @@ Node Message Type Information
 * Status: Draft
 * Implemented in: Node
 * Last updated: 2018-11-19
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/Vhz9AIMQ9AM
 
 ## Abstract
 
