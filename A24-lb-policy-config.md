@@ -2,10 +2,10 @@ Load Balancing Policy Configuration
 ----
 * Author(s): Mark D. Roth (roth@google.com)
 * Approver: a11r
-* Status: Draft
+* Status: In Review
 * Implemented in: C-core
-* Last updated: 2018-12-04
-* Discussion at: 
+* Last updated: 2018-12-05
+* Discussion at: https://groups.google.com/d/topic/grpc-io/K03NV5H8HoE/discussion
 
 ## Abstract
 
@@ -172,11 +172,11 @@ migration.
 
 There are several types of clients that we'll need to support for this
 migration:
-  * Old clients that do not understand the new LoadBalancingConfig service
+  * Old clients that do not understand the new `loadBalancingConfig` service
     config field.
-  * New clients that understand the new LoadBalancingConfig service config
+  * New clients that understand the new `loadBalancingConfig` service config
     field and support the xds LB policy.
-  * In-between clients that understand the new LoadBalancingConfig service
+  * In-between clients that understand the new `loadBalancingConfig` service
     config field but do not yet support the xds LB policy.
 
 To ease migration from `grpclb` to `xds`, a resolver can return both
@@ -190,7 +190,7 @@ least one balancer address.  (The old `loadBalancingPolicy` field will
 continue to be overridden by the presence of balancer addresses.)
 
 This gives us what we want in all cases:
-  * Old clients will ignore the `loadBalancingConfig field and will use
+  * Old clients will ignore the `loadBalancingConfig` field and will use
     `grpclb` based on the presence of the balancer addresses.
   * New clients will use `xds` based on the `loadBalancingConfig` field.
   * In-between clients will see the `loadBalancingConfig` field, but they
