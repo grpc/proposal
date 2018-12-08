@@ -156,7 +156,7 @@ def ...Servicer(...):
 
 ## Rationale
 
-There are four more alternative options of implementing this feature.
+There are five more alternative options of implementing this feature.
 
 ### Option 1: A New Exception Handling Mechanism
 
