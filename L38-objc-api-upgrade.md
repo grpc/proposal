@@ -427,6 +427,9 @@ Since GRPCChannel manages channel cache, the only reason GRPCHost still exists i
 
 When a call starts, if there's not a specified callOptions parameter, the call will fetch the parameters stored in GRPCHost pool based on its remote host name, then generate GPRCCallOption object based on these parameters.
 
+#### Nullability annotations
+The old gRPC API did not enforce nullability annotations, which makes usage of the functions unsafe for Swift binding. We enforce nullability annotations for the new API functions and, if they happen to be in the same file as an old API, the corresponding old API functions must be annotated too (e.g. `GRPCCall2` and `GRPCCall` are declared in the same file, so we have to annotate `GRPCCall` now. Since we enforce the annotation to make them consistent to the definition of the interface, it may break users' current code. Particularly, when annotating a property or return value `nullable` while the original annotation is empty, the type of this property becomes an optional. A user's code that currently uses the property as implicitly unwrapped optional will fail. We expect users to update this their usage of gRPC API to accomodate the change.
+
 ## Rationale
 
 ### New API wrapping the current API
