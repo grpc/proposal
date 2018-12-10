@@ -4,8 +4,8 @@ New RPC Status API for Python
 * Approver: a11r
 * Status: Draft
 * Implemented in: Python
-* Last updated: 12-06-2018
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 12-10-2018
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/8Ys6ba8gpLc
 
 ## Abstract
 
