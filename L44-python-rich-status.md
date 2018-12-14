@@ -466,7 +466,9 @@ However, the **status details** is deeply bound with gRPC Python since its very 
 
 ## Implementation
 
-PR: https://github.com/grpc/grpc/pull/17384
+Pull Requests:
+* Part of new status API is implemented in https://github.com/grpc/grpc/pull/17481
+* The new extension package is implemented in https://github.com/grpc/grpc/pull/17490
 
 ## Open issues (if applicable)
 
