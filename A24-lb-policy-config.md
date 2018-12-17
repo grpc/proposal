@@ -139,7 +139,7 @@ something like this could be used:
 ```proto
 load_balacing_config: {
   xds: {
-    balancer_name: "balancer.example.com:8080"
+    balancer_name: "dns:///balancer.example.com:8080"
     child_policy: {
       round_robin: {}
     }
@@ -154,7 +154,7 @@ look like this:
 {"loadBalancingConfig":
   [
     {"xds": {
-      "balancerName": "balancer.example.com:8080",
+      "balancerName": "dns:///balancer.example.com:8080",
       "childPolicy": {
         "round_robin": {}
       }
