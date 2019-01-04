@@ -2,9 +2,9 @@ Proposal to A New gRPC Objective-C API
 ----
 * Author(s): muxi
 * Approver: srini100
-* Status: In Review
+* Status: Final
 * Implemented in: Objective-C
-* Last updated: 2018-09-20
+* Last updated: 2019-01-04
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/Dmbfq416NTo
 
 ## Abstract
