@@ -200,7 +200,9 @@ This gives us what we want in all cases:
 Note: This assumes that the old clients do not yet implement gRPC Service
 Config Error Handling.  This means that we need to add support for the
 new `loadBalancingConfig` service config field (already done in C-core)
-before we implement the new error handling.
+before we implement the new error handling.  Otherwise, a client that
+does support Service Config Error Handling but does not yet support the
+new `loadBalancingConfig` field would reject the entire service config.
 
 Note: This also assumes that there are no clients that understand
 the `loadBalancingConfig` field and have an incomplete implementation
