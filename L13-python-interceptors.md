@@ -5,7 +5,7 @@ gRPC Python Interceptors
 * Status: In Review
 * Implemented in: Python
 * Last updated: January 17, 2019
-* Discussion at: https://groups.google.com/d/msg/grpc-io/7qIzyCPWbUA/1NKGXAQHCgAJ
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/XCubqJqexYw
 
 ## Abstract
 
