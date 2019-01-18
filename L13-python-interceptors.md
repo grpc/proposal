@@ -54,7 +54,7 @@ The `continuation` function is a function that proceeds with the invocation by e
 
 ### Client-Side Interceptors
 
-There are four interceptor interfaces mapping to the four possible types of an RPC. These interfaces enables developers to implement an arbitrary number of interceptor type within one class with the Python inheritance semantic. Each interceptor interface will have a corresponding abstract class method that takes in `continuation`, `grpc.ClientCallDetails`, and the outgoing RPC requests. The return value of that class method will be both a `grpc.Call` and a `grpc.Future` or response iterator depends on the cardinality of RPC. The definition of interfaces are:
+There are four interceptor interfaces mapping to the four possible types of an RPC. These interfaces enables developers to implement an arbitrary number of interceptor types within one class with the Python inheritance semantic. Each interceptor interface will have a corresponding abstract class method that takes in `continuation`, `grpc.ClientCallDetails`, and the outgoing RPC requests. The return value of that class method will be both a `grpc.Call` and a `grpc.Future` or response iterator, depending on the type of RPC. The definition of interfaces are:
 
 ```Python
 class UnaryUnaryClientInterceptor(six.with_metaclass(abc.ABCMeta)):
