@@ -9,27 +9,16 @@ gRPC Python Interceptors
 
 ## Abstract
 
-This proposal is a hindsight design document that explains the design and implementation details of the interceptor functionality for gRPC Python, which merged in 2017. This gRFC serves as an effort to stabilize the interceptor APIs.
+This proposal is a retroactive design document that explains the design and implementation details of the interceptor functionality for gRPC Python, which was merged in 2017. This gRFC serves as an effort to stabilize the interceptor APIs.
 
 
 ## Background
 
 ### The Need for Interceptors
 
-Interceptors are middleware which capable of manipulating or reacting to the transporting requests/responses throughout the life cycle of an RPC. It dramatically simplifies the implementation of tracing (See [grpc/grpc#8767](https://github.com/grpc/grpc/issues/8767)) and empowers gRPC developers to add general channel-level business logic.
+Interceptors are middleware which is capable of manipulating or reacting to the transporting requests/responses throughout the life cycle of an RPC. It dramatically simplifies the implementation of tracing (See [grpc/grpc#8767](https://github.com/grpc/grpc/issues/8767)) and empowers gRPC developers to add general channel-level business logic.
 
-Interceptors have existed with gRPC for a while now, and its semantics were carried out across gRPC implementations like Java, Go and wrapper languages like Node.js, Ruby.
-
-### Stabilization Status
-
-| gRPC Language | Client Interceptor | Server Interceptor |
-| ------------- | ------------------ | ------------------ |
-| Python        | Experimental       | Experimental       |
-| Node.js       | Stable             | N/A                |
-| Java          | Stable             | Stable             |
-| Golang        | Experimental       | Experimental       |
-| C++           | N/A                | N/A                |
-| Ruby          | Experimental       | Experimental       |
+Interceptors have existed within gRPC for a while now, and its semantics were implemented in bottom-up implementations like Java, Go and wrapper implementations like Node.js, Ruby.
 
 ### Related Proposals
 
@@ -42,7 +31,7 @@ Interceptors have existed with gRPC for a while now, and its semantics were carr
 
 ### Interface: Client Call Details
 
-To intercept the RPC, gRPC needs to describe the upcoming RPC that enables the interceptor function to inspect and modify the call options. Hence we introduce the new interface `grpc.ClientCallDetails`, which contains five properties:
+To intercept an RPC, we first require an interface by which a developer may inspect and modify options pertaining to a specific call. Hence we introduce the new interface `grpc.ClientCallDetails`, which contains five properties:
 
 ```Python
 class ClientCallDetails(six.with_metaclass(abc.ABCMeta)):
@@ -59,11 +48,11 @@ class ClientCallDetails(six.with_metaclass(abc.ABCMeta)):
 
 ### Concept: Continuation
 
-The `continuation` function is a function that proceeds with the invocation by executing the next interceptor in the chain or invoking the actual RPC on the underlying Channel. It is the interceptor’s responsibility to call it if it decides to move the RPC forward. The interceptor can use `response_future = continuation(client_call_details, request)` to continue with the RPC. Continuation returns an object that is both a Call for the RPC and a Future. In the event of RPC completion, the return Call-Future’s result value will be the response message of the RPC. Should the event terminate with non-OK status, the returned Call-Future’s exception value will be an RpcError.
+The `continuation` function is a function that proceeds with the invocation by executing the next interceptor in the chain or invoking the actual RPC on the underlying Channel. It is the interceptor’s responsibility to call the `continuation` unless it decides to terminate processing of the RPC. The interceptor can use `response_future = continuation(client_call_details, request)` to continue with the RPC. The `continuation` returns an object that is both a Call for the RPC and a Future. In the event of RPC completion, the return Call-Future’s result value will be the response message of the RPC. Should the event terminate with non-OK status, the returned Call-Future’s exception value will be an RpcError.
 
 ### Client-Side Interceptors
 
-There are four interceptor interfaces mapping to four cardinalities of RPC. It enables developers to implement an arbitrary number of interceptor type within one class with the Python inheritance semantic. Each interceptor interface will have a corresponding abstract class method that takes in `continuation`, `grpc.ClientCallDetails`, and the outgoing RPC requests. The return value of that class method will be both a `grpc.Call` and a `grpc.Future` or response iterator depends on the cardinality of RPC. The definition of interfaces are:
+There are four interceptor interfaces mapping to the four possible cardinalities of an RPC. These interfaces enables developers to implement an arbitrary number of interceptor type within one class with the Python inheritance semantic. Each interceptor interface will have a corresponding abstract class method that takes in `continuation`, `grpc.ClientCallDetails`, and the outgoing RPC requests. The return value of that class method will be both a `grpc.Call` and a `grpc.Future` or response iterator depends on the cardinality of RPC. The definition of interfaces are:
 
 ```Python
 class UnaryUnaryClientInterceptor(six.with_metaclass(abc.ABCMeta)):
@@ -125,11 +114,11 @@ Application Invoke an RPC ->
 Application Gets the Response
 ```
 
-Also, this implementation empowers developers to invoke the `Continuation` zero or multiple time if necessary, which is useful in case of authentication or retry.
+Also, this implementation empowers developers to invoke the `Continuation` zero or more times if necessary, which is useful in case of authentication or retry.
 
 ### Server-Side API
 
-On the server side, there is also an RPC description class, which only contains two property, `method` and `invocation_metadata`. Unlike the client side, the `method` variable is read-only.
+On the server side, there is also an RPC description class, which only contains two properties, `method` and `invocation_metadata`. Unlike the client side, the `method` variable is read-only.
 
 ```Python
 class HandlerCallDetails(six.with_metaclass(abc.ABCMeta)):
@@ -181,9 +170,9 @@ Server Receives a Request ->
 Server Replies
 ```
 
-The most significant difference with client-side is that the interception happens ahead of the actual invocation of application behavior. So the interceptor function will able to access neither the request nor servicer context.
+The most significant difference compared to the client side is that the interception happens ahead of the actual invocation of application behavior. So the interceptor function will be able to access neither the request nor servicer context.
 
-## Rational
+## Rationale
 
 ### The Benefit of Introducing "Continuation"
 
@@ -212,7 +201,7 @@ To balance the cost and benefit, the Python team decided to carry on with the ap
 
 ### Client-Side Interceptor Semantic Comparison
 
-There is two major design of interceptor across languages:
+Among the various implementations across different languages, there are two distinct interceptor designs.
 
 1. Wraps over low-level abstraction like startBatch, Operations (Java, Node.js).
 2. Wraps over high-level abstraction like Server, Channel (Python, Golang).
