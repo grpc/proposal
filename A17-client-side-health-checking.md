@@ -43,7 +43,7 @@ backend until it reports healthy again.
 
 Note that because the health-checking service requires a service name, the
 client will need to be configured with a service name to use.  However,
-by default, it can use the empty string, which would mean that the
+by convention, it can use the empty string, which would mean that the
 health of all services on a given host/port would be controlled with a
 single switch.  Semantically, the empty string is used to represent the
 overall health of the server, as opposed to the health of any individual
@@ -200,7 +200,8 @@ config](https://github.com/grpc/grpc/blob/master/doc/service_config.md):
 
 ```
 message HealthCheckConfig {
-  // Service name to use in the health-checking request.
+  // Service name to use in the health-checking request.  If unset,
+  // health checking is disabled.
   google.protobuf.StringValue service_name = 1;
 }
 ```
