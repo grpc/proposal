@@ -64,10 +64,14 @@ message XdsConfig {
   string balancer_name = 1;
   // Optional.  What LB policy to use for intra-locality routing.
   // If unset, will use whatever algorithm is specified by the balancer.
-  LoadBalancingConfig child_policy = 2;
+  // Multiple LB policies can be specified; clients will iterate through
+  // the list in order and stop at the first policy that they support.
+  repeated LoadBalancingConfig child_policy = 2;
   // Optional.  What LB policy to use in fallback mode.  If not
   // specified, defaults to round_robin.
-  LoadBalancingConfig fallback_policy = 3;
+  // Multiple LB policies can be specified; clients will iterate through
+  // the list in order and stop at the first policy that they support.
+  repeated LoadBalancingConfig fallback_policy = 3;
 }
 
 // Configuration for grpclb LB policy.
@@ -75,6 +79,11 @@ message GrpcLbConfig {
 }
 
 // Selects LB policy and provides corresponding configuration.
+//
+// In general, all instances of this field should be repeated.
+// Clients will iterate through the list in order and stop at the first
+// policy that they support.  This allows the service config to specify
+// custom policies that may not be known to all clients.
 message LoadBalancingConfig {
   // Exactly one LB policy may be configured.
   // If no LB policy is configured, then the default behavior is to pick
@@ -125,8 +134,6 @@ message ServiceConfig {
   LoadBalancingPolicy load_balancing_policy = 1 [deprecated=true];
   // Multiple LB policies can be specified; clients will iterate through
   // the list in order and stop at the first policy that they support.
-  // This allows the service config to specify custom policies that may not
-  // be known to all clients.
   repeated LoadBalancingConfig load_balancing_config = 4;
 
   // ...other existing fields...
