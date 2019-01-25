@@ -37,7 +37,7 @@ message Status {
 }
 ```
 
-### Current Python API
+### Current Python API About RPC Status
 
 ```Python
 # Client side
@@ -46,19 +46,18 @@ try:
     resp = stub.ARpcCall(...)
 except grpc.RpcError as rpc_error:
     code = rpc_error.code()
-    message = rpc_error.details()
+    details = rpc_error.details()
     # Unable to get rich status
 ```
 
 ```Python
 # Server side
 def ...Servicer(...):
-    ...
+
     def ARPCCall(request, context):
-        ...
         context.set_code(...)
         context.set_details(...)
-        ...
+        # Unable to set rich status
 
 ```
 
