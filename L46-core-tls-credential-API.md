@@ -8,7 +8,7 @@ Title
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/gMrROsizrtc
 
 ## Abstract
-This proposal aims to incorporate SPIFFE-based mutual TLS into gRPC C core auth stack. Towards the goal, it proposes a new credential API model that 1) allows flexible addition of new TLS-related features (e.g., credential reload) without breaking the API and 2) supports both synchronous and asynchronous implementations of those features. It then proposes SPIFFE and HTTPS-based TLS credential API's that comply with the new model.
+This proposal aims to incorporate SPIFFE-based mutual TLS into gRPC C core auth stack. Towards the goal, it proposes a new credential API model that 1) allows flexible addition of new TLS-related features (e.g., credential reload) without breaking the API and 2) supports both synchronous and asynchronous implementations of those features. It then proposes SPIFFE and HTTPS-based TLS credential API's that comply with the new model. Note that the API changes proposed in this gRFC only apply to gRPC core and its wrapped languages (not Java and Go).
 
 ## Background
 
