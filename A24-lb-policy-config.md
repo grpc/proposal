@@ -158,15 +158,19 @@ In JSON form (which is what is actually used in gRPC core), it would
 look like this:
 
 ```json
-{"loadBalancingConfig":
-  [
-    {"xds": {
-      "balancerName": "dns:///balancer.example.com:8080",
-      "childPolicy": {
-        "round_robin": {}
+{
+   "loadBalancingConfig":[
+      {
+         "xds":{
+            "balancerName":"dns:///balancer.example.com:8080",
+            "childPolicy":[
+               {
+                  "round_robin":{}
+               }
+            ]
+         }
       }
-    }}
-  ]
+   ]
 }
 ```
 
