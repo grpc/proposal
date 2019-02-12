@@ -78,34 +78,42 @@ duration that the service is set with an invalid config.
 Examples of invalid service configs :
 
 * Badly Formatted service config
+```
 “serviceConfig” : {
   “MethodConfig” : {
     “Service // bad format
   }
+```
 
 * Fields with invalid values are not allowed
+```
 “serviceConfig” : {
   “loadBalancingPolicy” : “UnknownPolicy”
 }
+```
 
 Note that loadBalancingPolicy is deprecated in favor of loadBalancingConfig,
 which provides a list of LB policies with the client selecting the first policy
 it supports. If it doesn’t understand any of the policies, it is treated as
 invalid, and the entire service config is rejected.
 
+```
 “serviceConfig” : {
   “loadBalancingConfig” : [
     “UnknownPolicy1” : {},
     “UnknownPolicy2” : {}
   ]
 }
+```
 
 Examples of valid service configs :
 * Unknown fields are allowed
+```
 “serviceConfig” : {
   “UnknownField” : “value”, // Field is unknown and hence ignored
   “methodConfig” : {}
 }
+```
 
 
 ### Service Config Channel Arguments
