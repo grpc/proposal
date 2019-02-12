@@ -48,12 +48,12 @@ configuration.
 	continue using the configuration from that config.
 	2. If this is a new client or a client which has not yet received a valid
 	service config -
-		1. It uses the default service config, if configured. Note that, an empty 
+		1. It uses the default service config, if configured. Note that, an empty
 		default service config is a valid service config.
-		2. If it does not have a default service config, it should treat the 
-		resolution attempt as having failed (e.g., for a polling-based resolver, 
-		it should retry the query after appropriate backoff). In other words, 
-		the channel will remain in state TRANSIENT_FAILURE until a valid service 
+		2. If it does not have a default service config, it should treat the
+		resolution attempt as having failed (e.g., for a polling-based resolver,
+		it should retry the query after appropriate backoff). In other words,
+		the channel will remain in state TRANSIENT_FAILURE until a valid service
 		config is received.
 
 ### Criteria to determine the validity of a service config
@@ -79,9 +79,8 @@ Examples of invalid service configs :
 
 * Badly Formatted service config
 “serviceConfig” : {
-  “MethodConfig” :
-   {
-   “Service // bad format
+  “MethodConfig” : {
+    “Service // bad format
   }
 
 * Fields with invalid values are not allowed
@@ -101,8 +100,62 @@ invalid, and the entire service config is rejected.
   ]
 }
 
+Examples of valid service configs :
+* Unknown fields are allowed
+“serviceConfig” : {
+  “UnknownField” : “value”, // Field is unknown and hence ignored
+  “methodConfig” : {}
+}
+
+
+### Service Config Channel Arguments
+
+gRPC allows two channel arguments to set that affect the behavior of service
+configs. One argument provides a service config to use if the resolver does not
+return a service config, and the other provides an option to disable service
+config resolution.
+
+If a default service config is provided, the client should fallback on the
+default service config (in case of an invalid config with no valid service
+config received earlier). On the other hand, if there is no default service
+config provided as a channel argument, the client should fail to start and keep
+waiting for a valid service config. Note that the default service config
+being set to an empty service config would be a valid fallback.
 
 ## Implementation
+
+To implement the above spec -
+1. The resolver needs to be provided a parsing method(s) that it can run for a
+service config. This function will be provided to the resolver at instantiation
+time along with the default service config (if registered). This method will
+return a parsed form of the service config, or an error indicating that parsing
+failed.
+2. When a resolver gets an update, it runs the parser on this service config.
+	1. If parsing succeeds, it saves this service config and returns it to
+        the channel to apply.
+	2. If parsing fails, it provides a previously saved service config
+        instead.
+
+The load balancing policy API will also need to provide a way to parse the load
+balancing part of the service config, where the first recognized load balancing
+policy is parsed according to the requirements specified by that load balancing
+policy. This method will return a parsed form of the first recognized load
+balancing policy if parsing succeeds, or an error if parsing fails, as described
+above. The parsed form will be what the load balancing policy API would see
+again if the parsing of the rest of the service config was also successful.
+
+### Avoiding Parsing the Service Config Twice
+In a naive implementation, the parsing method and the method to apply the new
+service config would both need to parse the service config. To avoid having to
+perform this parsing twice, the parse method will return the result of the
+parsing in some kind of object that when provided back to individual
+sub-parts/filters can be reused. Once parsing is done, this parsed result (as
+opposed to the original JSON representation) is provided back to the client.
+
+This also avoids potential inconsistencies between the code that validates the
+service config and the code that applies the service config. (We do not want to
+fail at parsing the service config when we are trying to apply, since this would
+require us to support partial roll-backs.)
 
 C -
 JAVA -
