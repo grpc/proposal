@@ -4,7 +4,7 @@ Service Config Error Handling
 * Approver: markdroth
 * Status: Draft
 * Implemented in:
-* Last updated: 09-17-2018
+* Last updated: 02-19-2019
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/bAxyse6c2eI
 
 ## Abstract
@@ -35,26 +35,28 @@ need to take on receiving a new config.
 
 ### Behavior on receiving a new gRPC Config
 
-1. A gRPC config can have multiple service configs. When multiple service configs
-are available, clients choose the service config to use based on the proposal
-[here](A2-service-configs-in-dns.md#canarying-changes).
-2. On choosing a service config, the client validates the service config based on
-the criteria outlined in the section below.
+1. A gRPC config can have multiple service configs. When multiple service
+configs are available, clients choose the service config to use based on the
+proposal
+[A2 Service Config in DNS](A2-service-configs-in-dns.md#canarying-changes).
+2. On choosing a service config, the client validates the service config based
+on the criteria outlined in the section below.
 3. If the service config is valid, the client uses the configuration provided.
 4. If the service config is invalid, the clients should reject the received
 config in its entirety and do different things depending on its state and
 configuration.
-	1. If it previously received an update with a valid service config, it should
-	continue using the configuration from that config.
-	2. If this is a new client or a client which has not yet received a valid
-	service config -
-		1. It uses the default service config, if configured. Note that, an empty
-		default service config is a valid service config.
+	1. If it previously had selected a valid service config or no service
+	config,	it should continue using that previous configuration from that
+	config. An empty service config is valid.
+	2. If the client has not previously selected a valid service config or no
+	service config, for example a new client, then:
+		1. It uses the default service config, if configured. Note that, an
+		empty default service config is a valid service config.
 		2. If it does not have a default service config, it should treat the
-		resolution attempt as having failed (e.g., for a polling-based resolver,
-		it should retry the query after appropriate backoff). In other words,
-		the channel will remain in state TRANSIENT_FAILURE until a valid service
-		config is received.
+		resolution attempt as having failed (e.g., for a polling-based
+		resolver, it should retry the query after appropriate backoff). In
+		other words,the channel will remain in state TRANSIENT_FAILURE until a
+		valid service config is received.
 
 ### Criteria to determine the validity of a service config
 
@@ -62,20 +64,23 @@ A valid service config needs to be well formatted, i.e., the JSON representation
 of the service config needs to be in a valid JSON format. If the service config
 is well formatted, the client validates each field that it recognizes while
 ignoring the unknown fields, i.e., unknown fields do not affect validation. For
-known fields, valid values are defined by the field itself. If any of the known
-fields fails in validation, the entire service config is deemed invalid.
+known fields, valid values are defined by the field itself. Fields can accept
+lists where some of the values may be unknown. As long as there is atleast one
+value in the list which succeeds in getting parsed, the field will be
+considered to have a valid value. If any of the known fields fails in
+validation, the entire service config is deemed invalid.
 
 ## Rationale
 
 By discarding invalid service configs instead of ignoring fields that have
 invalid values, we prevent clients from resorting to using default values which
-might be unwanted for certain systems. The clause that existing clients continue
-using older service configs prevents an invalid service config from bringing
-down the entire system, while newer clients which do not have a previously
-received valid service config fail to start, avoiding new traffic for the
-duration that the service is set with an invalid config.
+might be unwanted for certain systems. Existing clients continuing to use older
+service configs prevent an invalid service config from bringing down the
+entire system, while newer clients which do not have a previously received
+valid service config fail to start, avoiding new traffic for the duration that
+the service is set with an invalid config.
 
-Examples of invalid service configs :
+Examples of invalid service configs:
 
 * Badly Formatted service config
 ```
@@ -118,10 +123,10 @@ Examples of valid service configs :
 
 ### Service Config Channel Arguments
 
-gRPC allows two channel arguments to set that affect the behavior of service
-configs. One argument provides a service config to use if the resolver does not
-return a service config, and the other provides an option to disable service
-config resolution.
+gRPC allows two channel arguments that affect the behavior of service configs.
+One argument provides a service config to use if the resolver does not return a
+service config, and the other provides an option to disable service config
+resolution.
 
 If a default service config is provided, the client should fallback on the
 default service config (in case of an invalid config with no valid service
