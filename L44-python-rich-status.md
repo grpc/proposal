@@ -1,7 +1,7 @@
 New RPC Status API for Python
 ----
 * Author(s): lidizheng
-* Approver: a11r
+* Approver: ericgribkoff
 * Status: Draft
 * Implemented in: Python
 * Last updated: 12-10-2018
