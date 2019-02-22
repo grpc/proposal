@@ -435,14 +435,9 @@ Although the grpcio package can't enforce the consistency of status code and sta
 One more reason is that in the future, the `google.rpc.status.Status` may not be the only status proto we accept. This package provides a straightforward mapping between different status proto message.
 
 
-### Not Swapping the Two Concepts
+### Semantic difference of `details` between gRPC Python and `Status` proto
 
-Ideally speaking, the **status message** and **status details** are misused in Python implementation, and this proposal is our best chance to get them right. According to spec, the correct definition should be as followed:
-
-* **Status message** should be interpreted as a text (Unicode allowed) field that indicates the status of the RPC call, and it is intended to be read by the developers.
-* **Status details** should be understood as a encoded `google.rpc.status.Status` proto message that serves as rich status error details about the RPC Call.
-
-However, the **status details** is deeply bound with gRPC Python since its very first version. The concept swapping may be correct, but it presumably increases developers' recognition burden. Moreover, even if we can cleanly update our document and API interface to swap those two concepts, there are tons of tutorial/articles/examples about gRPC Python on the internet we can't ever correct them. So, we think maintaining the status quo is our current optimal solution.
+gRPC Python uses the field name `details` to store data that will later be transmitted in `grpc-message` header. But the `details` field in proto `Status` is a list for error details proto messages. Unfortunately, this discrepancy is deeply embedded in the gRPC Python API and unlikely to be changed.
 
 
 ## Implementation
