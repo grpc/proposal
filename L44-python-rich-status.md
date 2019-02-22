@@ -9,16 +9,15 @@ New RPC Status API for Python
 
 ## Abstract
 
-The current design of status API doesn't support rich status. Also the concept of status "details" doesn't comply with the gRPC spec. So, after discussion with @gnossen and @ericgribkoff, we think we should add a new set of status APIs to correct them.
-
+The current design of the gRPC Python servicer API for RPCs terminated with a non-OK status does not easily allow pairing the failure with associated additional information not expressible by the `grpc-status` and `grpc-message` fields. This proposal adds a rich `Status` class to gRPC Python that allows coupling the failure's status code, error string, and arbitrary additional information about the failure (sent as trailing metadata) in a unified interface.
 
 ## Background
 
-The gRPC [Spec](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses) defined two trailing data to indicate the status of an RPC call `Status` and `Status-Message`. However, status code and a text message themselves are insufficient to express more complicated situation like the RPC call failed because of quota check of specific policy, or the stack trace from the crashed server, or obtain retry delay from the server (see [error details](https://github.com/googleapis/api-common-protos/blob/master/google/rpc/error_details.proto)).
+The gRPC [Spec](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses) defined two trailing data to indicate the status of an RPC call `grpc-status` and `grpc-Message`. However, status code and a text message themselves are insufficient to express more complicated situation like the RPC call failed because of quota check of specific policy, or the stack trace from the crashed server, or obtain retry delay from the server (see [error details](https://github.com/googleapis/api-common-protos/blob/master/google/rpc/error_details.proto)).
 
-The one primary use case of this feature is Google Cloud API. The Google Cloud API needs it to transport rich status from the server to the client. Also, they are the owner of those proto files.
+The one primary use case of this feature is Google Cloud API. The Google Cloud API needs it to transport rich status from the server to the client.
 
-So, the gRPC team introduced a new internal trailing metadata entry `grpc-status-details-bin` to serve this purpose. It takes in serialized proto `google.rpc.status.Status` message binary and transmits as binary metadata. However, since gRPC is a ProtoBuf-agnostic framework, it can't enforce either the content of the binary data be set in the trailing metadata entry, nor the consistency of status code/status message with the additional status detail proto message. The result of this unsolvable problem is that for three major implementations of gRPC we have, each of them is slightly different about this behavior.
+So, the gRPC team introduced a new internal trailing metadata entry `grpc-status-details-bin` to serve this purpose. It takes in serialized proto `google.rpc.status.Status` message binary and transmits as binary metadata. Notably, the `google.rpc.status.Status` message contains its own `code` and `message` fields. However, since gRPC is a ProtoBuf-agnostic framework, it can't enforce either the content of the binary data set in the trailing metadata entry, nor the consistency of status code/status message with the additional status detail proto message. The result of this unsolvable problem is that for three major implementations of gRPC we have, each of them is slightly different about this behavior.
 
 ### Behavior Different Across Implementations
 
@@ -26,7 +25,7 @@ C++ implementation tolerates anything to be put in the `grpc-status-details-bin`
 
 So, which paradigm should Python follow?
 
-### The Proto of Status
+### Status Proto
 
 The proto of status is well-defined and used in many frameworks. Here is the definition of `Status`, for full version see [status.proto](https://github.com/googleapis/api-common-protos/blob/master/google/rpc/status.proto).
 ```proto
@@ -69,7 +68,7 @@ This class is used to describe the status of an RPC.
 
 The name of the class is `Status`, because it is shorter and cleaner than `RpcStatus` or `ServerRpcStatus`. In the future, we might want to utilize it at client side as well.
 
-The metadata field of `Status` is `trailing_metadata` instead of `metadata`. The `Status` should be the final status of an RPC, so it should assist developers to get information that only accessible at the end of the RPC. Also, if we want to support it at client side, we need to separate `initial_metadata` and `trailing_metadata`.
+The metadata field of `Status` is `trailing_metadata` instead of `metadata`. The `Status` should be the final status of an RPC, so it should assist developers to get information that only accessible at the end of the RPC.
 
 ```Python
 class Status(six.with_metaclass(abc.ABCMeta)):
@@ -87,7 +86,7 @@ class Status(six.with_metaclass(abc.ABCMeta)):
 
 ### Server side API
 
-gRPC Python team encountered lots of disagreements about how this part should be implemented. Available options are listed in the `Rationale` section. Here is our final consensus as a team, but feel free to comment about other options.
+Available options are listed in the `Rationale` section. Here is our final consensus as a team, but feel free to comment about other options.
 
 During the discussion we come up with several criteria for server-side API:
 1. Shouldn't pass `ServicerContext` around and let extension package to mutate it.
@@ -156,23 +155,6 @@ def ...Servicer(...):
         )
         context.abort_with_status(rpc_status.to_status(rich_status))
         # The method handler will abort
-```
-
-### Optional: Client side API
-
-Currently, the documentation about getting status resides in [grpc.Call](https://grpc.io/grpc/python/grpc.html#client-side-context) section. We propose to add a new member function named `status()`, it will return a `grpc.Status`.
-
-The usage snippet should look like:
-
-```Python
-stub = ...Stub(channel)
-
-try:
-    resp = stub.AMethodHandler(...)
-except grpc.RpcError as rpc_error:
-    code = rpc_error.status().code
-    details = rpc_error.status().details
-    trailing_metadata = rpc_error.status().trailing_metadata
 ```
 
 
@@ -448,7 +430,7 @@ def ...Servicer(...):
 
 ### Why we need a new package `grpcio-status`?
 
-Although we can't enforce the consistency of status code, status message, and status details, there is still value for the new package to help developers validate that. It demonstrates our recommendation through the design.
+Although the grpcio package can't enforce the consistency of status code and status message with the information embedded in the rich `Status` proto, there is still value to provide an additional package - one which can depend on protobuf and is able to verify that these elements are consistent - to help developers use the API in its intended fashion.. It demonstrates our recommendation through the design.
 
 One more reason is that in the future, the `google.rpc.status.Status` may not be the only status proto we accept. This package provides a straightforward mapping between different status proto message.
 
