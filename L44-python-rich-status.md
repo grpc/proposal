@@ -13,7 +13,7 @@ The current design of the gRPC Python servicer API for RPCs terminated with a no
 
 ## Background
 
-The gRPC [Spec](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses) defined two trailing data to indicate the status of an RPC call `grpc-status` and `grpc-Message`. However, status code and a text message themselves are insufficient to express more complicated situation like the RPC call failed because of quota check of specific policy, or the stack trace from the crashed server, or obtain retry delay from the server (see [error details](https://github.com/googleapis/api-common-protos/blob/master/google/rpc/error_details.proto)).
+The gRPC [Spec](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses) defined two trailing data to indicate the status of an RPC call `grpc-status` and `grpc-message`. However, status code and a text message themselves are insufficient to express more complicated situation like the RPC call failed because of quota check of specific policy, or the stack trace from the crashed server, or obtain retry delay from the server (see [error details](https://github.com/googleapis/api-common-protos/blob/master/google/rpc/error_details.proto)).
 
 The one primary use case of this feature is Google Cloud API. The Google Cloud API needs it to transport rich status from the server to the client.
 
