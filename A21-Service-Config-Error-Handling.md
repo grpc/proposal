@@ -39,8 +39,11 @@ need to take on receiving a new config.
 configs are available, clients choose the service config to use based on the
 proposal
 [A2 Service Config in DNS](A2-service-configs-in-dns.md#canarying-changes).
-2. On choosing a service config, the client validates the service config based
-on the criteria outlined in the section below.
+Only the chosen service config affects the validation of the gRPC config, i.e.,
+if the chosen service config is found invalid while the other service configs
+were invalid, the gRPC config would still be considered invalid as a whole.
+2. The client validates the choice based on the criteria outlined in the
+section below.
 3. If the service config is valid, the client uses the configuration provided.
 4. If the service config is invalid, the clients should reject the received
 config in its entirety and do different things depending on its state and
@@ -50,8 +53,8 @@ configuration.
 	config. An empty service config is valid.
 	2. If the client has not previously selected a valid service config or no
 	service config, for example a new client, then:
-		1. It uses the default service config, if configured. Note that, an
-		empty default service config is a valid service config.
+		1. It uses the default service config, if configured and valid. Note
+		that, an empty default service config is a valid service config.
 		2. If it does not have a default service config, it should treat the
 		resolution attempt as having failed (e.g., for a polling-based
 		resolver, it should retry the query after appropriate backoff). In
@@ -63,12 +66,13 @@ configuration.
 A valid service config needs to be well formatted, i.e., the JSON representation
 of the service config needs to be in a valid JSON format. If the service config
 is well formatted, the client validates each field that it recognizes while
-ignoring the unknown fields, i.e., unknown fields do not affect validation. For
-known fields, valid values are defined by the field itself. Fields can accept
-lists where some of the values may be unknown. As long as there is atleast one
-value in the list which succeeds in getting parsed, the field will be
-considered to have a valid value. If any of the known fields fails in
-validation, the entire service config is deemed invalid.
+ignoring the unknown fields, i.e., unknown fields do not affect validation.
+
+Fields in the service config must clearly define the validation criteria for
+values. Fields can accept lists where some of the values may be unknown. As
+long as there is at least one value in the list which succeeds in getting
+parsed, the field will be considered to have a valid value. If any of the known
+fields fails in validation, the entire service config is deemed invalid.
 
 ## Rationale
 
@@ -84,16 +88,16 @@ Examples of invalid service configs:
 
 * Badly Formatted service config
 ```
-“serviceConfig” : {
-  “MethodConfig” : {
-    “Service // bad format
+"serviceConfig" : {
+  "MethodConfig" : {
+    "Service // bad format
   }
 ```
 
 * Fields with invalid values are not allowed
 ```
-“serviceConfig” : {
-  “loadBalancingPolicy” : “UnknownPolicy”
+"serviceConfig" : {
+  "loadBalancingPolicy" : “UnknownPolicy”
 }
 ```
 
@@ -103,10 +107,10 @@ it supports. If it doesn’t understand any of the policies, it is treated as
 invalid, and the entire service config is rejected.
 
 ```
-“serviceConfig” : {
-  “loadBalancingConfig” : [
-    “UnknownPolicy1” : {},
-    “UnknownPolicy2” : {}
+"serviceConfig" : {
+  "loadBalancingConfig" : [
+    "UnknownPolicy1" : {},
+    "UnknownPolicy2" : {}
   ]
 }
 ```
@@ -114,9 +118,9 @@ invalid, and the entire service config is rejected.
 Examples of valid service configs :
 * Unknown fields are allowed
 ```
-“serviceConfig” : {
-  “UnknownField” : “value”, // Field is unknown and hence ignored
-  “methodConfig” : {}
+"serviceConfig" : {
+  "UnknownField" : “value”, // Field is unknown and hence ignored
+  "methodConfig" : {}
 }
 ```
 
@@ -140,14 +144,14 @@ being set to an empty service config would be a valid fallback.
 To implement the above spec -
 1. The resolver needs to be provided a parsing method(s) that it can run for a
 service config. This function will be provided to the resolver at instantiation
-time along with the default service config (if registered). This method will
-return a parsed form of the service config, or an error indicating that parsing
-failed.
+time. This method will return a parsed form of the service config, or an error
+indicating that parsing failed.
 2. When a resolver gets an update, it runs the parser on this service config.
-	1. If parsing succeeds, it saves this service config and returns it to
-        the channel to apply.
-	2. If parsing fails, it provides a previously saved service config
-        instead.
+	1. If parsing succeeds, it returns the parsed result to the channel to
+	apply.
+	2. If parsing fails, it returns the parse error.
+Irrespective of whether the parsing on the service config failed or not, the
+resolver always returns the list of addresses from the update.
 
 The load balancing policy API will also need to provide a way to parse the load
 balancing part of the service config, where the first recognized load balancing
@@ -171,7 +175,9 @@ fail at parsing the service config when we are trying to apply, since this would
 require us to support partial roll-backs.)
 
 C -
+
 JAVA -
+
 Go -
 
 ## Open issues (if applicable)
