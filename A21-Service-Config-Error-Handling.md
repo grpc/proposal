@@ -49,7 +49,7 @@ section below.
 config in its entirety and do different things depending on its state and
 configuration.
 	1. If it previously had selected a valid service config or no service
-	config,	it should continue using that previous configuration from that
+	config, it should continue using that previous configuration from that
 	config. An empty service config is valid.
 	2. If the client has not previously selected a valid service config or no
 	service config, for example a new client, then:
@@ -66,13 +66,14 @@ configuration.
 A valid service config needs to be well formatted, i.e., the JSON representation
 of the service config needs to be in a valid JSON format. If the service config
 is well formatted, the client validates each field that it recognizes while
-ignoring the unknown fields, i.e., unknown fields do not affect validation.
+ignoring the unknown fields, i.e., unknown fields do not affect validation. If
+any of the known fields fails in validation, the entire service config is deemed
+invalid.
 
 Fields in the service config must clearly define the validation criteria for
 values. Fields can accept lists where some of the values may be unknown. As
 long as there is at least one value in the list which succeeds in getting
-parsed, the field will be considered to have a valid value. If any of the known
-fields fails in validation, the entire service config is deemed invalid.
+parsed, the field will be considered to have a valid value.
 
 ## Rationale
 
