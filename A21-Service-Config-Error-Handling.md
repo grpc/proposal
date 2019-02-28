@@ -54,7 +54,7 @@ configuration.
 	2. If the client has not previously selected a valid service config or no
 	service config, for example a new client, then:
 		1. It uses the default service config, if configured and valid. Note
-		that, an empty default service config is a valid service config.
+		that an empty default service config is a valid service config.
 		2. If it does not have a default service config, it should treat the
 		resolution attempt as having failed (e.g., for a polling-based
 		resolver, it should retry the query after appropriate backoff). In
@@ -70,10 +70,10 @@ ignoring the unknown fields, i.e., unknown fields do not affect validation. If
 any of the known fields fails in validation, the entire service config is deemed
 invalid.
 
-Fields in the service config must clearly define the validation criteria for
-values. Fields can accept lists where some of the values may be unknown. As
-long as there is at least one value in the list which succeeds in getting
-parsed, the field will be considered to have a valid value.
+Future gRFCs that add new service config fields must define the validation
+criteria for those fields. In a case where different clients may support
+different values for a field, a gRFC may define a field to be a list of values,
+where each client will use the first value in the list that it understands.
 
 ## Rationale
 
