@@ -5,7 +5,7 @@ Node gRPC Types Package
 * Status: Draft
 * Implemented in: Node.js
 * Last updated: 2019-02-28
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/30SrKiqsEis
 
 ## Abstract
 
