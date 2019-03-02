@@ -116,6 +116,14 @@ When gRPC receives a non-OK response status from a server, this status is checke
 
 In general, only status codes that indicate the service did not process the request should be retried. However, a more aggressive set of parameters can be specified when the service owner knows that a method is idempotent, or safe to be processed more than once by the server. For example, if an RPC to a delete user method fails with an `INTERNAL` error code, it's possible that the user was already deleted before the failure occurred. If the method is idempotent then retrying the call should have no adverse effects. However, it is entirely possible to implement a non-idempotent delete method that has adverse side effects if called multiple times, and such a method should not be retried unless the error codes guarantee the original RPC was not processed. It is up to the service owner to pick the correct set of retryable status codes given the semantics of their service. gRPC retries do not provide a mechanism to specifically mark a method as idempotent.
 
+##### Validation of retryPolicy
+
+If `retryPolicy` is specified in a service config choice, the following validation rules apply:
+1. `maxAttempts` should be specified and should be a JSON integer value greater than 1.
+2. `initialBackoff` and `maxBackoff` should be specified, should follow the JSON representaion of proto3 Duration type https://developers.google.com/protocol-buffers/docs/proto3#json and should have a duration value greater than 0.
+3. `backoffMultiplier` should be specified and should be a JSON number greater than 0.
+4. `retryableStatusCodes` should be specified as a JSON array of status code and be non-empty. Each status code should be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
+
 #### Hedging Policy
 
 Hedging enables aggressively sending multiple copies of a single request without waiting for a response. Because hedged RPCs may be be executed multiple times on the server side, typically by different backends, it is important that hedging is only enabled for methods that are safe to execute multiple times without adverse affect.
@@ -148,6 +156,13 @@ If server pushback that specifies not to retry is received in response to a hedg
 
 Hedged requests should be sent to distinct backends, if possible. To facilitate this, the gRPC client will maintain a list of previously used backend addresses for each hedged RPC. This list will be passed to the gRPC client's local load-balancing policy. The load balancing policy may use this information to send the hedged request to an address that was not previously used. If all available backend addresses have already been used, the load-balancing policy's response is implementation-dependent.
 
+##### Validation of hedgingPolicy
+
+If `hedgingPolicy` is specified in a service config choice, the following validation rules apply:
+1. `maxAttempts` should be specified and should be a JSON integer value greater than 1. Values greater than 5 are treated as 5 without being considered a validation error.
+2. `hedgingDelay` is an optional field but if specified should follow the JSON representation of proto3 Duration type.
+3. `nonFatalStatusCodes` is a required field and follows the same validation rules as `retryableStatusCodes` in `retryPolicy`.
+
 ![State Diagram](A6_graphics/basic_hedge.png)
 
 [Link to SVG file](A6_graphics/basic_hedge.svg)
@@ -176,6 +191,12 @@ Throttling also applies to hedged RPCs. The first outgoing RPC will always be se
 Neither retry attempts or hedged RPCs block when `token_count` is less than or equal to the threshold. Retry attempts are canceled and the failure returned to the client application. The hedged request is cancelled, and if there are no other already-sent hedged RPCs the failure is returned to the client application.
 
 The only RPCs that are counted as failures for the throttling policy are RPCs that fail with a status code that qualifies as a [retryable](#retryable-status-codes) or [non-fatal status code](#hedging-policy), or that receive a pushback response indicating not to retry. This avoids conflating server failure with responses to malformed requests (such as the `INVALID_ARGUMENT` status code).
+
+##### Validation of retryThrottling
+
+If `retryThrottling` is specified in a service config, the following validation rules apply:
+1. `maxTokens` should be specified and should be a JSON integer value in the range (0, 1000].
+2. `tokenRatio` should be specified and should be a JSON floating point greater than 0. Decimal places beyond 3 are ignored. (eg. 0.5466 is treated as 0.546.)
 
 #### Pushback
 
@@ -423,7 +444,8 @@ The retry policy is transmitted to the client through the service config mechani
 
         // The set of status codes which may be retried.
         //
-        // Status codes are specified as strings, e.g., "UNAVAILABLE".
+        // Status codes are specified in the integer form or the case-insensitive
+        // string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"])
         //
         // This field is required and must be non-empty.
         "retryableStatusCodes": []
@@ -451,7 +473,8 @@ The retry policy is transmitted to the client through the service config mechani
         // RPCs will continue. Otherwise, outstanding requests will be canceled and
         // the error returned to the client application layer.
         //
-        // Status codes are specified as strings, e.g., "UNAVAILABLE".
+        // Status codes are specified in the integer form or the case-insensitive
+        // string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"])
         //
         // This field is required and must be non-empty.
         "nonFatalStatusCodes": []
