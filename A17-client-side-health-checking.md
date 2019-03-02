@@ -223,6 +223,10 @@ to "foo" in the service config in JSON form:
 "healthCheckConfig": {"serviceName": "foo"}
 ```
 
+#### Validation
+
+`serviceName` must be a valid JSON string.
+
 ### LB Policies Can Disable Health Checking When Needed
 
 There are some cases where an LB policy may want to disable client-side
