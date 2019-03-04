@@ -36,7 +36,7 @@ triggered whenever the resolver returns at least one balancer address.
 Instead, we would like to use data in the service config to tell the
 new `xds` policy which balancers to contact.
 
-### Related Proposals: 
+### Related Proposals:
 
 * [A5: gRPC-LB in DNS](A5-grpclb-in-dns.md)
 * [A21: Service Config Error Handling](https://github.com/grpc/proposal/pull/100) (in progress)
@@ -65,12 +65,14 @@ message XdsConfig {
   // Optional.  What LB policy to use for intra-locality routing.
   // If unset, will use whatever algorithm is specified by the balancer.
   // Multiple LB policies can be specified; clients will iterate through
-  // the list in order and stop at the first policy that they support.
+  // the list in order and stop at the first policy that they support. If none
+  // are supported, the service config is considered invalid.
   repeated LoadBalancingConfig child_policy = 2;
   // Optional.  What LB policy to use in fallback mode.  If not
   // specified, defaults to round_robin.
   // Multiple LB policies can be specified; clients will iterate through
-  // the list in order and stop at the first policy that they support.
+  // the list in order and stop at the first policy that they support. If none
+  // are supported, the service config is considered invalid.
   repeated LoadBalancingConfig fallback_policy = 3;
 }
 
@@ -133,7 +135,8 @@ message ServiceConfig {
   }
   LoadBalancingPolicy load_balancing_policy = 1 [deprecated=true];
   // Multiple LB policies can be specified; clients will iterate through
-  // the list in order and stop at the first policy that they support.
+  // the list in order and stop at the first policy that they support. If none
+  // are supported, the service config is considered invalid.
   repeated LoadBalancingConfig load_balancing_config = 4;
 
   // ...other existing fields...
