@@ -119,10 +119,10 @@ In general, only status codes that indicate the service did not process the requ
 ##### Validation of retryPolicy
 
 If `retryPolicy` is specified in a service config choice, the following validation rules apply:
-1. `maxAttempts` should be specified and should be a JSON integer value greater than 1.
-2. `initialBackoff` and `maxBackoff` should be specified, should follow the JSON representaion of proto3 Duration type https://developers.google.com/protocol-buffers/docs/proto3#json and should have a duration value greater than 0.
-3. `backoffMultiplier` should be specified and should be a JSON number greater than 0.
-4. `retryableStatusCodes` should be specified as a JSON array of status code and be non-empty. Each status code should be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
+1. `maxAttempts` MUST be specified and MUST be a JSON integer value greater than 1. Values greater than 5 are treated as 5 without being considered a validation error.
+2. `initialBackoff` and `maxBackoff` MUST be specified, MUST follow the JSON representaion of [proto3 Duration type](https://developers.google.com/protocol-buffers/docs/proto3#json), and MUST have a duration value greater than 0.
+3. `backoffMultiplier` MUST be specified and MUST be a JSON number greater than 0.
+4. `retryableStatusCodes` MUST be specified as a JSON array of status codes and be non-empty. Each status code MUST be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
 
 #### Hedging Policy
 
@@ -159,9 +159,9 @@ Hedged requests should be sent to distinct backends, if possible. To facilitate 
 ##### Validation of hedgingPolicy
 
 If `hedgingPolicy` is specified in a service config choice, the following validation rules apply:
-1. `maxAttempts` should be specified and should be a JSON integer value greater than 1. Values greater than 5 are treated as 5 without being considered a validation error.
-2. `hedgingDelay` is an optional field but if specified should follow the JSON representation of proto3 Duration type.
-3. `nonFatalStatusCodes` is a required field and follows the same validation rules as `retryableStatusCodes` in `retryPolicy`.
+1. `maxAttempts` MUST be specified and MUST be a JSON integer value greater than 1. Values greater than 5 are treated as 5 without being considered a validation error.
+2. `hedgingDelay` is an optional field but if specified MUST follow the JSON representation of proto3 Duration type.
+3. `nonFatalStatusCodes` is a required field, MUST be specified as a JSON array of status codes and be non-empty. Each status code MUST be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
 
 ![State Diagram](A6_graphics/basic_hedge.png)
 
@@ -195,8 +195,8 @@ The only RPCs that are counted as failures for the throttling policy are RPCs th
 ##### Validation of retryThrottling
 
 If `retryThrottling` is specified in a service config, the following validation rules apply:
-1. `maxTokens` should be specified and should be a JSON integer value in the range (0, 1000].
-2. `tokenRatio` should be specified and should be a JSON floating point greater than 0. Decimal places beyond 3 are ignored. (eg. 0.5466 is treated as 0.546.)
+1. `maxTokens` MUST be specified and MUST be a JSON integer value in the range (0, 1000].
+2. `tokenRatio` MUST be specified and MUST be a JSON floating point greater than 0. Decimal places beyond 3 are ignored. (eg. 0.5466 is treated as 0.546.)
 
 #### Pushback
 
