@@ -98,7 +98,7 @@ Examples of invalid service configs:
 * Fields with invalid values are not allowed
 ```
 "serviceConfig" : {
-  "loadBalancingPolicy" : “UnknownPolicy”
+  "loadBalancingPolicy" : "UnknownPolicy"
 }
 ```
 
@@ -120,7 +120,7 @@ Examples of valid service configs :
 * Unknown fields are allowed
 ```
 "serviceConfig" : {
-  "UnknownField" : “value”, // Field is unknown and hence ignored
+  "UnknownField" : "value", // Field is unknown and hence ignored
   "methodConfig" : {}
 }
 ```
