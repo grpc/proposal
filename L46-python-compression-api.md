@@ -5,7 +5,7 @@ Title
 * Status: Draft
 * Implemented in: python
 * Last updated: 2/28/2019
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/c5SVRTiIjmA
 
 ## Abstract
 
