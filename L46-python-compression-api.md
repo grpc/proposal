@@ -135,11 +135,31 @@ class StreamStreamMultiCallable(six.with_metaclass(abc.ABCMeta)):
         ...
 ```
 
+Analogously, a `compression` attrbute will be added to ClientCallDetails,
+rendering its interface as follows:
+
+```python
+class ClientCallDetails(six.with_metaclass(abc.ABCMeta)):
+    """Describes an RPC to be invoked.
+    This is an EXPERIMENTAL API.
+    Attributes:
+      method: The method name of the RPC.
+      timeout: An optional duration of time in seconds to allow for the RPC.
+      metadata: Optional :term:`metadata` to be transmitted to
+        the service-side of the RPC.
+      credentials: An optional CallCredentials for the RPC.
+      wait_for_ready: This is an EXPERIMENTAL argument. An optional flag t
+        enable wait for ready mechanism.
+      compression: An optional value specifying the type of compression to be
+        used.
+    """
+```
+
 In addition, a `compression` keyword argument will be aded to the
 `insecure_channel`, `secure_channel`, and `server` functions. This will define
 the compression method used throughout the lifetime of the channel or server.
 
-Finally, a `set_response_compression` method will be added to the
+Finally, `set_response_compression` method will be added to the
 `ServicerContext` interface. This will allow servers to set the compression
 method for an individual response.
 
