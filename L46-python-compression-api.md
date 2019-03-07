@@ -163,6 +163,13 @@ Finally, `set_response_compression` method will be added to the
 `ServicerContext` interface. This will allow servers to set the compression
 method for an individual response.
 
+If a type of compression is specified both at channel or server creation time
+and for an individual message, then the type of compression specified for the
+invidual message will be used.
+
+If a type of compression is neither specified at channel or server creation nor
+for an individual message, then no compression will be used.
+
 ### Examples
 
 At channel creation time.
