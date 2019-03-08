@@ -41,7 +41,7 @@ proposal
 [A2 Service Config in DNS](A2-service-configs-in-dns.md#canarying-changes).
 Only the chosen service config affects the validation of the gRPC config, i.e.,
 if the chosen service config is found invalid while the other service configs
-were invalid, the gRPC config would still be considered invalid as a whole.
+were valid, the gRPC config would still be considered invalid as a whole.
 2. The client validates the choice based on the criteria outlined in the
 section below.
 3. If the service config is valid, the client uses the configuration provided.
