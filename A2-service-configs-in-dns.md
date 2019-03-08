@@ -49,7 +49,7 @@ determine which choice will be selected by a given client:
     // If a field is absent or empty, it matches all clients.
     // All fields must match a client for this choice to be selected.
     // If any unexpected field name is present in this object, the entire
-    // choice is considered invalid.
+    // config is considered invalid.
     //
     // Client language(s): a list of strings (e.g., "c++", "java", "go",
     // "python", etc).  Each string is case insensitive.
@@ -68,16 +68,15 @@ determine which choice will be selected by a given client:
     // criteria.  (The format for this object is defined in
     // https://github.com/grpc/grpc/blob/master/doc/service_config.md.)
     // If this field is not an object, or is missing, or is otherwise 
-    // invalid, this service config choice is considered invalid.
+    // invalid, the entire config is considered invalid.
     "serviceConfig": object
   }
 ]
 ```
 
 If the service config choice cannot be parsed, or otherwise is not 
-semantically valid, it will be ignored.  Consumers of the service config
-SHOULD indicate when a config is not valid, but should not fail looking 
-for valid configs. 
+semantically valid, the entire config MUST be discarded as per 
+A21: [Service Config Error Handling](A21-service-config-error-handling.md).
 
 
 ### Encoding in DNS TXT Records
