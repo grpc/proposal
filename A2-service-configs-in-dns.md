@@ -75,9 +75,8 @@ determine which choice will be selected by a given client:
 ```
 
 If the service config choice cannot be parsed, or otherwise is not 
-semantically valid, it will be ignored.  Consumers of the service config
-SHOULD indicate when a config is not valid, but should not fail looking 
-for valid configs. 
+semantically valid, the entire service config will be discarded as per 
+A21: [Service Config Error Handling](A21-service-config-error-handling.md).
 
 
 ### Encoding in DNS TXT Records
