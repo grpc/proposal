@@ -9,8 +9,8 @@ Service Config Error Handling
 
 ## Abstract
 
-This document proposes a methodology to handle errors in a resolved service
-config.
+This document proposes a methodology to handle errors in service
+config obtained from a resolver.
 
 ## Background
 
