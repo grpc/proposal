@@ -78,6 +78,13 @@ message XdsConfig {
 
 // Configuration for grpclb LB policy.
 message GrpcLbConfig {
+  // Optional.  What LB policy to use for routing between the backend
+  // addresses.  If unset, defaults to round_robin.
+  // Currently, the only supported values are round_robin and pick_first.
+  // Note that this will be used both in balancer mode and in fallback mode.
+  // Multiple LB policies can be specified; clients will iterate through
+  // the list in order and stop at the first policy that they support.
+  repeated LoadBalancingConfig child_policy = 1;
 }
 
 // Selects LB policy and provides corresponding configuration.
