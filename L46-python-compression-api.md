@@ -218,5 +218,5 @@ interfaces for Python users.
 
 ## Implementation
 
-I (@gnossen) will implement these changes and merge them after the proposal has
-been accepted.
+I (@gnossen) have implemented these changes in [this PR](https://github.com/grpc/grpc/pull/18564)
+and will merge them after the proposal has been accepted.
