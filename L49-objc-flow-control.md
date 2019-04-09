@@ -52,9 +52,10 @@ properly even if `enableFlowControl` is YES.
 
 ### Write flow control
 Write flow control intend to slow down user's message writes such that there's
-only one pending message in gRPC Objective-C layer. This is achieved by an
-additional callback which informs a user that the previous message write is
-complete (i.e. forwarded to gRPC core) and a new message can be accepted.
+only one pending message for each call in gRPC Objective-C layer. This is
+achieved by an additional callback which informs a user that the previous
+message write is complete (i.e. forwarded to gRPC core) and a new message can
+be accepted.
 
 ```
 @protocol GRPCResponseHandler<NSCopying>
@@ -78,12 +79,14 @@ complete (i.e. forwarded to gRPC core) and a new message can be accepted.
 
 @end
 ```
-A user that enabled flow control is supposed to wait for issuance of
-`didWriteData` callback before making another `writeData` call. However, if
-`writeData` are called multiple times, e.g. due to a race to write messages,
-gRPC will still send all of the writes in order and issue `didWriteData` for
-each invoke of `writeData`. However in this case users assume their own
-responsibility of memory issue. When flow control is not enabled, the callback
+A user that enabled flow control should wait for issuance of `didWriteData`
+callback before making another `writeData` call. However, if `writeData` are
+called multiple times, e.g. due to a race to write messages, gRPC will still
+send all of the writes in order and issue `didWriteData` for each invoke of
+`writeData`. However in this case users assume their own responsibility of
+memory issue, e.g. it may be best to keep track of the number of pending
+`writeData` calls without `didWriteData` callback. There is no API to get these
+values from gRPC in such case. When flow control is not enabled, the callback
 `didWriteData` is not issued to the user.
 
 ### Read flow control
@@ -115,21 +118,22 @@ layer, and the `didWriteData` callback is issued to another thread. So a
 context switch happens for each write of message. On mobile platform this may
 not be a big issue, but in case some users do send a large amount of small
 messages and find the performance poorer than their expectation, the issue may
-be resolved in the following ways:
-* since gRPC does not put a hard restriction on how many messages, users may
-  self-restrict the number of pending writes without corresponding
-  `didWriteData` callback issued
+be resolved in either of the following ways:
+* since gRPC does not put a hard restriction on how many writes can be
+  pending for each call, users may have more than 1 pending writes for each
+  call in gRPC Objective-C layer and write their own flow control logic based
+  on `didWriteData` callbacks;
 * gRPC Objective-C layer may detect the size of message at `writeData` function
   and immediately issue back a `didWriteData` callback if the message size is
   small.
 
 ### Write flow control API
-We may put a hard limit on the write flow control such that when more than one
-message is pending in gRPC Objective-C layer, an error is returned to the user.
-However, the benefit of doing so is not very clear, and it eliminates the
-possibilities of providing users flexibility have more flexible flow control
-policy themselves as described in the previous subsection. Therefore we decide
-to not put such a hard limit.
+We considered putting a hard limit on the write flow control such that when
+more than one message is pending in gRPC Objective-C layer, an error is
+returned to the user.  However, the benefit of doing so is not very clear, and
+it eliminates the possibilities of providing users flexibility have more
+flexible flow control policy themselves as described in the previous
+subsection. Therefore we decide to not put such a hard limit.
 
 ### Read flow control API
 An alternative read flow control API could be:
