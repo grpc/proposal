@@ -43,7 +43,12 @@ for a call which is defaulted at disabling flow control.
 @end
 ```
 
-Both read and write flow control (described below) are enabled only if the boolean's value is YES.
+Both read and write flow control (described below) are enabled if the boolean's
+value is YES. Note that this variable is independent of
+[`GRPC\_EXPERIMENTAL\_DISABLE\_FLOW\_CONTROL`](https://github.com/grpc/grpc/blob/master/doc/environment_variables.md)
+environment variable that controls behavior of gRPC core. If
+`GRPC\_EXPERIMENTAL\_DISABLE\_FLOW\_CONTROL` is set, flow control may not work
+properly even if `enableFlowControl` is YES.
 
 ### Write flow control
 Write flow control intend to slow down user's message writes such that there's
