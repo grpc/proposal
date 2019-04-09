@@ -25,14 +25,13 @@ N/A
 
 ## Proposal
 
-I propose adding a new module within grpcio called `compression` that defines
-the following constants.
+I propose adding a new `Compression` class defined as follows.
 
 ```python
-NoCompression = _cygrpc.GRPC_COMPRESS_NONE
-Deflate = _cygrpc.GRPC_COMPRESS_DEFLATE
-Gzip = _cygrpc.GRPC_COMPRESS_GZIP
-StreamGzip = _cygrpc.GRPC_COMPRESS_STREAM_GZIP
+class Compression(enum.IntEnum):
+    NoCompression = _cygrpc.GRPC_COMPRESS_NONE
+    Deflate = _cygrpc.GRPC_COMPRESS_DEFLATE
+    Gzip = _cygrpc.GRPC_COMPRESS_GZIP
 ```
 
 These contants mirror those in gRPC core.
