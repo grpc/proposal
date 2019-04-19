@@ -2,10 +2,10 @@ gRPC Objective-C Interceptor
 ----
 * Author(s): mxyan
 * Approver: psrini
-* Status: Draft
+* Status: In Review
 * Implemented in: Objective-C
 * Last updated: 2019-04-18
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/7QGmsQW86Ss
 
 ## Abstract
 
