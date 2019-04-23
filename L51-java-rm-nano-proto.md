@@ -5,7 +5,7 @@ Java: Drop support for Protobuf's Javanano
 * Status: In Review
 * Implemented in: Java
 * Last updated: 2019-04-22
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/d/topic/grpc-io/ErFnaXbIuZc/discussion
 
 ## Abstract
 
