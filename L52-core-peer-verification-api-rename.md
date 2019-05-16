@@ -5,7 +5,7 @@ Rename verify_peer_options struct to grpc_verify_peer_options in grpc_security.h
 * Status:
 * Implemented in:
 * Last updated: May 14, 2019
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/52xBb0vMbKQ
 
 ## Abstract
 
