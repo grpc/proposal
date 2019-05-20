@@ -15,7 +15,7 @@ Proposes the interceptor architecture and API for gRPC Objective-C.
 
 gRPC interceptor has been a popular utility for users making HTTP requests.
 gRPC Objective-C library has received a number of requests to add support of
-this feature to gRPC. The old gRPC Objective-C library API was not flexiable enough to support interceptor API. With the [new API](https://github.com/grpc/proposal/blob/master/L38-objc-api-upgrade.md), now it is possible to add in this support.
+this feature to gRPC. The old gRPC Objective-C library API was not flexible enough to support interceptor API. With the [new API](https://github.com/grpc/proposal/blob/master/L38-objc-api-upgrade.md), now it is possible to add in this support.
 
 ### Use cases
 The use cases for interceptor is wide; a few examples include:
@@ -23,17 +23,18 @@ The use cases for interceptor is wide; a few examples include:
 * Collect metrics
 * Obtain/Refresh access tokens
 * Create test stub
+* Response caching
 * ...
 
 ### Requirements
 
 Requirements of interceptor API are
-* Allows access to headers, messages, and trailers
-* Allows access to call destination, paths, verbs, and call configuration parameters
+* Allows modification to headers, messages, and trailers
+* Allows modifications to call destination, paths, verbs, and call configuration parameters
 * Supports Bi-di streaming
 * Allows short-circuiting calls (interceptor can terminate the call)
 * Allows interceptors to specify their own dispatch queue
-* Scope interceptors separately without direct access to each other's states
+* Scope interceptors separately without direct read and write access to each other's states
 * Allows state sharing between interceptors when initiated by the interceptor author
 
 Some optional requirements that we may not implement at the initial stage
@@ -231,7 +232,7 @@ The current interceptor design does not allow intercepting protobuf message. Sin
 
 This problem makes it difficult for an interceptor that would like, e.g., to change a protobuf field in the request. One solution is to have the interceptor deserialize the message in the interceptor, modify it, serialize it again, then pass it on. Such an approach works but is inefficient.
 
-A possible enhancement to solve this problem is to introduce the concept of serializer to GRPCCall2 interface. It can be an object conforming to a serializer interface and passed along with callOptions.
+A possible enhancement to solve this problem is to introduce the concept of *marshaller* to GRPCCall2 interface. It can be an object conforming to a marshaller interface and passed along with callOptions.
 
 ```objectivec
 
@@ -250,7 +251,7 @@ A possible enhancement to solve this problem is to introduce the concept of seri
 
 @end
 ```
-After all the alternations in the interceptors, GRPCCall2Internal object uses the serializer to transform the data before passing it to core.
+After all the interceptors processing, GRPCCall2Internal object uses the marshaller to transform the data before passing it to core. The marshaller effectively delays serialization of outbound messages after the interceptors have processed them, so that interceptors can process them as proto messages.
 
 Though there are some potential use cases for this feature, it can be implemented independent of the proposal above.
 
