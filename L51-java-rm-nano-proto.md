@@ -1,10 +1,10 @@
 Java: Drop support for Protobuf's Javanano
 ----
 * Author(s): [Eric Anderson](https://github.com/ejona86)
-* Approver: a11r
-* Status: In Review
+* Approver: voidzcy
+* Status: Final
 * Implemented in: Java
-* Last updated: 2019-04-22
+* Last updated: 2019-05-21
 * Discussion at: https://groups.google.com/d/topic/grpc-io/ErFnaXbIuZc/discussion
 
 ## Abstract
