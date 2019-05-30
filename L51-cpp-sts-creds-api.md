@@ -1,21 +1,21 @@
-Title
+STS CallCredentials in C++
 ----
 * Author(s): Julien Boeuf
 * Approver: a11r
 * Status: Draft
 * Implemented in: core, cpp
 * Last updated: May 20, 2019
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/Bam9eLaI62Q
 
 ## Abstract
 
-This is a proposal to add support for a new type of credentials in the cpp stack implementing the [OAuth 2.0 Token Exchange](https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16) which documents a protocol for an HTTP- and JSON- based Security Token Service (STS) by defining how to request and obtain security tokens from OAuth 2.0 authorization servers, including security tokens employing impersonation and delegation.
+This is a proposal to add support for a new type of credentials in the cpp stack implementing the [OAuth 2.0 Token Exchange][oauth-token-exchange] which documents a protocol for an HTTP- and JSON- based Security Token Service (STS) by defining how to request and obtain security tokens from OAuth 2.0 authorization servers, including security tokens employing impersonation and delegation.
 
 ## Background
 
-[OAuth 2.0 Token Exchange](https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16) is the proposed standard for exchanging tokens, for scenarios where a client needs to access a resource that does not natively accept the credentials created by the authentication system used by the client. In these settings, enabling credential exchange can provide better security: Otherwise, the client needs to acquire a different set of credentials to access the resource, and the new credentials must be managed securely.
+[OAuth 2.0 Token Exchange][oauth-token-exchange] is the proposed standard for exchanging tokens for scenarios where a client needs to access a resource that does not natively accept the credentials created by the authentication system used by the client. In these settings, enabling credential exchange can provide better security: Otherwise, the client needs to acquire a different set of credentials to access the resource, and the new credentials must be managed securely.
 
-For instance, Kubernetes workloads can securely obtain credentials from their platform, and they can use these to authenticate to other entities in the cluster, or to the Kubernetes API itself. However, if a Kubernetes workload requires access to a cloud provider's API, it needs a separate set of secrets, and a way to deploy these secrets securely. With credential exchange this is no longer necessary: The workload credential can be directly exchanged for a short-lived token for the cloud API. We expect this type of interaction to become a best practice, as it eliminates a number of problematic patterns, such as secrets checked into code repos, or stored in improperly ACL'ed files.
+For instance, Kubernetes workloads can securely obtain credentials from their platform, and they can use these to authenticate to other entities in the cluster or to the Kubernetes API server itself. However, if a Kubernetes workload requires access to a cloud provider's API, it needs a separate set of secrets and a way to deploy these secrets securely. With credential exchange this is no longer necessary: The workload credential can be directly exchanged for a short-lived token for the cloud API. We expect this type of interaction to become a best practice, as it eliminates a number of problematic patterns, such as secrets checked into code repos or stored in improperly ACL'ed files.
 
 ### Related Proposals:
 None.
@@ -87,3 +87,5 @@ Other languages should get STS support from their own authentication library.
 
 ## Open issues (if applicable)
 None.
+
+[oauth-token-exchange]: https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16
