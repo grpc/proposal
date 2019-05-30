@@ -4,7 +4,7 @@ STS CallCredentials in C++
 * Approver: a11r
 * Status: Draft
 * Implemented in: core, cpp
-* Last updated: May 20, 2019
+* Last updated: May 30, 2019
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/Bam9eLaI62Q
 
 ## Abstract
