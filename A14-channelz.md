@@ -176,9 +176,6 @@ not be desired.  As mentioned in the section above, if there are any descendent
 channels, there will be no sockets.  This invariant exists to simplify the
 DAG structure, and more closely match the known implementations of gRPC.
 
-![channel hierarchy 3][channel hierarchy 3]
-
-
 ## Servers
 
 Servers are conceptually simpler than channels, and thus do not have the same
@@ -259,9 +256,9 @@ connections.  By default it includes the following:
 * Number of streams started, succeeded, or failed.
 * Number of gRPC messages sent and received.
 * Number of keepalive messages sent.
-* The last time a outbound stream was started and the last time an inbound
+* The last time an outbound stream was started and the last time an inbound
   stream was started.
-* The last time a outbound message was sent and the last time an inbound
+* The last time an outbound message was sent and the last time an inbound
   message was received.
 * The amount of flow control window granted to the remote endpoint, and the
   amount of flow control window granted by remote endpoint.
@@ -286,9 +283,9 @@ Calls may send and receive any number of messages, including zero.
 The number of keepalives sent represents how often the local endpoint wants to
 keep the socket alive.  Generally this is an HTTP/2 PING frame.  However, not
 all PING frames are keep alives.  Specifically, pings that were sent as a reply
-(ACK bit set) or were used for reasons unrelated to keep alives should not count
+(ACK bit set) or were used for reasons unrelated to keep alive should not count
 towards this.  For example, if pings were used to measure network bandwidth,
-they would not be treated as keep alives.   The intent is to measure how often
+they would not be treated as keep alive.   The intent is to measure how often
 the local endpoint is doing extra work to keep the connection alive.
 
 
@@ -320,7 +317,7 @@ information available.  To address these differences, each socket option name
 and value is expressed as a string.
 
 If there is a more structured form (such as TCP info), it too can be included
-in the socket option message.  At least one of the string form or the structured
+in the socket option message.  At least one of the string forms or the structured
 form should be present.  The additional data is exposed as a Proto3 Any field,
 to accommodate types added later.  A few default messages are included for the
 common options, such as that for TCP Info, and socket timeouts.
@@ -341,7 +338,7 @@ impractical, though they are encouraged to do so.
 An important part of debugging a connection is finding "who" the socket is
 connected to.  To answer this question each socket exposes a remote and a local
 address field.  The address implies what kind of socket it is (e.g. TCP, UDP,
-UDS, etc.) as well as the the identity used to establish the connection (e.g.
+UDS, etc.) as well as the identity used to establish the connection (e.g.
 IP Address, port number, filename, etc.).
 
 Not every socket has a remote address;  listening sockets may only include a
@@ -392,7 +389,7 @@ For example, the following sequence of events could occur: (C = client, S = serv
 1.  C sends GetTopChannels(id=0)
 2.  S sends RootChannels 1, 5, 9 but not 12, 13, 17, 18
 3.  C sends GetTopChannels(id=9+1)
-4.  S send RootChannels 12, 13, 17 but not 18
+4.  S sends RootChannels 12, 13, 17 but not 18
 5.  C sends GetTopChannels(id=17+1)
 6.  S sends RootChannels 18, end=true
 
@@ -466,7 +463,7 @@ the root channel, they do not fit in the Channel > Subchannel > Socket
 structure.
 
 Additionally, subchannels are practically identical to channels; the only
-difference is there location in the tree.  Even though they would have had a
+difference is their location in the tree.  Even though they would have had a
 specific message type, it didn't make sense to have two substantially equivalent
 messages.
 
@@ -511,7 +508,7 @@ stop setting an arbitrary field?)
 ## Page-Offset or Continuation Token Pagination
 
 Pagination of results makes it possible to load just some of the large amount of
-data.  A simple way to do this is to to include the page number and the size of
+data.  A simple way to do this is to include the page number and the size of
 the page to jump to the specific page of results.  Users of the pages can think
 of them as actual book pages (i.e. the "nth" page).  Implementers can easily
 retrieve the results since the offset can be calculated in constant time.
@@ -639,7 +636,6 @@ errors about the channel not being found.
 [message ref structure]: A14_graphics/1.png "Message Reference Structure"
 [channel hierarchy 1]: A14_graphics/2.png "Channel Hierarchy"
 [channel hierarchy 2]: A14_graphics/3.png "Channel Hierarchy"
-[channel hierarchy 3]: A14_graphics/4.svg "Channel Hierarchy"
 [connectivity-semantics]: https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
 
 
