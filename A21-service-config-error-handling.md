@@ -62,8 +62,9 @@ configuration.
 		valid service config is received.
 5. If the resolver does not support service config resolution OR if no gRPC
 config is received OR if gRPC config is received but no service config is
-chosen, the client should use the default service config, if configured, or
-empty service config if no default service config was provided.
+chosen (in case of the DNS resolver), the client should use the default service
+config, if configured, or empty service config if no default service config was
+provided.
 
 ### Criteria to determine the validity of a service config
 
