@@ -9,8 +9,11 @@ Static strings for `method` and `host` for the input to `grpc_channel_register_c
 
 ## Abstract
 
-This proposal proposes a requirement to only accept static strings for
-`method` and `host` as the arguments to `grpc_channel_register_call()`.
+This proposal proposes a requirement to only accept static strings (i.e.,
+kept alive while gRPC is running) for `method` and `host` as the arguments to
+`grpc_channel_register_call()`.
+
+This change requires a major bump of gRPC version.
 
 ## Background
 
