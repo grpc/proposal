@@ -5,7 +5,7 @@ Static strings for `method` and `host` for the input to `grpc_channel_register_c
 * Status: In Review
 * Implemented in: core
 * Last updated: 2019-06-05
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/iYwUVQKU-OU
 
 ## Abstract
 
@@ -20,7 +20,7 @@ non-static strings for `method` and `host`, we have to conservatively intern the
 strings since `grpc_channel_register_call()` is not clear about the ownership
 and life-time of `method` and `host`. Interning `method` and `host` results in
 unnecessary ref-counting and cache-line contention for every single call. This
-can be eliminated by making static.
+can be eliminated by making them static.
 
 ## Proposal
 
@@ -31,8 +31,8 @@ be kept valid while the server is up.
 ## Rationale
 
 `method` and `host` are reffed for every call. Doing an atomic fetch-add per
-call is quite expensive, and truly unnecessary since the strings can be easily
-kept alive while the channel is alive.
+call is quite expensive, and truly unnecessary since the strings can easily be
+kept alive while the server is up.
 
 ## Implementation
 
