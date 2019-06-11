@@ -37,5 +37,5 @@ kept alive while the server is up.
 ## Implementation
 
 This is basically a simple comment update and removing `grpc_slice_intern()`
-calls for `mehtod` and `host`, as implemented in
+calls for `method` and `host`, as implemented in
 [PR #19263](https://github.com/grpc/grpc/pull/19263).
