@@ -5,12 +5,12 @@ gRPC Python Server Wait API
 * Status: Draft
 * Implemented in: Python
 * Last updated: June 12, 2019
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/GhJl_JHfaHA
 
 ## Abstract
 
 Add a `wait_for_termination` API for Python server that can block in any thread
-until the server is stopped/terminated.
+until the server is stopped or terminated.
 
 ## Background
 
@@ -111,9 +111,10 @@ class Server:
 
 Besides the main-thread restriction, there are several more issues:
 
-1) The grace variable set here is not necessary the source of truth, because
-   other thread can call `server.Stop` as well;
-2) The semantic of delay is hard to define that which signal should it react to.
+1) The `grace` variable set here is not necessary the source of truth. Other
+   thread can call `server.Stop` as well;
+2) The semantic of delay is hard to define. It have to define which subset of
+   signals should it handle, and should each signal have different behaviors.
 
 ## Implementation
 
