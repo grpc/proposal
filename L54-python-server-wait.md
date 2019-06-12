@@ -16,8 +16,8 @@ until the server is stopped or terminated.
 
 Currently, the gRPC Python server only provides a `server.Start()` API, but
 there isn't any API to block forever. gRPC Python server applications need to
-explicitly block on main thread to keep serving. The solution the gRPC Python
-team proposed in examples is sleeping for a period of time then exit. See code:
+block on the main thread to keep serving explicitly. The solution the gRPC
+Python team proposed in examples is sleeping for a while then exit. See code:
 
 ```Python
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
@@ -79,10 +79,10 @@ class Server:
 ### Alternative Design: Await For Signal
 
 The termination of a long-running process usually come as a SIGTERM signal. So,
-in this version of design, the method adds signal handler that will clean up
-resources and delay the shutdown if necessary. However, due to that CPython can
-only register signal handler in mani thread. Calling this function in other
-thread will be problematic. It means we cannot properly use it in our own unit
+in this version of the design, the method adds a signal handler that cleans up
+resources and delays the shutdown if necessary. However, due to that, CPython
+can only register the signal handler in the main thread. Calling this function
+in another thread is problematic. It means we cannot properly use it in our unit
 tests.
 
 ```Python
@@ -113,7 +113,7 @@ Besides the main-thread restriction, there are several more issues:
 
 1) The `grace` variable set here is not necessary the source of truth. Other
    thread can call `server.Stop` as well;
-2) The semantic of delay is hard to define. It have to define which subset of
+2) The semantic of delay is hard to define. It has to define which subset of
    signals should it handle, and should each signal have different behaviors.
 
 ## Implementation
