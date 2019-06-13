@@ -14,7 +14,7 @@ until the server is stopped or terminated.
 
 ## Background
 
-Currently, the gRPC Python server only provides a `server.Start()` API, but
+Currently, the gRPC Python server only provides a `server.start()` API, but
 there isn't any API to block forever. gRPC Python server applications need to
 block on the main thread to keep serving explicitly. The solution the gRPC
 Python team proposed in examples is sleeping for a while then exit. See code:
@@ -55,21 +55,28 @@ None.
 
 ## Proposal
 
-This gRFC propose to add following API to `grpc.Server` interface:
+This gRFC proposes that we add the following API to `grpc.Server` interface:
 
 ```Python
 class Server:
 
-    def wait_for_termination(self):
+    def wait_for_termination(self, timeout=None):
         """Block current thread until the server stops.
-        
+
         This is an EXPERIMENTAL API.
+
+        The wait will not consume computational resources during blocking, and
+        it will block until one of the two following conditions are met:
+
+        1) The server is stopped or terminated;
+        2) A timeout occurs if timeout is not `None`.
         
-        The wait will not consume computational resources during blocking, and it
-        will block indefinitely. There are two ways to unblock:
-        
-        1) Calling `stop` on the server in another thread;
-        2) The `__del__` of the server object is invoked.
+        The timeout argument works in the same way as `threading.Event.wait()`.
+        https://docs.python.org/3/library/threading.html#threading.Event.wait
+
+        Args:
+          timeout: A floating point number specifying a timeout for the
+            operation in seconds.
         """
         raise NotImplementedError()
 ```
@@ -115,6 +122,35 @@ Besides the main-thread restriction, there are several more issues:
    thread can call `server.Stop` as well;
 2) The semantic of delay is hard to define. It has to define which subset of
    signals should it handle, and should each signal have different behaviors.
+
+### Alternative Design: Return a Threading.Event
+
+Proposed by @mehrdada in https://github.com/grpc/grpc/pull/19299.
+
+A simplified design will be provide the application necessary information to
+let them handle the blocking logic themselves.
+
+```Python
+class Server:
+
+    def termination_event(self) -> threading.Event:
+        """Returns a event that will set when the server terminates.
+
+        Usage like:
+        server = grpc.server(...)
+        server.start()
+        server.termination_event().wait()
+
+        Returns:
+          A threading.Event object.
+        """
+        raise NotImplementedError()
+```
+
+The down side of this deign:
+1) Adds cognitive cost for users to understand how `threading.Event` work;
+2) The semantic is not that clear as `wait_for_termination` suggesting.
+3) @mehrdada Users may `set` or `clear` this event.
 
 ## Implementation
 
