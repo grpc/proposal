@@ -2,7 +2,7 @@ gRPC Python Server Wait API
 ----
 * Author(s): lidiz
 * Approver: gnossen
-* Status: Draft
+* Status: In Review
 * Implemented in: Python
 * Last updated: June 12, 2019
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/GhJl_JHfaHA
