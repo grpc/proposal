@@ -2,10 +2,10 @@ Title
 ----
 * Author(s): muxi
 * Approver: psrini
-* Status: Draft
+* Status: In Review
 * Implemented in: Objective-C
 * Last updated: 2019-06-17
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/tRKcPcfQKi4
 
 ## Abstract
 
