@@ -161,7 +161,7 @@ Hedged requests should be sent to distinct backends, if possible. To facilitate 
 If `hedgingPolicy` is specified in a service config choice, the following validation rules apply:
 1. `maxAttempts` MUST be specified and MUST be a JSON integer value greater than 1. Values greater than 5 are treated as 5 without being considered a validation error.
 2. `hedgingDelay` is an optional field but if specified MUST follow the JSON representation of proto3 Duration type.
-3. `nonFatalStatusCodes` MUST be specified as a JSON array of status codes and MAY be empty. Each status code MUST be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
+3. `nonFatalStatusCodes` is an optional field but if specified MUST be specified as a JSON array of status codes. Each status code MUST be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
 
 ![State Diagram](A6_graphics/basic_hedge.png)
 
@@ -476,7 +476,7 @@ The retry policy is transmitted to the client through the service config mechani
         // Status codes are specified in the integer form or the case-insensitive
         // string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"])
         //
-        // This field is required and may be empty.
+        // This field is optional and may be empty.
         "nonFatalStatusCodes": []
       }
 
