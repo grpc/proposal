@@ -476,7 +476,7 @@ The retry policy is transmitted to the client through the service config mechani
         // Status codes are specified in the integer form or the case-insensitive
         // string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"])
         //
-        // This field is optional and may be empty.
+        // This field is optional.
         "nonFatalStatusCodes": []
       }
 
