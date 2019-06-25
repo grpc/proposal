@@ -55,9 +55,12 @@ determine which choice will be selected by a given client:
     // "python", etc).  Each string is case insensitive.
     "clientLanguage": [string],
     // Percentage: integer from 0 to 100 indicating the percentage of
-    // clients that should use this choice.  If present, the number must
-    // match the regular expression `^0|[0-9]|[1-9][0-9]|100$`
-    // All other numbers are considered invalid.
+    // clients that should use this choice.  Each client's resolver should
+    // compute its percentage at startup and use the same percentage for the
+    // lifetime of the resolver; if the client's computed percentage is less
+    // than the value of this field, then it is considered a match.
+    // If present, the number must match the regular expression
+    // `^0|[0-9]|[1-9][0-9]|100$`.  All other values are considered invalid.
     "percentage": number,
     // Client hostname(s): a list of strings.  Each name is case 
     // sensitive and must be an exact match of the hostname according to
