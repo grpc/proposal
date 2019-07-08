@@ -1,7 +1,7 @@
 gRPC Objective-C Bazel Build Support
 ----
 * Author: tonyzhehaolu
-* Approver: mxyan, psrini
+* Approver: mxyan
 * Status: Draft
 * Implemented in: Bazel and Starlark
 * Last updated: Today's date
@@ -45,19 +45,28 @@ The gist of these custom rules is to run protobuf compiler and Objective-C plugi
 
 We use the native `proto_library` rule as a manager for `.proto` files (i.e. their package paths and dependencies). They wrap the proto files and are passed into `objc_proto_lib` and `objc_grpc_lib` as `srcs`. As a result of using `proto_library`, proto files must not reside in a upper-level directory to the `BUILD` file.
 
-Due to naming rules within the protobuf compiler, we first need to convert file names into camel case in order to correctly declare all the output files. Given which pair of files will be compiled (Messages or Services) as a boolean parameter, file extensions will either be `.pbrpc.h/.m` or `.pbobjc.h/.m`.
+Due to naming rules within the protobuf compiler, we first need to convert file names into camel case in order to correctly declare all the output files. File extensions are either `.pbobjc.h/.m` or `.pbrpc.h/.m`, give the pair of files that will be compiled (Messages or Services, respectively) as a boolean parameter.
 
-The ObjC plugin will be one of the arguments. The precise arguments will be formatted by the libary function `get_plugin_args` provided in `//bazel:protobuf.bzl`.
+The ObjC plugin is one of the arguments. The precise arguments is formatted by the libary function `get_plugin_args` provided in `//bazel:protobuf.bzl`.
 
-If the proto files depend any of the "well known" proto files like `empty.proto` defined in `@com_google_protobuf//google/protobuf/`, this external rule `@com_google_protobuf//:well_known_protos` is needed in order to add those files into arguments.
+If the proto files are depend on any of the "well known" proto files like `empty.proto` defined in `@com_google_protobuf//google/protobuf/`, this external rule `@com_google_protobuf//:well_known_protos` is needed in order to add those files into arguments.
 
-Outputs will be generated in directories managed by Bazel. They will be further splitted into two groups - one for headers and the other for sources - and then passed into a native `objc_library` rule for the final product.
+Outputs will be generated in directories managed by Bazel. They will be further splitted into two groups - one for `hdrs` and the other for `srcs`/`non_arc_srcs` - and then passed into a native `objc_library` rule for the final compiled library. Note that one `objc_proto/grpc_lib` might need to depend on others as well.
 
 ### Example
 
 Suppose a very simple HelloWorldClient project with a single proto file `//HelloWorld/hello.proto` with both messages and services. Assume that it depends on one of the well known protos.
 
-Configure `WORKSPACE` as instructed in this [tutorial](https://docs.bazel.build/versions/master/tutorial/ios-app.html) and also load `grpc_deps` in `@com_github_grpc_grpc//bazel:grpc_deps.bzl`.
+Configure `WORKSPACE` as instructed in this [tutorial](https://docs.bazel.build/versions/master/tutorial/ios-app.html) and also load `grpc_deps`:
+```
+git_repository(
+    name = "com_github_grpc_grpc",
+    remote = "https://github.com/grpc/grpc.git",
+    branch = "master"
+)
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+grpc_deps()
+```
 
 And here is the `BUILD` file:
 ```
@@ -112,4 +121,4 @@ The implementation is almost complete. Simple use cases like the one above are a
 
 For the time being, the paths of `.proto` files are really significant. For instance, in the official route guide [example](https://github.com/grpc/grpc/tree/master/examples) by gRPC authors, the proto files are organized in `//proto/route_guide.proto`. With the current implementation, the import path will be `#import<proto/RouteGuide.pbrpc.h>`. It should be better if we can set it to `#import<RouteGuide/RouteGuide.pbrpc.h>`. This is plausible but still being experimented. It will not break the existing API, but at most add an argument in `objc_proto_lib` and `objc_grpc_lib`.
 
-If the `proto_library` is compiled on its own, Bazel might complain about some symbols not defined, which is not resolvable without breaking our custom rules. We are thinking about using only file names as `srcs` instead of `proto_library` targets.
+If the `proto_library` is compiled on its own, Bazel might complain that some symbols are not defined, which is not resolvable without breaking our custom rules. We are thinking about using only file names as `srcs` instead of `proto_library` targets.
