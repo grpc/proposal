@@ -2,9 +2,9 @@ Title
 ----
 * Author(s): muxi
 * Approver: psrini
-* Status: In Review
+* Status: Approved
 * Implemented in: Objective-C
-* Last updated: 2019-06-17
+* Last updated: 2019-07-10
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/tRKcPcfQKi4
 
 ## Abstract
