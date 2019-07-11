@@ -28,9 +28,9 @@ For now, assume that the `WORKSPACE` root is the gRPC repository.
 
 ### Dependency Graph
 
-![gRPC Objective-C Library Dependency](L56_graphics/dependency.png)
-
 According to the dependencies in an iOS application that uses gRPC Objc library (shown below), we created two `objc_library` targets in the `src/objective-c` package within the `com_github_grpc_grpc` workspace: `grpc_objc_client` and `grpc_objc_rpc`.
+
+![gRPC Objective-C Library Dependency](L56_graphics/dependency.png)
 
 * Target `//src/objective-c:grpc_objc_client` compiles all the files in `GRPCClient/` and `RxLibrary/`. It is dependent on a ready rule `//:grpc` which compiles core gRPC. It is publicly visible so that any application-specific Objective-C code can depend on it. It is only necessary when the app does not use protocol buffers (which means the service stub libraries, plus all that they are dependent on, are not included) - it is a rare case.
 * `//src/objective-c:grpc_objc_rpc` does the `ProtoRPC/` directory. It is also made publicly visible so that the generated service stubs can be compiled depending on this rule. Users do not need to manually add this label to `deps`, though.
@@ -54,13 +54,13 @@ For both rules, it is also possible to tell that [well known protos](https://git
 
 In terms of the execution of `protoc`, the command is similar to that in a [podspec](https://github.com/grpc/grpc/blob/0803c79411597f58eae0b12b4eb272c506b8cdbb/examples/objective-c/helloworld/HelloWorld.podspec) (all `.proto` targets in `deps`, including their transitive dependencies, are provided as inputs, and their directory from the `WORKSPACE` root are added to `-I` flags programmatically). The output directory is set to `//bazel-out/<*product type specific*>/bin/<package name>/_generated_protos/` so that bazel is able to locate the generated files.
 
-Generated files in the directory above follow the same hiearchy as the `.proto` files. Consider this project where we are building from package `//A`:
+Generated files in the directory above follow the same hierarchy as the `.proto` files. Consider this project where we are building from package `//A`:
 
-![Hiearchy Example](L56_graphics/hiearchy1.png)
+![hierarchy Example](L56_graphics/hierarchy1.png)
 
 The resulting structure in `bin` will be:
 
-![Hiearchy Result Example](L56_graphics/hiearchy2.png)
+![hierarchy Result Example](L56_graphics/hierarchy2.png)
 
 Lastly, three other targets are created to split the files into `hdrs`, `srcs` (potentially empty, since there might be no service stubs), and `non_arc_srcs`. They will be fed into a `objc_library` rule.
 
@@ -69,7 +69,7 @@ When `#import`-ing `.proto` and `.pb*.{h,m}` files, always use their *absolute p
 
 ### Example
 
-Consider the hiearchy from the above section and further suppose that `world.proto` imports both `hello.proto` and `grpc.proto`. Also suppose that `grpc.proto` and `world.proto` have service stubs defined which we would like to use.
+Consider the hierarchy from the above section and further suppose that `world.proto` imports both `hello.proto` and `grpc.proto`. Also suppose that `grpc.proto` and `world.proto` have service stubs defined which we would like to use.
 
 Note that the correct import statements in `world.proto` should be:
 ```
