@@ -41,10 +41,10 @@ This has the following consequences
   as there is no real reason for gRPC users to use IAsyncEnumerator<T> directly.
 - the user code that references `IAsyncEnumerator<T>` explicitly will need to change all the occurences to use `Grpc.Core.IAsyncStreamReader<T>` 
   instead. Note that this is the best we can do as there is no way to prevent avoid a breakage if a type gets removed.
- 
-The exact way of making the change is in 
 
-#### Change 2: Introduce common concept of a channel that can be used by different implementations
+Proposed PR: https://github.com/grpc/grpc/pull/19059
+
+#### Change 2: Introduce common concept of a channel "ChannelBase" that can be used by different implementations
 
 Motivation: gRPC currently has 2 implementations: gRPC C# and grpc-dotnet. While based on 2 different network stack,
 it is highly desirable that these two implementation share the same API for invoking (=client) and handling (=server) calls.
@@ -52,17 +52,17 @@ On the client side, the challenge is that the `Channel` API has been historicall
 of the C-core based implementation, and as such it is difficult to use for the grpc-dotnet implementation in its current form. Therefore, the grpc-dotnet implementation currently doesn't expose the concept of a "Channel" explicitly. This doesn't limit the basic functionality of grpc-dotnet clients, but it will likely become a problem as more advanced features are added in the future. Therefore, we propose introducing a common concept of a channel that can be used by both implementations.
 
 Proposed changes:
-- introduce a new `ChannelBase` class and make the current `Channel` class inherit from it
-- 
-https://github.com/grpc/grpc/pull/19599/files the breaking change: ClientBase constructor now takes a ChannelBase
+- Introduce a new `ChannelBase` class and make the current `Channel` class inherit from it. `ChannelBase` will represent the shared concept of a client-side channel.
+- `ClientBase` (parent class for all generated client classes) will take `ChannelBase` in constructor instead of `Channel`.
+  This is not a source breaking change, but it is a binary breaking change (requires recompile).
+  The advantages of making this breaking change is that it allows unifying the client side API for all gRPC implementations.
+  
+Proposed PR: https://github.com/grpc/grpc/pull/19599/files
 
-
-from our codebase by moving
-
-advantages:
-ClientBase can be moved to Grpc.Core.Api (not done yet in this PR)
-LiteClientBase can be removed (not done yet in this PR)   (need to change constructor in generated code).
-Client packages like Grpc.Reflection can now depend Grpc.Core.Api. They will work with C-Core client and .NET HttpClient client. (but code needs to be regenerated)
+Advantages:
+- ClientBase can be moved to Grpc.Core.Api (not done yet in this PR)
+- LiteClientBase can be removed (not done yet in this PR)   (need to change constructor in generated code).
+- Client packages like Grpc.Reflection can now depend Grpc.Core.Api. They will work with C-Core client and .NET HttpClient client. (but code needs to be regenerated)
 only a binary breaking change (= recompiling the code will fix things).
 
 
