@@ -30,7 +30,8 @@ is made at the same time, there will be no extra cost to users, but there will b
 Therefore we do both changes at the same time and release the next gRPC C# version as  
 v2.23.0 (instead of v1.23.0).
 
-**Change 1 (remove type that conflicts with .NET base class library)**
+#### Change 1: Remove the type that conflicts with .NET base class library
+
 Remove the references to `System.Collections.Generic.IAsyncEnumerator<T>` (the type that's now in conflict
 with .NET base class libraries) from our codebase. Methods declared by that interface will be moved to 
 to an existing type `Grpc.Core.IAsyncStreamReader<T>` (which inherits from `IAsyncEnumerator<T>`).
@@ -43,7 +44,7 @@ This has the following consequences
  
 The exact way of making the change is in https://github.com/grpc/grpc/pull/19059
 
-**Change 2 (introduce ChannelBase class)**
+#### Change 2: Introduce common concept of a channel that can be used by different implementations
 
 gRPC currently has 2 implementations: gRPC C# and grpc-dotnet. While based on 2 different network stack,
 it is highly desirable that these two implementation share the same API for invoking (=client) and handling (=server) calls.
