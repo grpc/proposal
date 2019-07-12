@@ -11,7 +11,7 @@ gRPC C# 2.x Release
 
 gRPC C# implementation will do a breaking change in the next release, which
 also forces a major version increase because we follow semantic versioning.
-This document summarizes the changes made and the reasons why the are needed.
+This document summarizes what are the changes being made and the reasons why they are needed.
 It also describes the impact on the users and documents the migration steps.
 
 ## Background
