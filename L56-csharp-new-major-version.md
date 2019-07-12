@@ -17,7 +17,7 @@ It also describes the impact on the users and documents the migration steps.
 ## Background
 
 .NET Core framework is adding new types in the next release, but these
-types conflict with types that are used by one of our dependencies and by our code.
+types conflict with types provided by one of our dependencies and which are used by our code.
 In order to keep gRPC C# working with future .NET releases, we are forced to remove
 the conflicting types from our codebase. See https://github.com/grpc/grpc/issues/18592
 for more technical details.
