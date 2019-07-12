@@ -56,7 +56,7 @@ Proposed changes:
   This qualifies as a binary-level breaking change (requires recompile).
   The advantages of making this breaking change is that it allows unifying the client channel side API for all gRPC implementations.
   
-Proposed PR: https://github.com/grpc/grpc/pull/19599/files
+Proposed PR: https://github.com/grpc/grpc/pull/19599
 
 ## Rationale
 
@@ -86,6 +86,6 @@ Most of proposed changes already exist in form of a PR
 
 To upgrade from gRPC C# v1.x to v2.x:
 - just upgrade the nuget packages and rebuild your project. Note that assemblies built against gRPC v1.x might not work against v2.x without rebuilding first.
-- if your code contains any direct references to `IAsyncEnumerator<T>` change them to `Grpc.Core.IAsyncStreamReader<T>` (which has exactly the same members as the original interface) and rebuild your project.
+- if your code contains any direct references to `IAsyncEnumerator<T>`, change all of them to `Grpc.Core.IAsyncStreamReader<T>` (which has exactly the same members as the original interface) and rebuild your project.
 
 Note that are NO protocol changes between gRPC C# version 2.x and 1.x - both versions are fully interoperable with each other and also with all other gRPC implementations.
