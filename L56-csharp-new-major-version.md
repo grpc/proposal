@@ -42,17 +42,14 @@ This has the following consequences
 - the user code that references `IAsyncEnumerator<T>` explicitly will need to change all the occurences to use `Grpc.Core.IAsyncStreamReader<T>` 
   instead. Note that this is the best we can do as there is no way to prevent avoid a breakage if a type gets removed.
  
-The exact way of making the change is in https://github.com/grpc/grpc/pull/19059
+The exact way of making the change is in 
 
 #### Change 2: Introduce common concept of a channel that can be used by different implementations
 
-gRPC currently has 2 implementations: gRPC C# and grpc-dotnet. While based on 2 different network stack,
+Motivation: gRPC currently has 2 implementations: gRPC C# and grpc-dotnet. While based on 2 different network stack,
 it is highly desirable that these two implementation share the same API for invoking (=client) and handling (=server) calls.
 On the client side, the challenge is that the `Channel` API has been historically designed to accomodate some specifics
-of the C-core based implementation, and as such it is difficult to use for the grpc-dotnet implementation in its current form.
-Therefore, the grpc-dotnet implementation currently doesn't expose the concept of a "Channel" explicitly. This doesn't limit
-the basic functionality of grpc-dotnet clients, but it will likely become a problem as more advanced features are being added
-in the future. Therefore, we propose introducing a common concept of a channel that can be used by both implementations.
+of the C-core based implementation, and as such it is difficult to use for the grpc-dotnet implementation in its current form. Therefore, the grpc-dotnet implementation currently doesn't expose the concept of a "Channel" explicitly. This doesn't limit the basic functionality of grpc-dotnet clients, but it will likely become a problem as more advanced features are added in the future. Therefore, we propose introducing a common concept of a channel that can be used by both implementations.
 
 Proposed changes:
 - introduce a new `ChannelBase` class and make the current `Channel` class inherit from it
@@ -76,5 +73,15 @@ only a binary breaking change (= recompiling the code will fix things).
 
 ## Implementation
 
-[A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
+Most of proposed changes already exist in form of a PR
+- `IAsyncEnumerator` dependency will be removed in https://github.com/grpc/grpc/pull/19059
+- `ChannelBase` will be introduced in https://github.com/grpc/grpc/pull/19599
+- jtattermusch will update the gRPC C# version for the next release to 1 -> 2
 
+## Migration instructions for users
+
+To upgrade from gRPC C# v1.x to v2.x:
+- just upgrade the nuget packages and rebuild your project. Note that assemblies built against gRPC v1.x might not work against v2.x without rebuilding first.
+- if your code contains any direct references to `IAsyncEnumerator<T>` change them to `Grpc.Core.IAsyncStreamReader<T>` (which has exactly the same members as the original interface) and rebuild your project.
+
+Note that are NO protocol changes between gRPC C# version 2.x and 1.x - both versions are fully interoperable with each other and also with all other gRPC implementations.
