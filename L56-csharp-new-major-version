@@ -9,19 +9,48 @@ gRPC C# 2.x Release
 
 ## Abstract
 
-[A short summary of the proposal.]
+gRPC C# implementation will do a breaking change in the next release, which
+also forces a major version increase because we follow semantic versioning.
+This document summarizes the changes made and the reasons why the are needed.
+It also describes the impact on the users and documents the migration steps.
 
 ## Background
 
-[An introduction of the necessary background and the problem being solved by the proposed change.]
-
-
-### Related Proposals: 
-* A list of proposals this proposal builds on or supersedes.
+.NET Core framework is adding new types in the next release, but these
+types conflict with types that are used by one of our dependencies and by our code.
+In order to keep gRPC C# working with future .NET releases, we are forced to remove
+the conflicting types from our codebase. See https://github.com/grpc/grpc/issues/18592
+for more technical details.
 
 ## Proposal
 
-[A precise statement of the proposed change.]
+This proposal has two parts, which should be considers as a whole. Change 1 (which is forced by the language ecosystem)
+will necessarily lead to binary breaking change (users will need to recompile their code) so if Change 2
+is made at the same time, there will be no extra cost to users, but there will be some significant benefits.
+
+**Change 1 (remove type that conflicts with .NET base class library)**
+Remove the references to `System.Collections.Generic.IAsyncEnumerator<T>` (the type that's now in conflict
+with .NET base class libraries) from our codebase. Methods declared by that interface will be moved to 
+the types inheriting from `IAsyncEnumerator<T>` to minimize the number of changes users need to do in their code
+(the expectation is that most users shouldn't need to do any changes)
+
+The exact way of making the change is in https://github.com/grpc/grpc/pull/19059
+
+
+**Change 2 (introduce ChannelBase class)**
+
+https://github.com/grpc/grpc/pull/19599/files
+the breaking change: ClientBase constructor now takes a ChannelBase
+
+
+from our codebase by moving
+
+advantages:
+ClientBase can be moved to Grpc.Core.Api (not done yet in this PR)
+LiteClientBase can be removed (not done yet in this PR)   (need to change constructor in generated code).
+Client packages like Grpc.Reflection can now depend Grpc.Core.Api. They will work with C-Core client and .NET HttpClient client. (but code needs to be regenerated)
+only a binary breaking change (= recompiling the code will fix things).
+
 
 ## Rationale
 
@@ -32,6 +61,3 @@ gRPC C# 2.x Release
 
 [A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
 
-## Open issues (if applicable)
-
-[A discussion of issues relating to this proposal for which the author does not  know the solution. This section may be omitted if there are none.]
