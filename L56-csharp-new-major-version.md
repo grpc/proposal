@@ -27,7 +27,7 @@ for more technical details.
 This proposal has two parts, which should be considered as a whole. Change 1 (which is forced by the language ecosystem)
 will necessarily lead to binary breaking change (users will need to recompile their code) so if Change 2
 is made at the same time, there will be no extra cost to users, but there will be some significant benefits.
-Therefore the overall plan is do both changes at the same time and release the next gRPC C# version as  
+Therefore we do both changes at the same time and release the next gRPC C# version as  
 v2.23.0 (instead of v1.23.0).
 
 **Change 1 (remove type that conflicts with .NET base class library)**
