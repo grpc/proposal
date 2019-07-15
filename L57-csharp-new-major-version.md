@@ -5,7 +5,7 @@ gRPC C# 2.x Release
 * Status: Draft
 * Implemented in: C#
 * Last updated: 2019-07-11
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/PeVsif_fzog
 
 ## Abstract
 
