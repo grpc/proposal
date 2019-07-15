@@ -2,10 +2,10 @@ gRPC Objective-C Bazel Build Support
 ----
 * Author: tonyzhehaolu
 * Approver: mxyan
-* Status: Draft
+* Status: In Review
 * Implemented in: Bazel and Starlark
 * Last updated: Jul 11, 2019
-* Discussion at: ???
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/p6Z8kfc1koQ
 
 ## Abstract
 
