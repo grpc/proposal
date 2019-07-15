@@ -29,15 +29,19 @@ will necessarily lead to binary breaking change (users will need to recompile th
 is made at the same time, there will be no extra cost to users, but there will be some significant benefits.
 Therefore we will make both changes at the same time and release the next gRPC C# version as v2.23.0 (instead of v1.23.0).
 
+We chose version v2.23.0 instead of v2.0.0 so that the minor version number can still be used for comparing how old a given release is relative to all other gRPC implementations. E.g. gRPC C# 2.24.x will be released together with gRPC C++ 1.24.x.
+
+NO protocol changes are proposed between gRPC C# version 2.x and 1.x - both versions will be fully interoperable with each other and also with all other gRPC implementations.
+
 #### Change 1: Remove the type that conflicts with .NET base class library
 
 Remove the references to `System.Collections.Generic.IAsyncEnumerator<T>` (the type that's now in conflict
 with .NET base class libraries) from our codebase. Methods declared by that interface will be moved to 
 to an existing type `Grpc.Core.IAsyncStreamReader<T>` (which inherits from `IAsyncEnumerator<T>`).
 This has the following consequences:
-- any user code that doesn't explicitly explicitly reference `IAsyncEnumerator<T>` will continue working with
+- any user code that doesn't explicitly reference `IAsyncEnumerator<T>` will continue working with
   no changes required, users will only need to recompile. We expect this is going to be the case for majority of users,
-  as there is no real reason for gRPC users to use IAsyncEnumerator<T> directly.
+  as there is no real reason for gRPC users to use `IAsyncEnumerator<T>` directly.
 - the user code that references `IAsyncEnumerator<T>` explicitly will need to change all the occurences to use `Grpc.Core.IAsyncStreamReader<T>` 
   instead. Note that offering a replacement type is the best we can do here as there is simply no way to avoid a source-level breakage in codebase that directly uses a type which needs to be removed.
 
@@ -88,4 +92,4 @@ To upgrade from gRPC C# v1.x to v2.x:
 - just upgrade the nuget packages and rebuild your project. Note that assemblies built against gRPC v1.x might not work against v2.x without rebuilding first.
 - if your code contains any direct references to `IAsyncEnumerator<T>`, change all of them to `Grpc.Core.IAsyncStreamReader<T>` (which has exactly the same members as the original interface) and rebuild your project.
 
-Note that are NO protocol changes between gRPC C# version 2.x and 1.x - both versions are fully interoperable with each other and also with all other gRPC implementations.
+The migration is fully transparent to the remote peers - gRPC C# version 2.x and 1.x are fully interoperable with each other and also with all other gRPC implementations.
