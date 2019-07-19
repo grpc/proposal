@@ -4,7 +4,7 @@ gRPC Objective-C Bazel Build Support
 * Approver: mxyan
 * Status: In Review
 * Implemented in: Bazel and Starlark
-* Last updated: Jul 11, 2019
+* Last updated: Jul 18, 2019
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/p6Z8kfc1koQ
 
 ## Abstract
@@ -28,14 +28,14 @@ For now, assume that the `WORKSPACE` root is the gRPC repository.
 
 ### Dependency Graph
 
-According to the dependencies in an iOS application that uses gRPC Objc library (shown below), we created two `objc_library` targets in the `src/objective-c` package within the `com_github_grpc_grpc` workspace: `grpc_objc_client` and `grpc_objc_rpc`.
+According to the dependencies in an iOS application that uses gRPC Objc library (shown below), we created two `objc_library` targets in the root package within the `com_github_grpc_grpc` workspace: `grpc_objc_client` and `proto_objc_rpc`.
 
 ![gRPC Objective-C Library Dependency](L56_graphics/dependency.png)
 
-* Target `//src/objective-c:grpc_objc_client` compiles all the files in `GRPCClient/` and `RxLibrary/`. It is dependent on a ready rule `//:grpc` which compiles core gRPC. It is publicly visible so that any application-specific Objective-C code can depend on it. It is only necessary when the app does not use protocol buffers (which means the service stub libraries, plus all that they are dependent on, are not included) - it is a rare case.
-* `//src/objective-c:grpc_objc_rpc` does the `ProtoRPC/` directory. It is also made publicly visible so that the generated service stubs can be compiled depending on this rule. Users do not need to manually add this label to `deps`, though.
+* Target `//:grpc_objc_client` compiles all the files in `src/objective-c/GRPCClient/`, dependent on `//:grpc` which compiles core gRPC and `//:rx_library` which compiles `src/objective-c/RxLibrary`. It is publicly visible so that any application-specific Objective-C code can depend on it. It is only necessary when the app does not use protocol buffers (which means the service stub libraries, plus all that they are dependent on, are not included) - it is a rare case.
+* `//:proto_objc_rpc` does the `src/objective-c/ProtoRPC/` directory. It is also made publicly visible so that the generated service stubs can be compiled depending on this rule. Users do not need to manually add this label to `deps`, though.
 * The Objective-C stubs are generated *and compiled* into native Bazel `objc_library` targets via `objc_proto_grpc_library` and `objc_grpc_library`. Details about these two custom rules are discussed in the upcoming sections.
-* Although "app-specific resources" depend on multiple libraries in the graph, users only need to add `objc_proto_grpc_library`'s and `objc_grpc_library`'s they defined. This is because the dependency on gRPC-protoRPC and gRPC-ObjC-client are carried along by those two rules.
+* Although "app-specific resources" depend on multiple libraries in the graph, users only need to add the `objc_proto_grpc_library` and (or) `objc_grpc_library` targets they defined. This is because the dependency on gRPC-protoRPC and gRPC-ObjC-client are carried along by those two rules.
 * All the necessary external dependencies are loaded with `grpc_deps()` in `//bazel:grpc_deps.bzl` and are hidden from users.
 
 ### Rules for Compiling `.proto` Files
@@ -46,7 +46,7 @@ We use the native `proto_library` rule as a manager for `.proto` files (i.e. the
 
 `objc_proto_grpc_library` takes in as `deps` a list of `proto_library` targets and geneates the message stubs (excluding the service ones) for these targets and all their transitively dependent protos.
 
-`objc_grpc_library`, in addition to `proto_library` targets, takes in a list of file names of `.proto` files as `srcs`. The list of `.proto` files should all contain service stubs; otherwise Bazel will complain about certain `.pbrpc.{h,m}` files not being generated. `objc_grpc_library`, in addition to message stubs, generates services stubs for a `.proto` file if and only if the `.proto` file is listed in `srcs`.
+`objc_grpc_library`, in addition to `proto_library` targets, takes in a list of labels of `.proto` files as `srcs`. The list of `.proto` files should all contain service stubs; otherwise Bazel will complain about certain `.pbrpc.{h,m}` files not being generated. `objc_grpc_library`, in addition to message stubs, generates services stubs for a `.proto` file if and only if the `.proto` file is listed in `srcs`.
 
 As a result of compiling every `.proto` files in the dependency chain, the app-specific code only needs to depend on the one or the few `objc_(proto_)grpc_library`'s at the bottom of the dependency graph.
 
@@ -65,6 +65,11 @@ The resulting structure in `bin` will be:
 Lastly, three other targets are created to split the files into `hdrs`, `srcs` (potentially empty, since there might be no service stubs), and `non_arc_srcs`. They will be fed into a `objc_library` rule.
 
 When `#import`-ing `.proto` and `.pb*.{h,m}` files, always use their *absolute paths* from the `WORKSPACE` root.
+
+
+### Compatibility with Google3
+
+In order to smoothen the transition to Google3, we defined a function in `bazel/grpc_build_system.bzl` that is loaded in `/BUILD` - `grpc_objc_library`. In the open-source version, this function solely passes the attributes to a `native.objc_library`. In Google3, however, the implementation of this function is different; it passes a subset of the attributes to `native.objc_library` but it also injects some dependencies and generates other targets according to circumstances.
 
 
 ### Example
@@ -115,7 +120,7 @@ objc_grpc_library(
     name = "world_grpc_objc",
     srcs = [
         "protos/world.proto",
-        "//B/D/grpc.proto", # since we need the service stubs from these two files
+        "//B/D:grpc.proto", # since we need the service stubs from these two files
     ],
     deps = [":world_proto"]
 )
@@ -145,4 +150,4 @@ The implementation is almost done by tonyzhehaolu.
 
 ## Open Issues
 
-The way to specify which `.proto` files (in rule `objc_grpc_library`) need to be compiled also for service stubs is open for discussion. For now, if the `.proto` file resides within the package root, it's referred to with a path relative to the package root (`protos/world.proto`); otherwise, it's referred to with an absolute path from the `WORKSPACE` root (`//B/D/grpc.proto`). 
+For the time being, `objc_(proto_)grpc_library` is unable to detect if a label in `srcs` crosses package boundaries. Namely, if a the `grpc.proto` (as in the example above) is referred to as `//B:D/grpc.proto` instead of `//B/D:grpc.proto`, it is still accepted.
