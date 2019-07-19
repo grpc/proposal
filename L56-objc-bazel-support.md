@@ -84,6 +84,7 @@ Note that the correct import statements in `world.proto` should be:
 
 Configure `WORKSPACE` as instructed in this [tutorial](https://docs.bazel.build/versions/master/tutorial/ios-app.html) and also load `grpc_deps` for binding external git repositories such as `@com_google_protobuf`:
 ```
+# The choice of name here is significant, because some bzl scripts are directly dependent on the name @com_github_grpc_grpc
 git_repository(
     name = "com_github_grpc_grpc",
     remote = "https://github.com/grpc/grpc.git",
