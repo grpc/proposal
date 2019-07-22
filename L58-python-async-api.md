@@ -413,6 +413,11 @@ other out of box.
 3) Also, the current contract of API constraint ourselves from changing their
    behavior after GA for two years.
 
+## Related Issues
+
+* https://github.com/grpc/grpc/issues/6046
+* https://github.com/grpc/grpc/issues/18376
+
 ## Implementation
 
 * TBD
