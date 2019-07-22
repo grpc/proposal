@@ -4,8 +4,8 @@ Async API for gRPC Python
 * Approver: a11r
 * Status: Draft
 * Implemented in: Python
-* Last updated: 2019-07-09
-* Discussion at: __TBD__
+* Last updated: 2019-07-22
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/7V7HYM_aph4
 
 ## Abstract
 
