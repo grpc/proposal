@@ -383,7 +383,7 @@ while 1:
     await stub.AsyncReportLoad(ReportRequest(
         timestamp=...,
         metrics=[...],
-    ))  # <- RPC not sent
+    ))
     await asyncio.sleep(3)
 ```
 
