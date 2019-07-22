@@ -10,11 +10,11 @@ Async API for gRPC Python
 ## Abstract
 
 A brand new set of async API that will solve concurrency issues and performance
-issues for gRPC Python. This set of API is available to Python 3.6+.
+issues for gRPC Python, which is available to Python 3.6+.
 
 ## Motivation
 
-* Asynchronous processing that perfectly fits IO-intensive gRPC use cases;
+* Asynchronous processing perfectly fits IO-intensive gRPC use cases;
 * Resolve a long-living design flaw of thread exhaustion problem;
 * Performance is much better than the multi-threading model.
 
@@ -118,8 +118,8 @@ object, and incompatibilities:
 > implementation-private concurrent.futures._base.CancelledError and the
 > built-in-but-only-in-3.3-and-later TimeoutError.
 
-Although the design of `Future` in Python finally settled down, it's not
-recommended to expose low-level API like `asyncio.Future` object. The Python
+Although the design of `Future` in Python finally settled down, it's **not
+recommended** to expose low-level API like `asyncio.Future` object. The Python
 documentation suggests that we should let the application to decide which
 `Future` implementation they want to use, and hide the ways to operate them
 directly.
@@ -131,22 +131,19 @@ directly.
 
 ### Python Coroutines in `asyncio`
 
-Python has several types of coroutine objects (see
-[Coroutines](https://docs.python.org/3/reference/datamodel.html#coroutines)).
-But this section will focus on how they interact with `asyncio` module. In a
-single-threaded application, creating a coroutine object doesn't necessarily
-mean it is scheduled to be executed in the event loop.
+In a single-threaded application, creating a coroutine object doesn't
+necessarily mean it is scheduled to be executed in the event loop.
 
-The functions defined by `async def` is primarily a function that returns a
+The functions defined by `async def`, underlying, is a function that returns a
 Python generator. If the program calls an `async def` function, it will NOT be
 executed. This behavior is one of the main reason why mixing `async def`
 function with normal function is a bad idea.
 
 There are three mechanisms to schedule coroutines:
 
-1. Await the coroutine;
-2. Submit the coroutine to the event loop object;
-3. Turn coroutine into an `asyncio.Task` object.
+1. Await the coroutine `await asyncio.sleep(1)`;
+2. Submit the coroutine to the event loop object `loop.call_soon(coro)`;
+3. Turn coroutine into an `asyncio.Task` object `asyncio.ensure_future(coro)`.
 
 ## Proposal
 
@@ -231,7 +228,7 @@ Changes in `grpc.aio.GenericRpcHandler`:
 
 Changes in `grpc.aio.RpcMethodHandler`:
 * All servicer handlers are coroutines;
-* (Debatable) Deserializer / serializer remain normal Python functions.
+* Deserializer / serializer remain normal Python functions.
 
 Changes in `grpc.ServicerContext`:
 * `invocation_metadata` method returns an `asyncio.Future` object;
@@ -367,9 +364,9 @@ coroutine object gets deallocated without execution, the interpreter will log an
 ```
 RuntimeWarning: coroutine '...' was never awaited
 ```
-
+<!-- 
 Except for the `MultiCallable` classes, I have inspected our APIs and found no
-particularly valid use case for the fire-and-forget pattern.
+particularly valid use case for the fire-and-forget pattern. -->
 
 ### Story for testing
 
@@ -418,4 +415,4 @@ other out of box.
 
 ## Implementation
 
-* N/A yet
+* TBD
