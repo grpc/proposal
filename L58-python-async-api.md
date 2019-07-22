@@ -192,6 +192,36 @@ cases:
   `ThreadPoolExecutor`;
 * Interfaces returning `Future` object are replaced.
 
+### Demo Snippet of Async API
+
+Server side:
+```Python
+class AsyncGreeter(helloworld_pb2_grpc.GreeterServicer):
+
+    async def SayHello(self, request, context):
+        await asyncio.sleep(1)
+        return helloworld_pb2.HelloReply(message='Hello, %s!' % request.name)
+
+server = grpc.aio.server()
+server.add_insecure_port(":50051")
+helloworld_pb2_grpc.add_GreeterServicer_to_server(Greeter(), server)
+server.start()
+await server.wait_for_termination()
+```
+
+Client side:
+```Python
+# Python 3.6 and lower
+with grpc.aio.insecure_channel("localhost:50051") as channel:
+    stub = echo_pb2_grpc.EchoStub(channel)
+    response = await stub.Hi(echo_pb2.EchoRequest(message="ping"))
+
+# Or using asynchronous context manager for Python3.7 and up
+async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    stub = echo_pb2_grpc.EchoStub(channel)
+    response = await stub.Hi(echo_pb2.EchoRequest(message="ping"))
+```
+
 ### Channel-Side
 
 Changes in `grpc.aio.Channel`:
