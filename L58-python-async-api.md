@@ -57,19 +57,6 @@ To read more about `asyncio` implementation in CPython, see:
 * [Python-Level
   implementation](https://github.com/python/cpython/blob/3.7/Lib/asyncio)
 
-<!-- ### Benefits Of `asyncio`
-
-* Asynchronous processing that perfectly fits IO-intensive gRPC usage;
-* Resolve a long-living design flaw of thread exhaustion problem;
-* Performance is much better than multi-threaded.
-
-### Drawbacks Of `asyncio`
-
-* Non-interoperability between coroutine functions and normal functions;
-* Cognitive overhead of event loop mechanism;
-* Calls to function may cause context-switches which resulted in unexpected
-  behavior. -->
-
 ### Python's Future
 
 Currently, there are two futures in the standard library.
@@ -211,12 +198,6 @@ await server.wait_for_termination()
 
 Client side:
 ```Python
-# Python 3.6 and lower
-with grpc.aio.insecure_channel("localhost:50051") as channel:
-    stub = echo_pb2_grpc.EchoStub(channel)
-    response = await stub.Hi(echo_pb2.EchoRequest(message="ping"))
-
-# Or using asynchronous context manager for Python3.7 and up
 async with grpc.aio.insecure_channel("localhost:50051") as channel:
     stub = echo_pb2_grpc.EchoStub(channel)
     response = await stub.Hi(echo_pb2.EchoRequest(message="ping"))
@@ -229,7 +210,7 @@ Changes in `grpc.aio.Channel`:
   `stream_tream` will be `MultiCallable` objects in `grpc.aio`.
 
 Changes in `grpc.aio.Call`:
-* All methods return `asyncio.Future` object.
+* All methods return coroutine object.
 
 Changes for `MultiCallable` classes in `grpc.aio`:
 * `grpc.aio.UnaryUnaryMultiCallable` and `grpc.aio.StreamUnaryMultiCallable`
@@ -261,7 +242,7 @@ Changes in `grpc.aio.RpcMethodHandler`:
 * Deserializer / serializer remain normal Python functions.
 
 Changes in `grpc.ServicerContext`:
-* `invocation_metadata` method returns an `asyncio.Future` object;
+* `invocation_metadata` method returns a coroutine object;
 * `send_initial_metadata` method is a coroutine and returns an `asyncio.Task`
   object.
 
@@ -287,6 +268,7 @@ Changes in `ClientInterceptor` classes in `grpc.aio`:
 ### Utility Functions
 
 Changes in `grpc.aio.channel_ready_future`:
+* Renamed into `grpc.aio.channel_ready`;
 * Accepts a `grpc.aio.Channel`;
 * Returns a coroutine object.
 
@@ -394,9 +376,6 @@ coroutine object gets deallocated without execution, the interpreter will log an
 ```
 RuntimeWarning: coroutine '...' was never awaited
 ```
-<!-- 
-Except for the `MultiCallable` classes, I have inspected our APIs and found no
-particularly valid use case for the fire-and-forget pattern. -->
 
 ### Story for testing
 
