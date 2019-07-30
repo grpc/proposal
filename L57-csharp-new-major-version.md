@@ -2,7 +2,7 @@ gRPC C# 2.x Release
 ----
 * Author(s): jtattermusch
 * Approver: a11r
-* Status: Draft
+* Status: Approved
 * Implemented in: C#
 * Last updated: 2019-07-11
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/PeVsif_fzog
