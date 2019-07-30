@@ -82,7 +82,7 @@ Note that the correct import statements in `world.proto` should be:
 #import "B/D/grpc.proto"
 ```
 
-Configure `WORKSPACE` as instructed in this [tutorial](https://docs.bazel.build/versions/master/tutorial/ios-app.html) and also load `grpc_deps` for binding external git repositories such as `@com_google_protobuf`:
+Configure `WORKSPACE` as shown below. Load `grpc_deps` for binding external git repositories such as `@com_google_protobuf` and other iOS-related dependencies:
 ```
 # The choice of name here is significant, because some bzl scripts are directly dependent on the name @com_github_grpc_grpc
 git_repository(
@@ -94,6 +94,12 @@ git_repository(
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 
 grpc_deps()
+
+load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
+apple_rules_dependencies()
+
+load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
+apple_support_dependencies()
 ```
 
 The `BUILD` file for this sample project can be written similar to the following snippet. Assume that this is the `BUILD` file for package `//A` and there is a `proto_library` target defined in package `//B` for `grpc.proto`, named `grpc_proto`.
@@ -142,7 +148,7 @@ Again, import the geneated stubs in the app-specific source files as:
 
 ## Implementation
 
-The implementation is almost done by tonyzhehaolu.
+The implementation is done by tonyzhehaolu.
 
 
 ## Open Issues
