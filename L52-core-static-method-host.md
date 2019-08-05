@@ -2,7 +2,7 @@ Static strings for `method` and `host` for the input to `grpc_channel_register_c
 ----
 * Author(s): [Soheil Hassas Yeganeh](https://github.com/soheilhy)
 * Approver: vjpai, yashykt
-* Status: In Review
+* Status: Approved
 * Implemented in: core
 * Last updated: 2019-06-05
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/iYwUVQKU-OU
