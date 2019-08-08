@@ -527,11 +527,11 @@ On the other hand, there are actually one valid use case that we should keep
 abstract class -- interceptors. To be more specific, the following interfaces
 won't be replaced by concrete classes:
 
-* grpc.ServerInterceptor
-* grpc.UnaryUnaryClientInterceptor
-* grpc.UnaryStreamClientInterceptor
-* grpc.StreamUnaryClientInterceptor
-* grpc.StreamStreamClientInterceptor
+* `grpc.ServerInterceptor`
+* `grpc.UnaryUnaryClientInterceptor`
+* `grpc.UnaryStreamClientInterceptor`
+* `grpc.StreamUnaryClientInterceptor`
+* `grpc.StreamStreamClientInterceptor`
 
 ## Rationale
 
