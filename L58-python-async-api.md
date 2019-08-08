@@ -1,10 +1,10 @@
 Async API for gRPC Python
 ----
-* Author(s): lidiz
-* Approver: a11r
-* Status: Draft
+* Author(s): lidizheng
+* Approver: gnossen
+* Status: In Review
 * Implemented in: Python
-* Last updated: 2019-07-22
+* Last updated: 2019-08-07
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/7V7HYM_aph4
 
 ## Abstract
@@ -187,7 +187,7 @@ class AsyncGreeter(helloworld_pb2_grpc.GreeterServicer):
 
     async def SayHello(self, request, context):
         await asyncio.sleep(1)
-        return helloworld_pb2.HelloReply(message='Hello, %s!' % request.name)
+        return helloworld_pb2.HelloReply(message="Hello, %s!" % request.name)
 
 server = grpc.aio.server()
 server.add_insecure_port(":50051")
@@ -310,6 +310,79 @@ generated on the same page.
 
 ## Controversial Details
 
+### Unified Stub Call
+
+Currently, for RPC invocations, gRPC Python provides 3 options: `__call__`,
+`with_call`, and `futures`. They behaves slightly different in whether block or
+not, and the number of return values (see
+[UnaryUnaryMultiCallable](https://grpc.github.io/grpc/python/grpc.html#grpc.UnaryUnaryMultiCallable)
+for details). Developers have to bare in mind the subtlety between these 3
+options across 4 types of RPC (not all combination are supported).
+
+Semantically, those 3 options grant users ability to:
+1. Directly getting the RPC response.
+2. Check metadata of the RPC.
+3. Control the life cycle of the RPC.
+4. Handle the RPC failure.
+
+It is understandable for current design to provide different options, since
+Python doesn't have a consensus `Future` before. The simplicity of an RPC call
+will be ruined if the original designer of gRPC Python API tries to merge those
+3 options.
+
+However, thanks to the official definition of `asyncio.Task`/`asyncio.Future`.
+They can be merged into one method by returning a `grpc.aio.Call` that extends
+(or composites) `asyncio.Task`.
+
+In `asyncio`, it is expected to `await` on asynchronous operations. Hence, it is
+nature for stub calls to return an `asyncio.Task` compatible object, which
+representing the RPC call.
+
+Also, the `grpc.aio.Call` object provides gRPC specific semantics to manipulate
+the ongoing RPC. So, all above functionality can be solved by one single merged
+method.
+
+```Python
+# Usage 1: A simple call
+response = await stub.Hi(...)
+
+# Usage 2: Check metadata
+call = stub.Hi(...)
+if validate(await call.initial_metadata()):
+    response = await call
+    print(f'Getting response [{response}] with code [{call.code()}]')
+else:
+    raise ValueError('Failed to validate initial metadata')
+
+# Usage 3: Control the life cycle
+call = stub.Hi(...)
+await async_stuff_that_takes_time()
+if call.is_active() and call.time_remaining() < REMAINING_TIME_THRESHOLD:
+    call.cancel()
+
+# Usage 4: Error handling
+try:
+    response = await stub.FailedHi(...)
+except grpc.RpcError as rpc_error:
+    print(f'RPC failed: {rpc_error.code()}')
+```
+
+### Support Thread And Process Executors
+
+The new API intended to solve all concurrency issue with asynchronous I/O.
+However, it also introduces a migration challenge for our users. For users who
+want to gradually migrate from current stack to async stack, their potentially
+non-asyncio native logic may block the entire thread. If the thread is blocked,
+then the event loop will be blocked, then the whole process will end up
+deadlocking.
+
+This is not needed for users who are willing to build entire program upon
+`asyncio`, and it is introducing complex concurrency maintenance burden.
+
+Also, by supporting this executors, we can allow users to mix async and sync
+method handlers on the server side, which further reduce the burden of
+migration.
+
 ### Generator Or Asynchronous Generator?
 
 For streaming calls, the requests on the client-side are supplied by generator
@@ -377,7 +450,7 @@ coroutine object gets deallocated without execution, the interpreter will log an
 RuntimeWarning: coroutine '...' was never awaited
 ```
 
-### Story for testing
+## Story For Testing
 
 For new `asyncio` related behavior, we will write unit tests dedicated to the
 new stack. However, currently, there are more than a hundred test cases in gRPC
@@ -391,6 +464,71 @@ manual labor may still be required for this approach.
 
 We should compare the cost of manual refactoring and wrapper when we want to
 reuse the existing test cases.
+
+## Other Official Packages
+
+Besides `grpcio` package, currently gRPC Python also own:
+
+* `grpcio-tools` (no service)
+* `grpcio-testing`
+* `grpcio-reflection`
+* `grpcio-health-checking`
+* `grpcio-channelz`
+* `grpcio-status` (no service)
+
+Apart from `grpcio-tools` and `grpcio-status`, all other packages have at least
+one gRPC service implementation. They will also require migration to adopt
+`asyncio`. This design doc propose to keep their current API untouched, and add
+new sets of async APIs.
+
+## Flow Control Enforcement
+
+To propagate HTTP/2 flow control push back, the new async API needs to aware of
+the flow control mechanism. Most complex logic is handled in C-Core, except
+there is a single rule the wrapper layer needs to follow: there can only be one
+outstanding read/write operation on each call.
+
+It means if the application fires two write in parallel, one of them have to
+wait until the other one finishes. Also, that rule doesn't prohibit reading and
+writing at the same time.
+
+So, even if all the read/write is asynchronous in `asyncio`, we will have to
+either enforce the rule ourselves by adding locks in our implementation. Or we
+can pass down the synchronization responsibility to our users.
+
+## Concrete Class Instead of Interfaces
+
+Interface is a design pattern that defines the contract of an entity that allows
+different implementation to work seamlessly in a system. In the past, gRPC
+Python has been using metaclass based Python interface pattern. It works just
+like interface in Golang and Java, except the error is generated in runtime
+instead of compile time.
+
+If the gRPC Python has multiple implementation for a single interface, the use
+of the design pattern provides productivity in unifying their behavior. However,
+almost non interfaces has second implementation, even if they do, they are
+depends directly on our concrete implementation, which should be considered as
+inheritance than "implements".
+
+Also, in the past, dependents of gRPC Python have observed several failure
+caused by the interface. The interface constraints our ability to add
+experimental API. Once we change even slightly with interfaces, the downstream
+implementations are likely to break.
+
+Since this is a new opportunity for us to re-design, we need to think cautiously
+about how do we empower our users to extend our classes. For majority of cases,
+we are providing the only implementation for the interface, and we should
+convert them into concrete classes.
+
+On the other hand, there are actually one valid use case that we should keep
+abstract class -- interceptors. To be more specific, the following interfaces
+will remain the same:
+
+* grpc.ServerInterceptor
+* grpc.UnaryUnaryClientInterceptor
+* grpc.UnaryStreamClientInterceptor
+* grpc.StreamUnaryClientInterceptor
+* grpc.StreamStreamClientInterceptor
 
 ## Rationale
 
