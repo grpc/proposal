@@ -178,6 +178,7 @@ cases:
 * `grpc.aio.server` no longer require the application to provide a
   `ThreadPoolExecutor`;
 * Interfaces returning `Future` object are replaced.
+* Client RPC invocation merges from `__call__`, `with_call` and `futures` into one.
 
 ### Demo Snippet of Async API
 
@@ -201,6 +202,9 @@ Client side:
 async with grpc.aio.insecure_channel("localhost:50051") as channel:
     stub = echo_pb2_grpc.EchoStub(channel)
     response = await stub.Hi(echo_pb2.EchoRequest(message="ping"))
+
+    async for response in stub.StreamingHi(...):
+        process(response)
 ```
 
 ### Channel-Side
@@ -210,15 +214,12 @@ Changes in `grpc.aio.Channel`:
   `stream_tream` will be `MultiCallable` objects in `grpc.aio`.
 
 Changes in `grpc.aio.Call`:
-* All methods return coroutine object.
+* All methods return coroutine object;
+* Implements `grpc.aio.Task` API for unary response;
+* Implements asynchronous generator API for stream response;
 
 Changes for `MultiCallable` classes in `grpc.aio`:
-* `grpc.aio.UnaryUnaryMultiCallable` and `grpc.aio.StreamUnaryMultiCallable`
-  returns `Awaitable` object for `__call__`;
-* `grpc.aio.UnaryUnaryMultiCallable` and `grpc.aio.StreamUnaryMultiCallable`
-  returns `(Awaitable, grpc.aio.Call)` for `with_call`;
-* `grpc.aio.UnaryStreamMultiCallable` and `grpc.aio.StreamStreamMultiCallable`
-  returns an asynchronous generator for `__call__`;
+* Returns a `grpc.aio.Call` object;
 * `grpc.aio.StreamUnaryMultiCallable` and `grpc.aio.StreamStreamMultiCallable`
   takes in an asynchronous generator as `request_iterator` argument.
 
@@ -272,6 +273,12 @@ Changes in `grpc.aio.channel_ready_future`:
 * Accepts a `grpc.aio.Channel`;
 * Returns a coroutine object.
 
+```Python
+async with grpc.aio.insecure_channel(...) as channel:
+    await grpc.aio.channel_ready(channel)
+    ...
+```
+
 ### Shared APIs
 
 APIs in the following categories remain in top level:
@@ -298,10 +305,9 @@ def add_GreeterServicer_to_server(servicer, server):
   ...
 ```
 
-As you can see, the `channel` and `server` object are passed in by the
-application. Thanks to the dynamic nature of Python, the generated code is
-agnostic to which set of API the application uses, as long as we respect the
-method name in our API contract.
+Both `channel` and `server` object are passed in by the application. The
+generated code is agnostic to which set of API the application uses, as long as
+we respect the method name in our API contract.
 
 ### API Reference Doc Generation
 
@@ -376,11 +382,8 @@ non-asyncio native logic may block the entire thread. If the thread is blocked,
 then the event loop will be blocked, then the whole process will end up
 deadlocking.
 
-This is not needed for users who are willing to build entire program upon
-`asyncio`, and it is introducing complex concurrency maintenance burden.
-
-Also, by supporting this executors, we can allow users to mix async and sync
-method handlers on the server side, which further reduce the burden of
+However, by supporting the executors, we can **allow mixing async and sync**
+**method handlers** on the server side, which further reduce the cost of
 migration.
 
 ### Generator Or Asynchronous Generator?
@@ -507,8 +510,8 @@ instead of compile time.
 If the gRPC Python has multiple implementation for a single interface, the use
 of the design pattern provides productivity in unifying their behavior. However,
 almost non interfaces has second implementation, even if they do, they are
-depends directly on our concrete implementation, which should be considered as
-inheritance than "implements".
+depends directly on our concrete implementation, which should better using
+inheritance or composition than interfaces.
 
 Also, in the past, dependents of gRPC Python have observed several failure
 caused by the interface. The interface constraints our ability to add
@@ -517,12 +520,12 @@ implementations are likely to break.
 
 Since this is a new opportunity for us to re-design, we need to think cautiously
 about how do we empower our users to extend our classes. For majority of cases,
-we are providing the only implementation for the interface, and we should
+we are providing the only implementation for the interface. We should
 convert them into concrete classes.
 
 On the other hand, there are actually one valid use case that we should keep
 abstract class -- interceptors. To be more specific, the following interfaces
-will remain the same:
+won't be replaced by concrete classes:
 
 * grpc.ServerInterceptor
 * grpc.UnaryUnaryClientInterceptor
@@ -560,11 +563,20 @@ other out of box.
 3) Also, the current contract of API constraint ourselves from changing their
    behavior after GA for two years.
 
+## Pending Topics
+
+Reviewers has thrown many valuable proposals. This design doc may not be the
+ideal place for those discussions.
+* Re-design streaming API on the server side to replace the iterator pattern.
+* Re-design the connectivity API to be consistent with C-Core.
+* Design a easy way to use channel arguments [grpc#19734](https://github.com/grpc/grpc/issues/19734).
+
 ## Related Issues
 
 * https://github.com/grpc/grpc/issues/6046
 * https://github.com/grpc/grpc/issues/18376
+* https://github.com/grpc/grpc/projects/16
 
 ## Implementation
 
-* TBD
+* TODO
