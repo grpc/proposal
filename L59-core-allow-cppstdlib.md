@@ -5,7 +5,7 @@ Allow C++ standard library in gRPC Core Library
 * Status: Draft
 * Implemented in: n/a
 * Last updated: August 19, 2019
-* Discussion at: <TBD>
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/umQyyXmNr2w
 
 ## Abstract
 
@@ -62,13 +62,13 @@ have full C++11 standard library.
 Using C++ standard library gives us several advantages:
 - gRPC Core can use all useful and essential classes in C++ standard library.
   This allows us not to reinvent everything which are already available.
-- gRPC Core can use other libraries which requires C++ standard library.
+- gRPC Core can use other libraries which require C++ standard library.
   Previously linking to abseil or protobuf was impossible because it requires C++
   standard library. With this, we can consider it.
 
-All previous restrictions not to link the library are arbitrary and it can
-change anytime because it's not part of standard or specification but
-implementation details. Having gRPC built by `gcc` and `libstdc++` doesn't
+All previous restrictions not to link the C++ standard library are arbitrary
+and it can change anytime because it's not part of standard or specification
+but implementation details. Having gRPC built by `gcc` and `libstdc++` doesn't
 guarantee that it can achieve the same goal with `clang` and `libc++`.
 
 ## Implementation
