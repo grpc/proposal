@@ -199,4 +199,4 @@ For the time being, `objc_grpc_library` is unable to detect if a label in `srcs`
 
 `tvos_unit_test` is not ready for use, so are `tvos_application` and `watchos_application`. Related issue: [here](https://github.com/bazelbuild/rules_apple/issues/523).
 
-By Aug 20, the `objc_proto_library` was already removed from Bazel as a native rule. It will probably be remove officially in 0.29. Therefore, we will need to split `objc_grpc_library` into two in the near future in order to stick with the convension in Google3.
+By Aug 20, the `objc_proto_library` was already removed from Bazel as a native rule. It will probably be remove officially in 0.29. Therefore, we will need to split `objc_grpc_library` into two in the near future in order to stick with the convension in Google3. This will not be discussed here as it's related to how the rules are implemented in Google3.
