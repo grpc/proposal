@@ -145,6 +145,48 @@ Again, import the geneated stubs in the app-specific source files as:
 #import "B/D/Grpc.pbrpc.h"
 ```
 
+## Migrating Tests and Examples to Bazel
+
+With Bazel basically up and running, some of the unit tests of Objective-C library are being migrated to Bazel for shorter test durations. The migration is already completed to the greated extent as for the current stage. Updated runner scripts are available in `src/objective-c/tests`.
+
+Different from the tests in `UnitTests`, other existing tests utilizes the property of an abstract base class and inheritance. To elaborate on that, we had defined a base class for `InteropTests` and `MacTests`, and other test classes that inherit the base class while implementing different setups, thereby invoking the same set of test methods under various circumstances. The base classes are not meant to be executed. With Xcode, previously, we just needed to disable the tests in the base class. With Bazel, however, there is currently no such feature.
+
+In order to prevent the test cases from the base class being executed, the `defaultTestSuite` property is overriden. The property returns an empty test suite if it sees the test instance is exactly the base class; otherwise, it returns the default test suite, which is all the tests being inherited. For example:
+
+In `InteropTests.h`:
+```
+@property(class, readonly) XCTestSuite *defaultTestSuite;
+```
+In `InteropTests.m`:
+```
++ (XCTestSuite *)defaultTestSuite {
+  if (self == [InteropTests class]) {
+    return [XCTestSuite testSuiteWithName:@"InteropTestsEmptySuite"];
+  } else {
+    return super.defaultTestSuite;
+  }
+}
+```
+
+### Test Target - `grpc_objc_client_internal_testing`
+
+Source files in `internal_testing` are meant to be used for logging patch data of each gRPC call, in order to provide some metrics in the test environment. In addition to that, there are a few lines in the source code that is disabled in the production environment - `GRPCOpBatchLog` and its refereneces. These lines are enabled only during testing as well.
+
+With Cocoapods, it is allowed to "inject" preprocessor definitions to any targets by modifying `post_install` in a Podfile. In contrast, due to the nature of Bazel, preprocessor definitions can only be passed down the dependency chain. There is no way to define preprocessors (unless from the command line for the whole project) for the targets that the current target depends on. Therefore, we created a target - `grpc_objc_client_internal_testing` that recompiled the entire library again with `GRPC_TEST_OBJC=1`. 
+
+`grpc_objc_client_internal_testing` includes all the source files previously in `grpc_objc_client` and `proto_objc_rpc`, along with `internal_testing/*`.
+
+### Local Version of `objc_grpc_library`
+
+The `objc_grpc_library` defined in `//bazel/objc_grpc_library.bzl` for external use creates duplicate symbol problem when used with local source files. That is because `objc_grpc_library` specifies the dependency to the gRPC library as an external repository which will create another identical set of static libraries in `bazel-out`. Therefore, a new rule `local_objc_grpc_library` is defined in `//src/objective-c:grpc_objc_internal_library.bzl`. Instead of `@com_github_grpc_grpc//src/objective-c:grpc_objc_client` and `proto_objc_rpc`, it depends on `//src/objective-c:grpc_objc_client_internal_testing`.
+
+Other than that, it works identically as `objc_grpc_library`.
+
+### Shared Library and Wrapper Rules
+
+For convenience and future imports to Google3, we defined another wrapper rule - `grpc_objc_testing_library` - for `src/objective-c/tests` package only. We created a target called `TestConfigs` which is basically an `objc_library` rule that contains shared headers, common preprocessor definitions, and the certificate bundle. Each test target is created with the wrapper rule which can append `TestConfigs` to every target. Meaningless repetitions of adding the shared configuration to `deps` is avoided, in consequence.
+
+`proto_library_objc_wrapper` is a temporary workaround for importing the test targets to Google3. Its open-source version does nothing other than passing the arguments to `native.proto_library`.
 
 ## Implementation
 
@@ -154,3 +196,7 @@ The implementation is done by tonyzhehaolu.
 ## Open Issues
 
 For the time being, `objc_grpc_library` is unable to detect if a label in `srcs` crosses package boundaries. Namely, if a the `grpc.proto` (as in the example above) is referred to as `//B:D/grpc.proto` instead of `//B/D:grpc.proto`, it is still accepted.
+
+`tvos_unit_test` is not ready for use, so are `tvos_application` and `watchos_application`. Related issue: [here](https://github.com/bazelbuild/rules_apple/issues/523).
+
+By Aug 20, the `objc_proto_library` was already removed from Bazel as a native rule. It will probably be remove officially in 0.29. Therefore, we will need to split `objc_grpc_library` into two in the near future in order to stick with the convension in Google3.
