@@ -2,9 +2,9 @@ gRPC Objective-C Bazel Build Support
 ----
 * Author: tonyzhehaolu
 * Approver: mxyan
-* Status: In Review
+* Status: Approved
 * Implemented in: Bazel and Starlark
-* Last updated: Jul 26, 2019
+* Last updated: Jul 22, 2019
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/p6Z8kfc1koQ
 
 ## Abstract
@@ -16,7 +16,7 @@ Proposes a set of Bazel rules for building iOS applications with gRPC Objective-
 
 The gRPC Objective-C library so far only supports installation via Cocoapods. Requests for Bazel support are continually raised.
 
-In addition to the available native rules (`objc_library` and `proto_library`), `objc_grpc_library` (with the same name and similar usage as the one in Google3) needs to be created because the native `objc_proto_library` is actually [not usable](https://github.com/bazelbuild/bazel/issues/7348). Some other rules are also needed in order to compile the actual library from `.proto` files.
+In addition to the available native rules (`objc_library` and `proto_library`), `objc_grpc_library` (with the same name and similar usage as the one in the internal repository) needs to be created because the native `objc_proto_library` is actually [not usable](https://github.com/bazelbuild/bazel/issues/7348). Some other rules are also needed in order to compile the actual library from `.proto` files.
 
 ### Related Proposals
 `objc_proto_grpc_library` and `objc_grpc_library` are built upon the implementation of the `generate_cc` rule defined in [generate_cc.bzl](https://github.com/grpc/grpc/blob/bazel_test/bazel/generate_cc.bzl). There doesn't seem to be a proposal for that, though.
@@ -65,14 +65,12 @@ Lastly, three other targets are created to split the files into `hdrs`, `srcs` (
 When `#import`-ing `.proto` and `.pb*.{h,m}` files, always use their *absolute paths* from the `WORKSPACE` root.
 
 
-### Compatibility with Google3
+### Compatibility with the internal repository
 
-In order to smoothen the transition to Google3, we defined a function in `//bazel/grpc_build_system.bzl` that is loaded in `src/objective-c/BUILD` - `grpc_objc_library`. In the open-source version, this function solely passes the attributes to a `native.objc_library`. In Google3, however, the implementation of this function is different; it passes a subset of the attributes to `native.objc_library` and injects some dependencies and generates other targets according to circumstances.
-
-In Google3, `//src/objective-c:grpc_objc_client` does not depend directly on `//:grpc`. Instead, it depends on a different `//:grpc_objc` target. Switching it to depend directly on `//:grpc` causes duplicated symbols so it's not practical. Therefore, in `//bazel:grpc_build_system.bzl`'s `grpc_generate_one_off_target()`, I generated an alias from `//:grpc_objc` to `//:grpc`.
+In order to smoothen the transition to the internal repository, we defined a wrapper rule in `//bazel/grpc_build_system.bzl` that is loaded in `src/objective-c/BUILD` - `grpc_objc_library`. In the open-source version, this function solely passes the attributes to a `native.objc_library`. The implementation is different in the internal repository. I generated an alias from `//:grpc_objc` to `//:grpc` for the same reason.
 
 
-### Example
+### Usage Example
 
 Consider the hierarchy from the above section and further suppose that `world.proto` imports both `hello.proto` and `grpc.proto`. Also suppose that `grpc.proto` and `world.proto` have service stubs defined which we would like to use.
 
@@ -184,9 +182,9 @@ Other than that, it works identically as `objc_grpc_library`.
 
 ### Shared Library and Wrapper Rules
 
-For convenience and future imports to Google3, we defined another wrapper rule - `grpc_objc_testing_library` - for `src/objective-c/tests` package only. We created a target called `TestConfigs` which is basically an `objc_library` rule that contains shared headers, common preprocessor definitions, and the certificate bundle. Each test target is created with the wrapper rule which can append `TestConfigs` to every target. Meaningless repetitions of adding the shared configuration to `deps` is avoided, in consequence.
+For convenience and future imports to the internal repository, we defined another wrapper rule - `grpc_objc_testing_library` - for `src/objective-c/tests` package only. We created a target called `TestConfigs` which is basically an `objc_library` rule that contains shared headers, common preprocessor definitions, and the certificate bundle. Each test target is created with the wrapper rule which can append `TestConfigs` to every target. Meaningless repetitions of adding the shared configuration to `deps` is avoided, in consequence.
 
-`proto_library_objc_wrapper` is a temporary workaround for importing the test targets to Google3. Its open-source version does nothing other than passing the arguments to `native.proto_library`.
+`proto_library_objc_wrapper` is a temporary workaround for importing the test targets to the internal repository. Its open-source version does nothing other than passing the arguments to `native.proto_library`.
 
 ## Implementation
 
@@ -199,4 +197,4 @@ For the time being, `objc_grpc_library` is unable to detect if a label in `srcs`
 
 `tvos_unit_test` is not ready for use, so are `tvos_application` and `watchos_application`. Related issue: [here](https://github.com/bazelbuild/rules_apple/issues/523).
 
-By Aug 20, the `objc_proto_library` was already removed from Bazel as a native rule. It will probably be remove officially in 0.29. Therefore, we will need to split `objc_grpc_library` into two in the near future in order to stick with the convension in Google3. This will not be discussed here as it's related to how the rules are implemented in Google3.
+After this [commit](https://github.com/bazelbuild/bazel/commit/2c55e6a7d452e86600d8a4d83be3e91c2333a319), the `objc_proto_library` was already removed from Bazel as a native rule. It will probably be remove officially in 0.29. Therefore, we will need to split `objc_grpc_library` into two in the near future in order to stick with the convension in the internal repository. This will not be discussed here as it's related to how the rules are implemented in the internal repository.
