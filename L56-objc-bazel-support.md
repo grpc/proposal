@@ -4,7 +4,7 @@ gRPC Objective-C Bazel Build Support
 * Approver: mxyan
 * Status: Approved
 * Implemented in: Bazel and Starlark
-* Last updated: Jul 22, 2019
+* Last updated: Aug 23, 2019
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/p6Z8kfc1koQ
 
 ## Abstract
@@ -137,7 +137,7 @@ ios_application(
     deps = [":exampleObjCLibrary"]
 )
 ```
-Again, import the geneated stubs in the app-specific source files as:
+Again, import the generated stubs in the app-specific source files as:
 ```
 #import "A/proto/Hello.pbrpc.h"
 #import "B/D/Grpc.pbrpc.h"
@@ -145,11 +145,11 @@ Again, import the geneated stubs in the app-specific source files as:
 
 ## Migrating Tests and Examples to Bazel
 
-With Bazel basically up and running, some of the unit tests of Objective-C library are being migrated to Bazel for shorter test durations. The migration is already completed to the greated extent as for the current stage. Updated runner scripts are available in `src/objective-c/tests`.
+With Bazel basically up and running, some of the unit tests of Objective-C library are being migrated to Bazel for shorter test durations. The migration is already completed to the greatest extent as for the current stage. Updated runner scripts are available in `src/objective-c/tests`.
 
 Different from the tests in `UnitTests`, other existing tests utilizes the property of an abstract base class and inheritance. To elaborate on that, we had defined a base class for `InteropTests` and `MacTests`, and other test classes that inherit the base class while implementing different setups, thereby invoking the same set of test methods under various circumstances. The base classes are not meant to be executed. With Xcode, previously, we just needed to disable the tests in the base class. With Bazel, however, there is currently no such feature.
 
-In order to prevent the test cases from the base class being executed, the `defaultTestSuite` property is overriden. The property returns an empty test suite if it sees the test instance is exactly the base class; otherwise, it returns the default test suite, which is all the tests being inherited. For example:
+In order to prevent the test cases from the base class being executed, the `defaultTestSuite` property is overridden. The property returns an empty test suite if it sees the test instance is exactly the base class; otherwise, it returns the default test suite, which is all the tests being inherited. For example:
 
 In `InteropTests.h`:
 ```
@@ -168,7 +168,7 @@ In `InteropTests.m`:
 
 ### Test Target - `grpc_objc_client_internal_testing`
 
-Source files in `internal_testing` are meant to be used for logging patch data of each gRPC call, in order to provide some metrics in the test environment. In addition to that, there are a few lines in the source code that is disabled in the production environment - `GRPCOpBatchLog` and its refereneces. These lines are enabled only during testing as well.
+Source files in `internal_testing` are meant to be used for logging patch data of each gRPC call, in order to provide some metrics in the test environment. In addition to that, there are a few lines in the source code that is disabled in the production environment - `GRPCOpBatchLog` and its references. These lines are enabled only during testing as well.
 
 With Cocoapods, it is allowed to "inject" preprocessor definitions to any targets by modifying `post_install` in a Podfile. In contrast, due to the nature of Bazel, preprocessor definitions can only be passed down the dependency chain. There is no way to define preprocessors (unless from the command line for the whole project) for the targets that the current target depends on. Therefore, we created a target - `grpc_objc_client_internal_testing` that recompiled the entire library again with `GRPC_TEST_OBJC=1`. 
 
@@ -193,8 +193,8 @@ The implementation is done by tonyzhehaolu.
 
 ## Open Issues
 
-For the time being, `objc_grpc_library` is unable to detect if a label in `srcs` crosses package boundaries. Namely, if a the `grpc.proto` (as in the example above) is referred to as `//B:D/grpc.proto` instead of `//B/D:grpc.proto`, it is still accepted.
+For the time being, `objc_grpc_library` is unable to detect if a label in `srcs` crosses package boundaries. Namely, if the `grpc.proto` (as in the example above) is referred to as `//B:D/grpc.proto` instead of `//B/D:grpc.proto`, it is still accepted.
 
 `tvos_unit_test` is not ready for use, so are `tvos_application` and `watchos_application`. Related issue: [here](https://github.com/bazelbuild/rules_apple/issues/523).
 
-After this [commit](https://github.com/bazelbuild/bazel/commit/2c55e6a7d452e86600d8a4d83be3e91c2333a319), the `objc_proto_library` was already removed from Bazel as a native rule. It will probably be remove officially in 0.29. Therefore, we will need to split `objc_grpc_library` into two in the near future in order to stick with the convension in the internal repository. This will not be discussed here as it's related to how the rules are implemented in the internal repository.
+After this [commit](https://github.com/bazelbuild/bazel/commit/2c55e6a7d452e86600d8a4d83be3e91c2333a319), the `objc_proto_library` was already removed from Bazel as a native rule. It will probably be removed officially in 0.29. Therefore, we will need to split `objc_grpc_library` into two in the near future in order to stick with the convention in the internal repository. How this should be done is not discussed here as it's related to implementation details of the two rules in the internal repository.
