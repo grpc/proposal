@@ -16,8 +16,15 @@ Allow C++ Standard Library to be used in the gRPC Core library.
 Since C++ was allowed to write gRPC, more and more code has been written in C++.
 But most features from C++ standard libraries were not allowed to use because
 we didn't want to introduce new dependency against C++ standard library.
-This gRFC proposes allowing C++ standard library to be used within the core
-library, but continues to restrict the public interface to C89.
+
+The decision to use C++ has been helping us to be more productive but it's not
+best because we cannot use C++ standard library and a few of C++ features which
+depend on this. This also prevents us from using other C++ library which rely 
+on the library. (e.g. abseil)
+
+This gRFC proposes allowing C++ standard library to be used within the gRPC 
+Core library. It may free us from reinventing wheels which already exists
+in the standard library and help us become more productive.
 
 ### Related Proposals:
 
@@ -43,14 +50,32 @@ will be valid except the restriction on C++ features and header-only library.
   Previously only header-only features were allowed to use.
 
 There are caveats since gRPC wrapped library are being distributed as a binary
-form and still there are many old but active Linux distributions which don't
-have full C++11 standard library.
+form. Wrapped library includes a gRPC Core artifact so this change affects
+all wrapped libraries and C++ standard library should be installed to make
+wrapped gRPC library work properly.
 
-- Only features from C++ standard library available on
-  [manylinux1](https://www.python.org/dev/peps/pep-0513)
-  can be allowed to use. It sounds a bit disappointing but most of essential
-  features in C++ standard library are available in `manylinux1`.
-  Following is a partial list of missing features because of `manylinux1`.
+Goal is to try not to ask users to install additional C++ standard library
+if possible. Solution varies depending on each platform.
+
+ - Linux: Uses the same restriction from 
+    [manylinux1](https://www.python.org/dev/peps/pep-0513) policy
+    because it targets old enough Linux.
+ - Windows: Since Windows hasn't been bundled with C++ library,
+    gRPC has been linked to C++ standard library in a static way.
+    So this change doesn't affect Windows.
+ - MacOS/iOS/Android: Since a specific version of C++ library has been
+    distributed on these platforms, 
+    users don't need to worry about this.
+
+Simply speaking, we can use C++11 library features which are available
+in `manylinux1`. For details on `manylinux`, you can see the 
+[doc](https://www.python.org/dev/peps/pep-0513).
+Here is what matters to C++.
+
+  - GLIBCXX <= 3.4.9 (GCC 4.2.0)
+
+Fortunately, most of C++ standrad library availble on this restriction.
+Following is a partial list of missing features because of `manylinux1`.
   - std::chrono.
   - std::numeric_limits for long long and some methods.
   - string and stream support for wchar_t.
