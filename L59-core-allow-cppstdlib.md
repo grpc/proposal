@@ -2,7 +2,7 @@ Allow C++ standard library in gRPC Core Library
 ----
 * Author(s): veblush
 * Approver: a11r
-* Status: Draft
+* Status: Final
 * Implemented in: n/a
 * Last updated: September 4, 2019
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/umQyyXmNr2w
