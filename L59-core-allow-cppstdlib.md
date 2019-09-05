@@ -108,8 +108,10 @@ doesn't guarantee that it can achieve the same goal with `clang` and `libc++`.
 
 1. Change the build configuration for all wrapped language to add the dependency
    to the C++ standard library.
+   [#19918](https://github.com/grpc/grpc/pull/19918)
 2. Make changes to use the C++ standard library to prove it's working.
    The change should be small enough so that we can easily roll it back.
+   [#20059](https://github.com/grpc/grpc/pull/20059)
    - Replace `grpc_core::map` with `std::map`
    - Replace `GRPC_ABSTRACT` with `= 0`
 3. Add new build tests to make sure that the version of library gRPC uses is
@@ -120,7 +122,9 @@ doesn't guarantee that it can achieve the same goal with `clang` and `libc++`.
 
 1. New dependency against the C++ standard library is added with some code
    depending on it. This must be easy to roll back in case of errors.
-   -> Target gRPC 1.25 (scheduled on October 22, 2019)
-2. Once this version looks fine like there is no breaking change,
+   - gRPC master branch gets this change with
+      [#19918](https://github.com/grpc/grpc/pull/19918) (on September 3, 2019)
+   - Released with gRPC 1.24 (scheduled on September 24, 2019)
+2. Once gRPC 1.24 release looks fine like there is no breaking change,
    the gRPC Core will be able to use the C++ standard library.
-   -> From gRPC 1.26-dev
+   - From gRPC 1.25-dev (after September 24, 2019)
