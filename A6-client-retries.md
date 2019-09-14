@@ -108,7 +108,7 @@ gRPC's call deadline applies across all attempts for a given RPC. For example, i
 
 The `initialBackoff`, `maxBackoff`, and `backoffMultiplier` parameters determine the randomized delay before retry attempts.
 
-The initial retry attempt will occur at `random(0, initialBackoff)`. In general, the `n`-th attempt will occur at `random(0, min(initialBackoff*backoffMultiplier**(n-1), maxBackoff))`.
+The initial retry attempt will occur at `random(0, initialBackoff)`. In general, the `n`-th attempt will occur at `random(0, min(initialBackoff*backoffMultiplier*(n-1), maxBackoff))`.
 
 ##### Retryable Status Codes
 
