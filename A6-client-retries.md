@@ -416,7 +416,7 @@ The retry policy is transmitted to the client through the service config mechani
       "name": [
         {
           "service": string,
-          "method": string,
+          "method": string
         }
       ],
 
