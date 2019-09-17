@@ -440,7 +440,7 @@ The retry policy is transmitted to the client through the service config mechani
         // They both must be greater than zero.
         "initialBackoff": string,  // Required. Long decimal with "s" appended
         "maxBackoff": string,  // Required. Long decimal with "s" appended
-        "backoffMultiplier": number  // Required. Must be greater than zero.
+        "backoffMultiplier": number,  // Required. Must be greater than zero.
 
         // The set of status codes which may be retried.
         //
@@ -449,7 +449,7 @@ The retry policy is transmitted to the client through the service config mechani
         //
         // This field is required and must be non-empty.
         "retryableStatusCodes": []
-      }
+      },
 
       "hedgingPolicy": {
         // The hedging policy will send up to maxAttempts RPCs.
@@ -478,14 +478,14 @@ The retry policy is transmitted to the client through the service config mechani
         //
         // This field is optional.
         "nonFatalStatusCodes": []
-      }
+      },
 
       "waitForReady": bool,
       "timeout": string,
       "maxRequestMessageBytes": number,
       "maxResponseMessageBytes": number
     }
-  ]
+  ],
 
   // If a RetryThrottlingPolicy is provided, gRPC will automatically throttle
   // retry attempts and hedged RPCs when the client’s ratio of failures to
