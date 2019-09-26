@@ -1,5 +1,8 @@
 # gRPC RFCs
 ## Introduction
+Please read the gRPC organization's [governance rules](https://github.com/grpc/grpc-community/blob/master/governance.md)
+and [contribution guidelines](https://github.com/grpc/grpc-community/blob/master/CONTRIBUTING.md) before proceeding.
+
 This repo contains the design proposals for substantial feature changes for
 gRPC that need to be designed upfront. The goal of the upfront design process
 is to:
