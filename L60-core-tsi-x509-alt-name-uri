@@ -1,0 +1,34 @@
+Title
+----
+* Author: mboldyrev
+* Approver: a11r
+* Status: Draft
+* Implemented in: c++
+* Last updated: 2019.09.30
+* Discussion at: -
+
+## Abstract
+
+Add subject alternative name of type URI from X.509 certificate to AuthContext.
+
+## Background
+
+Currently, only subject alternative names of types DNS and IP are transferred to AuthContext. But there are several more types ([RFC5280](https://tools.ietf.org/html/rfc5280#section-4.2.1.6)). URI is one of them.
+
+
+## Proposal
+
+Copy URI alternative names to AuthContext just like DNS and IP. The URI data is a simple IA5String string just like DNS, so some code can be reused.
+
+## Rationale
+
+This is a particular case solution, because it ignores all other alternative name variants in X.509. But other types have more complex structure, and there is also one named OtherName, which can be of any ASN.1 type, and its representation in AuthContext is not as trivial.
+
+
+## Implementation
+
+Reuse the code of getting IA5String from DNS. Add URI data just as DNS and IP.
+
+## Open issues (if applicable)
+
+How to deal with the rest SAN types?
