@@ -1661,6 +1661,11 @@ class StreamStreamClientInterceptor:
 ### Utility Functions
 
 ```Python
+# grpc.aio.EOF is a unique object per process that evaluates to False
+(grpc.aio.EOF or False) == False
+```
+
+```Python
 # grpc.aio.channel_ready
 async def channel_ready(channel: grpc.aio.Channel) -> None:
     """Creates a coroutine that ends when a Channel is ready.
