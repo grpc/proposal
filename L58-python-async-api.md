@@ -1490,7 +1490,7 @@ class ServerInterceptor:
     This is an EXPERIMENTAL API.
     """
 
-    def intercept_service(self,
+    async def intercept_service(self,
                           continuation: Callable[[grpc.HandlerCallDetails], grpc.aio.RpcMethodHandler],
                           handler_call_details: grpc.HandlerCallDetails
         ) -> grpc.aio.RpcMethodHandler:
@@ -1517,7 +1517,7 @@ class ServerInterceptor:
 class UnaryUnaryClientInterceptor:
     """Affords intercepting unary-unary invocations."""
 
-    def intercept_unary_unary(self,
+    async def intercept_unary_unary(self,
                               continuation: Callable[[grpc.ClientCallDetails, Any], grpc.aio.Call[Any]],
                               client_call_details: grpc.ClientCallDetails,
                               request: Any
@@ -1548,14 +1548,13 @@ class UnaryUnaryClientInterceptor:
             Should the event terminate with non-OK status, the returned
             Call-Future's exception value will be an RpcError.
         """
-        raise NotImplementedError()
 
 
 # grpc.aio.UnaryStreamClientInterceptor
 class UnaryStreamClientInterceptor:
     """Affords intercepting unary-stream invocations."""
 
-    def intercept_unary_stream(self,
+    async def intercept_unary_stream(self,
                                continuation: Callable[[grpc.ClientCallDetails, Any], grpc.aio.Call[AsyncIterable[Any]]],
                                client_call_details: grpc.ClientCallDetails,
                                request: Any
@@ -1584,14 +1583,13 @@ class UnaryStreamClientInterceptor:
             Call-iterator may raise RpcError indicating termination of
             the RPC with non-OK status.
         """
-        raise NotImplementedError()
 
 
 # grpc.aio.StreamUnaryClientInterceptor
 class StreamUnaryClientInterceptor:
     """Affords intercepting stream-unary invocations."""
 
-    def intercept_stream_unary(self,
+    async def intercept_stream_unary(self,
                                continuation: Callable[[grpc.ClientCallDetails, Optional[AsyncIterable[Any]]], grpc.aio.Call[Any]],
                                client_call_details: grpc.ClientCallDetails,
                                request_iterator: AsyncIterable[Any]
@@ -1627,7 +1625,7 @@ class StreamUnaryClientInterceptor:
 class StreamStreamClientInterceptor:
     """Affords intercepting stream-stream invocations."""
 
-    def intercept_stream_stream(self,
+    async def intercept_stream_stream(self,
                                 continuation: Callable[[grpc.ClientCallDetails, Optional[AsyncIterable[Any]]], grpc.aio.Call[AsyncIterable[Any]]],
                                 client_call_details: grpc.ClientCallDetails,
                                 request_iterator: AsyncIterable[Any]
