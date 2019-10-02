@@ -1662,7 +1662,11 @@ class StreamStreamClientInterceptor:
 
 ```Python
 # grpc.aio.EOF is a unique object per process that evaluates to False
-(grpc.aio.EOF or False) == False
+class _EOF:
+    def __bool__(self):
+        return False
+
+EOF = _EOF()
 ```
 
 ```Python
