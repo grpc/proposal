@@ -707,6 +707,37 @@ class Channel:
           callback: A callable previously registered with this Channel from
           having been passed to its "subscribe" method.
         """
+  
+    def check_connectivity_state(self, try_to_connect: bool=False) -> grpc.ChannelConnectivity:
+        """Check the connectivity state of a channel.
+
+        This is an EXPERIMENTAL API.
+
+        Args:
+          try_to_connect: a bool indicate whether the Channel should try to connect to peer or not.
+        
+        Returns:
+          A ChannelConnectivity object.
+        """
+
+    async def watch_connectivity_state(self,
+                                       last_observed_state: grpc.ChannelConnectivity,
+                                       timeout_seconds: float) -> Optional[grpc.ChannelConnectivity]:
+        """Watch for a change in connectivity state.
+
+        This is an EXPERIMENTAL API.
+        
+        Once the channel connectivity state is different from
+        last_observed_state, the function will return the new connectivity
+        state. If deadline expires BEFORE the state is changed, None will be
+        returned.
+
+        Args:
+          try_to_connect: a bool indicate whether the Channel should try to connect to peer or not.
+        
+        Returns:
+          A ChannelConnectivity object or None.
+        """
 
     def unary_unary(self,
                     method: Text,
