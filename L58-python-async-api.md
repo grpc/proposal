@@ -609,7 +609,7 @@ pass down to downstream server, so downstream services can react to that
 information and save computation resources or perform flow control.
 
 Acceptence critiria of this feature:
-* The implimentation of such feature should supported by official package, and
+* The implementation of such feature should supported by official package, and
 users are not expected to directly access those metadata;
 * Application logic has higher priority than the implicit propagation (e.g.
   setting timeout explicitly will override the propagated value);
