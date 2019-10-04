@@ -741,9 +741,9 @@ class Channel:
 
     def unary_unary(self,
                     method: Text,
-                    request_serializer: Optional[Callable[[Any], bytes]]=None,
-                    response_deserializer: Optional[Callable[[bytes], Any]]=None
-        ) -> grpc.aio.UnaryUnaryMultiCallable:
+                    request_serializer: Optional[Callable[[Request], bytes]]=None,
+                    response_deserializer: Optional[Callable[[bytes], Response]]=None
+        ) -> grpc.aio.UnaryUnaryMultiCallable[Request, Response]:
         """Creates a UnaryUnaryMultiCallable for a unary call method.
 
         Args:
@@ -760,9 +760,9 @@ class Channel:
 
     def unary_stream(self,
                      method: Text,
-                     request_serializer: Optional[Callable[[Any], bytes]]=None,
-                     response_deserializer: Optional[Callable[[bytes], Any]]=None
-        ) -> grpc.aio.UnaryStreamMultiCallable:
+                     request_serializer: Optional[Callable[[Request], bytes]]=None,
+                     response_deserializer: Optional[Callable[[bytes], Response]]=None
+        ) -> grpc.aio.UnaryStreamMultiCallable[Request, Response]:
         """Creates a UnaryStreamMultiCallable for a server streaming method.
 
         Args:
@@ -779,9 +779,9 @@ class Channel:
 
     def stream_unary(self,
                      method: Text,
-                     request_serializer: Optional[Callable[[Any], bytes]]=None,
-                     response_deserializer: Optional[Callable[[bytes], Any]]=None
-        ) -> grpc.aio.StreamUnaryMultiCallable:
+                     request_serializer: Optional[Callable[[Request], bytes]]=None,
+                     response_deserializer: Optional[Callable[[bytes], Response]]=None
+        ) -> grpc.aio.StreamUnaryMultiCallable[Request, Response]:
         """Creates a StreamUnaryMultiCallable for a client streaming method.
 
         Args:
@@ -798,9 +798,9 @@ class Channel:
 
     def stream_stream(self,
                       method: Text,
-                      request_serializer: Optional[Callable[[Any], bytes]]=None,
-                      response_deserializer: Optional[Callable[[bytes], Any]]=None
-        ) -> grpc.aio.StreamStreamMultiCallable:
+                      request_serializer: Optional[Callable[[Request], bytes]]=None,
+                      response_deserializer: Optional[Callable[[bytes], Response]]=None
+        ) -> grpc.aio.StreamStreamMultiCallable[Request, Response]:
         """Creates a StreamStreamMultiCallable for a bi-directional streaming method.
 
         Args:
@@ -827,17 +827,17 @@ class Channel:
 
 ```Python
 # grpc.aio.UnaryUnaryMultiCallable
-class UnaryUnaryMultiCallable:
+class UnaryUnaryMultiCallable(Generic[Request, Response]):
     """Affords invoking an async unary RPC from client-side."""
 
     def __call__(self,
-                 request: Any,
+                 request: Request,
                  timeout: Optional[int]=None,
-                 metadata: Optional[Sequence[Tuple[Text, Text]]]=None,
+                 metadata: Optional[Sequence[Tuple[Text, AnyStr]]]=None,
                  credentials: Optional[grpc.CallCredentials]=None,
                  wait_for_ready: Optional[bool]=None,
                  compression: Optional[grpc.Compression]=None
-    ) -> grpc.aio.Call[Any]:
+    ) -> grpc.aio.Call[Response]:
         """Schedules the underlying RPC.
 
         Args:
@@ -863,17 +863,17 @@ class UnaryUnaryMultiCallable:
         """
 
 # grpc.aio.UnaryStreamMultiCallable
-class UnaryStreamMultiCallable:
+class UnaryStreamMultiCallable(Generic[Request, Response]):
     """Affords invoking an async server streaming RPC from client-side."""
 
     def __call__(self,
-                 request: Any,
+                 request: Request,
                  timeout: Optional[int]=None,
-                 metadata: Optional[Sequence[Tuple[Text, Text]]]=None,
+                 metadata: Optional[Sequence[Tuple[Text, AnyStr]]]=None,
                  credentials: Optional[grpc.CallCredentials]=None,
                  wait_for_ready: Optional[bool]=None,
                  compression: Optional[grpc.Compression]=None
-    ) -> grpc.aio.Call[AsyncIterable[Any]]:
+    ) -> grpc.aio.Call[AsyncIterable[Response]]:
         """Schedules the underlying RPC.
 
         Args:
@@ -899,17 +899,17 @@ class UnaryStreamMultiCallable:
         """
 
 # grpc.aio.StreamUnaryMultiCallable
-class StreamUnaryMultiCallable:
+class StreamUnaryMultiCallable(Generic[Request, Response]):
     """Affords invoking an async client streaming RPC from client-side."""
 
     def __call__(self,
-                 request_iterator: Optional[AsyncIterable[Any]]=None,
+                 request_iterator: Optional[AsyncIterable[Request]]=None,
                  timeout: Optional[int]=None,
-                 metadata: Optional[Sequence[Tuple[Text, Text]]]=None,
+                 metadata: Optional[Sequence[Tuple[Text, AnyStr]]]=None,
                  credentials: Optional[grpc.CallCredentials]=None,
                  wait_for_ready: Optional[bool]=None,
                  compression: Optional[grpc.Compression]=None
-    ) -> grpc.aio.Call[Any]:
+    ) -> grpc.aio.Call[Response]:
         """Schedules the underlying RPC.
 
         Args:
@@ -936,17 +936,17 @@ class StreamUnaryMultiCallable:
         """
 
 # grpc.aio.StreamStreamMultiCallable
-class StreamStreamMultiCallable:
+class StreamStreamMultiCallable(Generic[Request, Response]):
     """Affords invoking an async bi-directional RPC from client-side."""
 
     def __call__(self,
-                 request_iterator: Optional[AsyncIterable[Any]]=None,
+                 request_iterator: Optional[AsyncIterable[Request]]=None,
                  timeout: Optional[int]=None,
-                 metadata: Optional[Sequence[Tuple[Text, Text]]]=None,
+                 metadata: Optional[Sequence[Tuple[Text, AnyStr]]]=None,
                  credentials: Optional[grpc.CallCredentials]=None,
                  wait_for_ready: Optional[bool]=None,
                  compression: Optional[grpc.Compression]=None
-    ) -> grpc.aio.Call[AsyncIterable[Any]]:
+    ) -> grpc.aio.Call[AsyncIterable[Response]]:
         """Schedules the underlying RPC.
 
         Args:
@@ -975,7 +975,7 @@ class StreamStreamMultiCallable:
 
 ```Python
 # grpc.aio.Call
-class Call(typing.Awaitable[T], grpc.RpcContext):
+class Call(Generic[Request, Response], grpc.RpcContext):
     """The representation of an RPC on the client-side."""
 
     def is_active(self) -> bool:
@@ -1012,7 +1012,7 @@ class Call(typing.Awaitable[T], grpc.RpcContext):
             already terminated or some other reason).
         """
 
-    async def initial_metadata(self) -> Sequence[Tuple[Text, Text]]:
+    async def initial_metadata(self) -> Sequence[Tuple[Text, AnyStr]]:
         """Accesses the initial metadata sent by the server.
 
         Coroutine continues once the value is available.
@@ -1021,7 +1021,7 @@ class Call(typing.Awaitable[T], grpc.RpcContext):
           The initial :term:`metadata`.
         """
 
-    async def trailing_metadata(self) -> Sequence[Tuple[Text, Text]]:
+    async def trailing_metadata(self) -> Sequence[Tuple[Text, AnyStr]]:
         """Accesses the trailing metadata sent by the server.
 
         Coroutine continues once the value is available.
@@ -1048,14 +1048,14 @@ class Call(typing.Awaitable[T], grpc.RpcContext):
           The details string of the RPC.
         """
 
-    def __aiter__(self) -> AsyncIterable[Any]:
+    def __aiter__(self) -> AsyncIterable[Response]:
         """Returns the async iterable representation that yields messages.
 
         Returns:
           An async iterable object that yields messages.
         """
 
-    async def read(self) -> Any:
+    async def read(self) -> Response:
         """Reads one message from the RPC.
 
         Only one read operation is allowed simultaneously. Mixing new streaming API and old
@@ -1068,7 +1068,7 @@ class Call(typing.Awaitable[T], grpc.RpcContext):
           An RpcError exception if the read failed.
         """
 
-    async def write(self, message: Any) -> None:
+    async def write(self, message: Request) -> None:
         """Writes one message to the RPC.
 
         Only one write operation is allowed simultaneously. Mixing new streaming API and old
@@ -1208,7 +1208,7 @@ class GenericRpcHandler:
 
 ```Python
 # grpc.aio.RpcMethodHandler
-class RpcMethodHandler:
+class RpcMethodHandler(Generic[Request, Response]):
     """An implementation of a single RPC method.
 
     Attributes:
@@ -1244,20 +1244,20 @@ class RpcMethodHandler:
     """
     request_streaming: bool
     response_streaming: bool
-    request_deserializer: Optional[Callable[[bytes], Any]]
-    response_serializer: Optional[Callable[[Any], bytes]]
-    unary_unary: Optional[Callable[[Any, grpc.aio.ServicerContext], Any]]
-    unary_stream: Optional[Callable[[Any, grpc.aio.ServicerContext], Optional[AsyncIterable[Any]]]]
-    stream_unary: Optional[Callable[[AsyncIterable[Any], grpc.aio.ServicerContext], Any]]
-    stream_stream: Optional[Callable[[AsyncIterable[Any], grpc.aio.ServicerContext], Optional[AsyncIterable[Any]]]]
+    request_deserializer: Optional[Callable[[bytes], Request]]
+    response_serializer: Optional[Callable[[Response], bytes]]
+    unary_unary: Optional[Callable[[Request, grpc.aio.ServicerContext], Response]]
+    unary_stream: Optional[Callable[[Request, grpc.aio.ServicerContext], Optional[AsyncIterable[Response]]]]
+    stream_unary: Optional[Callable[[AsyncIterable[Request], grpc.aio.ServicerContext], Response]]
+    stream_stream: Optional[Callable[[AsyncIterable[Request], grpc.aio.ServicerContext], Optional[AsyncIterable[Response]]]]
 ```
 
 ```Python
 # grpc.aio.ServicerContext
-class ServicerContext(grpc.RpcContext):
+class ServicerContext(Generic[Request, Response], grpc.RpcContext):
     """A context object passed to method implementations."""
 
-    def invocation_metadata(self) -> Optional[Sequence[Tuple[Text, Text]]]:
+    def invocation_metadata(self) -> Optional[Sequence[Tuple[Text, AnyStr]]]:
         """Accesses the metadata from the sent by the client.
 
         Returns:
@@ -1311,7 +1311,7 @@ class ServicerContext(grpc.RpcContext):
             grpc.compression.Gzip.
         """
 
-    async def send_initial_metadata(self, initial_metadata: Sequence[Tuple[Text, Text]]) -> None:
+    async def send_initial_metadata(self, initial_metadata: Sequence[Tuple[Text, AnyStr]]) -> None:
         """Sends the initial metadata value to the client.
 
         This method need not be called by implementations if they have no
@@ -1321,7 +1321,7 @@ class ServicerContext(grpc.RpcContext):
           initial_metadata: The initial :term:`metadata`.
         """
 
-    async def set_trailing_metadata(self, trailing_metadata: Sequence[Tuple[Text, Text]]) -> None:
+    async def set_trailing_metadata(self, trailing_metadata: Sequence[Tuple[Text, AnyStr]]) -> None:
         """Sends the trailing metadata for the RPC.
 
         This method need not be called by implementations if they have no
@@ -1395,7 +1395,7 @@ class ServicerContext(grpc.RpcContext):
         server creation or set on the call.
         """
 
-    async def read(self) -> Any:
+    async def read(self) -> Request:
         """Reads one message from the RPC.
 
         Only one read operation is allowed simultaneously. Mixing new streaming API and old
@@ -1408,7 +1408,7 @@ class ServicerContext(grpc.RpcContext):
           An RpcError exception if the read failed.
         """
 
-    async def write(self, message: Any) -> None:
+    async def write(self, message: Response) -> None:
         """Writes one message to the RPC.
 
         Only one write operation is allowed simultaneously. Mixing new streaming API and old
@@ -1421,10 +1421,10 @@ class ServicerContext(grpc.RpcContext):
 
 ```Python
 # grpc.aio.unary_unary_rpc_method_handler
-def unary_unary_rpc_method_handler(behavior: Callable[[Any, grpc.aio.ServicerContext], Any],
-                                   request_deserializer: Optional[Callable[[bytes], Any]]=None,
-                                   response_serializer: Optional[Callable[[Any], bytes]]=None
-    ) -> grpc.aio.RpcMethodHandler:
+def unary_unary_rpc_method_handler(behavior: Callable[[Request, grpc.aio.ServicerContext], Response],
+                                   request_deserializer: Optional[Callable[[bytes], Request]]=None,
+                                   response_serializer: Optional[Callable[[Response], bytes]]=None
+    ) -> grpc.aio.RpcMethodHandler[Request, Response]:
     """Creates an RpcMethodHandler for a unary-unary RPC method.
 
     Args:
@@ -1439,10 +1439,10 @@ def unary_unary_rpc_method_handler(behavior: Callable[[Any, grpc.aio.ServicerCon
 
 
 # grpc.aio.unary_stream_rpc_method_handler
-def unary_stream_rpc_method_handler(behavior: Callable[[Any, grpc.aio.ServicerContext], Optional[AsyncIterable[Any]]],
-                                    request_deserializer: Optional[Callable[[bytes], Any]]=None,
-                                    response_serializer: Optional[Callable[[Any], bytes]]=None
-    ) -> grpc.aio.RpcMethodHandler:    
+def unary_stream_rpc_method_handler(behavior: Callable[[Request, grpc.aio.ServicerContext], Optional[AsyncIterable[Response]]],
+                                    request_deserializer: Optional[Callable[[bytes], Request]]=None,
+                                    response_serializer: Optional[Callable[[Response], bytes]]=None
+    ) -> grpc.aio.RpcMethodHandler[Request, Response]:
     """Creates an RpcMethodHandler for a unary-stream RPC method.
 
     Args:
@@ -1457,10 +1457,10 @@ def unary_stream_rpc_method_handler(behavior: Callable[[Any, grpc.aio.ServicerCo
 
 
 # grpc.aio.stream_unary_rpc_method_handler
-def stream_unary_rpc_method_handler(behavior: Callable[[AsyncIterable[Any], grpc.aio.ServicerContext], Any],
-                                    request_deserializer: Optional[Callable[[bytes], Any]]=None,
-                                    response_serializer: Optional[Callable[[Any], bytes]]=None
-    ) -> grpc.aio.RpcMethodHandler:
+def stream_unary_rpc_method_handler(behavior: Callable[[AsyncIterable[Request], grpc.aio.ServicerContext], Response],
+                                    request_deserializer: Optional[Callable[[bytes], Request]]=None,
+                                    response_serializer: Optional[Callable[[Response], bytes]]=None
+    ) -> grpc.aio.RpcMethodHandler[Reqeust, Response]:
     """Creates an RpcMethodHandler for a stream-unary RPC method.
 
     Args:
@@ -1475,10 +1475,10 @@ def stream_unary_rpc_method_handler(behavior: Callable[[AsyncIterable[Any], grpc
 
 
 # grpc.aio.stream_stream_rpc_method_handler
-def stream_stream_rpc_method_handler(behavior: Callable[[AsyncIterable[Any], grpc.aio.ServicerContext], Optional[AsyncIterable[Any]]],
-                                     request_deserializer: Optional[Callable[[bytes], Any]]=None,
-                                     response_serializer: Optional[Callable[[Any], bytes]]=None
-    ) -> grpc.aio.RpcMethodHandler:
+def stream_stream_rpc_method_handler(behavior: Callable[[AsyncIterable[Request], grpc.aio.ServicerContext], Optional[AsyncIterable[Response]]],
+                                     request_deserializer: Optional[Callable[[bytes], Request]]=None,
+                                     response_serializer: Optional[Callable[[Response], bytes]]=None
+    ) -> grpc.aio.RpcMethodHandler[Request, Response]:
     """Creates an RpcMethodHandler for a stream-stream RPC method.
 
     Args:
@@ -1549,10 +1549,10 @@ class UnaryUnaryClientInterceptor:
     """Affords intercepting unary-unary invocations."""
 
     async def intercept_unary_unary(self,
-                              continuation: Callable[[grpc.ClientCallDetails, Any], grpc.aio.Call[Any]],
+                              continuation: Callable[[grpc.ClientCallDetails, Request], grpc.aio.Call[Response]],
                               client_call_details: grpc.ClientCallDetails,
-                              request: Any
-        ) -> grpc.aio.Call[Any]:
+                              request: Request
+        ) -> grpc.aio.Call[Response]:
         """Intercepts a unary-unary invocation asynchronously.
 
         Args:
@@ -1586,10 +1586,10 @@ class UnaryStreamClientInterceptor:
     """Affords intercepting unary-stream invocations."""
 
     async def intercept_unary_stream(self,
-                               continuation: Callable[[grpc.ClientCallDetails, Any], grpc.aio.Call[AsyncIterable[Any]]],
+                               continuation: Callable[[grpc.ClientCallDetails, Request], grpc.aio.Call[AsyncIterable[Response]]],
                                client_call_details: grpc.ClientCallDetails,
-                               request: Any
-        ) -> grpc.aio.Call[AsyncIterable[Any]]:
+                               request: Request
+        ) -> grpc.aio.Call[AsyncIterable[Response]]:
         """Intercepts a unary-stream invocation.
 
         Args:
@@ -1621,10 +1621,10 @@ class StreamUnaryClientInterceptor:
     """Affords intercepting stream-unary invocations."""
 
     async def intercept_stream_unary(self,
-                               continuation: Callable[[grpc.ClientCallDetails, Optional[AsyncIterable[Any]]], grpc.aio.Call[Any]],
+                               continuation: Callable[[grpc.ClientCallDetails, Optional[AsyncIterable[Request]]], grpc.aio.Call[Response]],
                                client_call_details: grpc.ClientCallDetails,
-                               request_iterator: AsyncIterable[Any]
-        ) -> grpc.aio.Call[Any]:
+                               request_iterator: AsyncIterable[Request]
+        ) -> grpc.aio.Call[Response]:
         """Intercepts a stream-unary invocation asynchronously.
 
         Args:
@@ -1657,10 +1657,10 @@ class StreamStreamClientInterceptor:
     """Affords intercepting stream-stream invocations."""
 
     async def intercept_stream_stream(self,
-                                continuation: Callable[[grpc.ClientCallDetails, Optional[AsyncIterable[Any]]], grpc.aio.Call[AsyncIterable[Any]]],
+                                continuation: Callable[[grpc.ClientCallDetails, Optional[AsyncIterable[Request]]], grpc.aio.Call[AsyncIterable[Response]]],
                                 client_call_details: grpc.ClientCallDetails,
-                                request_iterator: AsyncIterable[Any]
-        ) -> grpc.aio.Call[AsyncIterable[Any]]:
+                                request_iterator: AsyncIterable[Request]
+        ) -> grpc.aio.Call[AsyncIterable[Response]]:
         """Intercepts a stream-stream invocation.
 
         Args:
