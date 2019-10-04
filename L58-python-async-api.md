@@ -1000,16 +1000,11 @@ class Call(Generic[Request, Response], grpc.RpcContext):
         Idempotent and has no effect if the RPC has already terminated.
         """
 
-    def add_callback(self, callback: Callable[None, None]) -> None:
+    def add_done_callback(self, callback: Callable[[Call], None]) -> None:
         """Registers a callback to be called on RPC termination.
 
         Args:
-          callback: A no-parameter callable to be called on RPC termination.
-
-        Returns:
-          True if the callback was added and will be called later; False if
-            the callback was not added and will not be called (because the RPC
-            already terminated or some other reason).
+          callback: A callable that accepts the grpc.aio.Call itself.
         """
 
     async def initial_metadata(self) -> Sequence[Tuple[Text, AnyStr]]:
@@ -1416,6 +1411,13 @@ class ServicerContext(Generic[Request, Response], grpc.RpcContext):
 
         Raises:
           An RpcError exception if the write failed.
+        """
+    
+    def add_done_callback(self, callback: Callable[[ServicerContext], None]) -> None:
+        """Registers a callback to be called on RPC termination.
+
+        Args:
+          callback: A callable that accepts the grpc.aio.ServicerContext itself.
         """
 ```
 
