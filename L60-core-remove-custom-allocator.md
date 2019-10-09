@@ -1,11 +1,11 @@
-Remove grpc_use_signal from core surface API
+Remove custom allocation function overrides from core surface API
 ----
 * Author(s): veblush
 * Approver: mark
 * Status: Draft
 * Implemented in: https://github.com/grpc/grpc/pull/20462
-* Last updated: 2019-10-08
-* Discussion at: TBD
+* Last updated: 2019-10-09
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/kDswzg-cEZU
 
 ## Abstract
 
@@ -34,8 +34,9 @@ Following functions managing custom memory allocator will be removed.
 - `gpr_get_allocation_functions`
 - `gpr_set_allocation_functions`
 
-gRPC memory allocation functions `gpr_malloc` will remain with this change.
-But it doesn't promise that it uses custom allocators given by users.
+gRPC memory allocation functions such as `gpr_malloc` and `gpr_free` will
+remain with this change because they have been used when data allocated in
+user applications is passed into gRPC Core such as `metadata`.
 
 ## Rationale
 
