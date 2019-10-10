@@ -85,7 +85,7 @@ or a custom allocator. This can be misleading to developers.
 
 ## Implementation
 
-Core: https://github.com/grpc/grpc/pull/16706
+Core: https://github.com/grpc/grpc/pull/20462
 
 ## Open issues (if applicable)
 
