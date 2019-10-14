@@ -677,36 +677,6 @@ class Channel:
     Channel objects implement the Async Context Manager type, although they need
     not support being entered and exited multiple times.
     """
-
-    def subscribe(self,
-                  callback: Callable[[ChannelConnectivity], None],
-                  try_to_connect: bool=False) -> None:
-        """Subscribe to this Channel's connectivity state machine.
-
-        A Channel may be in any of the states described by ChannelConnectivity.
-        This method allows application to monitor the state transitions.
-        The typical use case is to debug or gain better visibility into gRPC
-        runtime's state.
-
-        Args:
-          callback: A callable to be invoked with ChannelConnectivity argument.
-            ChannelConnectivity describes current state of the channel.
-            The callable will be invoked immediately upon subscription
-            and again for every change to ChannelConnectivity until it
-            is unsubscribed or this Channel object goes out of scope.
-          try_to_connect: A boolean indicating whether or not this Channel
-            should attempt to connect immediately. If set to False, gRPC
-            runtime decides when to connect.
-        """
-
-    def unsubscribe(self,
-                    callback: Callable[[ChannelConnectivity], None]) -> None:
-        """Unsubscribes a subscribed callback from this Channel's connectivity.
-
-        Args:
-          callback: A callable previously registered with this Channel from
-          having been passed to its "subscribe" method.
-        """
   
     def check_connectivity_state(self, try_to_connect: bool=False) -> grpc.ChannelConnectivity:
         """Check the connectivity state of a channel.
