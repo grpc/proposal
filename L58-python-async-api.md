@@ -270,63 +270,22 @@ class AsyncGreeter(helloworld_pb2_grpc.GreeterServicer):
 
 ```Python
 ### Client side
-class RequestIterator:
 
-    def __init__(self):
-        self._queue = asyncio.Queue()
+async def async_request_iterator() -> HelloRequest:
+    for request in [...]:
+        yield response
 
-    async def send(self, message: HelloRequest):
-        await self._queue.put(message)
-
-    def __aiter__(self) -> AsyncIterable[HelloRequest]:
-        return self
-
-    async def __anext__(self) -> HelloRequest:
-        return await self._queue.get(block=True)
-
-request_iterator = RequestIterator()
 # No await needed, the response_iterator is grpc.aio.Call
-response_iterator = stub.StreamingHi(request_iterator)
-
-# In sending coroutine
-await request_iterator.send(proto_message)
-
-# In receiving coroutine
+response_iterator = stub.StreamingHi(async_request_iterator())
 async for response in response_iterator:
     process(response)
 
 ### Server side
-class ResponseIterator:
-
-    def __init__(self):
-        self._queue = asyncio.Queue()
-
-    async def send(self, message: HelloReply):
-        await self._queue.put(message)
-
-    def __aiter__(self) -> AsyncIterable[HelloReply]:
-        return self
-
-    async def __anext__(self) -> HelloReply:
-        return await self._queue.get()
-
-async def streaming_hi_worker(
-        request_iterator: AsyncIterable[HelloRequest],
-        response_iterator: ResponseIterator
-    ) -> None:
-    async for request in request_iterator:
-        if request.needs_respond:
-            await response_iterator.send(response)
 
 class Greeter(helloworld_pb2_grpc.GreeterServicer):
-    async def StreamingHi(self,
-                          request_iterator: AsyncIterable[HelloRequest],
-                          context: grpc.aio.ServicerContext
-            ) -> AsyncIterable[HelloReply]:
-        response_iterator = ResponseIterator()
-        # Handle the write in another coroutine
-        asyncio.get_event_loop.create_task(streaming_hi_worker(request_iterator, response_iterator))
-        return response_iterator
+    async def StreamingHi(self, request_iterator, context):
+        async for request in request_iterator:
+            yield response
 ```
 
 #### Co-existence Of New And Current Streaming API
@@ -457,20 +416,16 @@ stub.SayHelloStreaming(iter([
 ]))
 
 ### The new usage is much verbose for same scenario
-class AsyncIter:
-    def __init__(self, items):    
-        self.items = items    
+async def request_iterator():
+    for request from [
+        HelloRequest(name='Golden'),
+        HelloRequest(name='Retriever'),
+        HelloRequest(name='Pan'),
+        HelloRequest(name='Cake'),
+    ]:
+        yield request
 
-    async def __aiter__(self):    
-        for item in self.items:    
-            yield item
-
-stub.SayHelloStreaming(AsyncIter([
-    HelloRequest(name='Golden'),
-    HelloRequest(name='Retriever'),
-    HelloRequest(name='Pan'),
-    HelloRequest(name='Cake'),
-]))
+stub.SayHelloStreaming(request_iterator())
 ```
 
 ### No Special Async Functions Naming Pattern
