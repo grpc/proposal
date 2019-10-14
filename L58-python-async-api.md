@@ -145,7 +145,7 @@ gRPC Python programming in Python 3 runtime.
 `asyncio` is great, but not silver bullet to solve everything. It has its
 limitations and unique advantages. gRPC Python as a framework should empower
 tech-savvy users to use the cutting-edge features, in the same time as we allow
-majority of our users to code in the way they familier.
+majority of our users to code in the way they familiar.
 
 The new API will be isolated from the current API. The implementation of the new
 API is an entirely different stack than the current stack. On the downside, most
