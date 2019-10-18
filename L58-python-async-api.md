@@ -997,6 +997,13 @@ class Call(Generic[Request, Response], grpc.RpcContext):
         Raises:
           An RpcError exception if the write failed.
         """
+
+    def done_writing(self) -> None:
+        """Notifies server that the client is done sending messages.
+
+        After done_writing is called, any additional invocation to the write
+        function will fail with RpcError.
+        """
 ```
 
 ### Server-Side
