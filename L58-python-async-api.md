@@ -213,7 +213,7 @@ async with grpc.aio.insecure_channel("localhost:50051") as channel:
         process(response)
 ```
 
-### New Streaming API
+### New Streaming API - Reader / Writer API
 
 Existing streaming API has usability problem that its logic complexes user
 application. For client side, it requires the request iterator to be defined
@@ -240,7 +240,7 @@ euroelessar@ points out several great reasons for the new streaming API:
 So, this gRFC introduces a new pattern of streaming API that reads/writes
 message to peer with explicit call.
 
-#### Snippet For New Streaming API
+#### Snippet For Reader / Writer Streaming API
 
 ```Python
 ### Client side
@@ -260,13 +260,13 @@ class AsyncGreeter(helloworld_pb2_grpc.GreeterServicer):
                           context: grpc.aio.ServicerContext
             ) -> None:
         bootstrap_request = await context.read()
-        initialize_environment(bootstrap_request)
-        while has_response():
+        ...(bootstrap_request)
+        while ...:
             response = ...
             await context.write(response)
 ```
 
-#### Snippet For Current Streaming API
+#### Snippet For Async Iterator Streaming API
 
 ```Python
 ### Client side
