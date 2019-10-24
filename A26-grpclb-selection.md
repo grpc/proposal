@@ -113,7 +113,22 @@ method.  This will be implemented by:
 
 ### Java
 
-TBD
+Java will remove the legacy method of gRPCLB selection (via balancer addresses
+produced by the resolver via the Address list). This was internal-only
+functionality already, as it required using
+`io.grpc.internal.GrpcAttributes.ATTR_LB_ADDR_AUTHORITY`.
+
+The new approach will be implemented by:
+
+1. Move `io.grpc.internal.GrpcAttributes.ATTR_LB_ADDR_AUTHORITY` to
+   `io.grpc.grpclb.GrpclbConstants.ATTR_LB_ADDR_AUTHORITY`.
+2. Add `io.grpc.grpclb.GrpclbConstants.ATTR_LB_ADDRS` with type
+   `Attributes.Key<List<EquivalentAddressGroup>>`. Every
+   `EquivalentAddressGroup` in the list must have a `ATTR_LB_ADDR_AUTHORITY`.
+   This key would pass addresses via the Attributes arguments of
+   `NameResolver.Listener.onAddresses(List<EAG>, Attributes)`
+3. Change grpclb policy to look for LB addresses via ATTR_LB_ADDRS instead of
+   the normal list of EAG.
 
 ### C
 
