@@ -3,9 +3,9 @@ A26: gRPCLB Selection
 * Author(s): Doug Fawley
 * Approver: a11r
 * Status: Draft
-* Implemented in: None
+* Implemented in: C
 * Last updated: 2019-10-22
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/d/msg/grpc-io/pB3vWC6MtlQ/vo681HkiAwAJ
 
 ## Abstract
 
@@ -25,8 +25,8 @@ can be declared stable, yet not create long-lasting maintenance problems.
 
 ## Proposal
 
-C core will promote its existing channel arg that configures the DNS resolver to
-fetch SRV records to "stable".
+C core will continue to provide its channel arg that configures the DNS resolver
+to fetch SRV records.
 
 In Go and Java, the default DNS resolver will not fetch SRV records. However,
 when gRPCLB is imported, it will override the default DNS resolver with a
@@ -132,4 +132,4 @@ The new approach will be implemented by:
 
 ### C
 
-TBD
+Implementation: https://github.com/grpc/grpc/pull/20803
