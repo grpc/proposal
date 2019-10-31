@@ -2,7 +2,7 @@ Remove custom allocation function overrides from core surface API
 ----
 * Author(s): veblush
 * Approver: mark
-* Status: Draft
+* Status: Approved
 * Implemented in: https://github.com/grpc/grpc/pull/20462
 * Last updated: 2019-10-09
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/kDswzg-cEZU
