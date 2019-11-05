@@ -251,7 +251,9 @@ with stub.StreamingHi() as streaming_call:
   while response:  # or response is not grpc.aio.EOF
       process(response)
       response = await streaming_call.read()
+```
 
+```Python
 ### Server side
 class AsyncGreeter(helloworld_pb2_grpc.GreeterServicer):
 
@@ -279,7 +281,9 @@ async def async_request_iterator() -> HelloRequest:
 response_iterator = stub.StreamingHi(async_request_iterator())
 async for response in response_iterator:
     process(response)
+```
 
+```Python
 ### Server side
 
 class Greeter(helloworld_pb2_grpc.GreeterServicer):
