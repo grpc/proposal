@@ -2,7 +2,7 @@ A26: gRPCLB Selection
 ----
 * Author(s): Doug Fawley
 * Approver: a11r
-* Status: Draft
+* Status: Final
 * Implemented in: C
 * Last updated: 2019-10-22
 * Discussion at: https://groups.google.com/d/msg/grpc-io/pB3vWC6MtlQ/vo681HkiAwAJ
