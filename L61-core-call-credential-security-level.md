@@ -1,4 +1,4 @@
-Associate transport security level to call credential.
+gRPC security level negotiation between call credentials and channels.
 ----
 * Author(s): Yihua Zhang
 * Approver: Mark Roth
@@ -12,7 +12,9 @@ Associate transport security level to call credential.
 Associate a security level (privacy+integrity, integrity-only, insecure)
 to each `grpc_call_credentials` implementation to dictate the level of
 transport security an underlying connection should satisfy in order to transfer
-a corresponding call credential.
+a corresponding call credential. Whenever a call credential is about to be
+transferred on a channel we check if the security level of channel is greater than or
+equal to that of call credential and fail the transfer if it is not.
 
 ## Background
 
