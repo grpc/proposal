@@ -3,9 +3,9 @@ gRPC security level negotiation between call credentials and channels.
 * Author(s): Yihua Zhang
 * Approver: Mark Roth
 * Status: In review
-* Implemented in:https: //github.com/grpc/grpc/pull/21215
+* Implemented in: https: //github.com/grpc/grpc/pull/21215
 * Last updated: 2019-12-05
-* Discussion at:
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/ZtXYweohOwE
 
 ## Abstract
 
