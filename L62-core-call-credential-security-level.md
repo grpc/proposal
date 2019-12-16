@@ -100,6 +100,14 @@ experimental, we reserve the right to make the change. For insecure connections,
 there is currently no mechanism to allow call credentials to be transferred
 over them and thus, they will not get affected as well.
 
+### Modify the existing `grpc_plugin_credentials` creation API to additionally take `grpc_security_level` as a parameter.
+
+``` C
+GRPCAPI grpc_call_credentials*
+grpc_metadata_credentials_create_from_plugin(
+    grpc_metadata_credentials_plugin plugin, grpc_security_level level, void* reserved);
+```
+
 Notice that we allow security levels to be configurable for plugin credentials
 since the plugin credentials will be inherited by other call credential
 implementations which will define their own security levels and without this
