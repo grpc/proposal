@@ -5,7 +5,7 @@ A27: xDS-Based Global Load Balancing
 * Status: Draft
 * Implemented in: (in progress in C-core, Java, and Go)
 * Last updated: 2020-01-07
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/d/topic/grpc-io/GWIH4XhIqHA/discussion
 
 ## Abstract
 
