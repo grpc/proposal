@@ -80,9 +80,9 @@ be used by both the resolver and the LB policies.
 There will be two separate LB policies for xDS, one to support `Cluster`
 data, and another to support `ClusterLoadAssignment` data.
 
-Note that both the resolvers and the LB policies will have
-"experimental" suffixes for their names for now.  These suffixes will be
-removed when the functionality has proven to be stable.
+Note that the LB policies will have "experimental" suffixes for their
+names for now.  These suffixes will be removed when the functionality
+has proven to be stable.
 
 ![gRPC Client Architecture Diagram](A27_graphics/grpc_client_architecture.png)
 
@@ -221,9 +221,10 @@ policy will be responsible for both selecting the highest priority set
 of localities that are reachable and distributing the traffic across the
 localities in the selected priority based on the locality weights.
 
-Note that the EDS policy will *not* support overprovisioning, which is
-different from Envoy.  Envoy takes the overprovisioning into account in
-both [locality-weighted load
+Note that the EDS policy will *not* support
+[overprovisioning](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/overprovisioning),
+which is different from Envoy.  Envoy takes the
+overprovisioning into account in both [locality-weighted load
 balancing](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/locality_weight)
 and [priority
 fail-over](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/priority),
@@ -282,9 +283,9 @@ does not specify a port.
 Because we are requesting one specific resource by name, the LDS response
 should include exactly one `Listener`.  However, many existing xDS servers
 do not support requesting one specific resource in LDS, so the gRPC client
-should be tolerant of servers that may ignore the requested resource name;
-if the server returns multiple resources, the client should look for the one
-with the name it asked for, and it should ignore the rest of the entries.
+must be tolerant of servers that may ignore the requested resource name;
+if the server returns multiple resources, the client will look for the one
+with the name it asked for, and it will ignore the rest of the entries.
 Note that this means that the resource returned by the xDS server must
 have exactly the name specified by the client.
 
@@ -305,9 +306,9 @@ then the client will send an RDS request asking for the specific
 
 Because we are requesting one specific resource by name, the RDS response
 should include exactly one RouteConfiguration.  However, the gRPC client
-should be tolerant of servers that may ignore the resource name in the
-request; if the server returns multiple resources, the client should look
-for the one with the name it asked for, and it should ignore the rest of
+must be tolerant of servers that may ignore the resource name in the
+request; if the server returns multiple resources, the client will look
+for the one with the name it asked for, and it will ignore the rest of
 the entries.
 
 #### RouteConfiguration Proto
@@ -364,9 +365,9 @@ client will make a CDS request asking for that specific cluster name.
 Because we are requesting one specific resource by name, the CDS response
 should include exactly one `Cluster`.  However, many existing xDS servers
 do not support requesting one specific resource in CDS, so the gRPC client
-should be tolerant of servers that may ignore the requested resource name;
-if the server returns multiple resources, the client should look for the one
-with the name it asked for, and it should ignore the rest of the entries.
+must be tolerant of servers that may ignore the requested resource name;
+if the server returns multiple resources, the client will look for the one
+with the name it asked for, and it will ignore the rest of the entries.
 Note that this means that the resource returned by the xDS server must
 have exactly the name specified by the client.
 
