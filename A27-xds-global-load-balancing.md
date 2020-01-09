@@ -188,11 +188,10 @@ The CDS policy will use the XdsClient object passed in from the xds resolver
 to query for the `Cluster` resource with the cluster name from the LB
 policy configuration.
 
-Initially, the CDS policy will support only hard-coded cluster names, so
-it will always create an EDS policy as the child policy.  (In the
-future, it will change to dynamically determine which child policy to
-create, in order to support features like weighted clusters and aggregate
-clusters.)
+Initially, the CDS policy will always create an EDS policy as the child
+policy.  In the future, this may change; for example, we may add support
+for clusters that use DNS or for aggregate clusters, which would require
+different child policies.
 
 #### EDS LB Policy
 
@@ -363,7 +362,7 @@ Once the cluster name is obtained from the __VirtualHost__ proto, the gRPC
 client will make a CDS request asking for that specific cluster name.
 
 Because we are requesting one specific resource by name, the CDS response
-should include exactly one `Listener`.  However, many existing xDS servers
+should include exactly one `Cluster`.  However, many existing xDS servers
 do not support requesting one specific resource in CDS, so the gRPC client
 should be tolerant of servers that may ignore the requested resource name;
 if the server returns multiple resources, the client should look for the one
