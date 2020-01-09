@@ -62,6 +62,10 @@ where all of these resource types are obtained on a single gRPC stream.
 However, the different phases of the API flow are still typically
 referred to using the separate service names described above.
 
+In the future, we may add support for the incremental ADS variant of
+xDS.  However, we have no plans to support any non-aggregated variants
+of xDS, nor do we plan to support REST.
+
 ### Related Proposals: 
 
 [A24: Load Balancing Policy Configuration](https://github.com/grpc/proposal/blob/master/A24-lb-policy-config.md)
