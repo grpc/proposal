@@ -401,6 +401,8 @@ the value of the `eds_cluster_config.service_name` field in the
 The `ClusterLoadAssignment` proto must have the following fields set:
 
 - The `endpoints` field must contain at least one entry.  In each entry:
+  - If the `load_balancing_weight` field is unset, the `endpoints` entry
+    is skipped; otherwise, the value is used for weighted locality picking.
   - The `priority` field must be set.
   - The `lb_endpoints` field must contain at least one entry.  In each entry:
     - If the `health_status` field has any value other than HEALTHY or
