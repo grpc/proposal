@@ -44,16 +44,21 @@ The xDS APIs are essentially pub/sub mechanisms, where each API allows
 subscribing to a different type of configuration resource.  In the xDS
 API flow, the client uses the following main APIs, in this order:
 
-- __Listener Discovery Service (LDS)__: Returns `Listener` resources.
-  Used basically as a convenient root for the gRPC client's configuration.
-  Points to the RouteConfiguration.
-- __Route Discovery Service (RDS)__: Returns `RouteConfiguration`
-  resources.  Provides data used to populate the gRPC service config.  Points
-  to the Cluster.
-- __Cluster Discovery Service (CDS)__: Returns `Cluster` resources.
-  Configures things like load balancing policy and load reporting.  Points
-  to the ClusterLoadAssignment.
-- __Endpoint Discovery Service (EDS)__: Returns `ClusterLoadAssignment`
+- __Listener Discovery Service (LDS)__: Returns
+  [`Listener`](https://github.com/envoyproxy/envoy/blob/9e83625b16851cdc7e4b0a4483b0ce07c33ba76b/api/envoy/api/v2/listener.proto#L27)
+  resources.  Used basically as a convenient root for the gRPC client's
+  configuration.  Points to the RouteConfiguration.
+- __Route Discovery Service (RDS)__: Returns
+  [`RouteConfiguration`](https://github.com/envoyproxy/envoy/blob/9e83625b16851cdc7e4b0a4483b0ce07c33ba76b/api/envoy/api/v2/route.proto#L24)
+  resources.  Provides data used to populate the gRPC [service
+  config](https://github.com/grpc/grpc/blob/master/doc/service_config.md).
+  Points to the Cluster.
+- __Cluster Discovery Service (CDS)__: Returns
+  [`Cluster`](https://github.com/envoyproxy/envoy/blob/9e83625b16851cdc7e4b0a4483b0ce07c33ba76b/api/envoy/api/v2/cluster.proto#L34)
+  resources.  Configures things like load balancing policy and load reporting.
+  Points to the ClusterLoadAssignment.
+- __Endpoint Discovery Service (EDS)__: Returns
+  [`ClusterLoadAssignment`](https://github.com/envoyproxy/envoy/blob/9e83625b16851cdc7e4b0a4483b0ce07c33ba76b/api/envoy/api/v2/endpoint.proto#L33)
   resources.  Configures the set of endpoints (backend servers) to load
   balance across and may tell the client to drop requests.
 
@@ -147,14 +152,14 @@ in the bootstrap file will be silently ignored.
 
 #### xds Resolver
 
-Clients will enable use of xDS by using the "xds" resolver in the
+Clients will enable use of xDS by using the `xds` resolver in the
 target URI used to create the gRPC channel.  For example, a user may
 create a channel using the URI "xds:example.com:123" or
 "xds:///example.com:123", which will use xDS to establish contact with
 the server "example.com:123".  The "xds" URI scheme does not support any
 authority.
 
-When the channel attempts to connect, the xds resolver will
+When the channel attempts to connect, the `xds` resolver will
 instantiate an XdsClient object and use it to send an xDS request for
 a `Listener` resource with the name of the server that the client
 wishes to connect to (in the example above, "example.com:123").  If the
@@ -164,15 +169,15 @@ This information will be used to construct the gRPC [service
 config](https://github.com/grpc/grpc/blob/master/doc/service_config.md),
 which the resolver will return to the channel.
 
-In particular, the resulting service config will select use of the CDS
-LB policy, described below.  The configuration of the CDS policy will
-indicate which `Cluster` resource will be used.
+The `xds` resolver will return a service config that selects use of the CDS LB
+policy, described below.  The configuration of the CDS policy will indicate
+which `Cluster` resource will be used.
 
-Note that the resolver will return an empty list of addresses, because
+Note that the `xds` resolver will return an empty list of addresses, because
 in the xDS API flow, the addresses are not returned until the
 `ClusterLoadAssignment` resource is obtained later.
 
-The xds resolver will also return a reference to the XdsClient object
+The `xds` resolver will also return a reference to the XdsClient object
 that it instantiated.  This reference will be passed down to the LB
 policies, which is how the resolver and LB policies can share the same
 XdsClient object.
@@ -188,7 +193,7 @@ will be of the following form:
 }
 ```
 
-The CDS policy will use the XdsClient object passed in from the xds resolver
+The CDS policy will use the XdsClient object passed in from the `xds` resolver
 to query for the `Cluster` resource with the cluster name from the LB
 policy configuration.
 
@@ -285,7 +290,7 @@ xDS server effectively defines what the default port means if the URI
 does not specify a port.
 
 Because we are requesting one specific resource by name, the LDS response
-should include exactly one `Listener`.  However, many existing xDS servers
+should include at least one `Listener`.  However, many existing xDS servers
 do not support requesting one specific resource in LDS, so the gRPC client
 must be tolerant of servers that may ignore the requested resource name;
 if the server returns multiple resources, the client will look for the one
@@ -298,22 +303,22 @@ have exactly the name specified by the client.
 The returned `Listener` should be an "HTTP API listener", using the format
 added to the xDS API in https://github.com/envoyproxy/envoy/pull/8170.
 The HTTP API listener configuration may either provide the
-`RouteConfiguration` directly in-line, or it may tell the client to
+`RouteConfiguration` directly inline, or it may tell the client to
 use RDS.  Note that if using RDS, the __ConfigSource__ proto for the RDS
 server must indicate to use ADS.
 
 #### RDS
 
-If the `Listener` does not include the `RouteConfiguration` in-line,
+If the `Listener` does not include the `RouteConfiguration` inline,
 then the client will send an RDS request asking for the specific
 `RouteConfiguration` name specified in the `Listener`.
 
 Because we are requesting one specific resource by name, the RDS response
-should include exactly one RouteConfiguration.  However, the gRPC client
-must be tolerant of servers that may ignore the resource name in the
-request; if the server returns multiple resources, the client will look
-for the one with the name it asked for, and it will ignore the rest of
-the entries.
+should include no more than one RouteConfiguration.  However, the gRPC
+client must be tolerant of servers that may ignore the resource name in
+the request; if the server returns multiple resources, the client will
+look for the one with the name it asked for, and it will ignore the rest
+of the entries.
 
 #### RouteConfiguration Proto
 
@@ -321,7 +326,7 @@ The `RouteConfiguration` includes a list of zero or more __VirtualHost__
 resources.  The gRPC client will look through this list to find an element
 whose domains field matches the server name specified in the "xds:" URI
 (with port, if any, stripped off).  If no matching VirtualHost is found in
-the RouteConfiguration, the xds resolver will return an error to the client
+the RouteConfiguration, the `xds` resolver will return an error to the client
 channel.
 
 In our initial implementation, the only field in the VirtualHost proto
@@ -331,10 +336,10 @@ whose match field must contain a prefix field whose value is the empty
 string and whose route field must be set.  Inside that route message,
 the cluster field will indicate which cluster to send the request to.
 
-If the cluster cannot be determined, the xds resolver will return an
+If the cluster cannot be determined, the `xds` resolver will return an
 error to the client channel.
 
-If the cluster can be determined, the xds resolver will return a service
+If the cluster can be determined, the `xds` resolver will return a service
 config that selects the CDS LB policy.  The LB policy's configuration will
 include the name of the cluster.
 
@@ -367,7 +372,7 @@ Once the cluster name is obtained from the __VirtualHost__ proto, the gRPC
 client will make a CDS request asking for that specific cluster name.
 
 Because we are requesting one specific resource by name, the CDS response
-should include exactly one `Cluster`.  However, many existing xDS servers
+should include at least one `Cluster`.  However, many existing xDS servers
 do not support requesting one specific resource in CDS, so the gRPC client
 must be tolerant of servers that may ignore the requested resource name;
 if the server returns multiple resources, the client will look for the one
@@ -408,7 +413,10 @@ The `ClusterLoadAssignment` proto must have the following fields set:
     - If the `health_status` field has any value other than HEALTHY or
       UNKNOWN, the entry will be ignored.
     - The `endpoint` field must be set.  Inside of it:
-      - The `address` field must be set.
+      - The `address` field must be set.  Inside of it:
+        - The `socket_address` field must be set.  Inside of it:
+          - The `address` field must be set to an IPv4 or IPv6 address.
+          - The `port_value` field must be set.
 - The `policy.drop_overloads` field may be set.
 
 FIXME: Is this true?  Need to resolve internal discussion and decide
