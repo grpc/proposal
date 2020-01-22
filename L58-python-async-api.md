@@ -1,10 +1,10 @@
 Async API for gRPC Python
 ----
-* Author(s): lidizheng
+* Author(s): lidizheng, pfreixes
 * Approver: gnossen
 * Status: In Review
 * Implemented in: Python
-* Last updated: 2019-10-01
+* Last updated: 2020-01-22
 * Discussions at:
   * https://groups.google.com/forum/#!topic/grpc-io/7V7HYM_aph4
   * https://github.com/lidizheng/grpc-api-examples/pull/1
@@ -903,18 +903,29 @@ class StreamStreamMultiCallable(Generic[Request, Response]):
 ```
 
 ```Python
-# grpc.aio.Call
-class Call(Generic[Request, Response], grpc.RpcContext):
-    """The representation of an RPC on the client-side."""
+# grpc.aio.RpcContext
+class RpcContext:
+    """Provides RPC-related information and action."""
 
-    def is_active(self) -> bool:
-        """Describes whether the RPC is active or has terminated.
+    def cancelled(self) -> bool:
+        """Return True if the RPC is cancelled.
+
+        The RPC is cancelled when the cancellation was requested with cancel().
 
         Returns:
-          True if RPC is active, False otherwise.
+          A bool indicates whether the RPC is cancelled or not.
         """
 
-    def time_remaining(self) -> float:
+    def done(self) -> bool:
+        """Return True if the RPC is done.
+
+        An RPC is done if the RPC is completed, cancelled or aborted.
+
+        Returns:
+          A bool indicates if the RPC is done.
+        """
+
+    def time_remaining(self) -> Optional[float]:
         """Describes the length of allowed time remaining for the RPC.
 
         Returns:
@@ -923,32 +934,38 @@ class Call(Generic[Request, Response], grpc.RpcContext):
           timed out, or None if no deadline was specified for the RPC.
         """
 
-    def cancel(self) -> None:
+    def cancel(self) -> bool:
         """Cancels the RPC.
 
         Idempotent and has no effect if the RPC has already terminated.
+
+        Returns:
+          A bool indicates if the cancellation is performed or not.
         """
 
-    def add_done_callback(self, callback: Callable[[Call], None]) -> None:
+    def add_done_callback(self, callback: DoneCallbackType) -> None:
         """Registers a callback to be called on RPC termination.
 
         Args:
-          callback: A callable that accepts the grpc.aio.Call itself.
+          callback: A callable object will be called with the call object as
+          its only argument.
         """
+```
 
-    async def initial_metadata(self) -> Sequence[Tuple[Text, AnyStr]]:
+```Python
+# grpc.aio.Call
+class Call(grpc.aio.RpcContext):
+    """The abstract base class of an RPC on the client-side."""
+
+    async def initial_metadata(self) -> MetadataType:
         """Accesses the initial metadata sent by the server.
-
-        Coroutine continues once the value is available.
 
         Returns:
           The initial :term:`metadata`.
         """
 
-    async def trailing_metadata(self) -> Sequence[Tuple[Text, AnyStr]]:
+    async def trailing_metadata(self) -> MetadataType:
         """Accesses the trailing metadata sent by the server.
-
-        Coroutine continues once the value is available.
 
         Returns:
           The trailing :term:`metadata`.
@@ -957,8 +974,6 @@ class Call(Generic[Request, Response], grpc.RpcContext):
     async def code(self) -> grpc.StatusCode:
         """Accesses the status code sent by the server.
 
-        Coroutine continues once the value is available.
-
         Returns:
           The StatusCode value for the RPC.
         """
@@ -966,47 +981,107 @@ class Call(Generic[Request, Response], grpc.RpcContext):
     async def details(self) -> Text:
         """Accesses the details sent by the server.
 
-        Coroutine continues once the value is available.
-
         Returns:
           The details string of the RPC.
         """
 
-    def __aiter__(self) -> AsyncIterable[Response]:
+
+# grpc.aio.UnaryUnaryCall
+class UnaryUnaryCall(Generic[RequestType, ResponseType], Call):
+    """The abstract base class of an unary-unary RPC on the client-side."""
+
+    def __await__(self) -> Awaitable[ResponseType]:
+        """Await the response message to be ready.
+
+        Returns:
+          The response message of the RPC.
+        """
+
+
+# grpc.aio.UnaryStreamCall
+class UnaryStreamCall(Generic[RequestType, ResponseType], Call):
+
+    def __aiter__(self) -> AsyncIterable[ResponseType]:
         """Returns the async iterable representation that yields messages.
+
+        Under the hood, it is calling the "read" method.
 
         Returns:
           An async iterable object that yields messages.
         """
 
-    async def read(self) -> Response:
-        """Reads one message from the RPC.
+    async def read(self) -> Union[EOFType, ResponseType]:
+        """Reads one message from the stream.
 
-        Only one read operation is allowed simultaneously. Mixing new streaming API and old
-        streaming API will resulted in undefined behavior.
+        Read operations must be serialized when called from multiple
+        coroutines.
 
         Returns:
-          A response message of the RPC.
-        
-        Raises:
-          An RpcError exception if the read failed.
+          A response message, or an `grpc.aio.EOF` to indicate the end of the
+          stream.
         """
 
-    async def write(self, message: Request) -> None:
-        """Writes one message to the RPC.
 
-        Only one write operation is allowed simultaneously. Mixing new streaming API and old
-        streaming API will resulted in undefined behavior.
+# grpc.aio.StreamUnaryCall
+class StreamUnaryCall(Generic[RequestType, ResponseType], Call):
+
+    async def write(self, request: RequestType) -> None:
+        """Writes one message to the stream.
 
         Raises:
           An RpcError exception if the write failed.
         """
 
-    def done_writing(self) -> None:
+    async def done_writing(self) -> None:
         """Notifies server that the client is done sending messages.
 
         After done_writing is called, any additional invocation to the write
-        function will fail with RpcError.
+        function will fail. This function is idempotent.
+        """
+
+    def __await__(self) -> Awaitable[ResponseType]:
+        """Await the response message to be ready.
+
+        Returns:
+          The response message of the stream.
+        """
+
+
+# grpc.aio.StreamStreamCall
+class StreamStreamCall(Generic[RequestType, ResponseType], Call):
+
+    def __aiter__(self) -> AsyncIterable[ResponseType]:
+        """Returns the async iterable representation that yields messages.
+
+        Under the hood, it is calling the "read" method.
+
+        Returns:
+          An async iterable object that yields messages.
+        """
+
+    async def read(self) -> Union[EOFType, ResponseType]:
+        """Reads one message from the stream.
+
+        Read operations must be serialized when called from multiple
+        coroutines.
+
+        Returns:
+          A response message, or an `grpc.aio.EOF` to indicate the end of the
+          stream.
+        """
+
+    async def write(self, request: RequestType) -> None:
+        """Writes one message to the stream.
+
+        Raises:
+          An RpcError exception if the write failed.
+        """
+
+    async def done_writing(self) -> None:
+        """Notifies server that the client is done sending messages.
+
+        After done_writing is called, any additional invocation to the write
+        function will fail. This function is idempotent.
         """
 ```
 
