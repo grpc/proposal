@@ -198,7 +198,7 @@ class AsyncGreeter(helloworld_pb2_grpc.GreeterServicer):
 
 server = grpc.aio.server()
 server.add_insecure_port(":50051")
-helloworld_pb2_grpc.add_GreeterServicer_to_server(Greeter(), server)
+helloworld_pb2_grpc.add_GreeterServicer_to_server(AsyncGreeter(), server)
 server.start()
 await server.wait_for_termination()
 ```
