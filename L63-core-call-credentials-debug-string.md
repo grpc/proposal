@@ -1,11 +1,11 @@
 Title
 ----
 * Author(s): mhaidry
-* Approver: a11r
-* Status: Draft
+* Approver: chwarr, jiagtaoli2016, vjpai, markdroth,
+* Status: In review
 * Implemented in: cpp
-* Last updated: [Date]
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 02/18/2020
+* Discussion : https://groups.google.com/g/grpc-io/c/eqA-G6eLE5Y
 
 ## Abstract
 
@@ -50,26 +50,26 @@ debug string contents
 
 ### C Call credentials and its derived classes
 The base C struct grpc_call_credentials will provide a helper debug_string().
-This will again be a virtual class that returns an empty string by default.
+This will again be a virtual function that returns an empty string by default.
 We will discuss how every derived grpc_call_credentials struct will implement
 the debug_string method.  For now we will exclude grpc_plugin_credentials and
 grpc_composite_call_credentials. They will be discussed in separate sections
 
 ![C CallCredentials hierarchy](L63_graphics/c_call_creds_hierarchy.png)
 
-### GRPC Oauth2 Token fetcher credentials (grpc_oauth2_token_fetcher_credentials)
-We could print whether a token is present and the token expiration time here.
+### GRPC Oauth2 Token fetcher credentials (`grpc_oauth2_token_fetcher_credentials`)
+Return that the token is present/absent and the token expiration time.
 
-### GRPC Google IAM credentials (grpc_google_iam_credentials)
-We could print whether a token is present and the authority selector here.
-GRPC Service Account JWT Credentials (grpc_service_account_jwt_access_credentials)
-We could print the client id and token expiration data
+### GRPC Google IAM credentials (`grpc_google_iam_credentials`)
+Return that the token is present/absent and the authority selector.
 
-### GRPC Access Token Credentials (grpc_access_token_credentials)
-TBD
+### GRPC Service Account JWT Credentials (`grpc_service_account_jwt_access_credentials`)
+Return the token expiration date.
 
+### GRPC Access Token Credentials (`grpc_access_token_credentials`)
+Return that the token is present/absent.
 
-### GRPC Plugin Credentials (grpc_plugin_credentials)
+### GRPC Plugin Credentials (`grpc_plugin_credentials`)
 The grpc plugin credentials, as the name suggests, uses plugins to extract
 auth metadata from a different kind of credentials.
 The extraction and other actions are achieved by maintaining callbacks in the
@@ -80,12 +80,11 @@ that string.
 To do this we need demonstrate the flow of how a callback is invoked by the
 plugin
 
-
 ![GRPC metadata creds plugin codeflow](L63_graphics/plugin_creds_codeflow.png)
 
 * The grpc_plugin_credentials composes a grpc_metadata_credentials_plugin
 that has all the callbacks to interact with the Credential type.
-* We add a grpc_metadata_credentials::(*debug_string)(void *state)
+* We add a grpc_metadata_credentials::`(*debug_string)(void *state)`
 callback where state translates to the MetadataCredentialsPlugin class.
 * The MetadataCredentialsPluginWrapper provides the translation to refer to
 the C++ MetadataCredentialsPlugin class from the C Core grpc_plugin_credentials.
@@ -100,7 +99,7 @@ returns an empty string by default.
 * Then we implement the debug string for the
 respective classes derived from MetadataCredentialsPlugin.
 
-### GRPC Composite Call Credentials (grpc_composite_call_credentials)
+### GRPC Composite Call Credentials (`grpc_composite_call_credentials`)
 
 The GRPC Composite call credentials maintains a list of CallCredentials.
 This means that the debug string for this struct would need to be a
@@ -108,14 +107,11 @@ concatenation of the CallCredentials this class composes. Also since any of the
 items in the list could be a Composite Call Credential, we would need to recurse
 through them and concatenate it with the parent’s debug string. Since this could
 be unbounded and would lead to multiple memory allocations and the pain of
-concatenating and passing strings I propose we just return that the credentials
-are of the composite type to the user. The rationale here is that there is no
-current Feature Requirement for logging composite credentials and we can revisit
-this once we have any composite call creds users asking for this.
+concatenating and passing strings.
 
 
 ### Tests
 We will need to add end2end tests for all of the above credential types.
 The tests will sit in.
-//third_party/grpc/test/cpp/end2end:credentials_debug_string_test
+`//test/cpp/end2end:credentials_debug_string_test`
 
