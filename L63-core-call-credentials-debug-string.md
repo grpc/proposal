@@ -105,10 +105,10 @@ The GRPC Composite call credentials maintains a list of CallCredentials.
 This means that the debug string for this struct would need to be a
 concatenation of the CallCredentials this class composes. Also since any of the
 items in the list could be a Composite Call Credential, we would need to recurse
-through them and concatenate it with the parent’s debug string. Since this could
-be unbounded and would lead to multiple memory allocations and the pain of
-concatenating and passing strings.
-
+through them and concatenate it with the parent’s debug string. There was a
+concern of this being unbounded but that issue would be an underlying problem
+of Composite credentials itself, as long as the Composite credentials are within
+memory bounds the complete debug string should be fine as well.
 
 ### Tests
 We will need to add end2end tests for all of the above credential types.
