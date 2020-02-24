@@ -3,7 +3,7 @@ Title
 * Author(s): mhaidry
 * Approver: chwarr, jiagtaoli2016, vjpai, markdroth,
 * Status: In review
-* Implemented in: cpp
+* Implemented in: Core and C++
 * Last updated: 02/18/2020
 * Discussion : https://groups.google.com/g/grpc-io/c/eqA-G6eLE5Y
 
@@ -15,7 +15,7 @@ used on the RPC.
 
 ## Background
 
-This feature satisfies requests from internal google users who would wish to
+This feature satisfies requests from internal Google users who would wish to
 get a debug string from the CallCredentials class
 
 ### Related Proposals: 
