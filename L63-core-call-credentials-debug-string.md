@@ -1,5 +1,5 @@
-Title
-----
+CallCredentials DebugString API
+--------------------------------
 * Author(s): mhaidry
 * Approver: chwarr, jiagtaoli2016, vjpai, markdroth,
 * Status: In review
@@ -37,6 +37,7 @@ computation and memory allocations is done during the DebugString method so that
 there is no default performance hits on the RPC.
 
 ## Implementation
+PR - https://github.com/grpc/grpc/pull/21984
 
 ### CallCredentials and SecureCallCredentials
 CallCredentials is the primary abstract class. Here we will add a virtual
