@@ -81,6 +81,12 @@ that string.
 To do this we need demonstrate the flow of how a callback is invoked by the
 plugin
 
+**Note: The changes made to `grpc_metadata_credentials_plugin` to support a
+`debug_string` results in a breaking API change. As
+`grpc_metadata_credentials_plugin` is a C struct and may have debug_string
+callback uninitialized. The caller has to initialize the method if they plan
+to use the `debug_string` method.**
+
 ![GRPC metadata creds plugin codeflow](L63_graphics/plugin_creds_codeflow.png)
 
 * The grpc_plugin_credentials composes a grpc_metadata_credentials_plugin
@@ -114,5 +120,7 @@ memory bounds the complete debug string should be fine as well.
 ### Tests
 We will need to add end2end tests for all of the above credential types.
 The tests will sit in.
-`//test/cpp/end2end:credentials_debug_string_test`
+`//test/cpp/end2end:end2end_test`
+`//test/core/lib/security/credentials/credentials_test`
+
 
