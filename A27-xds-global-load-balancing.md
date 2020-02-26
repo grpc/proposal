@@ -143,9 +143,9 @@ configuration.
 
 The `node` field will be populated with the [xDS `Node`
 proto](https://github.com/envoyproxy/data-plane-api/blob/1adb5d54abb0e28ca409254d26fad1cf5535239b/envoy/api/v2/core/base.proto#L85).
-Note that the `build_version` field should not be specified in the
-bootstrap file, since that will be populated automatically based on the gRPC
-client's version.
+Note that the `build_version` and `client_features` fields should not be
+specified in the bootstrap file, since they will be populated automatically
+by the gRPC xDS client.
 
 To allow for future changes in a backward-compatible way, unknown fields
 in the bootstrap file will be silently ignored.
@@ -236,9 +236,14 @@ which is different from Envoy.  Envoy takes the
 overprovisioning into account in both [locality-weighted load
 balancing](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/locality_weight)
 and [priority
-fail-over](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/priority),
+failover](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/priority),
 but gRPC assumes that the xDS server will update it to redirect traffic
-when this kind of graceful fail-over is needed.
+when this kind of graceful failover is needed.  gRPC will send the
+[`envoy.lb.does_not_support_overprovisioning` client
+feature](https://github.com/envoyproxy/envoy/pull/10136) to the xDS
+server to tell the xDS server that it will not perform graceful failover;
+xDS server implementations may use this to decide whether to perform
+graceful failover themselves.
 
 Unlike the grpclb policy, which relied on server-side load reporting to
 the balancer, the EDS policy will perform client-side load reporting
@@ -418,10 +423,8 @@ The `ClusterLoadAssignment` proto must have the following fields set:
           - The `address` field must be set to an IPv4 or IPv6 address.
           - The `port_value` field must be set.
 - The `policy.drop_overloads` field may be set.
-
-FIXME: Is this true?  Need to resolve internal discussion and decide
-whether to remove this before merging this gRFC.
-- The `policy.disable_overprovisioning` field must be set to true.
+- Note: The `policy.overprovisioning_factor` field will be ignored if
+  set; see description of the EDS LB policy above for details.
 
 ## Rationale
 
