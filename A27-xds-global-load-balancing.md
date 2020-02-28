@@ -143,9 +143,9 @@ configuration.
 
 The `node` field will be populated with the [xDS `Node`
 proto](https://github.com/envoyproxy/data-plane-api/blob/1adb5d54abb0e28ca409254d26fad1cf5535239b/envoy/api/v2/core/base.proto#L85).
-Note that the `build_version` and `client_features` fields should not be
-specified in the bootstrap file, since they will be populated automatically
-by the gRPC xDS client.
+Note that the `build_version`, `user_agent_name`, `user_agent_version`, and
+`client_features` fields should not be specified in the bootstrap file, since
+they will be populated automatically by the gRPC xDS client.
 
 To allow for future changes in a backward-compatible way, unknown fields
 in the bootstrap file will be silently ignored.
