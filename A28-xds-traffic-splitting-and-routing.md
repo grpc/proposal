@@ -1,0 +1,1095 @@
+# gRPC xDS traffic splitting and routing
+----
+* Author(s): Menghan Li
+* Approver: a11r
+* Status: Draft
+* Implemented in: (in progress in C-core, Java, and Go)
+* Last updated: 2020-05-20
+* Discussion at: https://groups.google.com/d/topic/grpc-io/<span style="color: red">TODO</span>
+
+
+
+
+# Background
+
+Traffic splitting is a feature where RPCs are sent to different clusters with
+a specified distribution. RPC routing is a feature where RPCs are sent to
+different clusters based on different criteria (e.g. path matching, header
+matching). In xDS, routing configurations are specified in RDS responses,
+including different ways to match a route, and different actions to perform
+to split the traffic.
+
+This doc covers how gRPC parses RDS routing related fields, and how to route
+the RPCs.
+
+It's based on the resolver/LB architecture and the xDS client behavior in the
+[A27: xDS-Based Global Load
+Balancing](https://github.com/grpc/proposal/blob/xds/A27-xds-global-load-balancing.md).
+
+
+# Overview
+
+To support traffic splitting and routing, the xDS resolver will be extended
+to handle the routing fields in RDS responses, and convert them to service
+config.
+
+A new top level LB policy (`xds_routing_experimental`) will be added to do
+RPC routing. It will pick the action to perform for the matched RPCs.
+
+The action can be either to route to a cluster, or to do a weighted cluster
+pick. So another LB policy (`weighted_target_experimental`) will be added to
+support the latter.
+
+The new architecture will be:
+
+![gRPC xDS client Architecture](A28_graphics/grpc_xds_client_architecture.png)
+
+The next section of this doc covers what fields of RDS response will be
+processed, how the xDS client will convert RDS to service config, and how the
+balancers will use them.
+
+# Detailed design
+
+This section will cover the LB policies, their configuration and behaviors
+first, and then how the configuration is generated from RDS responses.
+
+## Weighted target LB policy
+
+The weighted target LB policy will have a group of child policies and their
+corresponding weights, and will do weighted pick among the child policies.
+
+This LB policy will have the following configuration
+
+```proto
+message WeightedTargetConfig {
+  message Target {
+    uint32 weight = 1;
+    repeated LoadBalancingConfig child_policy = 2;
+  }
+  map<string, Target> targets = 1;
+}
+```
+
+The name (key of the map) will allow the LB policy to be intelligent about
+updating existing children instead of needlessly recreating them when it
+receives an updated config.
+
+The policy will create the child policy for each target. It will then
+distribute picks to the child policies based on the specified weights.
+
+For the purpose of traffic splitting, the child policy will always be
+`cds_experimental`. But note that this policy can be generalized to have
+other LB policies as children.
+
+The way child policies are managed is similar to how the EDS policy manages
+its child policies for localities (in fact, this policy can be reused as a
+child of the EDS policy, but that’s out of the scope of this design). The
+connectivity state of the policy will be the aggregated state of all child
+policies. The WRR algorithm will be random based. When a child policy is
+removed, it will be cached for 15 minutes.
+
+## Routing LB policy
+
+The routing LB policy will have a group of child policies, and their
+corresponding matching criteria. The RPCs will be matched against the
+criteria, and will be distributed to the matched child.
+
+### Matching criteria
+
+The matching criteria will support matcher types specified in
+[RouteMatch](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L349),
+as a combination of:
+
+*   One required [path
+    matcher](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L360)
+*   One or more optional [header
+    matchers](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L435)
+*   One optional
+    [match\_fraction](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L428)
+    *   For fraction N/D, route is considered if random(0,D) <= N
+*   A route is matched if all matching criteria are matched
+*   The first match wins
+
+### Child policies
+
+The child policies will be one of
+
+*   `cds_experimental`
+*   `weighted_target_experimental`
+    *   Because this will only have CDS as children, this is essentially
+        `weighted_CDS`
+
+More child policies can be added in the future.
+
+### Balancer config
+
+The `xds_routing_experimental` LB policy will have the following
+configuration:
+
+```proto
+/*
+
+Route List                         Action list
++---------+--------+               +-------+-----------------+--------------+
+| matcher | action |               | name  | policy          | config       |
++------------------+               +----------------------------------------+
+| /s/m1   | wt_1   | +-----------> | wt_1  | weighted_target | <config_1>   |
++------------------+               +----------------------------------------+
+| /s/m2   | cds_1  | +----\ /----> | wt_2  | weighted_target | <config_2>   |
++------------------+       x       +----------------------------------------+
+| /s2/m3  | wt_2   | +----/ \----> | cds_1 | CDS             | <cds_config> |
++------------------+            -> +-------+-----------------+--------------+
+| /s2/m4  | cds_1  | +---------/
++---------+--------+
+
+ */
+
+message XdsRouting {
+  message Action {
+    repeated LoadBalancingConfig child_policy = 1;
+  }
+  // Route represents a routing rule to send an RPC. It contains a matcher and
+  // the name of the action to take. The action with the name can be found in
+  // the action list.
+  //
+  // Route contains the action name instead of embedding the Action, so Action
+  // can be shared and reused by multiple routes.
+  message Route {
+    message HeaderMatcher {
+      message Int64Range {
+        int64 start = 1;
+        int64 end = 2;
+      }
+      string name = 1;
+      oneof header_match_specifier {
+        string exact_match = 2;
+        string regex_match = 3;
+        Int64Range range_match = 4;
+        bool present_match = 5;
+        string prefix_match = 6;
+        string suffix_match = 7;
+      }
+      bool invert_match = 8;
+    }
+    message Fraction {
+      // Specifies the numerator. Defaults to 0.
+      uint32 numerator = 1;
+
+      // Specifies the denominator. If the denominator specified is
+      // less than the numerator, the final fractional percentage
+      // is capped at 1 (100%).
+      uint32 denominator = 2;
+    }
+
+    oneof path_matcher {
+      string path = 1;
+      string prefix = 2;
+      string regex = 3;
+    }
+    repeated HeaderMatcher headers = 3;
+
+    // Every time the route is considered for a match, it
+    // must also fall under the percentage of matches
+    // indicated by this field. For some fraction N/D, a
+    // random number in the range [0,D) is selected. If the
+    // number is <= the value of the numerator N, or if the
+    // key is not present, the default value, the router
+    // continues to evaluate the remaining match criteria.
+    Fraction match_fraction = 4;
+
+    string action = 5; // The action name
+  }
+
+  repeated Route route = 1;
+  map<string, Action> action = 2;
+}
+```
+
+The route refers to the action name instead of embedding the action directly,
+so that one action can be shared by multiple routes.
+
+The config must fulfill the following:
+
+*   Routes
+    *   There must be exactly one `path_matcher` rule.
+        *   `path_matcher` is an oneof so this is always true in proto. But json
+            doesn’t have the oneof concept, so a route may have multiple path
+            matchers, and it will be considered invalid.
+    *   The `action` name must be present in the action list.
+    *   Duplicate matchers are allowed.
+        *   Duplicate matcher means that more than one routes have the same
+            matcher, no matter whether the actions are the same or not.
+        *   Because the first match wins, the second matcher will never be used.
+*   Actions
+    *   The actions in list must be referred by the routes
+    *   There must be at least one valid config in `child_policy`
+
+Violating any of these will make the balancer config invalid, and be rejected.
+
+For each action, the config in `child_policy` to be used to create a child LB
+policy will be picked using the same algorithm as [service
+config](https://github.com/grpc/grpc-proto/blob/master/grpc/service_config/service_config.proto#L297).
+
+*   The first known (registered) policy name in the list will be picked
+    *   If none is registered, the config is invalid
+*   The config for the picked policy will be validated
+    *   If the validation fails, the config is invalid. We won’t move on to the
+        next entry.
+
+Action names are used as ID for the child policies. If an action name exists
+in the previous service config, the action’s balancer config will be sent as
+an update to the corresponding child policy (instead of creating a new child
+policy for it).
+
+NOTE: this LB policy is named `xds_routing` (instead of just routing) because
+we plan to make it deeply integrated with the xds resolver as part of
+RouteAction design.
+
+### Picking
+
+When making a pick, the first match wins.
+
+For example, with config
+
+```
+{prefix: "/MyService"}:             childPolicy-1
+{path:   "/MyService/MyMethod"}:    childPolicy-2
+```
+
+`ChildPolicy-1` will be picked for `/MyService/MyMethod`, even though the
+second route is an exact match. It is this way because Envoy always picks the
+first matched route. And with header matching, finding the exact match can be
+tricky.
+
+The pick will always be delegated to the picker from the matched child
+policy, even if it’s not in connectivity state READY (as opposed to
+weighted\_target will only pick the READY child policies).
+
+There will also be cases where for an RPC, a match is found, but the child
+policy hasn’t generated the picker (for example, the child policy is still
+initializing, and no picker has been created). When this happens, the RPCs
+will be always queued until a picker is updated.
+
+If no match can be found, the RPC will fail with code Unavailable, and
+detailed information in the error message.
+
+When the policy gets an update, including:
+
+*   Balancer config update from the resolver (route update)
+*   Child policy picker update
+
+The queued RPCs will all re-pick, even though it could get the same result
+because its route isn’t updated, or it’s matching child policy hasn’t
+changed. (This is less than ideal, and some of the picks are wasted. But this
+is necessary because the RPCs are queued by the channel, and the LB policy
+cannot only re-pick some of them.)
+
+The connectivity state of the policy will be the aggregated state of all the
+child policies. Even though this is not true for a specific RPC (the actual
+state is the state of the child policy that will be picked), it represents
+the overall state of the channel.
+
+## xDS resolver and xDS client
+
+The xDS resolver’s overall behavior will be similar as before. It will call
+the xDS client, and will send a service config generated from
+RouteConfiguration (the RDS response) to the parent gRPC client channel.
+
+The xDS client will make an LDS request, with resource\_names set to the
+target URI with “xds:” scheme removed. The client will get
+HttpConnectionManager configuration from the listener response, and make an
+RDS request to get RouteConfiguration.
+
+All new features should be flag-protected until interop testing. Balancers
+are passively picked by service config, so the flag-protection can be done
+before service config generation. Because xds\_client also does response
+validation, and xds\_resolver behavior can be controlled by the parsed result
+from xds\_client, the flag-protection should be done in the xds\_client. The
+flag-protection will use the following environment variable:
+
+```
+GRPC_XDS_EXPERIMENTAL_ROUTING = (true|false)
+```
+
+### Response validation
+
+After LDS/RDS, when the xDS client gets a
+[RouteConfiguration](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route.proto#L24),
+it will look at the list of VirtualHosts and find the element whose
+[domains](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L72)
+field **_best matches_** the server name from URI (with scheme stripped off).
+If no matching VirtualHost is found, the xDS client will report that to the
+xDS resolver, and the xDS resolver will return an error to the client
+channel.
+
+In the matched VirtualHost, the xDS client will iterate over the list of
+[routes](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L76),
+and validate match field and action field:
+
+The route’s [match
+field](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L179)
+
+*   Must have
+    [path\_specifier](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L360)
+    *   Options supported:
+        [prefix](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L365),
+        [path](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L369)
+        or
+        [safe\_regex](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L405)
+    *   NOT regex
+        *   Justification: unsafe and deprecated -- replaced by safe\_regex
+        *   The presence of this field will cause a NACK
+    *   Not having path\_specifier will cause a NACK
+*   Can have
+    [headers](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L435),
+    with
+    [header\_match\_specifier](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1382)
+    set to
+    *   Options supported:
+        [exact\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1384),
+        [safe\_regex\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1409),
+        [range\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1422),
+        [present\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1426),
+        [prefix\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1434),
+        [suffix\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1442)
+        or
+        [invert\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1451)
+    *   NOT regex\_match
+        *   Justification: unsafe and deprecated -- replaced by
+            safe\_regex\_match
+        *   The presence of this field will cause a NACK
+*   Can have
+    [runtime\_fraction](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L428)
+    *   gRPC doesn’t support runtime config, so only
+        [default\_value](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/core/base.proto#L369)
+        will be used,
+        [runtime\_key](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/core/base.proto#L372)
+        will be ignored
+*   Can have
+    [query\_parameters](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L442)
+    *   Note: the entire route containing this will be ignored, regardless of
+        the other matchers, this is the same as this always evaluates to false,
+        because gRPC does not and will not support query parameters)
+*   Must not have
+    [case\_sensitive](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L410)
+    set to false (OK to be unset, default value is true)
+    *   Setting this to false will cause a NACK
+
+The route’s [action
+field](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L181)
+must be
+[route](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L185),
+and its
+[cluster\_specifier](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L696):
+*   Can be
+    [Cluster](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L701)
+*   Can be
+    [Weighted\_clusters](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L719)
+    *   The sum of
+        [weights](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L278)
+        must add up to the
+        [total\_weight](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L335).
+*   Can be
+    [cluster\_header](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L712)
+    *   Note: the route containing this action will be ignored. This feature can
+        be accomplished by header matching.
+
+Duplicate matches are allowed, but because the first match wins, the second
+will never be used.
+
+Violating any of the validation causes the response to be rejected (NACK’ed).
+The fields not covered by this section will all be ignored.
+
+### Service config generating
+
+The service config generated by the xDS resolver will pick
+`xds_routing_experimental` as the LB policy. As an optimization, when there’s
+only one route, the LB policy picked will be `cds_experimental` or
+`weighted_target_experimental` depending on the action, so we can skip the
+`xds_routing` policy that has only one child.
+
+The `xds_routing_experimental` balancer config will contain the validated
+`{matchers, action}` pairs. The actions will be in a separate list, and will
+be referred to by the routes by their names.
+
+#### Action list
+
+All the actions from the validated `{matchers, action}` pairs will be
+de-duplicated and stored in a cache. All actions in the cache will be
+assigned a unique name.
+
+When processing an RDS response, for each action:
+
+*   If the action is cluster, the child\_policy will be `cds_experimental`, with
+    a balancer config containing the cluster string.
+*   If the action is weighted\_clusters, the child\_policy will be
+    `weighted_target_experimental`. The balancer config will contain a list of
+    `cds_experimental` LB configs, and their corresponding weights.
+*   If this action is already in the cache, it will be reused, and nothing needs
+    to be done
+*   If the action is new, it will be be added to the list and assigned a name
+    *   The name should be a human readable hash of the config, to be logged for
+        debugging purposes.
+    *   For example, the names can be `cds:cluster1` and
+        `weighted:cluster1_cluster2_<index_number>`.
+
+When assigning names to new actions, we will try to reuse the existing names.
+This will help the xds\_routing policy to not always close/create child
+policy. But we will limit the name reuse only between weighted cluster
+actions that share the same set of clusters (the only update is weights).
+This covers the typical use case where the user keeps updating the cluster
+weights during a canary rollout.
+
+To do this, for each new RDS response, the client will
+
+1.  Calculate the list of new actions to add, and the list of old actions to remove.
+    1.  This is to find what actions changed between the new response and the previous response, two actions are the same if they have the same set of clusters, and the same weight for each cluster.
+1.  For each new action, either find an action to reuse, or create a new action
+    1.  If there’s a to-be-removed action with the same set of clusters (but different weights), it will get the old action’s name, otherwise it will be assigned a new name.
+1.  To accelerate processing, use 2-level-maps to keep track of the actions
+    1.  First level key is cluster names without weight, second level is cluster names + weights
+    1.  See appendix for [pseudocode](#Action-name-reusing-pseudocode).
+
+
+#### Route list
+
+For each `{matchers, action}`, a route will be generated:
+
+*   With matchers in json representation.
+*   The action will be the name of this action from the action list.
+
+The processed response will be converted to a [JSON service
+config](#JSON-service-config-generated-by-xDS-resolver).
+
+### Multiple watches for the same resource
+
+There could be multiple instances of CDS LB policies, and EDS as a child of
+CDS. So the xDS client will get parallel requests for `WatchCluster()` and
+`WatchEndpoints()`. And those watches can be for the same or for different
+resource\_names. The xDS client should be able to handle them.
+
+#### Start a new watch
+
+When the client is asked to watch for a resource\_name:
+
+*   If there’s an existing watch for this resource\_name, the client will not
+    send a xDS request
+    *   If there’s already a response, the new watcher will be notified
+        immediately
+*   If this is a new resource\_name, the client will start the watch by sending a
+    xDS request
+    *   If there are existing watches for the same type, but different
+        resource\_names, the new xDS request’s resource\_names should be the the
+        new name appended to the old names
+    *   Note that this could cause the server to resend the data for the previous
+        resouce\_names. The xDS client should try to filter out the duplicate
+        responses, and not notify the watchers.
+
+#### Cancel a watch
+
+When a watch is cancelled:
+
+*   If there are still other watch for the same name, the client will do nothing
+*   If this is the last watch for this name
+    *   The client will send a xDS request, with this name removed from
+        resource\_names list
+        *   Note that this will result in a xDS request with an empty
+            resource\_names list when the last watch is cancelled. It's expected
+            that the server won't handle this as a wild card (because this is not
+            the first request).
+    *   The item for this resource\_name will be cleared from the cache
+        *   The cache should only contain the responses for the in-process
+            watches. If we keep the item in cache after the watch is cancelled,
+            it will quickly become outdated.
+
+#### Handle responses
+
+When a response is received, the xDS client will
+
+*   Parse and notify all the watchers for this type
+*   Store the updated in cache, to prepare for future watches for the same
+    resource
+
+# Alternatives considered
+
+## Child policy sharing
+
+One child policy instance, including `cds_experimental` and
+`weighted_target_experimental`, can be an action shared by multiple routes.
+
+For example, the same `{"cds": cluster_1}` can be used as direct actions in
+route1 and route2, and as a child policy of `weighted_target` in route3.
+
+Problem with multiple LB policy instances (not sharing)
+
+*   There may be a lot of routes (resulting in a lot of LB instances)
+    *   The routes also carry RPC configurations, which can be different even if
+        the route actions are the same
+    *   It’s quite easy for users to add a route
+    *   One route only contains one path, not a list of paths
+*   The subchannels are not shared across LB policies in Java and Go (so
+    duplicate TCP connections)
+*   The logic in all child policy will be duplicate (potential memory problem)
+
+Problem with sharing
+
+*   It dramatically complicates the implementation
+    *   The child policy will be owned by multiple parents, life cycle and update
+        propagation (e.g. subchannel state change) get complex. And any picker
+        update will need to fork and notify all parents.
+*   When the route changes, the action may be diverged to a different policy (new
+    or existing). Any state (e.g. stickiness) will be lost.
+
+### Solutions
+
+The problem we want to solve immediately is the duplicate TCP connections. We
+can do
+
+*   Share at the top level `xds_routing_experimental` LB policy
+*   Share all cds policy instances
+*   Share subchannels
+
+The first solution is chosen because it’s easy to implement, and it solves
+most of the subchannel duplication problem. Even wIthout subchannel sharing,
+the number of TCP connections will be linear to the number of different
+actions, not the number of routes. Users can create a large amount of routes,
+but the number of different actions to take is usually small.
+
+# Appendix
+
+## JSON service config generated by xDS resolver
+
+For an RDS response with content
+
+```
+{
+  "URL_MAP/1",
+  path: "/service_1/method_1",
+  cluster: {cluster_1}
+},
+{
+  "URL_MAP/2",
+  path: "/service_1/method_2",
+  cluster: {cluster_1}
+},
+{
+  "URL_MAP/3",
+  prefix: "/service_2/method_2",
+  weighted_clusters: [
+    {name: cluster_1, weight: 75},
+    {name: cluster_2, weight: 25}
+  ]
+},
+{
+  "URL_MAP/4",
+  prefix: "/service_2",
+  weighted_clusters: [
+    {name: cluster_1, weight: 75},
+    {name: cluster_2, weight: 25}
+  ]
+},
+{
+  "URL_MAP/5",
+  regex: "^/service_2/method_3$",
+  weighted_clusters: [
+    {name: cluster_1, weight: 99},
+    {name: cluster_3, weight: 1}
+  ]
+},
+```
+
+The generated service config will be
+
+```json
+{
+  "loadBalancingConfig":[{
+    "xds_routing_experimental":{
+      "Action":{
+        "cds:cluster_1":{
+          "childPolicy":[{
+            "cds_experimental":{"cluster":"cluster_1"}
+          }]
+        },
+        "weighted:cluster_1_cluster_2_1":{
+          "childPolicy":[{
+            "weighted_target_experimental":{
+              "targets": {
+                "cluster_1" : {
+                  "weight":75,
+                  "childPolicy":[{"cds_experimental":{"cluster":"cluster_1"}}]
+                },
+                "cluster_2" : {
+                  "weight":25,
+                  "childPolicy":[{"cds_experimental":{"cluster":"cluster_2"}}]
+                }
+              }
+            }
+          }]
+        },
+        "weighted:cluster_1_cluster_3_1":{
+          "childPolicy":[{
+            "weighted_target_experimental":{
+              "targets": {
+                "cluster_1": {
+                  "weight":99,
+                  "childPolicy":[{"cds_experimental":{"cluster":"cluster_1"}}]
+                },
+                "cluster_3": {
+                  "weight":1,
+                  "childPolicy":[{"cds_experimental":{"cluster":"cluster_3"}}]
+                }
+              }
+            }
+          }]
+        }
+      },
+
+      "Route":[{
+        "path":"/service_1/method_1",
+        "action":"cds:cluster_1"
+      },
+      {
+        "path":"/service_1/method_2",
+        "action":"cds:cluster_1"
+      },
+      {
+        "prefix":"/service_2/method_1",
+        "action":"weighted:cluster_1_cluster_2_1"
+      },
+      {
+        "prefix":"/service_2",
+        "action":"weighted:cluster_1_cluster_2_1"
+      },
+      {
+        "regex":"^/service_2/method_3$",
+        "action":"weighted:cluster_1_cluster_3_1"
+      }]
+    }
+  }]
+}
+```
+
+## Action name reusing pseudocode
+
+Previous RDS response:
+
+```
+{a:20, b:30, c:50}
+{a:10, b:50, c:40}
+{a:50, b:50}
+```
+
+oldActions (contains the final actions, with names assigned, is updated by
+the following code). Note that the cluster names are sorted, so we don’t have
+both “a\_b\_c\_” and “a\_c\_b\_”:
+
+<table>
+  <tr>
+   <td>key-1
+   </td>
+   <td>key-2
+   </td>
+   <td>value
+   </td>
+  </tr>
+  <tr>
+   <td rowspan="3" >a_b_c_
+   </td>
+   <td>a20_b30_c50_
+   </td>
+   <td>clusters: {a:20, b:30, c:50}
+<p>
+name: a_b_c_0
+   </td>
+  </tr>
+  <tr>
+   <td>a10_b50_c40_
+   </td>
+   <td>clusters: {a:10, b:50, c:40}
+<p>
+name: a_b_c_1
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>nextIndex: 2
+   </td>
+  </tr>
+  <tr>
+   <td rowspan="2" >a_b_
+   </td>
+   <td>a50_b50_
+   </td>
+   <td>clusters: {a:50, b:50}
+<p>
+name: a_b_0
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>nextIndex: 1
+   </td>
+  </tr>
+</table>
+
+New RDS response:
+
+```
+{a:10, b:50, c:40}
+{a:30, b:30, c:40}
+{a:40, b:40, c:20}
+{c:50, d:50}
+```
+
+newActions (temporary map for new actions from RDS, with action names
+unassigned):
+
+<table>
+  <tr>
+   <td>key-1
+   </td>
+   <td>key-2
+   </td>
+   <td>value
+   </td>
+  </tr>
+  <tr>
+   <td rowspan="3" >a_b_c_
+   </td>
+   <td>a10_b50_c40_
+   </td>
+   <td>clusters: {a:10, b:50, c:40}
+<p>
+name: “”
+   </td>
+  </tr>
+  <tr>
+   <td>a30_b30_c40_
+   </td>
+   <td>clusters: {a:30, b:30, c:40}
+<p>
+name: “”
+   </td>
+  </tr>
+  <tr>
+   <td>a40_b40_c20_
+   </td>
+   <td>clusters: {a:40, b:40, c:20}
+<p>
+name: “”
+   </td>
+  </tr>
+  <tr>
+   <td>c_d_
+   </td>
+   <td>c50_d50_
+   </td>
+   <td>clusters: {c: 50, d: 50}
+<p>
+name: “”
+   </td>
+  </tr>
+</table>
+
+actionsToRemove (actions in oldActions, but not in newActions, with name,
+will be searched for action names to reuse):
+
+<table>
+  <tr>
+   <td>key-1
+   </td>
+   <td>key-2
+   </td>
+   <td>value
+   </td>
+  </tr>
+  <tr>
+   <td>a_b_c_
+   </td>
+   <td>a20_b30_c50_
+   </td>
+   <td>clusters: {a:20, b:30, c:50}
+<p>
+name: a_b_c_0
+   </td>
+  </tr>
+  <tr>
+   <td>a_b_
+   </td>
+   <td>a50_b50_
+   </td>
+   <td>clusters: {a:50, b:50}
+<p>
+name: a_b_0
+   </td>
+  </tr>
+</table>
+
+Iterate over newActions, add entries to new actions, and search
+actionsToRemove for names to reuse. This will add “a30\_b30\_c40\_” (reuses
+name “a\_b\_c\_0”, and deletes “a20\_b30\_c50\_”), adds “a40\_b40\_c20” (adds
+1 to nextIndex), and add “c50\_d50\_” with a new name.
+
+oldActions after update:
+
+<table>
+  <tr>
+   <td>key-1
+   </td>
+   <td>key-2
+   </td>
+   <td>value
+   </td>
+  </tr>
+  <tr>
+   <td rowspan="5" >a_b_c_
+   </td>
+   <td><del>a20_b30_c50_</del>
+   </td>
+   <td><del>clusters: {a:20, b:30, c:50}</del>
+<p>
+<del>name: a_b_c_0</del>
+   </td>
+  </tr>
+  <tr>
+   <td>a10_b50_c40_
+   </td>
+   <td>clusters: {a:10, b:50, c:40}
+<p>
+name: a_b_c_1
+   </td>
+  </tr>
+  <tr>
+   <td>a30_b30_c40_
+   </td>
+   <td>clusters: {a:30, b:30, c:40}
+<p>
+name: a_b_c_0
+   </td>
+  </tr>
+  <tr>
+   <td>a40_b40_c20_
+   </td>
+   <td>clusters: {a:40, b:40, c:20}
+<p>
+name: “a_b_c_2”
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>nextIndex: 3
+   </td>
+  </tr>
+  <tr>
+   <td rowspan="2" >a_b_
+   </td>
+   <td>a50_b50_
+   </td>
+   <td>clusters: {a:50, b:50}
+<p>
+name: a_b_0
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>nextIndex: 1
+   </td>
+  </tr>
+  <tr>
+   <td rowspan="2" >c_d_
+   </td>
+   <td>c50_d50_
+   </td>
+   <td>clusters: {c:50, d:50}
+<p>
+name: c_d_0
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>nextIndex: 1
+   </td>
+  </tr>
+</table>
+
+actionsToRemove after update:
+
+<table>
+  <tr>
+   <td>key-1
+   </td>
+   <td>key-2
+   </td>
+   <td>value
+   </td>
+  </tr>
+  <tr>
+   <td><del>a20_b30_c50_</del>
+   </td>
+   <td><del>clusters: {a:20, b:30, c:50}</del>
+<p>
+<del>name: a_b_c_0</del>
+   </td>
+   <td><del>a20_b30_c50_</del>
+   </td>
+  </tr>
+  <tr>
+   <td>a_b_
+   </td>
+   <td>a50_b50_
+   </td>
+   <td>clusters: {a:50, b:50}
+<p>
+name: a_b_0
+   </td>
+  </tr>
+</table>
+
+Delete remaining actionsToRemove from oldActions:
+
+<table>
+  <tr>
+   <td>key-1
+   </td>
+   <td>key-2
+   </td>
+   <td>value
+   </td>
+  </tr>
+  <tr>
+   <td rowspan="4" >a_b_c_
+   </td>
+   <td>a10_b50_c40_
+   </td>
+   <td>clusters: {a:10, b:50, c:40}
+<p>
+name: a_b_c_1
+   </td>
+  </tr>
+  <tr>
+   <td>a30_b30_c40_
+   </td>
+   <td>clusters: {a:30, b:30, c:40}
+<p>
+name: a_b_c_0
+   </td>
+  </tr>
+  <tr>
+   <td>a40_b40_c20_
+   </td>
+   <td>clusters: {a:40, b:40, c:20}
+<p>
+name: “a_b_c_2”
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>nextIndex: 3
+   </td>
+  </tr>
+  <tr>
+   <td rowspan="2" >c_d_
+   </td>
+   <td>c50_d50_
+   </td>
+   <td>clusters: {c:50, d:50}
+<p>
+name: c_d_0
+   </td>
+  </tr>
+  <tr>
+   <td>
+   </td>
+   <td>nextIndex: 1
+   </td>
+  </tr>
+</table>
+
+oldActions now contains updated actions.
+
+```python
+struct action {
+  clusters map[string]int # cluster:weight
+  name     string # the assigned name, clusters plus index number, "A_B_1"
+}
+
+# oldActions contains the final actions. The following code updates
+# oldActions with updates from RDS resp.
+oldActions = map[string]struct{
+  actions    map[string]action, # key is clusters+weights, "A20_B30_"
+  nextIndex  uint64,
+}
+
+# Turn an RDS response into a map of actions.
+# newActions contains new actions, with names unassigned
+#
+# Note that this only handles actions, but not matches. The routes in the
+# generated balancer config should maintain the same order as in RDS resp.
+# A separate list of routes would work.
+newActions = map[string]map[string]action
+for r in newRDSResp.Routes:
+  clusters = map[string]int{}
+  for wc in r.WeightCluters:
+    clusters[wc.name] = wc.weight
+
+  # generate names, with and without weights
+  clustersOnly = ""
+  clustersWithWeight = ""
+  for (cluster, weight) in sorted(clusters.items): # sort clusters by key
+    clustersOnly += cluster + "_" # -> A_B_
+    clustersWithWeight += cluster + weight + "_" # -> A40_B60_
+  # -> {"A_B_": {"A40_B60_": {"A": 40, "B": 60}}}
+  newAction[clustersOnly][clustersWithWeight] = action{clusters: clusters}
+
+# Find actions in old, but not in new, and keep them in a map to be reused.
+actionsToRemove = map[string]map[string]action{}
+for (clustersOnly, i) in oldAction:
+  for (clustersWithWeight, action) in i.actions:
+    if newActions[clustersOnly][clustersWithWeight] not found:
+      actionsToRemove[clustersOnly][clustersWithWeight] = action
+
+# For all actions in new:
+# - if it's in old, do nothing
+# - if it's not in old
+#   - if a reusable found, reuse its name
+#   - else add a new entry with a new name
+for (clustersOnly, i) in newActions:
+  for (clustersWithWeight, action) in i:
+    if actionsWithNextIndex := oldAction[clustersOnly] found:
+      # If the exact action found in old, do nothing
+      if actionsWithNextIndex.action[clustersWithWeight] found:
+        continue
+      
+      # If the exact action found in ToRemove, reuse its name, and delete it
+      # from ToRemove.
+      if clustersToRemove := actionsToRemove[clustersOnly] found:
+        # Get one to reuse, doesn't matter which one
+        clusterWeightToRemove, actionToRemove = clustersToRemove.First
+        action.name = actionToRemove.name
+        delete actionsToRemove[clustersOnly][clusterWeightToRemove]
+        delete oldAction[clustersOnly][clusterWeightToRemove]
+        actionsWithNextIndex.action[clustersWithWeight] = action
+        continue
+      
+      # No name to reuse, add a new name, and nextIndex++.
+      action.name = clustersOnly + string(actionsWithNextIndex.nextIndex+1)
+      actionsWithNextIndex.nextIndex++
+      actionsWithNextIndex.action[clustersWithWeight] = action
+      continue
+    
+    # If this is the first one with the clusters, add an new entry starting at
+    # index 0
+    action.name = clustersOnly + "0"
+    oldActions[clustersOnly] = {map{clustersWithWeight: action}, 1}
+
+# Actions remain in ToRemove are not reusable, delete them.
+for (clustersOnly, i) in actionsToRemove:
+  for (clustersWithWeight, action) in i:
+    delete oldActions[clustersOnly][clustersWithWeight]
+```
