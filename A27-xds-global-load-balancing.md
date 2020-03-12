@@ -329,10 +329,9 @@ of the entries.
 
 The `RouteConfiguration` includes a list of zero or more __VirtualHost__
 resources.  The gRPC client will look through this list to find an element
-whose domains field matches the server name specified in the "xds:" URI
-(with port, if any, stripped off).  If no matching VirtualHost is found in
-the RouteConfiguration, the `xds` resolver will return an error to the client
-channel.
+whose domains field matches the server name specified in the "xds:" URI.
+If no matching VirtualHost is found in the RouteConfiguration, the `xds`
+resolver will return an error to the client channel.
 
 In our initial implementation, the only field in the VirtualHost proto
 that the gRPC client needs to look at is the list of routes.  The client
