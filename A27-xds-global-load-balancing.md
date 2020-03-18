@@ -69,7 +69,11 @@ referred to using the separate service names described above.
 
 In the future, we may add support for the incremental ADS variant of
 xDS.  However, we have no plans to support any non-aggregated variants
-of xDS, nor do we plan to support REST.
+of xDS, nor do we plan to support REST or filesystem subscription.
+
+Initially, gRPC will support version 2 of the xDS APIs.  In the future,
+we will likely upgrade to v3 or beyond, with appropriate transition
+periods to allow users to upgrade their management servers.
 
 ### Related Proposals: 
 
