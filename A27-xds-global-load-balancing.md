@@ -2,9 +2,9 @@ A27: xDS-Based Global Load Balancing
 ----
 * Author(s): Mark D. Roth
 * Approver: a11r
-* Status: Draft
-* Implemented in: (in progress in C-core, Java, and Go)
-* Last updated: 2020-01-07
+* Status: Implemented
+* Implemented in: C-core, Java, and Go
+* Last updated: 2020-03-18
 * Discussion at: https://groups.google.com/d/topic/grpc-io/GWIH4XhIqHA/discussion
 
 ## Abstract
