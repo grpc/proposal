@@ -417,7 +417,8 @@ The `ClusterLoadAssignment` proto must have the following fields set:
   - If the `load_balancing_weight` field is unset, the `endpoints` entry
     is skipped; otherwise, the value is used for weighted locality picking.
   - The `priority` field must be set.
-  - The `lb_endpoints` field must contain at least one entry.  In each entry:
+  - If the `lb_endpoints` field is empty, the locality will be considered
+    unreachable.  In each entry of the `lb_endpoints` field:
     - If the `health_status` field has any value other than HEALTHY or
       UNKNOWN, the entry will be ignored.
     - The `endpoint` field must be set.  Inside of it:
