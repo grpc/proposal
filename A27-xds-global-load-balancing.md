@@ -413,10 +413,12 @@ the value of the `eds_cluster_config.service_name` field in the
 
 The `ClusterLoadAssignment` proto must have the following fields set:
 
-- The `endpoints` field must contain at least one entry.  In each entry:
+- If the `endpoints` field is empty, the EDS LB policy will report
+  itself as being unreachable.  In each entry in the `endpoints` field:
   - If the `load_balancing_weight` field is unset, the `endpoints` entry
     is skipped; otherwise, the value is used for weighted locality picking.
-  - The `priority` field must be set.
+  - The `priority` field will be used.  As per normal protobuf rules, if
+    the field is unset, it defaults to zero.
   - If the `lb_endpoints` field is empty, the locality will be considered
     unreachable.  In each entry of the `lb_endpoints` field:
     - If the `health_status` field has any value other than HEALTHY or
