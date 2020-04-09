@@ -9,7 +9,7 @@ gRPC Python Runtime Proto Parsing
 
 ## Abstract
 
-Generated protobuf code is hard to manage for those without monorepos equipped with a hermetic build system. This has been echoed by the maintainers of libraries wrapping gRPC as well as direct users of gRPC. In this document, we aim to lay out a scalable solution for users of gRPC Python whose codebase consists of several independent code repositories.
+Generated protobuf code is hard to manage for those without monorepos equipped with a hermetic build system. This has been echoed by the maintainers of libraries wrapping gRPC as well as direct users of gRPC. In this document, we aim to lay out a more Pythonic way of dealing with Protocol Buffer-backed modules.
 
 
 ## Background
@@ -78,10 +78,15 @@ These functions will behave like normal `import` statements. `sys.path` will be 
 
 Users have reported that getting Protobuf paths to match Python import paths is quite tricky today using `protoc`. In the case of a failure to import, the library will print troubleshooting information alongside the error.
 
+### Arbitrary Protos
+
+It should be stated that, in practice, it is possible to use these new functions to load totally arbitrary protos. Suppose you wrote a server that took `.proto` files as inputs from clients, instatiated modules from them, and returned some data about the file. For example, the number of message types contained within the supplied file. This could become problematic as new syntax features are added to the Protobuf specification. In the worst case, this would require a redeploy of the server with a sufficiently up-to-date version of `grpcio-tools`. But, regardless, we will claim no support for this use case. The intent of these functions is to enable import of *fixed* `.proto` files, known at build time.
 
 ## Dependency Considerations
 
 gRPC makes a point not to incur a direct dependency on protocol buffers. It is not the intent of this feature to change that. Instead, the implementations of these new functions will live in the `grpcio-tools` package, which necessarily *already* has a hard dependency on `protobuf`. If the `grpcio` package finds that `grpc_tools` is importable, it will do so and use the implementations found there to back the `protos` and `services` functions. Otherwise, it will raise a `NotImplementedError`.
+
+In order to take advantage of newer language features, support will only be added for Python versions 3.6+. All other versions will result in a `NotImplementedError`.
 
 ## Implementation
 
@@ -89,4 +94,4 @@ This proposal has been implemented [here](https://github.com/grpc/grpc/pull/2145
 
 ## Alternatives Considered
 
-Consideration was given to implementing the functionality of what is here presented as `grpc.protos` in the `protobuf` Python package. After a thorough investigation, we found that this feature could not be implemented in a way that satisfied both the compatibility requirements of the gRPC library and the Protobuf library. However, we are able to provide all of desired functionality with an implementation enirely in the `grpcio` package.
+Consideration was given to implementing the functionality of what is here presented as `grpc.protos` in the `protobuf` Python package. After a thorough investigation, we found that this feature could not be implemented in a way that satisfied both the compatibility requirements of the gRPC library and the Protobuf library. However, we are able to provide all of desired functionality with an implementation enirely in the `grpcio` package. If at some point in the future this is no longer the case and an implementation of the required functionality in the `protobuf` repo is feasible, our `grpc.protos` function can simply proxy to it.
