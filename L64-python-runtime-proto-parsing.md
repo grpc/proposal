@@ -60,9 +60,11 @@ To be precise, we propose the introduction of three new functions with the follo
 def protos(proto_file: Text,
            runtime_generated: Optional[bool] = True) -> types.ModuleType:
     pass
+
 def services(proto_file: Text,
              runtime_generated: Optional[bool] = True) -> types.ModuleType:
     pass
+
 def protos_and_services(proto_file: Text,
                         runtime_generated: Optional[bool] = True) -> Tuple[types.ModuleType, types.ModuleType]:
     pass
@@ -72,7 +74,7 @@ The final function, `protos_and_services` is a simple convenience function allow
 
 The change will be entirely backward compatible. Users manually invoking `protoc` today will not be required to change their build process.
 
-## Import Paths
+### Import Paths
 
 These functions will behave like normal `import` statements. `sys.path` will be used to search for `.proto` files. The path under which each particular `.proto` file was found will be passed to the protobuf parser as the root of the tree (equivalent to the `-I` flag of `protoc`). This means that a file located at `${SYS_PATH_ENTRY}/foo/bar/baz.proto` will result in the instantation of a module with the fully qualified name `foo.bar.baz_pb2`.  Users are expected to have a directory structure mirroring their desired import structure.
 
@@ -82,7 +84,7 @@ Users have reported that getting Protobuf paths to match Python import paths is 
 
 It should be stated that, in practice, it is possible to use these new functions to load totally arbitrary protos. Suppose you wrote a server that took `.proto` files as inputs from clients, instatiated modules from them, and returned some data about the file. For example, the number of message types contained within the supplied file. This could become problematic as new syntax features are added to the Protobuf specification. In the worst case, this would require a redeploy of the server with a sufficiently up-to-date version of `grpcio-tools`. But, regardless, we will claim no support for this use case. The intent of these functions is to enable import of *fixed* `.proto` files, known at build time.
 
-## Dependency Considerations
+### Dependency Considerations
 
 gRPC makes a point not to incur a direct dependency on protocol buffers. It is not the intent of this feature to change that. Instead, the implementations of these new functions will live in the `grpcio-tools` package, which necessarily *already* has a hard dependency on `protobuf`. If the `grpcio` package finds that `grpc_tools` is importable, it will do so and use the implementations found there to back the `protos` and `services` functions. Otherwise, it will raise a `NotImplementedError`.
 
