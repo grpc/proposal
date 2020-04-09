@@ -5,7 +5,7 @@ gRPC Python Runtime Proto Parsing
 * Status: Draft
 * Implemented in: Python
 * Last updated: April 9, 2020
-* Discussion at: **TODO**
+* Discussion at: **TODO(gnossen)**
 
 ## Abstract
 
@@ -58,14 +58,17 @@ To be precise, we propose the introduction of three new functions with the follo
 
 ```python
 def protos(proto_file: Text,
-           runtime_generated: Optional[bool] = True) -> types.ModuleType
+           runtime_generated: Optional[bool] = True) -> types.ModuleType:
+    pass
 def services(proto_file: Text,
-             runtime_generated: Optional[bool] = True) -> types.ModuleType
+             runtime_generated: Optional[bool] = True) -> types.ModuleType:
+    pass
 def protos_and_services(proto_file: Text,
-                        runtime_generated: Optional[bool] = True) -> Tuple[types.ModuleType, types.ModuleType]
+                        runtime_generated: Optional[bool] = True) -> Tuple[types.ModuleType, types.ModuleType]:
+    pass
 ```
 
-The final function, `protos_and_services` is simple convenience function allowing the user to import protos and services in a single function call.
+The final function, `protos_and_services` is a simple convenience function allowing the user to import protos and services in a single function call.
 
 The change will be entirely backward compatible. Users manually invoking `protoc` today will not be required to change their build process.
 
@@ -73,16 +76,16 @@ The change will be entirely backward compatible. Users manually invoking `protoc
 
 These functions will behave like normal `import` statements. `sys.path` will be used to search for `.proto` files. The path under which each particular `.proto` file was found will be passed to the protobuf parser as the root of the tree (equivalent to the `-I` flag of `protoc`). This means that a file located at `${SYS_PATH_ENTRY}/foo/bar/baz.proto` will result in the instantation of a module with the fully qualified name `foo.bar.baz_pb2`.  Users are expected to have a directory structure mirroring their desired import structure.
 
+Users have reported that getting Protobuf paths to match Python import paths is quite tricky today using `protoc`. In the case of a failure to import, the library will print troubleshooting information alongside the error.
+
 
 ## Dependency Considerations
 
-gRPC makes a point not to incur a direct dependency on protocol buffers. As such, this feature will not add a hard dependency on the `protobuf` package. Instead, the implementations of these new functions will live in the `grpcio-tools` package, which necessarily *already* has a hard dependency on `protobuf`. If the `grpcio` package finds that `grpc_tools` is importable, it will do so and use the implementations found there to back the `protos` and `services` functions. Otherwise, it will raise a `NotImplementedError`.
+gRPC makes a point not to incur a direct dependency on protocol buffers. It is not the intent of this feature to change that. Instead, the implementations of these new functions will live in the `grpcio-tools` package, which necessarily *already* has a hard dependency on `protobuf`. If the `grpcio` package finds that `grpc_tools` is importable, it will do so and use the implementations found there to back the `protos` and `services` functions. Otherwise, it will raise a `NotImplementedError`.
 
 ## Implementation
 
-This proposal has been implemented [here](https://github.com/grpc/grpc/pull/21458).
-
-This implementation uses the C++ protobuf runtime already built into the `grpcio-tools` C extension to parse the protocol buffers and generate textual Python code in memory. This code is then used to [instantiate the modules](https://www.python.org/dev/peps/pep-0302/) to be provided to the calling application.
+This proposal has been implemented [here](https://github.com/grpc/grpc/pull/21458). This implementation uses the C++ protobuf runtime already built into the `grpcio-tools` C extension to parse the protocol buffers and generate textual Python code in memory. This code is then used to [instantiate the modules](https://www.python.org/dev/peps/pep-0302/) to be provided to the calling application.
 
 ## Alternatives Considered
 
