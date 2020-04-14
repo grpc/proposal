@@ -70,7 +70,7 @@ def protos_and_services(proto_file: Text,
     pass
 ```
 
-The final function, `protos_and_services` is a simple convenience function allowing the user to import protos and services in a single function call.
+The final function, `protos_and_services` is a simple convenience function allowing the user to import protos and services in a single function call. All three of these functions will be idempotent. That is, like the python built-in `import` statement, after an initial call, subsequent inbvocations will not result in a reload of the ".proto" file from disk.
 
 The change will be entirely backward compatible. Users manually invoking `protoc` today will not be required to change their build process.
 
