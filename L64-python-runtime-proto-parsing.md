@@ -80,6 +80,43 @@ These functions will behave like normal `import` statements. `sys.path` will be 
 
 Users have reported that getting Protobuf paths to match Python import paths is quite tricky today using `protoc`. In the case of a failure to import, the library will print troubleshooting information alongside the error.
 
+#### Best Practices
+
+In general, our recommendation will be for users to align their Python import path, Python fully qualified module name, Protobuf import path, and Protobuf package name. This will ensure that only one entry will ever be required on the `PYTHONPATH`. As an example, suppose you had the following file at "src/protos/foo/bar.proto":
+
+```protobuf
+syntax = "proto3";
+
+package foo;
+
+message BarMessage {
+  ...
+}
+```
+
+And the following at "src/protos/foo/baz.proto":
+
+```protobuf
+syntax = "proto3";
+
+package foo;
+
+import "foo/bar.proto";
+
+...
+```
+
+Then, ensuring that the `src/protos/` directory is on `sys.path` either by running from that directory or specifying it with the `PYTHONPATH` environment variable, you will be able to import as follows:
+
+```python
+bar_protos = grpc.protos('foo/bar.proto')
+baz_protos = grpc.protos('foo/baz.proto')
+```
+
+The critical bit here is that all `import` statements within ".proto" files must be resolvable along a path on `sys.path`. Suppose instead that `baz.proto` had imported `bar.proto` with `import "src/protos/foo/bar.proto"`. Now, in order to resolve the import, at least two paths would have to be on `sys.path`: the repo root and `src/protos/`. For simplicity's sake, the root used for both calls to `grpc.protos` and the protobuf `import` statement should be unified.
+
+In order to avoid naming clashes between protos you've authored yourself and any other protos pulled in by third-party dependencies, the root directory of your proto source tree should have a universally unique name. Ideally, this uniqueness should be guaranteed by your organization having ownership of the package by that name on PyPI. See [PEP 423](https://www.python.org/dev/peps/pep-0423/) for a deeper discussion of how package name uniqueness is handled in the Python ecosystem.
+
 ### Arbitrary Protos
 
 It should be stated that, in practice, it is possible to use these new functions to load totally arbitrary protos. Suppose you wrote a server that took `.proto` files as inputs from clients, instatiated modules from them, and returned some data about the file. For example, the number of message types contained within the supplied file. This could become problematic as new syntax features are added to the Protobuf specification. In the worst case, this would require a redeploy of the server with a sufficiently up-to-date version of `grpcio-tools`. But, regardless, we will claim no support for this use case. The intent of these functions is to enable import of *fixed* `.proto` files, known at build time.
