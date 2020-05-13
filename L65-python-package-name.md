@@ -21,7 +21,8 @@ packages.
 Package `grpc` is an alternative version of gRPC Python only supports Python 2,
 and the first version is uploaded in 2013. We have seen complaints about the
 installation failure or unable to execute our example code. The tricky package
-name is a usability issue for years.
+name is a usability issue for years. In 2019, gRPC team claim the package name
+`grpc` under PEP 541 (see [thread](https://github.com/pypa/pypi-support/issues/3)).
 
 ### Package `grpcio`
 
@@ -29,17 +30,6 @@ Package `grpcio` is first uploaded in 2015, given the fact that the name `grpc`
 already being taken, this name is likely a workaround.
 
 ## Proposal
-
-### List of Package Name
-
-Here is a list of new proxy packages:
-* `grpc`
-* `grpc-status`
-* `grpc-channelz`
-* `grpc-tools`
-* `grpc-reflection`
-* `grpc-testing`
-* `grpc-health-checking`
 
 ### Proxy Mechanism
 
@@ -56,9 +46,24 @@ RuntimeError: Please install the official package with: pip install grpcio
 The maintenance cost for this solution is minimum since these packages are
 agnostic to our releases.
 
+### List of New Packages
+
+Here is a list of new packages:
+* `grpc`
+* `grpc-status`
+* `grpc-channelz`
+* `grpc-tools`
+* `grpc-reflection`
+* `grpc-testing`
+* `grpc-health-checking`
+
 ### Package Version
 
-All new proxy packages will be versioned as `1.0`.
+Rather than releasing new versions of the `grpc` and `grpc-*` packages in
+lockstep with the canonical `grpc` and `grpcio-*` packages for each release, we
+will instead upload only one new artifact for each package name, versioned as
+`v1.0`. A stable version number suggests this package's behavior won't change
+actively.
 
 ## Rationale
 
