@@ -1,10 +1,10 @@
 Async API for gRPC Python
 ----
 * Author(s): lidizheng, pfreixes
-* Approver: gnossen, rmariano, bloodbare
-* Status: In Review
+* Approver: gnossen, rmariano
+* Status: Approved
 * Implemented in: Python
-* Last updated: 2020-01-22
+* Last updated: 2020-05-13
 * Discussions at:
   * https://groups.google.com/forum/#!topic/grpc-io/7V7HYM_aph4
   * https://github.com/lidizheng/grpc-api-examples/pull/1
@@ -145,7 +145,7 @@ gRPC Python programming in Python 3 runtime.
 `asyncio` is great, but not silver bullet to solve everything. It has its
 limitations and unique advantages. gRPC Python as a framework should empower
 tech-savvy users to use the cutting-edge features, in the same time as we allow
-majority of our users to code in the way they familiar.
+majority of our users to use Python in their most familiar way.
 
 The new API will be isolated from the current API. The implementation of the new
 API is an entirely different stack than the current stack. On the downside, most
@@ -199,7 +199,7 @@ class AsyncGreeter(helloworld_pb2_grpc.GreeterServicer):
 server = grpc.aio.server()
 server.add_insecure_port(":50051")
 helloworld_pb2_grpc.add_GreeterServicer_to_server(AsyncGreeter(), server)
-server.start()
+await server.start()
 await server.wait_for_termination()
 ```
 
@@ -248,7 +248,7 @@ with stub.StreamingHi() as streaming_call:
   request = echo_pb2.EchoRequest(message="ping")
   await streaming_call.write(request)
   response = await streaming_call.read()
-  while response:  # or response is not grpc.aio.EOF
+  while response != grpc.aio.EOF:
       process(response)
       response = await streaming_call.read()
 ```
@@ -403,35 +403,6 @@ However, by supporting the executors, we can **allow mixing async and sync**
 **method handlers** on the server side, which further reduce the cost of
 migration.
 
-### Using Asynchronous Generator
-
-For streaming calls, the requests on the client-side are supplied by generator
-for now. If a user wants to provide a pre-defined list of request messages, they
-can use build-in `iter()` function. But there isn't an equivalent function for
-async generator. Should we wrap it inside our library to increase usability?
-
-```Python
-### Current usage of Python generator
-stub.SayHelloStreaming(iter([
-    HelloRequest(name='Golden'),
-    HelloRequest(name='Retriever'),
-    HelloRequest(name='Pan'),
-    HelloRequest(name='Cake'),
-]))
-
-### The new usage is much verbose for same scenario
-async def request_iterator():
-    for request in [
-        HelloRequest(name='Golden'),
-        HelloRequest(name='Retriever'),
-        HelloRequest(name='Pan'),
-        HelloRequest(name='Cake'),
-    ]:
-        yield request
-
-stub.SayHelloStreaming(request_iterator())
-```
-
 ### No Special Async Functions Naming Pattern
 
 Fire-and-forget is a valid use case in async programming. For the non-critical
@@ -512,40 +483,6 @@ So, even if all the read/write is asynchronous in `asyncio`, we will have to
 either enforce the rule ourselves by adding locks in our implementation. Or we
 can pass down the synchronization responsibility to our users.
 
-### Concrete Class Instead of "Interfaces"
-
-Interface is a design pattern that defines the contract of an entity that allows
-different implementation to work seamlessly in a system. In the past, gRPC
-Python has been using metaclass based Python interface pattern. It works just
-like interface in Golang and Java, except the error is generated in runtime
-instead of compile time.
-
-If the gRPC Python has multiple implementation for a single interface, the use
-of the design pattern provides productivity in unifying their behavior. However,
-almost non interfaces has second implementation, even if they do, they are
-depends directly on our concrete implementation, which should better using
-inheritance or composition than interfaces.
-
-Also, in the past, dependents of gRPC Python have observed several failure
-caused by the interface. The interface constraints our ability to add
-experimental API. Once we change even slightly with interfaces, the downstream
-implementations are likely to break.
-
-Since this is a new opportunity for us to re-design, we need to think cautiously
-about how do we empower our users to extend our classes. For majority of cases,
-we are providing the only implementation for the interface. We should
-convert them into concrete classes.
-
-On the other hand, there are actually one valid use case that we should keep
-abstract class -- interceptors. To be more specific, the following interfaces
-won't be replaced by concrete classes:
-
-* `grpc.ServerInterceptor`
-* `grpc.UnaryUnaryClientInterceptor`
-* `grpc.UnaryStreamClientInterceptor`
-* `grpc.StreamUnaryClientInterceptor`
-* `grpc.StreamStreamClientInterceptor`
-
 ## Future Features
 
 ### Implicit Context Propagation By `contextvars`
@@ -567,7 +504,7 @@ For deadline propagation, the deadline of upstream server will be implicitly
 pass down to downstream server, so downstream services can react to that
 information and save computation resources or perform flow control.
 
-Acceptence critiria of this feature:
+Acceptance criteria of this feature:
 * The implementation of such feature should supported by official package, and
 users are not expected to directly access those metadata;
 * Application logic has higher priority than the implicit propagation (e.g.
@@ -576,7 +513,7 @@ users are not expected to directly access those metadata;
 * The exception error string should be informative (e.g. pointing out the
   timeout is due to upstream deadline).
 
-Further discussion around this topic, please see related sections under [Rationale].
+Further discussion around this topic, see [grpc-api-examples#2](https://github.com/lidizheng/grpc-api-examples/pull/2).
 
 ### Introduce Typing To Generated Code
 
@@ -622,9 +559,11 @@ other out of box.
 
 ### Explicit Context vs. Implicit Context
 
-TBD
 
 ## API Interfaces
+
+The proposed API interface might be obsoleted, please refer to our [master](https://github.com/grpc/grpc)
+branch or our [API reference](https://grpc.github.io/grpc/python/grpc_asyncio.html).
 
 ### Channel-Side
 
@@ -667,6 +606,9 @@ class Channel:
         Returns:
           A ChannelConnectivity object or None.
         """
+
+    async def channel_ready(self) -> None:
+        """Creates a coroutine that blocks until the Channel is READY."""
 
     def unary_unary(self,
                     method: Text,
@@ -1337,7 +1279,7 @@ class ServicerContext(Generic[Request, Response], grpc.RpcContext):
           trailing_metadata: The trailing :term:`metadata`.
         """
 
-    def abort(self, code: grpc.StatusCode, details: Text) -> NoReturn:
+    async def abort(self, code: grpc.StatusCode, details: Text) -> NoReturn:
         """Raises an exception to terminate the RPC with a non-OK status.
 
         The code and details passed as arguments will supercede any existing
@@ -1354,7 +1296,7 @@ class ServicerContext(Generic[Request, Response], grpc.RpcContext):
             RPC to the gRPC runtime.
         """
 
-    def abort_with_status(self, status: grpc.Status) -> NoReturn:
+    async def abort_with_status(self, status: grpc.Status) -> NoReturn:
         """Raises an exception to terminate the RPC with a non-OK status.
 
         The status passed as argument will supercede any existing status code,
@@ -1711,16 +1653,6 @@ class _EOF:
 EOF = _EOF()
 ```
 
-```Python
-# grpc.aio.channel_ready
-async def channel_ready(channel: grpc.aio.Channel) -> None:
-    """Creates a coroutine that ends when a Channel is ready.
-
-    Args:
-      channel: A Channel object.
-    """
-```
-
 ### New Exceptions
 
 ```Python
@@ -1758,8 +1690,8 @@ APIs in the following categories remain in top level:
 
 Reviewers has thrown many valuable proposals. This design doc may not be the
 ideal place for those discussions.
-* Re-design the connectivity API to be consistent with C-Core.
 * Design a easy way to use channel arguments [grpc#19734](https://github.com/grpc/grpc/issues/19734).
+* Integrate type annotation into generated code [grpc#20479](https://github.com/grpc/grpc/issues/20479).
 
 ## Related Issues
 
@@ -1769,4 +1701,5 @@ ideal place for those discussions.
 
 ## Implementation
 
-* TODO
+* [Project Dashboard: gRPC Async API](https://github.com/grpc/grpc/projects/16)
+* API reference available since v1.28.0
