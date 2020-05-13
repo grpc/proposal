@@ -2,27 +2,28 @@ Additional PyPI Packages for gRPC Python
 ----
 * Author(s): lidiz
 * Approver: gnossen
-* Status: Draft
+* Status: In Review
 * Implemented in: python
 * Last updated: 05/13/2020
-* Discussion at: **TBD**
+* Discussion at: https://groups.google.com/g/grpc-io/c/6thuMVK8fTo
 
 ## Abstract
 
 gRPC Python is uploaded as `grpcio` on PyPI, but there is another package named
-`grpc`. Hence some users are confused. This document proposes gRPC Python to
-upload additional packages named `grpc` and `grpc-*` as proxies to our official
+`grpc`. Hence, some users are confused. This document proposes to upload
+additional packages named `grpc` and `grpc-*` to guide users to official
 packages.
 
 ## Background
 
 ### Package `grpc`
 
-Package `grpc` is an alternative version of gRPC Python only supports Python 2,
-and the first version is uploaded in 2013. We have seen complaints about the
-installation failure or unable to execute our example code. The tricky package
-name is a usability issue for years. In 2019, gRPC team claim the package name
-`grpc` under PEP 541 (see [thread](https://github.com/pypa/pypi-support/issues/3)).
+Package `grpc` is an alternative version of gRPC Python which only supports
+Python 2, and its first version is uploaded in 2013. We have seen complaints
+about the installation failure or unable to execute our example code. The tricky
+package name is a usability issue for years. In 2019, gRPC team claimed the
+package name `grpc` under [PEP 541](https://www.python.org/dev/peps/pep-0541/)
+(see [thread](https://github.com/pypa/pypi-support/issues/3)).
 
 ### Package `grpcio`
 
@@ -31,10 +32,10 @@ already being taken, this name is likely a workaround.
 
 ## Proposal
 
-### Proxy Mechanism
+### Package Content
 
-Each proxy package will raise a `RuntimeError` exception upon installation,
-asking users to install with the correct package name. For example, for proxy
+Upon installation, each new package raises a `RuntimeError` exception, asking
+users to install with the correct package name. For example, for the new
 package `grpc`, the exception will look like:
 
 ```
@@ -59,11 +60,10 @@ Here is a list of new packages:
 
 ### Package Version
 
-Rather than releasing new versions of the `grpc` and `grpc-*` packages in
-lockstep with the canonical `grpc` and `grpcio-*` packages for each release, we
-will instead upload only one new artifact for each package name, versioned as
-`v1.0`. A stable version number suggests this package's behavior won't change
-actively.
+Rather than releasing new versions of the `grpc*` packages in lockstep with the
+canonical `grpcio*` packages for each release, we will instead upload only one
+new artifact for each package name, versioned as `v1.0`. A stable version number
+suggests this package's behavior won't change actively.
 
 ## Rationale
 
@@ -112,8 +112,8 @@ Implementing transparent dependency is a complex topic. The first question will
 be how to version the new packages? Should we always upload them simultaneously
 with built packages? Like uploading `grpc==1.29.0` and `grpcio==1.29.0` at the
 same time. It would also require more work in our infrastructure. The second
-question will be historical versions. Should we upload proxy packages for older
-versions? Which version should they depend on?
+question will be historical versions. Should we upload older versions? Which
+version should they depend on?
 
 Also, if we allow the package with the wrong name to be installed successfully,
 users might diverge between these two names and generate contents
