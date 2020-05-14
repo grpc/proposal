@@ -4,7 +4,7 @@ Additional PyPI Packages for gRPC Python
 * Approver: gnossen
 * Status: In Review
 * Implemented in: python
-* Last updated: 05/13/2020
+* Last updated: 05/14/2020
 * Discussion at: https://groups.google.com/g/grpc-io/c/6thuMVK8fTo
 
 ## Abstract
@@ -112,8 +112,8 @@ Implementing transparent dependency is a complex topic. The first question will
 be how to version the new packages? Should we always upload them simultaneously
 with built packages? Like uploading `grpc==1.29.0` and `grpcio==1.29.0` at the
 same time. It would also require more work in our infrastructure. The second
-question will be historical versions. Should we upload older versions? Which
-version should they depend on?
+question will be historical versions. Should we upload `grpc`-prefixed packages
+for older versions? And which version should they depend on?
 
 Also, if we allow the package with the wrong name to be installed successfully,
 users might diverge between these two names and generate contents
