@@ -1,7 +1,7 @@
 # gRPC xDS traffic splitting and routing
 ----
 * Author(s): Menghan Li
-* Approver: a11r
+* Approver: markdroth
 * Status: Draft
 * Implemented in: (in progress in C-core, Java, and Go)
 * Last updated: 2020-05-20
@@ -46,7 +46,7 @@ The new architecture will be:
 
 The next section of this doc covers what fields of RDS response will be
 processed, how the xDS client will convert RDS to service config, and how the
-balancers will use them.
+LB policies will use them.
 
 # Detailed design
 
@@ -58,7 +58,8 @@ first, and then how the configuration is generated from RDS responses.
 The weighted target LB policy will have a group of child policies and their
 corresponding weights, and will do weighted pick among the child policies.
 
-This LB policy will have the following configuration
+This LB policy will have the following
+[configuration](https://github.com/grpc/grpc-proto/blob/dd2dca318eb197b96b60f22297871fb1ed862800/grpc/service_config/service_config.proto#L317)
 
 ```proto
 message WeightedTargetConfig {
@@ -94,22 +95,6 @@ The routing LB policy will have a group of child policies, and their
 corresponding matching criteria. The RPCs will be matched against the
 criteria, and will be distributed to the matched child.
 
-### Matching criteria
-
-The matching criteria will support matcher types specified in
-[RouteMatch](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L349),
-as a combination of:
-
-*   One required [path
-    matcher](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L360)
-*   One or more optional [header
-    matchers](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L435)
-*   One optional
-    [match\_fraction](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L428)
-    *   For fraction N/D, route is considered if random(0,D) <= N
-*   A route is matched if all matching criteria are matched
-*   The first match wins
-
 ### Child policies
 
 The child policies will be one of
@@ -121,7 +106,7 @@ The child policies will be one of
 
 More child policies can be added in the future.
 
-### Balancer config
+### LB policy config
 
 The `xds_routing_experimental` LB policy will have the following
 configuration:
@@ -129,7 +114,7 @@ configuration:
 ```proto
 /*
 
-Route List                         Action list
+Route List                         Action map
 +---------+--------+               +-------+-----------------+--------------+
 | matcher | action |               | name  | policy          | config       |
 +------------------+               +----------------------------------------+
@@ -188,62 +173,67 @@ message XdsRouting {
     }
     repeated HeaderMatcher headers = 3;
 
-    // Every time the route is considered for a match, it
-    // must also fall under the percentage of matches
-    // indicated by this field. For some fraction N/D, a
-    // random number in the range [0,D) is selected. If the
-    // number is <= the value of the numerator N, or if the
-    // key is not present, the default value, the router
-    // continues to evaluate the remaining match criteria.
+    // match_fraction specifies the percentage this route should be considered.
+    // For fraction `N/D`, route is considered if `random(0,D) <= N`.
+    //
+    // The default value (when this field is not set) is 100%, which means
+    // always consider this route (continue to evaluate the remaining match
+    // criteria).
     Fraction match_fraction = 4;
 
     string action = 5; // The action name
   }
 
   repeated Route route = 1;
+
+  // action is a map from action name to the actual action.
   map<string, Action> action = 2;
 }
 ```
 
-The route refers to the action name instead of embedding the action directly,
-so that one action can be shared by multiple routes.
-
 The config must fulfill the following:
 
 *   Routes
-    *   There must be exactly one `path_matcher` rule.
-        *   `path_matcher` is an oneof so this is always true in proto. But json
-            doesn’t have the oneof concept, so a route may have multiple path
-            matchers, and it will be considered invalid.
-    *   The `action` name must be present in the action list.
+    * Matchers
+        *   There must be exactly one `path_matcher`.
+            *   `path_matcher` is a oneof so this is always true in proto. But
+                json doesn’t have the oneof concept, so a route may have
+                multiple path matchers, and it will be considered invalid.
+        *   There can be one or more optional `header matchers`.
+        *   There can be one optional `match_fraction`.
+    *   The `action` name must be present in the action map.
     *   Duplicate matchers are allowed.
         *   Duplicate matcher means that more than one routes have the same
             matcher, no matter whether the actions are the same or not.
         *   Because the first match wins, the second matcher will never be used.
 *   Actions
-    *   The actions in list must be referred by the routes
-    *   There must be at least one valid config in `child_policy`
+    *   Every action in the map must be referred to by at least one route.
+    *   There must be at least one valid config in `child_policy`.
 
-Violating any of these will make the balancer config invalid, and be rejected.
+Violating any of these will make the LB policy config invalid, and be rejected.
+
+For each pick, a route is matched if all matching criteria are matched. The
+first match wins.
 
 For each action, the config in `child_policy` to be used to create a child LB
 policy will be picked using the same algorithm as [service
-config](https://github.com/grpc/grpc-proto/blob/master/grpc/service_config/service_config.proto#L297).
+config](https://github.com/grpc/grpc-proto/blob/dd2dca318eb197b96b60f22297871fb1ed862800/grpc/service_config/service_config.proto#L401).
 
 *   The first known (registered) policy name in the list will be picked
     *   If none is registered, the config is invalid
 *   The config for the picked policy will be validated
     *   If the validation fails, the config is invalid. We won’t move on to the
-        next entry.
+        next entry
 
-Action names are used as ID for the child policies. If an action name exists
-in the previous service config, the action’s balancer config will be sent as
-an update to the corresponding child policy (instead of creating a new child
-policy for it).
+Action names are used as ID for the child policies. If an action name exists in
+the previous service config, the action’s LB policy config will be sent as an
+update to the corresponding child policy (instead of creating a new child policy
+for it). The route refers to the action name instead of embedding the action
+directly, so that one action can be shared by multiple routes.
 
-NOTE: this LB policy is named `xds_routing` (instead of just routing) because
-we plan to make it deeply integrated with the xds resolver as part of
-RouteAction design.
+NOTE: this LB policy is named `xds_routing` (instead of just routing) because we
+plan to make it deeply integrated with the xds resolver as part of the
+forthcoming RouteAction design.
 
 ### Picking
 
@@ -263,19 +253,19 @@ tricky.
 
 The pick will always be delegated to the picker from the matched child
 policy, even if it’s not in connectivity state READY (as opposed to
-weighted\_target will only pick the READY child policies).
+weighted\_target, which will only pick the READY child policies).
 
 There will also be cases where for an RPC, a match is found, but the child
 policy hasn’t generated the picker (for example, the child policy is still
 initializing, and no picker has been created). When this happens, the RPCs
 will be always queued until a picker is updated.
 
-If no match can be found, the RPC will fail with code Unavailable, and
+If no match can be found, the RPC will fail with code UNAVAILABLE, and
 detailed information in the error message.
 
 When the policy gets an update, including:
 
-*   Balancer config update from the resolver (route update)
+*   LB policy config update from the resolver (route update)
 *   Child policy picker update
 
 The queued RPCs will all re-pick, even though it could get the same result
@@ -291,21 +281,20 @@ the overall state of the channel.
 
 ## xDS resolver and xDS client
 
-The xDS resolver’s overall behavior will be similar as before. It will call
-the xDS client, and will send a service config generated from
-RouteConfiguration (the RDS response) to the parent gRPC client channel.
+The xDS resolver and xds client's overall behavior will be similar as before.
+The xDS resolver will call the xDS client to send xDS, and will send service
+config generated from RouteConfiguration (the RDS response) to the parent gRPC
+client channel. The xDS client will make LDS and RDS (as in
+[A27](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md#xds-resolver)),
+but will read and parse more fields in the RDS response.
 
-The xDS client will make an LDS request, with resource\_names set to the
-target URI with “xds:” scheme removed. The client will get
-HttpConnectionManager configuration from the listener response, and make an
-RDS request to get RouteConfiguration.
-
-All new features should be flag-protected until interop testing. Balancers
-are passively picked by service config, so the flag-protection can be done
-before service config generation. Because xds\_client also does response
-validation, and xds\_resolver behavior can be controlled by the parsed result
-from xds\_client, the flag-protection should be done in the xds\_client. The
-flag-protection will use the following environment variable:
+Note on flag-protection for new features: new features should be flag-protected
+until it has proven to be stable. LB policies are passively picked by service
+config, so the flag-protection can be done before service config generation.
+Because xds\_client also does response validation, and xds\_resolver behavior
+can be controlled by the parsed result from xds\_client, the flag-protection
+should be done in the xds\_client. The flag-protection for routing will use the
+following environment variable:
 
 ```
 GRPC_XDS_EXPERIMENTAL_ROUTING = (true|false)
@@ -336,6 +325,9 @@ field](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/r
         [path](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L369)
         or
         [safe\_regex](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L405)
+        *   With `safe_regex`, the [recently
+            deprecated](https://github.com/envoyproxy/envoy/pull/10971)
+            `max_program_size` field will be ignored
     *   NOT regex
         *   Justification: unsafe and deprecated -- replaced by safe\_regex
         *   The presence of this field will cause a NACK
@@ -354,6 +346,9 @@ field](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/r
         [suffix\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1442)
         or
         [invert\_match](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L1451)
+        *   With `safe_regex_match`, the [recently
+            deprecated](https://github.com/envoyproxy/envoy/pull/10971)
+            `max_program_size` field will be ignored
     *   NOT regex\_match
         *   Justification: unsafe and deprecated -- replaced by
             safe\_regex\_match
@@ -369,7 +364,18 @@ field](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/r
     [query\_parameters](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L442)
     *   Note: the entire route containing this will be ignored, regardless of
         the other matchers, this is the same as this always evaluates to false,
-        because gRPC does not and will not support query parameters)
+        because gRPC does not and will not support query parameters
+*   Can have
+    [grpc](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L447)
+    *   This matcher will be ignored (but the other matchers in the route will
+        be evaluated). The `content-type` can be used instead to filter gRPC
+        requests.
+*   Can have
+    [tls_context](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L453)
+    *   This matcher will be ignored (but the other matchers in the route will
+        be evalulated). We may add support for this feature later, but the
+        service owners need to be careful how they start using it, because the
+        older clients will ignore it
 *   Must not have
     [case\_sensitive](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L410)
     set to false (OK to be unset, default value is true)
@@ -404,11 +410,11 @@ The fields not covered by this section will all be ignored.
 
 The service config generated by the xDS resolver will pick
 `xds_routing_experimental` as the LB policy. As an optimization, when there’s
-only one route, the LB policy picked will be `cds_experimental` or
+only one route, the LB policy picked may be `cds_experimental` or
 `weighted_target_experimental` depending on the action, so we can skip the
 `xds_routing` policy that has only one child.
 
-The `xds_routing_experimental` balancer config will contain the validated
+The `xds_routing_experimental` LB policy config will contain the validated
 `{matchers, action}` pairs. The actions will be in a separate list, and will
 be referred to by the routes by their names.
 
@@ -421,15 +427,15 @@ assigned a unique name.
 When processing an RDS response, for each action:
 
 *   If the action is cluster, the child\_policy will be `cds_experimental`, with
-    a balancer config containing the cluster string.
+    a LB policy config containing the cluster string.
 *   If the action is weighted\_clusters, the child\_policy will be
-    `weighted_target_experimental`. The balancer config will contain a list of
+    `weighted_target_experimental`. The LB policy config will contain a list of
     `cds_experimental` LB configs, and their corresponding weights.
 *   If this action is already in the cache, it will be reused, and nothing needs
     to be done
 *   If the action is new, it will be be added to the list and assigned a name
-    *   The name should be a human readable hash of the config, to be logged for
-        debugging purposes.
+    *   The name should be a human readable string with information of the
+        config, to be logged for debugging purposes.
     *   For example, the names can be `cds:cluster1` and
         `weighted:cluster1_cluster2_<index_number>`.
 
@@ -507,8 +513,8 @@ When a watch is cancelled:
 When a response is received, the xDS client will
 
 *   Parse and notify all the watchers for this type
-*   Store the updated in cache, to prepare for future watches for the same
-    resource
+*   Store the updated resource in cache, to prepare for future watches for the
+    same resource
 
 # Alternatives considered
 
@@ -550,7 +556,7 @@ can do
 *   Share subchannels
 
 The first solution is chosen because it’s easy to implement, and it solves
-most of the subchannel duplication problem. Even wIthout subchannel sharing,
+most of the subchannel duplication problem. Even without subchannel sharing,
 the number of TCP connections will be linear to the number of different
 actions, not the number of routes. Users can create a large amount of routes,
 but the number of different actions to take is usually small.
@@ -590,7 +596,7 @@ For an RDS response with content
 },
 {
   "URL_MAP/5",
-  regex: "^/service_2/method_3$",
+  safe_regex: "^/service_2/method_3$",
   weighted_clusters: [
     {name: cluster_1, weight: 99},
     {name: cluster_3, weight: 1}
@@ -1030,8 +1036,8 @@ oldActions = map[string]struct{
 # newActions contains new actions, with names unassigned
 #
 # Note that this only handles actions, but not matches. The routes in the
-# generated balancer config should maintain the same order as in RDS resp.
-# A separate list of routes would work.
+# generated LB policy config should maintain the same order as in RDS resp. A
+# separate list of routes would work.
 newActions = map[string]map[string]action
 for r in newRDSResp.Routes:
   clusters = map[string]int{}
