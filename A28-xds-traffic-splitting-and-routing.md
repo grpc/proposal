@@ -158,12 +158,11 @@ message XdsRouting {
     }
     message Fraction {
       // Specifies the numerator. Defaults to 0.
-      uint32 numerator = 1;
-
-      // Specifies the denominator. If the denominator specified is
-      // less than the numerator, the final fractional percentage
+      //
+      // The implicit denominator is 1M. If the numerator specified is
+      // bigger than the denominator, the final fractional percentage
       // is capped at 1 (100%).
-      uint32 denominator = 2;
+      uint32 numerator = 1;
     }
 
     oneof path_matcher {
