@@ -156,14 +156,6 @@ message XdsRouting {
       }
       bool invert_match = 8;
     }
-    message Fraction {
-      // Specifies the numerator. Defaults to 0.
-      //
-      // The implicit denominator is 1M. If the numerator specified is
-      // bigger than the denominator, the final fractional percentage
-      // is capped at 1 (100%).
-      uint32 numerator = 1;
-    }
 
     oneof path_matcher {
       string path = 1;
@@ -175,10 +167,15 @@ message XdsRouting {
     // match_fraction specifies the percentage this route should be considered.
     // For fraction `N/D`, route is considered if `random(0,D) <= N`.
     //
+    // The number in this field specifies the numerator. Defaults to 0.  The
+    // implicit denominator is 1M (1,000,000). If the numerator specified is
+    // bigger than the denominator, the final fractional percentage is capped
+    // at 1 (100%).
+    //
     // The default value (when this field is not set) is 100%, which means
     // always consider this route (continue to evaluate the remaining match
     // criteria).
-    Fraction match_fraction = 4;
+    google.protobuf.UInt32Value match_fraction = 4;
 
     string action = 5; // The action name
   }
@@ -367,8 +364,7 @@ field](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/r
 *   Can have
     [grpc](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L447)
     *   This matcher will be ignored (but the other matchers in the route will
-        be evaluated). The `content-type` can be used instead to filter gRPC
-        requests.
+        be evaluated)
 *   Can have
     [tls_context](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L453)
     *   This matcher will be ignored (but the other matchers in the route will
