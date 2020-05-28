@@ -40,7 +40,7 @@ to the RFC as new commits to the PR. Through the process, the discussion
 needs to be kept to the designated thread in the mailing list in order to
 avoid splintering conversations. The OWNER is encouraged to solicit as much
 feedback on the proposal as possible during this period.
-PR comments should belimited to formatting and vocabulary.
+PR comments should be limited to formatting and vocabulary.
 1. If there is consensus as deemed by the APPROVER during the comment period,
 the APPROVER will mark the proposal as final and assign it a gRFC number.
 Once this is assigned (as part of the closure of discussion), the OWNER will
@@ -74,5 +74,5 @@ or ``In Review`` state. This can happen if issues are discovered during
 implementation. At which point, the review process as described above must be
 followed.
 1. Once a proposal is ``Final`` and if it has been implemented by a language,
-it can be updated to a status of ``Implemented`` with the list of languages
-listed (listing versions is not required).
+it can be updated to a status of ``Implemented`` with the implementing
+languages listed. (Listing versions is not required.)
