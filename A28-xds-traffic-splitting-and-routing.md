@@ -167,10 +167,9 @@ message XdsRouting {
     // match_fraction specifies the percentage this route should be considered.
     // For fraction `N/D`, route is considered if `random(0,D) <= N`.
     //
-    // The number in this field specifies the numerator. Defaults to 0.  The
-    // implicit denominator is 1M (1,000,000). If the numerator specified is
-    // bigger than the denominator, the final fractional percentage is capped
-    // at 1 (100%).
+    // The number in this field specifies the numerator.  The implicit
+    // denominator is 1M (1,000,000). If the numerator specified is bigger than
+    // the denominator, the final fractional percentage is capped at 1 (100%).
     //
     // The default value (when this field is not set) is 100%, which means
     // always consider this route (continue to evaluate the remaining match
