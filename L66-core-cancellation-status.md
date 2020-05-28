@@ -48,7 +48,7 @@ Calling an RPC cancelled if it completes for entirely expected reasons is confus
 * Does this affect the core wrapped language APIs?
   - This distinction is not visible to Ruby or the C++ synchronous API at all since the RPC in both of those cases is complete when returning status. Thus cancellation checks just see the effect of other forms of cancellation.
   - For the C++ asynchronous API, `IsCancelled` currently doesn't define its result. This change will also include an explciit definition of cancellation for C++.
-  - For Python, ???
+  - Python does not expose this functionality to the server application.
   - For C#, ???
 
 * Should this only trigger on explicit cancellations?
