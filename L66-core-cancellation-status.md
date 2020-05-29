@@ -1,6 +1,6 @@
 Core server RPCs will not report cancellation if completed with non-OK status
 ----
-* Author(s): vpai
+* Author(s): vjpai
 * Approver: markdroth
 * Status: Proposed
 * Implemented in: https://github.com/grpc/grpc/pull/22991
