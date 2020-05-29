@@ -41,7 +41,7 @@ Calling an RPC cancelled if it completes for entirely expected reasons is confus
 1. Fix core tests (wrapped language tests already had the proper expectations)
 1. Mark a call failed according to channelz if it was canceled or if the server sent a non-OK status
 1. Add a C++ test to validate that OnCancel is not called on non-OK explicit status
- 1. Fix the core surface comment about this topic and bump the core major API version
+1. Fix the core surface comment about this topic and bump the core major API version
 
 ## Open issues (if applicable)
 
@@ -52,8 +52,8 @@ Calling an RPC cancelled if it completes for entirely expected reasons is confus
   - For C#, ???
 
 * Should this only trigger on explicit cancellations?
-- In practice, it doesn't matter if the application requested cancellation or cancellation happened because of a deadline or network problem; in any case, the RPC is failed for reasons out of the scope of the RPC. In practice, issues like deadline exceeded could be implemented using cancellation, so there is no strong distinction in any case.
+  - In practice, it doesn't matter if the application requested cancellation or cancellation happened because of a deadline or network problem; in any case, the RPC is failed for reasons out of the scope of the RPC. In practice, issues like deadline exceeded could be implemented using cancellation, so there is no strong distinction in any case.
 
 * Should server-side cancellations mark an RPC cancelled since they are an explicit part of the server operation?
-- In practice, server-side completion is preferred over cancellation even on failed RPCs. Cancellation should be used for unusual or unexpected cases (such as a need to promptly release resources), so that should still mark RPCs cancelled. Additionally, the name would make it non-intuitive to treat server-side cancellations as anything other than cancelled RPCs.
+  - In practice, server-side completion is preferred over cancellation even on failed RPCs. Cancellation should be used for unusual or unexpected cases (such as a need to promptly release resources), so that should still mark RPCs cancelled. Additionally, the name would make it non-intuitive to treat server-side cancellations as anything other than cancelled RPCs.
 
