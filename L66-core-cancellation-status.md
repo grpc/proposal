@@ -20,7 +20,7 @@ gRPC core versions up to 10.X specify that the out argument of the `GRPC_OP_RECV
           cancellation on the server), or 0 if the call succeeded */
 ```
 
-The phrase "in any way" is not clear, and the broadest (and current) definition is that it accounts for failures caused by client-side or server-side cancellations, deadline exceeded, maximum connection age exceeded, network resets, *and also explicit sending of non-OK status*.
+The phrase "in any way" is not clear, and the broadest (and current) definition is that it accounts for failures caused by issues such as client-side or server-side cancellations, deadlines being exceeded, connections exceeding their maximum age, network resets, *and explicit sending of non-OK status*.
 
 
 ### Related Proposals
