@@ -37,17 +37,20 @@ Calling an RPC cancelled if it completes for entirely expected reasons is confus
 
 ## Implementation
 
+The implementation is contained entirely within a single pull request at https://github.com/grpc/grpc/pull/22991 . This pull request does the following:
+
 1. Decide if a server call is canceled by whether or not it could successfully send status
 1. Fix core tests (wrapped language tests already had the proper expectations)
 1. Mark a call failed according to channelz if it was canceled or if the server sent a non-OK status
 1. Add a C++ test to validate that OnCancel is not called on non-OK explicit status
 1. Fix the core surface comment about this topic and bump the core major API version
+1. Add a C++ comment clarifying the meaning of `IsCancelled`
 
 ## Open issues (if applicable)
 
 * Does this affect the core wrapped language APIs?
   - This distinction is not visible to Ruby or the C++ synchronous API at all since the RPC in both of those cases is complete when returning status. Thus cancellation checks just see the effect of other forms of cancellation.
-  - For the C++ asynchronous API, `IsCancelled` currently doesn't define its result. This change will also include an explciit definition of cancellation for C++.
+  - For the C++ asynchronous API, `IsCancelled` currently doesn't define its result. This change also includes an explciit definition of cancellation for C++.
   - Python does not expose this functionality to the server application.
   - For C#, ???
 
