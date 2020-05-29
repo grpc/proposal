@@ -20,7 +20,7 @@ gRPC core versions up to 10.X specify that the out argument of the `GRPC_OP_RECV
           cancellation on the server), or 0 if the call succeeded */
 ```
 
-The term `in any way` is not clear, and the broadest (and current) definition is that it accounts for failures caused by client-side or server-side cancellations, deadline exceeded, maximum connection age exceeded, network resets, *and also explicit sending of non-OK status*.
+The phrase "in any way" is not clear, and the broadest (and current) definition is that it accounts for failures caused by client-side or server-side cancellations, deadline exceeded, maximum connection age exceeded, network resets, *and also explicit sending of non-OK status*.
 
 
 ### Related Proposals
@@ -56,5 +56,4 @@ Calling an RPC cancelled if it completes for entirely expected reasons is confus
 
 * Should server-side cancellations mark an RPC cancelled since they are an explicit part of the server operation?
 - In practice, server-side completion is preferred over cancellation even on failed RPCs. Cancellation should be used for unusual or unexpected cases (such as a need to promptly release resources), so that should still mark RPCs cancelled. Additionally, the name would make it non-intuitive to treat server-side cancellations as anything other than cancelled RPCs.
-
 
