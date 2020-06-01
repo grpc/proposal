@@ -9,7 +9,8 @@ EventManager API
 
 ## Abstract
 This proposal describes a plan to upgrade gRPC's event engine to a newer set of interfaces called EventManager API.The gRPC team is making a fundamental change in the gRPC core's polling model. Instead of borrowing threads from the application and giving the application control over which threads poll which fds, gRPC will migrate to a new model based on EventManager, which provides dedicated polling threads with an internal thread pool. User callbacks and timers will also be handled by the EventManager. The EventManager interface will be a public API, which allows users to integrate gRPC into the event loops of their applications if necessary.
-Background
+
+## Background
 The gRPC has been using a custom event handling framework called iomgr API. The original iomgr API had only two implementations, one for posix (Linux and MacOS) and one for Windows. As part of an effort to improve performance, we changed the posix iomgr implementation to support pluggable polling engines, selectable at run-time.  We then wrote [a whole bunch of different polling engines](https://github.com/grpc/grpc/blob/master/doc/core/grpc-polling-engines.md) to experiment on and determine which one(s) worked best.  Some of them didn't work out and have been deleted, but we still support three of them (see below).
 
 The EventManager interface aims at simplifying the usage and maintenance of gRPC event framework. It allows users of gRPC to write their own event management implementation to be used by gRPC for specific needs. The project also paves the way for supporting features such as the C++ callback API in gRPC (See proposal [gRFC L67: C++ callback-based asynchronous API](https://github.com/grpc/proposal/pull/180)).
