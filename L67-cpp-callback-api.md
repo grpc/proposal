@@ -1,10 +1,10 @@
 C++ callback-based asynchronous API
 ----
 * Author(s): vjpai, sheenaqotj
-* Approver: 
+* Approver:
 * Status: Proposed
 * Implemented in: https://github.com/grpc/grpc/projects/12
-* Last updated: May 28, 2020
+* Last updated: June 1, 2020
 * Discussion at
 
 ## Abstract
@@ -28,7 +28,7 @@ The goal of the synchronous version is to be easy to program. However, this come
 ### Related proposals
 
 * The [EventManager](https://www.github.com/grpc/proposal/XXX) is critical to the operation of the callback API.
-* The C++ callback API is built on top of a new callback API in core
+* The C++ callback API is built on top of a new [callback completion queue in core](https://github.com/grpc/proposal/pull/181)
 * The API structure has substantial similarities to the gRPC-Node and gRPC-Java APIs
 
 ## Proposal
@@ -91,7 +91,7 @@ Message allocator
 
 `RegisterCallbackGenericService` is a new method of `ServerBuilder` to allow for processing of generic (unparsed) RPCs. This is similar to the pre-existing `RegisterAsyncGenericService` but uses the callback API and reactors rather than the CQ-based async API. It is expected to be used primarily for generic gRPC proxies where the exact serialization format or list of supported methods is unknown.
 
-Method-by-method specification of APi type
+Method-by-method specification of API type
 
 ## Rationale
 
