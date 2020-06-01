@@ -25,7 +25,7 @@ The phrase "in any way" is not clear, and the broadest (and current) definition 
 
 ### Related Proposals
 
-N/A
+* The [C++ callback API](https://github.com/grpc/proposal/pull/180) directly exposes an `OnCancel` method that makes the impact of this API decision very visible.
 
 ## Proposal
 
@@ -53,6 +53,7 @@ The implementation is contained entirely within a single pull request at https:/
   - For the C++ asynchronous API, `IsCancelled` currently doesn't define its result. This change also includes an explciit definition of cancellation for C++.
   - Python does not expose this functionality to the server application.
   - For C#, ???
+  - PHP and Objective-C wrap core but are not server languages, so this issue does not apply to them.
 
 * Should this only trigger on explicit cancellations?
   - In practice, it doesn't matter if the application requested cancellation or cancellation happened because of a deadline or network problem; in any case, the RPC is failed for reasons out of the scope of the RPC. In practice, issues like deadline exceeded could be implemented using cancellation, so there is no strong distinction in any case.
