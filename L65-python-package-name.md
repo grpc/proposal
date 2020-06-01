@@ -2,7 +2,7 @@ Additional PyPI Packages for gRPC Python
 ----
 * Author(s): lidiz
 * Approver: gnossen
-* Status: In Review
+* Status: Approved
 * Implemented in: python
 * Last updated: 05/14/2020
 * Discussion at: https://groups.google.com/g/grpc-io/c/6thuMVK8fTo
