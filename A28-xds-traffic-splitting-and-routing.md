@@ -301,10 +301,10 @@ After LDS/RDS, when the xDS client gets a
 [RouteConfiguration](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route.proto#L24),
 it will look at the list of VirtualHosts and find the element whose
 [domains](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L72)
-field **_best matches_** the server name from URI (with scheme stripped off).
-If no matching VirtualHost is found, the xDS client will report that to the
-xDS resolver, and the xDS resolver will return an error to the client
-channel.
+field **_most specifically matches_** the server name from URI (with scheme
+stripped off). If no matching VirtualHost is found, the xDS client will report
+that to the xDS resolver, and the xDS resolver will return an error to the
+client channel.
 
 In the matched VirtualHost, the xDS client will iterate over the list of
 [routes](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L76),
