@@ -28,6 +28,7 @@ The goal of the synchronous version is to be easy to program. However, this come
 ### Related proposals
 
 * The [EventManager](https://www.github.com/grpc/proposal/XXX) is critical to the operation of the callback API.
+* The C++ callback API is built on top of a new callback API in core
 * The API structure has substantial similarities to the gRPC-Node and gRPC-Java APIs
 
 ## Proposal
@@ -95,6 +96,8 @@ Method-by-method specification of APi type
 ## Rationale
 
 ## Implementation
+
+Implemented via the core callback API, discussed in a separate gRFC
 
 ## Open issues (if applicable)
 
