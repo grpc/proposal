@@ -1,6 +1,6 @@
 C++ callback-based asynchronous API
 ----
-* Author(s): vjpai, sheenaqotj
+* Author(s): vjpai, sheenaqotj, yang-g
 * Approver:
 * Status: Proposed
 * Implemented in: https://github.com/grpc/grpc/projects/12
