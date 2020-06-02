@@ -452,7 +452,10 @@ To do this, for each new RDS response, the client will
 
 For each `{matchers, action}`, a route will be generated:
 
-*   With matchers in json representation.
+*   With matchers in JSON representation.
+    *    For `runtime_fraction`, the denominator will be scaled up to 1M, and
+         only the numerator (after scaling up) will be specified in JSON field
+         `match_fraction`.
 *   The action will be the name of this action from the action list.
 
 The processed response will be converted to a [JSON service
