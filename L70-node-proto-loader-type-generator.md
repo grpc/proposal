@@ -53,6 +53,8 @@ The options will correspond directly to the `protoLoader.load` options as follow
  - `--oneofs`: Indicates that virtual "oneof" fields will be set to the present field's name in the output
  - `--includeDirs=<directories...>`, `-I`: A list of directories to search for included `.proto` files
 
+ - `--outDir`, `-O`: The path in which to output the `.d.ts` file
+
 ## Rationale
 
 The goal is to have type information available when editing and building code that uses `@grpc/proto-loader` to load `.proto` files at runtime. It is not possible to infer this type information from the interfaces currently provided by this library because TypeScript cannot infer type information from `.proto` files. The only other option is to generate this type information separately. The recommended usage of the `@grpc/proto-loader` library is to call `load` or `loadSync` and then pass the result of that to `grpc.loadPackageDefinition`, so the type of the final result of that will be useful to most users. The output of `load` and `loadSync` are objects with runtime data that describes the resulting types, so the types of those objects are significantly less useful, and the final type that we will generate here cannot be effectively inferred from those types.
