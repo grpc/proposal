@@ -52,7 +52,7 @@ The implementation is contained entirely within a single pull request at https:/
   - This distinction is not visible to Ruby or the C++ synchronous API at all since the RPC in both of those cases is complete when returning status. Thus cancellation checks just see the effect of other forms of cancellation.
   - For the C++ asynchronous API, `IsCancelled` currently doesn't define its result. This change also includes an explciit definition of cancellation for C++.
   - Python does not expose this functionality to the server application.
-  - For C#, ???
+  - In C#, cancellation is expressed through the language-level [`CancellationToken`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.cancellationtoken) and its `IsCancellationRequested` method (or the related `ThrowIfCancellationRequested`). The API for this object indicates that `IsCancellationRequested` should be true if the `CancellationToken` has its `Cancel` method called. Nowhere in the language-level or gRPC API is there any indication that a cancellation should be observable if the method handler throws an error status, so this change preserves API. (In practice, well-behaved codes have no reason to access a copy of a method handler's `ServerCallContext` object after return or throw from the handler, and such behavior isn't tested.)
   - PHP and Objective-C wrap core but are not server languages, so this issue does not apply to them.
 
 * Should this only trigger on explicit cancellations?
