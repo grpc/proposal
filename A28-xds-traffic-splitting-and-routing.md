@@ -75,8 +75,12 @@ The name (key of the map) will allow the LB policy to be intelligent about
 updating existing children instead of needlessly recreating them when it
 receives an updated config.
 
-The policy will create the child policy for each target. It will then
-distribute picks to the child policies based on the specified weights.
+The policy will create the child policy for each target. It will then distribute
+picks to the child policies (that are reporting READY), based on the specified
+weights. Note that this picking behavior is similar to most other gRPC LB
+policies that only READY child policies are considered during a pick, unlike in
+Envoy weighted_clusters, where READY and non-READY localities are both
+considered.
 
 For the purpose of traffic splitting, the child policy will always be
 `cds_experimental`. But note that this policy can be generalized to have
@@ -246,9 +250,11 @@ second route is an exact match. It is this way because Envoy always picks the
 first matched route. And with header matching, finding the exact match can be
 tricky.
 
-The pick will always be delegated to the picker from the matched child
-policy, even if it’s not in connectivity state READY (as opposed to
-weighted\_target, which will only pick the READY child policies).
+The pick will consider the child policies that are not reporting READY (unlike
+in most gRPC LB policies, e.g. weighted_target, only the READY child policies
+will be considered during pick). So the pick will always be delegated to the
+picker from the matched child, even if the child is in a non-READY connectivity
+state.
 
 There will also be cases where for an RPC, a match is found, but the child
 policy hasn’t generated the picker (for example, the child policy is still
