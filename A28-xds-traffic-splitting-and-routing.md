@@ -251,10 +251,10 @@ first matched route. And with header matching, finding the exact match can be
 tricky.
 
 The pick will consider the child policies that are not reporting READY (unlike
-in most gRPC LB policies, e.g. weighted_target, only the READY child policies
-will be considered during pick). So the pick will always be delegated to the
-picker from the matched child, even if the child is in a non-READY connectivity
-state.
+in most gRPC LB policies, e.g. weighted_target, where only the READY child
+policies will be considered during pick). So the pick will always be delegated
+to the picker from the matched child, even if the child is in a non-READY
+connectivity state.
 
 There will also be cases where for an RPC, a match is found, but the child
 policy hasn’t generated the picker (for example, the child policy is still
