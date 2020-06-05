@@ -44,10 +44,13 @@ system for the completion of operations.
 
 ### Related proposals
 
-* The [EventManager](https://www.github.com/grpc/proposal/XXX) is
-critical to the operation of the callback completion queue since this
+* An asynchronous event processing loop implementation is critical to
+the operation of the callback completion queue since this
 completion queue type will not provide any accessor function to drive
-the progress of the library
+the progress of the library. Python achieves this
+through its asyncio interface, but more generally, the
+[EventManager](https://www.github.com/grpc/proposal/pull/182) is
+gRPC's multi-lingual answer to this problem.
 * The callback completion queue is the implementation mechanism for the [C++ callback API](https://www.github.com/grpc/proposal/pull/180)
 
 ## Proposal
@@ -55,13 +58,13 @@ the progress of the library
 gRPC core will now support a new completion queue type called
 `GRPC_CQ_CALLBACK`. Although this is called a completion queue because
 it supports the semantic interface of `grpc_completion_queue`,
-operations in this will never be queued in this structure. Instead, a
+operations will never be queued in this structure. Instead, a
 completion will cause a user-specified function to be called.
 
 The tags injected into this completion queue
 are still of type `void*` so as not to affect the API of RPC operation
 initiation functions, but these will be interpreted by the
-library. These tags *must* point to a struct of type
+library. These tags *must* point to a C89 struct of type
 `grpc_completion_queue_functor` which has two user-provided members:
 
 * `void (*functor_run)(struct grpc_completion_queue_functor*, int)` : a pointer to a
@@ -73,15 +76,30 @@ normally (corresponding to the `ok` result of
 `grpc_completion_queue_next` on the `GRPC_CQ_NEXT` queue).
 * `int inlineable`: specifies whether this functor can be run inline
 in the same thread as the one that detected it rather than sending
-it to an executor thread. This should only be
-used very carefully for trivial internally-generated callbacks that
-do not use locks.
+it to an executor thread. This must be
+used very carefully and only for trivial internally-generated callbacks that
+do not use locks. Incorrect use can lead to deadlock, so this flag must always
+be set to `0` (false) unless the library is certain that the callback always
+meets the requirements.
 
 ## Rationale
 
-This feature naturally support the implementation of the C++ callback
+A more thorough longer-term solution would have been to use a
+notification mechanism specific to the C++ callback API rather than trying
+to wedge this implementation into the existing completion queue
+definition. That said, such an approach would likely further delay the
+deployment and development of the C++ callback API. The approach
+described in this proposal naturally supports the implementation of the C++ callback
 API with minimal extensions to the core surface and no core surface
 API breakages.
+
+In the longer-term, we expect to take advantage of the
+[EventManager](https://github.com/grpc/proposal/pull/182) integration
+more explicitly and use direct callbacks via the EventManager rather
+than CQ-based notifications. Full adoption of the EventManager and the
+elimination of the existing thread-borrowing polling model will enable
+the removal of `grpc_completion_queue` from the core surface
+API. However, that is a longer-term project that needs to be planned separately.
 
 ## Implementation
 
