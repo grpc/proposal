@@ -2,10 +2,10 @@ EventManager API
 ----
 * Author(s): @muxi
 * Approver: @markdroth
-* Status: Draft
+* Status: In-review
 * Implemented in: gRPC Core
 * Last updated: June 1, 2020
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/7EDteJbI2nc
 
 ## Abstract
 This proposal describes a plan to upgrade gRPC's event engine to a newer set of interfaces called EventManager API.The gRPC team is making a fundamental change in the gRPC core's polling model. Instead of borrowing threads from the application and giving the application control over which threads poll which fds, gRPC will migrate to a new model based on EventManager, which provides dedicated polling threads with an internal thread pool. User callbacks and timers will also be handled by the EventManager. The EventManager interface will be a public API, which allows users to integrate gRPC into the event loops of their applications if necessary.
