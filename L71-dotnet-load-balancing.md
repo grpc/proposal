@@ -3,7 +3,7 @@ L71: gRPC for .NET load balancing support
 * Author(s): Paweł Wichary
 * Approver: a11r
 * Status: Draft
-* Implemented in: C#
+* Implemented in: C# (gRPC for .NET)
 * Last updated: 2020-06-08
 * Discussion at: (filled after thread exists)
 
