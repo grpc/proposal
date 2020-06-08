@@ -18,6 +18,7 @@ Add a tool to the `@grpc/proto-loader` to generate types that describe the objec
 
 ### Related Proposals: 
 * L23 Standalone Node.js gRPC+Protobuf.js Library API
+* L43 Node Message Type Information
 
 ## Proposal
 
@@ -54,7 +55,7 @@ server.addService(loadedPackageDefinition.fully.qualified.package.ServiceName.se
 The tool will be named `proto-loader-gen-types` and will have this usage:
 
 ```
-proto-loader-gen-types [OPTIONS] <proto file name>
+proto-loader-gen-types [OPTIONS] <proto file name> ...
 ```
 
 The options will correspond directly to the `protoLoader.load` options as follows:
@@ -72,7 +73,7 @@ The options will correspond directly to the `protoLoader.load` options as follow
  - `--outDir=<directory>`, `-O <directory>`: The directory in which to output files
  - `--grpcLib=grpc|@grpc/grpc-js`: The gRPC implementation library that these types will be used with
 
-The output will be one file for each `message` and `enum` loaded, with file paths based on the package and type names, plus a single master file that combines all of those to produce the type that the user will load, as described above. Messages will have an additional type generated, suffixed with `__Output`, that describes the type of objects that will be output by gRPC, i.e. response messages on the client, and request messages on the server. These "output" message types will be subtypes of the main message type, restricted based on the options that are set.
+The output will be one file for each `message` and `enum` loaded, with file paths based on the package and type names, plus a master file per input file that combines all of those to produce the type that the user will load, as described above. `ProtoGrpcType` types from different files can be intersected to get the type that results from loading those files together at runtime. Messages will have an additional type generated, suffixed with `__Output`, that describes the type of objects that will be output by gRPC, i.e. response messages on the client, and request messages on the server. These "output" message types will be subtypes of the main message type, restricted based on the options that are set.
 
 To support this generated code, `@grpc/proto-loader` will need to re-export the `Long` type from `protobufjs`, because that is a type that can be used by generated message types.
 
@@ -147,6 +148,7 @@ export interface MessageName__Output {
 // filename_proto.d.ts
 
 import * as grpc from '@grpc/grpc-js';
+import { EnumTypeDefinition, MessageTypeDefinition } from '@grpc/proto-loader';
 
 export namespace messages {
   export namespace package_name {
@@ -163,17 +165,22 @@ type SubtypeConstructor<Constructor, Subtype> = {
   new(args: ConstructorArguments<Constructor>): Subtype;
 }
 
-export namespace ProtoGrpcType = {
-  export namespace package_name {
-    export namespace subpackage_name: {
-      interface ServiceNameClient extends Client {
-        // This would actually be expanded into a few overrides
-        method(messages.package_name.subpackage_name.MessageName, metadata?: grpc.Metadata, callOptions?: grpc.CallOptions, callback: (error?: grpc.ServiceError, response?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.UnaryCall;
+interface ServiceNameClient extends Client {
+  // This would actually be expanded into a few overrides
+  method(messages.package_name.subpackage_name.MessageName, metadata?: grpc.Metadata, callOptions?: grpc.CallOptions, callback: (error?: grpc.ServiceError, response?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.UnaryCall;
 
-        // Also the same for "Method" in addition to "method"
-      }
+  // Also the same for "Method" in addition to "method"
+}
+
+export interface ProtoGrpcType {
+  package_name: {
+    subpackage_name: {
 
       ServiceName: SubtypeConstructor<typeof grpc.Client, ServiceNameClient & { service: ServiceDefinition};
+
+      EnumName: EnumTypeDefinition;
+
+      MessageName: MessageTypeDefinition;
     }
   }
 }
