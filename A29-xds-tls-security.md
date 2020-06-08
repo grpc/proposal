@@ -5,7 +5,7 @@ A29: xDS-Based Security for gRPC Clients and Servers
 * Status: Draft
 * Implemented in: C-core, Java, and Go (planned)
 * Last updated: 2020-06-04
-* Discussion at: 
+* Discussion at: https://groups.google.com/g/grpc-io/c/4IwVLPeTAe4
 
 ## Abstract
 
