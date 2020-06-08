@@ -1,4 +1,4 @@
-L66: gRPC for .NET load balancing support
+L71: gRPC for .NET load balancing support
 ----
 * Author(s): Paweł Wichary
 * Approver: a11r
@@ -26,7 +26,7 @@ Former implementation in the C language is not a part of this proposal as it lev
 
 Why even bother with gRPC for dotnet? gRPC was presented by Microsoft as an alternative for WCF technology used in the .NET world and an alternative for existing communication tools. Some developers will try to adopt gRPC technology and it will be the easiest for them to start with the gRPC for dotnet as it has first-class integration with the .NET Core framework. 
 
-![comparison-grpc-csharp-grpc-dotnet](./L66_graphics/comparison-grpc-csharp-grpc-dotnet.PNG)
+![comparison-grpc-csharp-grpc-dotnet](./L71_graphics/comparison-grpc-csharp-grpc-dotnet.PNG)
 
 ## Background - Load balancing in gRPC Java
 
@@ -54,17 +54,17 @@ When a new channel is created, the URI and the scheme is defined. The scheme is 
 
 The way the name resolver does its job is abstracted by the API. The default behavior can be easily replaced by writing a new resolver and associated provider (aka factory) with higher priority. Selecting between providers is handled by the supporting infrastructure.
 
-![supporting-infrastructure-dynamic-registry](./L66_graphics/supporting-infrastructure-dynamic-registry.PNG)
+![supporting-infrastructure-dynamic-registry](./L71_graphics/supporting-infrastructure-dynamic-registry.PNG)
 
 After the resolver is started, a managed channel attaches a listener that reacts to any observed change. Notification can be triggered anytime, but in most cases it occurs on request or periodically. Anytime a listener observes, a change it’s role is to call a load balancer (aka load balancing policy) and delegate further processing.
 
-![reactive-name-resolution](./L66_graphics/reactive-name-resolution.PNG)
+![reactive-name-resolution](./L71_graphics/reactive-name-resolution.PNG)
 
 NOTE: Name resolvers and observers are also responsible for forming an object with the configuration used in policies. This object is commonly named as ServiceConfig, this proposal aims for establishing API and trivial policies like pick_first and round_robin that do not require full blast service config implementation. We suggest little increments with the possibility of extension to reduce the scope of this proposal.
 
 Load balancing policies contain the main balancing logic that focuses on maintaining subchannels accordingly to the resolution results and creating subchannel pickers. Subchannels maintain physical connections (aka transports) for sending new RPCs. Picker on the other hand does actual load balancing when a new call is requested. A high-level overview of the end-to-end process was presented below.
 
-![reactive-name-resolution-with-policy-and-subchannels](./L66_graphics/reactive-name-resolution-with-policy-and-subchannels.PNG)
+![reactive-name-resolution-with-policy-and-subchannels](./L71_graphics/reactive-name-resolution-with-policy-and-subchannels.PNG)
 
 Channel and subchannels are exposing meaningful information about their state using a state machine with five states: IDLE, CONNECTING, READY, TRANSIENT_FAILURE and SHUTDOWN. This information can be used while writing custom policies. It is up to the policy implementation how to handle states transitions eg. policy may keep the channel in READY state as long as there is at least one READY subchannel. 
 
@@ -110,7 +110,7 @@ Then a concrete implementation of name resolver and load balancing policies will
 
 Last but not least, new implementations will be wired with the existing codebase.
 
-![load-balancing-high-level-overview](./L66_graphics/load-balancing-high-level-overview.PNG)
+![load-balancing-high-level-overview](./L71_graphics/load-balancing-high-level-overview.PNG)
 
 ### Approach to the process of porting Java API
 
@@ -149,21 +149,21 @@ First case assumes no failures during subchannel creation. In this case overhead
 
 gRPC for dotnet (current state) with no errors
 
-![grpc-calls](./L66_graphics/grpc-calls-no-lb-no-errors.PNG)
+![grpc-calls](./L71_graphics/grpc-calls-no-lb-no-errors.PNG)
 
 Proposed changes with an initial load balancing overhead
 
-![grpc-calls](./L66_graphics/grpc-calls-with-lb-no-errors.PNG)
+![grpc-calls](./L71_graphics/grpc-calls-with-lb-no-errors.PNG)
 
 The second case is about covering possible failures that may appear during calls execution. gRPC for dotnet implementation is not aware of available service replicas, current implementation always sticks to the first dns A record, it finds. Such implementation has limited capabilities of scaling and self-healing. Proposed changes allow refreshing name resolution and update subchannels accordingly. 
 
 gRPC for dotnet (current state) in face of error stops further execution
 
-![grpc-calls](./L66_graphics/grpc-calls-no-lb-with-errors.PNG)
+![grpc-calls](./L71_graphics/grpc-calls-no-lb-with-errors.PNG)
 
 Proposed changes are aware of changing infrastructure
 
-![grpc-calls](./L66_graphics/grpc-calls-with-lb-with-errors.PNG)
+![grpc-calls](./L71_graphics/grpc-calls-with-lb-with-errors.PNG)
 
 ### Known issues
 
