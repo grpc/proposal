@@ -2,10 +2,10 @@ Core callback-based completion queue
 ----
 * Author(s): vjpai
 * Approver: markdroth
-* Status: Proposed
+* Status: Approved
 * Implemented in: https://github.com/grpc/grpc/projects/12
-* Last updated: June 1, 2020
-* Discussion at
+* Last updated: June 9, 2020
+* Discussion at https://groups.google.com/g/grpc-io/c/3peKeX7fXvY
 
 ## Abstract
 
