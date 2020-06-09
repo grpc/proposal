@@ -84,6 +84,45 @@ meets the requirements. In practice, it should only be used for code that
 belongs to a library that wraps core (e.g., the `DefaultReactor` in the C++ 
 callback API implementation) and not for end-user application callbacks.
 
+### Usage example
+
+As before, `grpc_call_start_batch` is the most common entry point for
+posting a new operation in gRPC, and one of its arguments is the completion
+queue tag associated with the operation. For this type of completion-queue,
+the tag must actually point to a `grpc_completion_queue_functor`. Since this
+structure has minimal useful content, it should generally be used either via
+composition or inheritance. (Existing gRPC libraries use both formats, with
+Python using composition and C++ using inheritance.) The following is an
+example of hypothetical usage in C using composition.
+
+```
+struct MyFunctor {
+  grpc_completion_queue_functor functor;  // first field to match pointer
+  int my_other_field1;
+  char* my_other_field2;
+  ...
+};
+
+void RunFunction(grpc_completion_queue_functor* functor_arg, int ok) {
+  MyFunctor* functor = (MyFunctor*)functor_arg;
+  printf("Operation %d of type %s complete\n", functor->my_other_field1,
+          functor->my_other_field2);
+  ...
+  free(functor);
+}
+
+void InitiateOperation() {
+  MyFunctor* functor = malloc(sizeof(MyFunctor));
+  
+  functor->functor.functor_run = &RunFunction;
+  functor->functor.inlineable = 0;
+  functor->my_other_field1 = 18;
+  functor->my_other_field2 = "hello world";
+
+  grpc_call_start_batch(..... , functor);
+}
+```
+
 ## Rationale
 
 A more thorough longer-term solution would have been to use a
