@@ -77,10 +77,12 @@ normally (corresponding to the `ok` result of
 * `int inlineable`: specifies whether this functor can be run inline
 in the same thread as the one that detected it rather than sending
 it to an executor thread. This must be
-used very carefully and only for trivial internally-generated callbacks that
+used very carefully and only for known-safe callbacks that
 do not use locks. Incorrect use can lead to deadlock, so this flag must always
 be set to `0` (false) unless the library is certain that the callback always
-meets the requirements.
+meets the requirements. In practice, it should only be used for code that
+belongs to a library that wraps core (e.g., the `DefaultReactor` in the C++ 
+callback API implementation) and not for end-user application callbacks.
 
 ## Rationale
 
