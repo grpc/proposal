@@ -53,28 +53,41 @@ class BaseEventManagerInterface {
   // ConsistentCancel, the closure will be run with false in the calling thread of 
   // ConsistentCancel. Callers of ConsistentCancel need to be cautious to avoid 
   // deadlock.
-  virtual void ScheduleAlarmIn(gpr_timespec deadline, std::function<void(bool)> c, Priority priority, AlarmKey* key = nullptr) = 0;
+  virtual void ScheduleAlarmAt(gpr_timespec deadline, std::function<void(bool)> c, Priority priority, AlarmKey* key = nullptr) = 0;
+
+  // Adds a new one-shot alarm with a slack, which will be scheduled at the given 
+  // deadline plus the timespan specified in slack. Reducing the precision of 
+  // alarms through a timer slack allows the EventManager to perform 
+  // timer-coalescing, which minimizes thread wake-up and has the potential of 
+  // substantially reducing CPU utilization.
+  virtual void ScheduleAlarmAtWithSlack(gpr_timespec deadline, std::function<void(bool)> c, Priority priority, TaskKey* key, gpr_timespec slack) = 0;
 
   // Adds a closure to the EventManager, which will be run at the earliest possible 
   // time. The TaskKey pointer is an output parameter which can be used to cancel 
   // the closure at a later time (currently not supported in 
   // BaseEventManagerInterface). Note that the closure should not be blocking or 
-  // long-running, as it would block the worker thread in the EventManager from 
-  // polling the file descriptors.
+  // long-running because the EventManager may depend on the worker thread to
+  // drive the events.
   virtual void RunFunction(std::function<void()> handler, Priority priority, TaskKey* key = nullptr) = 0;
 
   struct Task {
     std::function<void()> handler;
     Priority priority;
     TaskKey* key;
+    // The tasks may be sharded to multiple internal queues of the event manager
+    // for performance reason, e.g. to reduce contention during task scheduling.
+    // This parameter specifies which queue to add the task in. It's an optional
+    // feature that can be supported by EventManager implementations. When not
+    // supported, an EventManager implementation simply ignores this parameter.
     int internal_added_queue;
   };
   // Adds multiple closures to the event management system all at once.
-  virtual void RunFunctions(Task* tasks, int length) = 0;
+  virtual void RunFunctions(Task* tasks, size_t length) = 0;
 
-  // Cancels an alarm which has been added to the EventManager via 
-  // ScheduleAlarmIn(). This function will run the closure with false in the 
-  // calling thread if it successfully cancels the alarm.
+  // Cancels an alarm which has been added to the EventManager via
+  // ScheduleAlarmAt(). This cancel operation is "consistent" in that it will
+  // still run the alarm closure with false as parameter when successfully
+  // cancelled the alarm.
   virtual void ConsistentCancel(const AlarmKey& key) = 0;
 
   // Cancels an alarm as ConsistentCancel(), but wait if the task is currently 
@@ -170,13 +183,6 @@ class EpollEventManagerInterface: public BaseEventManagerInterface {
   virtual EpollDescriptorInterface* RegisterFileDescriptor(int fd) = 0;
 
   virtual void DeleteDescriptor(EpollDescriptorInterface* d) = 0;
-
-  // Adds a new one-shot alarm with a slack, which will be scheduled at the given 
-  // deadline plus the timespan specified in slack. Reducing the precision of 
-  // alarms through a timer slack allows the EventManager to perform 
-  // timer-coalescing, which minimizes thread wake-up and has the potential of 
-  // substantially reducing CPU utilization.
-  virtual void ScheduleAlarmInWithSlack(gpr_timespec deadline, std::function<void(bool)> c, Priority priority, TaskKey* key, gpr_timespec slack) = 0;
 };
 ```
 
@@ -228,7 +234,7 @@ class LibuvDescriptorInterface {
   virtual void NotifyAfterWrite(std::function<void(int)> upcall, LibuvWriteInfo info) = 0;
 
   // Accessor and mutator of arbitrary user-defined data. NOT thread-safe.
-  virtual void* data() = 0;
+  virtual void* data() const = 0;
   virtual void set_data(void* d) = 0;
 };
 
