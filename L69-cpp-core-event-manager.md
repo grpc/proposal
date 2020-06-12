@@ -48,10 +48,10 @@ class BaseEventManagerInterface {
   // closure with true. The deadline here is an absolute time. The AlarmKey pointer 
   // is an output parameter which can be used to cancel the alarm before it fires. 
   // Note that the closure should not be blocking or long-running, as it would 
-  // block the worker thread in the EventManager from polling the file 
-  // descriptors. In case that the alarm is cancelled successfully in 
-  // ConsistentCancel, the closure will be run with false in the calling thread of 
-  // ConsistentCancel. Callers of ConsistentCancel need to be cautious to avoid 
+  // block the worker thread in the EventManager from polling the file
+  // descriptors. In case that the alarm is cancelled successfully in
+  // CancelAndRun, the closure will be run with false in the calling thread of
+  // CancelAndRun. Callers of CancelAndRun need to be cautious to avoid
   // deadlock.
   virtual void ScheduleAlarmAt(gpr_timespec deadline, std::function<void(bool)> c, Priority priority, AlarmKey* key = nullptr) = 0;
 
@@ -88,11 +88,11 @@ class BaseEventManagerInterface {
   // ScheduleAlarmAt(). This cancel operation is "consistent" in that it will
   // still run the alarm closure with false as parameter when successfully
   // cancelled the alarm.
-  virtual void ConsistentCancel(const AlarmKey& key) = 0;
+  virtual void CancelAndRun(const AlarmKey& key) = 0;
 
-  // Cancels an alarm as ConsistentCancel(), but wait if the task is currently 
+  // Cancels an alarm as CancelAndRun(), but wait if the task is currently 
   // running.
-  virtual void BlockingConsistentCancel(const AlarmKey& key) = 0;
+  virtual void BlockingCancelAndRun(const AlarmKey& key) = 0;
 
   // These two methods adjust a refcount of the EventManager, preventing it from 
   // shutdown if the refcount is positive. ShutdownRef() should be called before 
