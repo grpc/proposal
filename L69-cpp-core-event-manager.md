@@ -186,7 +186,7 @@ class EpollEventManagerInterface: public BaseEventManagerInterface {
 };
 ```
 
-Note that there will be no native implementation provided by gRPC for the epoll based interface in the first step. Instead, gRPC will provide a default event manager implementation based on libuv. The libuv EM implementation will be applied to all the gRPC languages based on gRPC core, and the users may choose to override it with their custom implementation of the EM interface. gRPC may release more native event manager implementations down the road map.
+Note that in the first step gRPC will provide a default EventManager implementation based on libuv. The libuv EM implementation will be used by all the gRPC languages based on gRPC core, and the users may choose to override it with their custom implementation of the EM interface. gRPC may release more native event manager implementations down the road map.
 ```cpp
 // Represents a file descriptor when using libuv.
 class LibuvDescriptorInterface {
