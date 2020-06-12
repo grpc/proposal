@@ -60,7 +60,7 @@ proto-loader-gen-types [OPTIONS] <proto file name> ...
 
 The options will correspond directly to the `protoLoader.load` options as follows:
 
- - `--keep-case`: Preserve the case of field names
+ - `--keepCase`: Preserve the case of field names
  - `--longs=String|Number`: Specify the type that should be used to output 64 bit integer values
  - `--enums=String`: Specify that enum values should be output as strings
  - `--bytes=Array|String`: Specify the type that should be used to output `bytes` fields
@@ -68,7 +68,7 @@ The options will correspond directly to the `protoLoader.load` options as follow
  - `--arrays`: Indicates that empty arrays should be output for missing repeated fields even if `--defaults` is unset
  - `--objects`: Indicates that empty objects should be output for missing message fields even if `--defaults` is unset
  - `--oneofs`: Indicates that virtual "oneof" fields will be set to the present field's name in the output
- - `--includeDir=<directory>`, `-I <directory>`: A directory to search for included `.proto` files. Can be passed multiple times to include multiple directories
+ - `--includeDirs=<directory>`, `-I <directory>`: A directory to search for included `.proto` files. Can be passed multiple times to include multiple directories
 
  - `--outDir=<directory>`, `-O <directory>`: The directory in which to output files
  - `--grpcLib=grpc|@grpc/grpc-js`: The gRPC implementation library that these types will be used with
@@ -148,7 +148,7 @@ export interface MessageName__Output {
 // filename_proto.d.ts
 
 import * as grpc from '@grpc/grpc-js';
-import { EnumTypeDefinition, MessageTypeDefinition } from '@grpc/proto-loader';
+import { ServiceDefinition, EnumTypeDefinition, MessageTypeDefinition } from '@grpc/proto-loader';
 
 export namespace messages {
   export namespace package_name {
@@ -167,7 +167,7 @@ type SubtypeConstructor<Constructor, Subtype> = {
 
 interface ServiceNameClient extends Client {
   // This would actually be expanded into a few overrides
-  method(messages.package_name.subpackage_name.MessageName, metadata?: grpc.Metadata, callOptions?: grpc.CallOptions, callback: (error?: grpc.ServiceError, response?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.UnaryCall;
+  method(argument: messages.package_name.subpackage_name.MessageName, metadata?: grpc.Metadata, callOptions?: grpc.CallOptions, callback: (error?: grpc.ServiceError, response?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.UnaryCall;
 
   // Also the same for "Method" in addition to "method"
 }
@@ -176,7 +176,7 @@ export interface ProtoGrpcType {
   package_name: {
     subpackage_name: {
 
-      ServiceName: SubtypeConstructor<typeof grpc.Client, ServiceNameClient & { service: ServiceDefinition};
+      ServiceName: SubtypeConstructor<typeof grpc.Client, ServiceNameClient> & { service: ServiceDefinition};
 
       EnumName: EnumTypeDefinition;
 
