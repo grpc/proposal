@@ -234,6 +234,10 @@ policy will be responsible for both selecting the highest priority set
 of localities that are reachable and distributing the traffic across the
 localities in the selected priority based on the locality weights.
 
+Note that the EDS policy will support locality-level weights, but it
+will *not* support endpoint-level weights.  Providing a mechanism for
+endpoint-level weighting will be addressed in future work.
+
 Note that the EDS policy will *not* support
 [overprovisioning](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/overprovisioning),
 which is different from Envoy.  Envoy takes the
@@ -423,6 +427,7 @@ The `ClusterLoadAssignment` proto must have the following fields set:
     unreachable.  In each entry of the `lb_endpoints` field:
     - If the `health_status` field has any value other than HEALTHY or
       UNKNOWN, the entry will be ignored.
+    - The `load_balancing_weight` field will be ignored.
     - The `endpoint` field must be set.  Inside of it:
       - The `address` field must be set.  Inside of it:
         - The `socket_address` field must be set.  Inside of it:
