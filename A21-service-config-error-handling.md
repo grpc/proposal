@@ -51,15 +51,12 @@ configuration.
 	1. If it previously had selected a valid service config or no service
 	config, it should continue using that previous configuration from that
 	config. An empty service config is valid.
-	2. If the client has not previously selected a valid service config or no
-	service config, for example a new client, then:
-		1. It uses the default service config, if configured and valid. Note
-		that an empty default service config is a valid service config.
-		2. If it does not have a default service config, it should treat the
-		resolution attempt as having failed (e.g., for a polling-based
-		resolver, it should retry the query after appropriate backoff). In
-		other words,the channel will remain in state TRANSIENT_FAILURE until a
-		valid service config is received.
+	2. If the client has not previously selected a valid service config or
+	no service config, for example a new client, then it treats the
+	resolution attempt as having failed (e.g., for a polling-based resolver,
+	it should retry the query after appropriate backoff). In other words,
+	the channel will remain in state TRANSIENT_FAILURE until a valid
+	service config is received.
 5. If the resolver does not support service config resolution OR if no gRPC
 config is received OR if gRPC config is received but no service config is
 chosen (in case of the DNS resolver), the client should use the default service
