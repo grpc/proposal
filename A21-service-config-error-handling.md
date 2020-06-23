@@ -55,8 +55,8 @@ configuration.
 	no service config, for example a new client, then it treats the
 	resolution attempt as having failed (e.g., for a polling-based resolver,
 	it should retry the query after appropriate backoff). In other words,
-	the channel will remain in state TRANSIENT_FAILURE until a valid
-	service config is received.
+	the channel will remain in state TRANSIENT_FAILURE until the
+        resolver returns a valid response.
 5. If the resolver does not support service config resolution OR if no gRPC
 config is received OR if gRPC config is received but no service config is
 chosen (in case of the DNS resolver), the client should use the default service
