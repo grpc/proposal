@@ -119,7 +119,7 @@ like this:
   // future change to add support for failing over to a secondary xDS server
   // if the primary is down, but for now, only the first entry in the
   // array will be used.
-  xds_servers": [
+  "xds_servers": [
     {
       "server_uri": <string containing URI of xds server>,
       // List of channel creds; client will stop at the first type it
