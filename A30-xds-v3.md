@@ -218,15 +218,19 @@ either v2 or v3 resources.
 
 ### Version of LRS Protocol
 
-TODO(roth): Need to figure this out.  We had been planning to use the
-`transport_api_version` field in the LRS `ConfigSource` in the CDS
-response to set this.  However, that `ConfigSource` contains a
-`SelfConfigSource`, not an `ApiConfigSource`, so there is no
-`transport_api_version` field.  One option is to add a `transport_api_version`
-field to `SelfConfigSource`.  Another option would just be to say that
-the server feature in the bootstrap file controls both the xDS and LRS
-transport versions, although I'm not sure whether that will be flexible
-enough in the long run.
+For now, we will use the same server feature in the bootstrap file to
+indicate both the xDS and the LRS transport protocol version to use.
+
+Note that this means that there will not be a way to configure the client
+to use different transport versions for the two protocols.  In the future,
+if this becomes a problem, we can make use of `transport_api_version`
+field being added in https://github.com/envoyproxy/envoy/pull/11754 to
+specify the transport version of LRS.  However, since this field will exist
+only in xDS v3, this would still not provide a clean way to specify use
+of LRS v3 while using xDS v2.
+
+Just as with xDS, the LRS client will parse responses as v3, regardless
+of which version of the transport protocol is being used.
 
 ### Environment Variable
 
