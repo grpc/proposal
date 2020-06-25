@@ -2,10 +2,10 @@ A30: xDS v3 Support
 ----
 * Author(s): Mark D. Roth (markdroth)
 * Approver: ejona86, dfawley
-* Status: Draft
+* Status: In Review
 * Implemented in: 
-* Last updated: 2020-06-23
-* Discussion at: 
+* Last updated: 2020-06-25
+* Discussion at: https://groups.google.com/g/grpc-io/c/YRVqRMUQwhM
 
 ## Abstract
 
