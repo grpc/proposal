@@ -17,8 +17,8 @@ xDS versioning on an ongoing basis.
 
 gRPC has recently added support for obtaining configuration via the
 [xDS API](https://github.com/envoyproxy/data-plane-api).  Our current
-implementation uses uses v2 of the xDS API, but we are now adding
-support for [xDS
+implementation uses v2 of the xDS API, but we are now adding support
+for [xDS
 v3](https://docs.google.com/document/d/1xeVvJ6KjFBkNjVspPbY_PwEDHC7XPi0J5p1SqUXcCl8/edit).
 In addition, we have been working with the xDS community on the new
 [minor/patch versioning
@@ -112,14 +112,14 @@ For each new version of xDS, a server feature will be defined.  The
 presence of that feature in the `server_features` list will indicate
 that the server supports that version of xDS.
 
-Note that because each release of gRPC will support only two versions of
-xDS and will always assume that servers support the lower of the two
-versions, a server feature added to support version N+1 will no longer
-be used once gRPC adds support for version N+2.  However, it will not
-cause any problems to be left in the bootstrap file.  So at any given
-time, it useful to have a bootstrap file indicating the total set of
-versions supported by your xDS server, and each client will use the
-latest version it supports.
+Note that because each release of gRPC will support only two versions
+of xDS and will always assume that servers support the lower of the
+two versions, the server feature indicating support for version N+1
+will no longer be used by a release of gRPC that supports version N+2.
+However, it will not cause any problems to be left in the bootstrap file.
+So at any given time, it useful to have a bootstrap file indicating the
+total set of versions supported by your xDS server, and each client will
+use the latest version it supports.
 
 For xDS v3, the server feature will be the string `xds_v3`.
 
