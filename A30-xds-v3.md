@@ -27,9 +27,9 @@ which should provide a smoother transition mechanism going forward.
 
 Regardless of whether a new version is indicated by bumping the
 major version (as was done with the v2 to v3 transition) or by bumping
-the minor version (as will probably be done going forward), the current
-plan is that there will still be one new version of the xDS API per
-year.
+the minor version (as will probably be done for most new versions going
+forward), the current plan is that there will still be one new version of
+the xDS API per year.
 
 ### Related Proposals: 
 
@@ -52,20 +52,27 @@ xDS API.
 
 ### Deciding What Version to Use
 
-Any given gRPC release will support two versions of xDS, versions N-1 and N.
-It will assume that all servers speak version N-1, and there will be a
-server feature defined in the bootstrap file (see below) to tell it that
-the server supports version N.  When speaking to the server, gRPC will use
-the highest version that is common to both itself and the server.
+For each new version of xDS that gRPC adds support for, there will be a
+server feature defined in the bootstrap file (see below) to indicate that
+the server supports that version of xDS.  When speaking to the server,
+gRPC will use the highest version that is common to both itself and
+the server.
 
 For example, let's say that the gRPC binary supports versions N-1 and N.
-If there is no server feature in the bootstrap file telling it that the
-server supports version N, it will assume that the server supports only
-version N-1, and it will speak version N-1 to the server.
+If the bootstrap file contains only the server feature for version N-1,
+the highest version that is common to both the client and the server is
+N-1, so the client will speak version N-1.  However, if the bootstrap file
+contains the server features for both versions N-1 and N, the highest
+version that is common to both the client and server is N, so the client
+will speak version N.
 
-However, if the bootstrap file does contain a server feature telling gRPC
-that the server supports version N, then it will believe that the server
-supports both versions N-1 and N, and it will speak version N to the server.
+As a special case for backward compatibility, there will be no server
+feature defined for xDS v2 support.  Existing releases of gRPC
+automatically assume that servers support v2, and we will continue to
+assume that when we add support for v2.  When we add support for the
+next version beyond v3 (probably v3.1), we will drop support for v2, and
+from that point on, all versions will be explicitly indicated via a
+server feature in the bootstrap file.
 
 ### Server Features in the Bootstrap File
 
@@ -113,13 +120,12 @@ presence of that feature in the `server_features` list will indicate
 that the server supports that version of xDS.
 
 Note that because each release of gRPC will support only two versions
-of xDS and will always assume that servers support the lower of the
-two versions, the server feature indicating support for version N+1
-will no longer be used by a release of gRPC that supports version N+2.
-However, it will not cause any problems to be left in the bootstrap file.
-So at any given time, it useful to have a bootstrap file indicating the
-total set of versions supported by your xDS server, and each client will
-use the latest version it supports.
+of xDS, the server feature for version N-1 will no longer be used by a
+release of gRPC that supports version N+1.  However, it will not cause
+any problems to be left in the bootstrap file.  So at any given time, it
+is useful to have a bootstrap file indicating the total set of versions
+supported by your xDS server, and each client will use the latest version
+it supports.
 
 For xDS v3, the server feature will be the string `xds_v3`.
 
@@ -136,10 +142,8 @@ allows the following:
 - Newer gRPC clients that support versions N-1 and N will see the server
   feature for version N in the bootstrap file, so they will use version
   N.  (If for some reason the server feature for version N was not
-  present in the bootstrap file, they would also work using version N-1.
-  Note that these clients will not care whether the bootstrap file
-  contains the server feature for version N-1, because they will assume
-  that the server supports this version anyway.)
+  present in the bootstrap file, they would also work using version N-1,
+  as long as that server feature is present.)
 
 Now let's say that you want to drop support for version N-1 in your xDS
 server, so that it supports only version N.  Before you can do that,
@@ -151,13 +155,13 @@ and N-1.  You have two choices:
   N in the bootstrap file.
 - Upgrade the clients to the newest release supporting versions N and
   N+1.  These clients will not see a server feature for version N+1 in
-  the bootstrap file, so they will use version N.  (They will not
-  actually care whether the server feature for version N is present in
-  the bootstrap file, since they will assume the server supports this
-  version anyway.)
+  the bootstrap file, but they will see a server feature for version N,
+  so they will use version N.
 
 Once you are sure that you have no more clients using version N-1, you
-can drop support for that version from your xDS server.
+can drop support for that version from your xDS server.  At this point,
+you should remove the server feature for version N-1 from your bootstrap
+files, just in case any older clients are started.
 
 Next, let's say that xDS version N+1 has been released, and you want to add
 support for that version to your xDS server.  You can of course do this at
@@ -195,13 +199,22 @@ The xDS major version number appears in two main places in the API:
 When gRPC uses v3 to talk to a server, the primary thing that it is
 choosing is the transport protocol version, not the resource version.
 
-Luckily, we can be more flexible with the resource version, because
-there's essentially only one case where we use a field in the v2 protos
-that was removed in the v3 protos.  (That case is the node `build_version`
-field, which we can handle as a special case.)  Therefore, we can
-simply change our code to parse all incoming messages as v3, regardless
-of whether they are actually v2 or v3 messages.  We will also need to
-accept both v2 and v3 type names interchangeably in all `type_url` fields.
+Luckily, we can be more flexible with the resource version, because there
+are no cases where we use a field in the v2 protos that was removed in
+the v3 protos.  Therefore, we can simply change our code to parse all
+incoming messages as v3, regardless of whether they are actually v2
+or v3 messages.  We will also need to accept both v2 and v3 type names
+interchangeably in all `type_url` fields.
+
+Note that we will actually take the same approach for the proto messages
+related to the transport version, such as `DiscoveryRequest` and
+`DiscoveryResponse`.  We will unconditionally use the v3 protos to
+serialize and deserialize these messages, regardless of what version of
+the transport protocol we are using.  There is one case where we are
+using a field in the v2 protos that does not exist in the v3 protos,
+which is the `build_version` field; for this one special case, we will
+use a hack to manually populate this field in the v3 proto message by its
+v2 field number when we are speaking the v2 transport version.
 
 This means that the logic for determining the transport protocol version
 is completely independent of the logic for handling the resource version.
@@ -224,10 +237,9 @@ indicate both the xDS and the LRS transport protocol version to use.
 Note that this means that there will not be a way to configure the client
 to use different transport versions for the two protocols.  In the future,
 if this becomes a problem, we can make use of `transport_api_version`
-field being added in https://github.com/envoyproxy/envoy/pull/11754 to
-specify the transport version of LRS.  However, since this field will exist
-only in xDS v3, this would still not provide a clean way to specify use
-of LRS v3 while using xDS v2.
+field being added in https://github.com/envoyproxy/envoy/pull/11754 and
+https://github.com/envoyproxy/envoy/pull/11824 to specify the transport
+version of LRS.
 
 Just as with xDS, the LRS client will parse responses as v3, regardless
 of which version of the transport protocol is being used.
