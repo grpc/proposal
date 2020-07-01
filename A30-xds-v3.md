@@ -231,7 +231,7 @@ either v2 or v3 resources.
 
 Note that the ability to accept resource versions that are different
 than what was requested is only intended for use as a rollout strategy
-during transitions where the management server has some a prior
+during transitions where the management server has some a priori
 knowledge that its clients can support resources of a different version.
 In the general case, management servers cannot assume this, because
 (e.g.) if a client requests v2 resources, it might not be able to handle
