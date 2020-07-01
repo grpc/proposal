@@ -69,7 +69,7 @@ will speak version N.
 As a special case for backward compatibility, there will be no server
 feature defined for xDS v2 support.  Existing releases of gRPC
 automatically assume that servers support v2, and we will continue to
-assume that when we add support for v2.  When we add support for the
+assume that when we add support for v3.  When we add support for the
 next version beyond v3 (probably v3.1), we will drop support for v2, and
 from that point on, all versions will be explicitly indicated via a
 server feature in the bootstrap file.
@@ -228,6 +228,14 @@ request v2 resources, but it's fine for the server to send us either v2
 or v3 resources.  Similarly, if we're using the v3 transport protocol,
 we will request v3 resources, but it's fine for the server to send us
 either v2 or v3 resources.
+
+Note that the ability to accept resource versions that are different
+than what was requested is only intended for use as a rollout strategy
+during transitions where the management server has some a prior
+knowledge that its clients can support resources of a different version.
+In the general case, management servers cannot assume this, because
+(e.g.) if a client requests v2 resources, it might not be able to handle
+v3 resources sent in response.
 
 ### Version of LRS Protocol
 
