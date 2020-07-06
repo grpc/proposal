@@ -5,7 +5,7 @@ Allow Call Credentials to be Specified in `grpc_google_default_credentials_creat
 * Status: Draft
 * Implemented in: Core
 * Last updated: July 6th, 2020
-* Discussion at: (TODO)
+* Discussion at: https://groups.google.com/g/grpc-io/c/fZNm4pU8e3s/m/2Be8u1n7BQAJ
 
 ## Abstract
 
