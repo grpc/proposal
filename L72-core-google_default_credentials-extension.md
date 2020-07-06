@@ -10,16 +10,13 @@ Allow Call Credentials to be Specified in `grpc_google_default_credentials_creat
 ## Abstract
 
 This document proposes that `grpc_google_default_credentials_create` be
-amended to allow the user to specify their desired call credential, while
-also adding a `void* reserved` argument to lessen the burden of any such
-changes in the future.
-
+amended to allow the user to specify their desired call credentials.
 
 ## Background
 
-The so-called "Google default credentials" created by the
-`grpc_google_default_credentials_create` function in Core enables connection to
-GCP via a combination of ALTS and SSL credentials, along with a special oauth2
+The Google default credentials created by the
+`grpc_google_default_credentials_create` function in Core enable connection to
+Google services via a combination of ALTS and SSL credentials, along with a special oauth2
 token that must assert the same identity as the channel-level ALTS credential.
 
 This oauth2 token attached by `grpc_google_default_credentials_create` is based
@@ -39,8 +36,7 @@ amended to the following:
 
 ```C
 GRPCAPI grpc_channel_credentials*
-grpc_google_default_credentials_create(grpc_call_credentials* call_credentials,
-                                       void* reserved);
+grpc_google_default_credentials_create(grpc_call_credentials* call_credentials);
 ```
 
 Supplying `nullptr` for `call_credentials` will result in the current behavior
