@@ -4,7 +4,7 @@ Allow Call Credentials to be Specified in `grpc_google_default_credentials_creat
 * Approver: markdroth
 * Status: Draft
 * Implemented in: Core
-* Last updated: July 6th, 2020
+* Last updated: July 8th, 2020
 * Discussion at: https://groups.google.com/g/grpc-io/c/fZNm4pU8e3s/m/2Be8u1n7BQAJ
 
 ## Abstract
@@ -19,15 +19,14 @@ The Google default credentials created by the
 Google services via a combination of ALTS and SSL credentials, along with a special oauth2
 token that must assert the same identity as the channel-level ALTS credential.
 
-This oauth2 token attached by `grpc_google_default_credentials_create` is based
-on the default VM service account, but the auth libraries for wrapped languages
-allow the creation of channels with non-default service accounts. In this case,
-a mismatch in identity occurs that may cause an unexpected persistent failure of
-RPCs at runtime.
-
-While the default service account is the correct option is most cases, there
-should be an option that enables auth libraries to supply their own call
-credentials.
+In C++, auth is handled by the gRPC library itself. In wrapped
+languages such as Python, however, auth is handled by external libraries which
+incur a dependency on gRPC, such as [`google-auth-library-python`](https://github.com/googleapis/google-auth-library-python).
+These libraries have their own implementation of the
+[Application Default Credentials](https://cloud.google.com/docs/authentication/production?_ga=2.68587985.1354052904.1594166352-2074181900.1593114348#finding_credentials_automatically)
+mechanism. Thus, if an auth library were to use the current version of
+`grpc_google_default_credentials_create`, the Application Default Credentials
+logic would be duplicated between the auth library and gRPC Core.
 
 ## Proposal
 
@@ -40,14 +39,22 @@ grpc_google_default_credentials_create(grpc_call_credentials* call_credentials);
 ```
 
 Supplying `nullptr` for `call_credentials` will result in the current behavior
-of the function -- oauth2 call credentials based on the default service account
-of the VM will be used.
+of the function. That is, Core will attach a compute engine call credential
+based on the Application Default Credentials mechanism.
 
 ## Rationale
 
 A first attempt at this problem was the addition of a new API very similar to
 `grpc_google_default_credentials_create`, but it was determined that too much
 was duplicated by this implementation.
+
+It is possible that the call credentials provided by the caller are not compute
+engine credentials or do not assert the identity of the default service account
+of the VM. Ideally, a programmatic check would verify that no such credentials
+are passed in. Unfortunately, the type of credentials passed in are opaque to
+both Core and the gRPC wrapped language library, making such a check impossible.
+A prominent warning will be added to the documentation for the function to warn
+users of such pitfalls.
 
 ## Implementation
 
