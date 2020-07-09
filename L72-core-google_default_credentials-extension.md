@@ -17,15 +17,28 @@ amended to allow the user to specify their desired call credentials.
 The Google default credentials created by the
 `grpc_google_default_credentials_create` function in Core enable connection to
 Google services via a combination of ALTS and SSL credentials, along with a special oauth2
-token that must assert the same identity as the channel-level ALTS credential.
+token that must assert the same identity as the channel-level ALTS credential,
+which is gathered from a request to the
+`http://metadata.google.internal/computeMetadata/v1/project/service-accounts/default/token`
+endpoint.
 
 In C++, auth is handled by the gRPC library itself. In wrapped
 languages such as Python, however, auth is handled by external libraries which
 incur a dependency on gRPC, such as [`google-auth-library-python`](https://github.com/googleapis/google-auth-library-python).
 These libraries have their own implementation of the
 [Application Default Credentials](https://cloud.google.com/docs/authentication/production?_ga=2.68587985.1354052904.1594166352-2074181900.1593114348#finding_credentials_automatically)
-mechanism. Thus, if an auth library were to use the current version of
-`grpc_google_default_credentials_create`, the Application Default Credentials
+(ADC) mechanism, which uses the following strategy to create credentials:
+
+1. First, ADC checks to see if the environment variable  
+   `GOOGLE_APPLICATION_CREDENTIALS` is set. If the variable is set, ADC uses  
+   the service account file that the variable points to.
+2. If the environment variable isn't set, ADC uses the default service account  
+   that Compute Engine, Google Kubernetes Engine, Cloud Run, App Engine, and  
+   Cloud Functions provide, for applications that run on those services.
+3. If ADC can't use either of the above credentials, an error occurs.
+
+Thus, if an auth library were to use the current version of
+`grpc_google_default_credentials_create`, this ADC
 logic would be duplicated between the auth library and gRPC Core.
 
 ## Proposal
