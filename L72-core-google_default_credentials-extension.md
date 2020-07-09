@@ -32,9 +32,11 @@ These libraries have their own implementation of the
 1. First, ADC checks to see if the environment variable  
    `GOOGLE_APPLICATION_CREDENTIALS` is set. If the variable is set, ADC uses  
    the service account file that the variable points to.
+
 2. If the environment variable isn't set, ADC uses the default service account  
    that Compute Engine, Google Kubernetes Engine, Cloud Run, App Engine, and  
    Cloud Functions provide, for applications that run on those services.
+
 3. If ADC can't use either of the above credentials, an error occurs.
 
 Thus, if an auth library were to use the current version of
