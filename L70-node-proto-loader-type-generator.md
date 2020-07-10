@@ -117,70 +117,85 @@ service ServiceName {
 
 export enum EnumName {
   OPTION0 = 0,
-  OPTION1 = 1
+  OPTION1 = 1,
 }
 
 // package_name/subpackage_name/MessageName.d.ts
 
-import { package_name__subpackage_name__EnumName } from './EnumName';
+import { EnumName as _package_name_subpackage_name_EnumName } from '../../package_name/subpackage_name/EnumName';
 import { Long } from '@grpc/proto-loader';
 
 export interface MessageName {
-  string_value?: string;
-  number_value?: number;
-  enum_value?: package_name__subpackage_name__EnumName | keyof typeof package_name__subpackage_name__EnumName;
-  long_value?: number | string | Long;
-  oneof_value?: 'bool_value' | 'bytes_value';
-  bool_value?: boolean;
-  bytes_value?: Buffer;
+  'string_value'?: (string);
+  'number_value'?: (number);
+  'enum_value'?: (_package_name_subpackage_name_EnumName | keyof typeof _package_name_subpackage_name_EnumName);
+  'long_value'?: (number | string | Long);
+  'bool_value'?: (boolean);
+  'bytes_value'?: (Buffer | Uint8Array | string);
+  'oneof_value'?: "bool_value"|"bytes_value";
 }
 
 export interface MessageName__Output {
-  string_value: string;
-  number_value: number;
-  enum_value: keyof typeof package_name__subpackage_name__EnumName;
-  long_value: string;
-  oneof_value: 'bool_value' | 'bytes_value';
-  bool_value?: boolean;
-  bytes_value?: Buffer;
+  'string_value': (string);
+  'number_value': (number);
+  'enum_value': (keyof typeof _package_name_subpackage_name_EnumName);
+  'long_value': (string);
+  'bool_value'?: (boolean);
+  'bytes_value'?: (Buffer);
+  'oneof_value': "bool_value"|"bytes_value";
 }
 
-// filename_proto.d.ts
+// filename.ts
 
 import * as grpc from '@grpc/grpc-js';
 import { ServiceDefinition, EnumTypeDefinition, MessageTypeDefinition } from '@grpc/proto-loader';
 
+import { EnumName as _package_name_subpackage_name_EnumName } from './package_name/subpackage_name/EnumName';
+import { MessageName as _package_name_subpackage_name_MessageName, MessageName__Output as _package_name_subpackage_name_MessageName__Output } from './package_name/subpackage_name/MessageName';
+
 export namespace messages {
   export namespace package_name {
     export namespace subpackage_name {
-      export * from './package_name/subpackage_name/EnumName';
-      export * from './package_name/subpackage_name/MessageName';
+      export type EnumName = _package_name_subpackage_name_EnumName;
+      export type MessageName = _package_name_subpackage_name_MessageName;
+      export type MessageName__Output = _package_name_subpackage_name_MessageName__Output;
+      export namespace ServiceName {
+      }
     }
   }
 }
 
-type ConstructorArguments<Constructor> = Constructor extends new (...args: infer Args): any ? Args: never;
-
-type SubtypeConstructor<Constructor, Subtype> = {
-  new(args: ConstructorArguments<Constructor>): Subtype;
+export namespace ClientInterfaces {
+  export namespace package_name {
+    export namespace subpackage_name {
+      export namespace MessageName {
+      }
+      export interface ServiceNameClient extends grpc.Client {
+        Method(argument: messages.package_name.subpackage_name.MessageName, metadata: grpc.Metadata, options: grpc.CallOptions, callback: (error?: grpc.ServiceError, result?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.ClientUnaryCall;
+        Method(argument: messages.package_name.subpackage_name.MessageName, metadata: grpc.Metadata, callback: (error?: grpc.ServiceError, result?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.ClientUnaryCall;
+        Method(argument: messages.package_name.subpackage_name.MessageName, metadata: grpc.Metadata, options: grpc.CallOptions, callback: (error?: grpc.ServiceError, result?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.ClientUnaryCall;
+        Method(argument: messages.package_name.subpackage_name.MessageName, metadata: grpc.Metadata, callback: (error?: grpc.ServiceError, result?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.ClientUnaryCall;
+        method(argument: messages.package_name.subpackage_name.MessageName, metadata: grpc.Metadata, options: grpc.CallOptions, callback: (error?: grpc.ServiceError, result?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.ClientUnaryCall;
+        method(argument: messages.package_name.subpackage_name.MessageName, metadata: grpc.Metadata, callback: (error?: grpc.ServiceError, result?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.ClientUnaryCall;
+        method(argument: messages.package_name.subpackage_name.MessageName, metadata: grpc.Metadata, options: grpc.CallOptions, callback: (error?: grpc.ServiceError, result?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.ClientUnaryCall;
+        method(argument: messages.package_name.subpackage_name.MessageName, metadata: grpc.Metadata, callback: (error?: grpc.ServiceError, result?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.ClientUnaryCall;
+        
+      }
+    }
+  }
 }
 
-interface ServiceNameClient extends Client {
-  // This would actually be expanded into a few overrides
-  method(argument: messages.package_name.subpackage_name.MessageName, metadata?: grpc.Metadata, callOptions?: grpc.CallOptions, callback: (error?: grpc.ServiceError, response?: messages.package_name.subpackage_name.MessageName__Output) => void): grpc.UnaryCall;
-
-  // Also the same for "Method" in addition to "method"
+type ConstructorArguments<Constructor> = Constructor extends new (...args: infer Args) => any ? Args: never;
+type SubtypeConstructor<Constructor, Subtype> = {
+  new(...args: ConstructorArguments<Constructor>): Subtype;
 }
 
 export interface ProtoGrpcType {
   package_name: {
     subpackage_name: {
-
-      ServiceName: SubtypeConstructor<typeof grpc.Client, ServiceNameClient> & { service: ServiceDefinition};
-
-      EnumName: EnumTypeDefinition;
-
-      MessageName: MessageTypeDefinition;
+      EnumName: EnumTypeDefinition
+      MessageName: MessageTypeDefinition
+      ServiceName: SubtypeConstructor<typeof grpc.Client, ClientInterfaces.package_name.subpackage_name.ServiceNameClient> & { service: ServiceDefinition }
     }
   }
 }
@@ -188,8 +203,11 @@ export interface ProtoGrpcType {
 export namespace ServiceHandlers {
   export namespace package_name {
     export namespace subpackage_name {
+      export namespace MessageName {
+      }
       export interface ServiceName {
-        method(grpc.ServerUnaryCall<messages.package_name.subpackage_name.MessageName__Output>, grpc.SendUnaryData<messages.package_name.subpackage_name.MessageName>): void;
+        Method(call: grpc.ServerUnaryCall<messages.package_name.subpackage_name.MessageName__Output, messages.package_name.subpackage_name.MessageName>, callback: grpc.sendUnaryData<messages.package_name.subpackage_name.MessageName>): void;
+        
       }
     }
   }
