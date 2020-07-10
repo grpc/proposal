@@ -7,14 +7,14 @@ data.
 
 Three types of binder are involved in our implementation.
 
-*   The _endpoint binder_, owned by the OnDeviceServerEndpoint instance, and
-    returned from concrete services onBind method.
+*   The _endpoint binder_, owned by the BinderServer or OnDeviceServerEndpoint
+    instance, and returned from the host Android service's onBind method.
 *   The _client binder_, owned by the ClientTransport implementation within the
     Channel.
 *   The _server binder_, owned by the ServerTransport implementation.
 
-A single endpoint binder exists for each endpoint. A client binder / server
-binder pair is created for each transport pair.
+A single endpoint binder exists for each BinderServer or OnDeviceServerEndpoint.
+A client binder / server binder pair is created for each transport pair.
 
 ## Transaction Types
 
@@ -137,7 +137,7 @@ The setup of a new transport occurs in the following steps.
 
 1.  The ClientTransport first binds to the endpoint Android Service, to obtain
     an endpoint binder.
-2.  The ClientTransport sends a _setup transport_ transaction to the host
+2.  The ClientTransport sends a _setup transport_ transaction to the endpoint
     binder, passing the client binder in the parcel, then discarding the
     reference to the endpoint binder.
 3.  The server receives the _setup transport_ transaction from the client and
