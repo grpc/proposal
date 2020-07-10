@@ -33,28 +33,30 @@ cross-application.
 
 Despite this, the use of [bound services] is necessary for the Android platform
 to be aware of inter-process dependencies, and there's occasionally a need to
-pass platform-define parcelable objects (e.g. `PendingIntent`), some of which
+pass platform-defined parcelable objects (e.g. `PendingIntent`), some of which
 can't simply be serialized into a byte stream.
 
 ## Proposal
 
-We propose the creation of client and server transport that supports
-communication via [Binder] transactions with an Android [bound service], with
+We propose the creation of client and server transports that support
+communication via [Binder] transactions with an Android [bound service], and
 corresponding channel and server builders. This transport will support the
 inclusion of Android Parcelable objects in Metadata, to allow Parcelables when
 necessary, while discouraging Parcelables as a general message format.
 
 In addition we propose the creation of an "on-device" gRPC server concept, which
 is simultaneously a "binder" server and an in-process server, with a
-NameResolver able to choose between the most efficient transport mechanism.
+NameResolver to choose the most efficient transport mechanism for a given client
+context.
 
-We're unable to support channel creation via [ManagedChannelBuilder] since a
-[bound service] connection requires an Android [Context] object to bind _from_.
+In both cases, we're unable to support channel creation via [ManagedChannelBuilder]
+since a [bound service] connection requires an Android [Context] object to bind
+_from_.
 
 ### A note on lifecycle
 
 To help prevent accidental memory leaks, we allow Channels to be attached to the
-lifecycle of an Android component via the [androidx.lifecycle] package. When the
+lifecycle of an Android component via a [Lifecycle] instance. When the
 component is destroyed, the bound Channel will be shutdown, preventing remote
 processes from being anchored for longer than necessary.
 
@@ -166,6 +168,9 @@ created via a corresponding OnDeviceServerBuilder class. However, an
 OnDeviceServer instance wraps two other InternalServer instances, BinderServer
 (described above) and gRPC's existing InProcessServer.
 
+This allows rpcs to use an in-process channel if the client happens to be 
+in the same process.
+
 ### OnDeviceChannelBuilder
 
 OnDeviceChannelBuilder is used to create a channel to an on-device server. This
@@ -211,7 +216,7 @@ out-of-process servers), or to `Supplier<Server>` for in-process servers.
 
 The use of `Supplier<Server>` for in-process name resolution, means server
 creation can happen lazily. This is particularly important since we're running
-in a mobile operating system, where processes often starting from cold in
+in a mobile operating system, where processes are often started from cold in
 response to user invocation.
 
 ### OnDeviceServerEndpoint
@@ -231,19 +236,19 @@ being passed to the internal _BinderServer_.
 
 ### Security
 
-During transport setup, both ClientTransport and ServerTransport will lookup the
+During transport setup, both client and server transport implementations will lookup the
 UID of their peer (via
 [Binder.getCallingUid](https://developer.android.com/reference/android/os/Binder#getCallingUid\(\))).
 
-An instance of the `SecurityPolicy` class decides whether any given UID UID can
+An instance of the `SecurityPolicy` class decides whether any given UID can
 be communicated with. The default policy is to only allow comunnication with the
 same UID.
 
-OnDeviceChannelBuilder takes a SecurityPolicy in order to validate the
-connected-to server's UID.
+Both OnDeviceChannelBuilder and BinderChannelBuilder take a SecurityPolicy in
+order to validate the connected-to server's UID.
 
-OnDeviceServerEndpointBuilder takes a ServerSecurityPolicy to validate the UID
-of each client. ServerSecurityPolicy allows for a separate SecurityPolicy to be
+OnDeviceServerEndpointBuilder and BinderServerBuilder take a ServerSecurityPolicy to validate
+the UID of each client. ServerSecurityPolicy allows for a separate SecurityPolicy to be
 set for each service name.
 
 ## Rationale
@@ -290,7 +295,8 @@ size costs.
 
 #### Performance
 
-A gRPC call will always come with more overhead than a hand-rolled binder call.
+A gRPC call will always come with more overhead than a hand-rolled binder call,
+though testing shows this overhead is small enough for most use cases.
 
 ## Implementation
 
