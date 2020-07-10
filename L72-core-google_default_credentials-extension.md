@@ -17,8 +17,9 @@ amended to allow the user to specify their desired call credentials.
 The Google default credentials created by the
 `grpc_google_default_credentials_create` function in Core enable connection to
 Google services via a combination of ALTS and SSL credentials, along with a special oauth2
-token that must assert the same identity as the channel-level ALTS credential,
-which is gathered from a request to the
+token that, by default, asserts the same identity as the channel-level ALTS credential.
+The ALTS credential will use the identity in a token gathered from a request to
+the
 `http://metadata.google.internal/computeMetadata/v1/project/service-accounts/default/token`
 endpoint.
 
@@ -42,6 +43,9 @@ These libraries have their own implementation of the
 Thus, if an auth library were to use the current version of
 `grpc_google_default_credentials_create`, this ADC
 logic would be duplicated between the auth library and gRPC Core.
+
+By default, the identity pulled from the `metadata.google.internal` endpoint and
+the identity from the ADC mechanism will align.
 
 ## Proposal
 
