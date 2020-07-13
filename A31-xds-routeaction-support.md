@@ -5,7 +5,7 @@ A31: gRPC xDS RouteAction Support
 * Status: In Review
 * Implemented in:
 * Last updated: 2020-07-13
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/iujkovEFSJU
 
 ## Abstract
 
