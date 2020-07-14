@@ -151,19 +151,27 @@ red box represents the top-level Load Balancing Policy and its children.
 
 ![xDS Architecture](A31_graphics/xds_architecture.png "xDS Architecture")
 
+#### Supported Fields
+
 Initially, only timeout-related `RouteAction` settings will be supported:
 <code>[timeout](https://github.com/envoyproxy/envoy/blob/7abb0e0bbed4f6b6304403b93762614ad385f80d/api/envoy/api/v2/route/route_components.proto#L886)</code>
 and
-<code>[max_grpc_timeout](https://github.com/envoyproxy/envoy/blob/7abb0e0bbed4f6b6304403b93762614ad385f80d/api/envoy/api/v2/route/route_components.proto#L979)</code>. <code>[grpc_timeout_offset](https://github.com/envoyproxy/envoy/blob/7abb0e0bbed4f6b6304403b93762614ad385f80d/api/envoy/api/v2/route/route_components.proto#L988)</code>
-is used in Envoy for shortening timeouts set by clients to ensure the timeout is
-reached before the client cancels the RPC, so supporting it in the client would
-be counter-productive.  If <code>max_grpc_timeout</code> is not present, the
-<code>timeout</code> field will specify the maximum RPC timeout for this route,
-with a default of 15s.  If <code>max_grpc_timeout</code> is present, then
-timeout is ignored and <code>max_grpc_timeout</code> limits the maximum timeout
-for RPCs on this route.  A value of 0 indicates no limit should be applied.  In
-all cases, the RPC timeout set by the application may never be exceeded due to
-these settings.  For examples, see the following table:
+<code>[max_grpc_timeout](https://github.com/envoyproxy/envoy/blob/7abb0e0bbed4f6b6304403b93762614ad385f80d/api/envoy/api/v2/route/route_components.proto#L979)</code>.
+gRPC's xDS support will completely ignore
+<code>[grpc_timeout_offset](https://github.com/envoyproxy/envoy/blob/7abb0e0bbed4f6b6304403b93762614ad385f80d/api/envoy/api/v2/route/route_components.proto#L988)</code>.
+This field is used in Envoy for shortening timeouts set by clients to ensure the
+timeout is reached before the gRPC client cancels the RPC due to its deadline,
+so supporting it directly in the client is unnecessary and would be
+counter-productive.
+
+If <code>max_grpc_timeout</code> is not present, the <code>timeout</code> field
+will specify the maximum RPC timeout for this route, with a default of 15s.
+
+If <code>max_grpc_timeout</code> is present, then timeout is ignored and
+<code>max_grpc_timeout</code> limits the maximum timeout for RPCs on this route.
+A value of 0 indicates no limit should be applied.  In all cases, the RPC
+timeout set by the application may never be exceeded due to these settings.  For
+examples, see the following table:
 
 Application Deadline | `max_grpc_timeout` | `timeout` | Effective Timeout
 -------------------- | ------------------ | --------- | -----------------
