@@ -1,6 +1,4 @@
-# Draft of L73-binder-channel.md
-
-## BinderChannel
+# BinderChannel for native cross-process communication on Android
 
 *   Author(s): markb74
 *   Approver:
@@ -315,7 +313,7 @@ productionized but some internal users.
 [ComponentName]: https://developer.android.com/reference/android/content/ComponentName
 [InProcessTransport]: https://github.com/grpc/grpc-java/blob/master/core/src/main/java/io/grpc/inprocess/InProcessTransport.java
 [Binder]: https://developer.android.com/reference/android/os/Binder
-[onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\))
+[onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\)
 [InternalServer]: https://github.com/grpc/grpc-java/blob/v1.29.0/core/src/main/java/io/grpc/internal/InternalServer.java
 [BinaryStreamMarshaller]: https://grpc.github.io/grpc-java/javadoc/io/grpc/Metadata.BinaryStreamMarshaller.html
 [ProtoInputStream]: https://github.com/grpc/grpc-java/blob/v1.29.0/protobuf-lite/src/main/java/io/grpc/protobuf/lite/ProtoInputStream.java
