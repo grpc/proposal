@@ -209,7 +209,9 @@ These alternatives were considered to generating files in a directory structure 
 
 The gRPC implementation is specified at build time because the types depend on types from that library and the user should know at that point which implementation they are using. An alternative is to use generics to insert the types in a different way, but that increases the complexity of both the generated code and the code that uses it for relatively little gain.
 
-Two types are generated for each message definition to represent that at runtime the library is permissive with what it accepts, but stricter with what it outputs. Having those stricter output types allows the user to get tigher type guarantees where possible.
+The goal of generating two separate interfaces for each message type is to describe two separate things as narrowly as possible: the objects that users can pass to the library as input, and the objects that the library will output. We have more control over what the library outputs, so we can be more specific in that type. This simplifies handling of messages output by the library, while still allowing the same flexibility when providing input messages that users get with the JavaScript interface.
+
+For example, all Protobuf 3 fields are optional, so the input type allows the user to omit fields, but with the `defaults` code generation option, we know that the library will always output the default value for omitted fields, so the output type can guarantee that every field will have a value.
 
 ## Implementation
 
