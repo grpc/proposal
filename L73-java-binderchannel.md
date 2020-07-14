@@ -2,10 +2,10 @@
 
 *   Author(s): markb74
 *   Approver:
-*   Status: Draft
+*   Status: In Review
 *   Implemented in: Java
-*   Last updated: July 10, 2020
-*   Discussion at:
+*   Last updated: July 14, 2020
+*   Discussion at: https://groups.google.com/g/grpc-io/c/RFmjrxdtwzE
 
 ## Abstract
 
