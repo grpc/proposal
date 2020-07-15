@@ -180,7 +180,7 @@ Like BinderChannelBuilder, each channel can be created either globally for the
 entire application, or tied to the lifecycle of one component via a [Lifecycle]
 instance.
 
-~~~java
+```java
 OnDeviceChannelBuilder.create(
         application,
         "ondevice://example")
@@ -202,7 +202,7 @@ OnDeviceChannelBuilder.create(
         activity.getLifecycle(),
         AndroidComponentAddress.forRemoteComponent("pkg", "pkg.ServiceClass"))
     .build();
-~~~
+```
 
 ### OnDeviceNameResolverProvider
 
