@@ -5,7 +5,7 @@ Java: Channel and Server Credentials
 * Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2020-06-17
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/GNU9svnDsQs/m/kG6XsUy9BwAJ
 
 ## Abstract
 
