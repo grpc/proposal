@@ -38,6 +38,9 @@ There are two reasons you might want to call this:
       clean up after itself when the library is unloaded.
 
 Before it's called, the normal cleanup using grpc_shutdown has to be done.
+grpc_final_shutdown_library() is not a replacement for grpc_shutdown() but can be called after the normal
+cleanup with grpc_shutdown() when using automatic leak-detection at process exit.
+If you don't use automatic leak-detection then you don't need to call this function.
 
 ```c
 GRPCAPI void grpc_final_shutdown_library(void);
@@ -92,8 +95,7 @@ static DefaultGlobalClientCallbacks* g_default_client_callbacks =
 
 ## Rationale
 
-N/A
-
+This approach was chosen because it already works for libprotobuf for many years.
 
 ## Implementation
 
@@ -107,3 +109,51 @@ full cleanup when grpc_final_shutdown_library() is called.
 ## Open issues (if applicable)
 
 N/A
+
+## Testing
+
+I don't know how testing can be done in a portable way for gRPC. On Windows after changing the constructor
+of TestEnvironment to enable leak-detection nearly every test dumps memory leaks.
+
+```c++
+TestEnvironment::TestEnvironment(int argc, char** argv) {
+  _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+  _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
+  _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+  grpc_test_init(argc, argv);
+}
+```
+for example init_test.exe:
+
+```
+init_test.exe
+D0720 23:13:35.451000000 34824 test_config.cc:386] test slowdown factor: sanitizer=1, fixture=1, poller=1, total=1
+Detected memory leaks!
+Dumping objects ->
+{161} normal block at 0x01537F58, 8 bytes long.
+ Data: < z< 0   > 04 7A 3C 00 30 D3 FA 01
+{160} normal block at 0x01537C48, 8 bytes long.
+ Data: <X<S     > 58 3C 53 01 00 00 00 00
+{159} normal block at 0x01533C58, 44 bytes long.
+ Data: <H|S X S ` S ` S > 48 7C 53 01 58 7F 53 01 60 7F 53 01 60 7F 53 01
+{158} normal block at 0x01FAD330, 4 bytes long.
+ Data: <    > 00 00 00 00
+Object dump complete.
+```
+
+After adding grpc_final_shutdown_library() to the destructor of TestEnvironment no
+memory leaks are dumped except real memory leaks or when grpc_core::OnShutdownDelete or
+grpc_core::OnShutdownFree is missing.
+
+```c++
+TestEnvironment::~TestEnvironment() {
+  ...
+  gpr_log(GPR_INFO, "TestEnvironment ends");
+  grpc_final_shutdown_library();
+}
+```
+
+```
+init_test.exe
+D0720 23:17:30.048000000 11500 test_config.cc:386] test slowdown factor: sanitizer=1, fixture=1, poller=1, total=1
+```
