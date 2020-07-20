@@ -5,7 +5,7 @@ Provide a functionality to cleanup all static-duration objects allocated by the 
 * Status: Draft
 * Implemented in: C, C++
 * Last updated: July 19, 2020
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/oLLAsP8hcKM
 
 ## Abstract
 
