@@ -37,9 +37,9 @@ There are two reasons you might want to call this:
     - You are writing a dynamically-loaded library which needs to
       clean up after itself when the library is unloaded.
 
-Before it's called, the normal cleanup using grpc_shutdown has to be done.
+Before it's called, the normal cleanup using grpc_shutdown has to be done.  
 grpc_final_shutdown_library() is not a replacement for grpc_shutdown() but can be called after the normal
-cleanup with grpc_shutdown() when using automatic leak-detection at process exit.
+cleanup with grpc_shutdown() when using automatic leak-detection at process exit.  
 If you don't use automatic leak-detection then you don't need to call this function.
 
 ```c
@@ -81,7 +81,7 @@ inline void* OnShutdownFree(void* p) {
 }  // namespace grpc_core
 ```
 
-### Usage example 
+### Usage example (in the internal implementation of gRPC Core and C++)
 
 ```c++
 // src\cpp\client\client_context.cc
@@ -91,6 +91,18 @@ static DefaultGlobalClientCallbacks* g_default_client_callbacks =
 // src\core\lib\surface\init.cc 
   g_shutting_down_cv =
       static_cast<gpr_cv*>(grpc_core::OnShutdownFree(malloc(sizeof(gpr_cv))));
+```
+
+### Usage example (end-user client/server applications)
+
+```c++
+int main(int argc, char** argv) {
+
+  // use gRPC: grpc_init(), ..., grpc_shutdown(), grpc_init(), ..., grpc_shutdown()
+  
+  grpc_final_shutdown_library();
+  return 0;
+}
 ```
 
 ## Rationale
