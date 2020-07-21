@@ -2,9 +2,9 @@
 ----
 * Author(s): murgatroid99
 * Approver: wenbozhu
-* Status: Draft
+* Status: Final
 * Implemented in: Node.js
-* Last updated: 2020-06-01
+* Last updated: 2020-06-21
 * Discussion at: https://groups.google.com/g/grpc-io/c/FwLprMC-5Qc
 
 ## Abstract
@@ -215,4 +215,4 @@ For example, all Protobuf 3 fields are optional, so the input type allows the us
 
 ## Implementation
 
-I (murgatroid99) will implement this in the `@grpc/proto-loader` library.
+I (murgatroid99) will implement this in the `@grpc/proto-loader` library in [PR #1474](https://github.com/grpc/grpc-node/pull/1474)
