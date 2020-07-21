@@ -28,7 +28,7 @@ N/A
 
 ### cleanup function for public use by end-user client/server applications
 
-Add grpc_final_shutdown_library() which can be called to delete all static-duration objects allocated by the library.
+Add `grpc_final_shutdown_library()` which can be called to delete all static-duration objects allocated by the library.
 There are two reasons you might want to call this:
 
     - You use a draconian definition of "memory leak" in which you expect every
@@ -37,10 +37,13 @@ There are two reasons you might want to call this:
     - You are writing a dynamically-loaded library which needs to
       clean up after itself when the library is unloaded.
 
-Before it's called, the normal cleanup using grpc_shutdown has to be done.  
-grpc_final_shutdown_library() is not a replacement for grpc_shutdown() but can be called after the normal
-cleanup with grpc_shutdown() when using automatic leak-detection at process exit.  
+Before it's called, the normal cleanup using `grpc_shutdown()` has to be done.  
+The library can be (re)initialized and shutdown as often as needed with `grpc_init()`/`grpc_shutdown()`.
+`grpc_final_shutdown_library()` is not a replacement for `grpc_shutdown()` but can be called after the normal
+cleanup with `grpc_shutdown()` when using automatic leak-detection at process exit.  
 If you don't use automatic leak-detection then you don't need to call this function.
+After calling `grpc_final_shutdown_library()` the library cannot be reinitialized again.
+
 
 ```c
 GRPCAPI void grpc_final_shutdown_library(void);
@@ -48,8 +51,8 @@ GRPCAPI void grpc_final_shutdown_library(void);
 
 ### functions for use in the internal implementation of gRPC Core and C++
 
-Add a function grpc_on_shutdown_callback() to register a cleanup callback with no arguments and a function
-grpc_on_shutdown_callback_with_arg() to register a cleanup callback together with a void* argument.
+Add a function `grpc_on_shutdown_callback()` to register a cleanup callback with no arguments and a function
+`grpc_on_shutdown_callback_with_arg()` to register a cleanup callback together with a void* argument.
 
 ```c
 GRPCAPI void grpc_on_shutdown_callback(void (*func)());
@@ -59,7 +62,7 @@ GRPCAPI void grpc_on_shutdown_callback_with_arg(void (*f)(const void*),
 
 ### Add convenience functions OnShutdownDelete, OnShutdownFree.
 
-These functions should take the pointer returned by new/malloc, register the delete/free call and
+These functions should take the pointer returned by `new`/`malloc`, register the `delete`/`free` call and
 transparently return the pointer.
 
 ```c++
@@ -108,15 +111,18 @@ int main(int argc, char** argv) {
 ## Rationale
 
 This approach was chosen because it already works for libprotobuf for many years.
+  
+It minimises the efford for the libary programmer as well as for the library user and
+it is not a breaking change, only one new public function that can be called if needed.
 
 ## Implementation
 
-The core functionality and some OnShutdownDelete/OnShutdownFree calls are implemented in this PR:
+The core functionality and some `OnShutdownDelete`/`OnShutdownFree` calls are implemented in this PR:
 
 https://github.com/grpc/grpc/pull/23362
 
 Any allocation of a static-duration object should now and in the future be wrapped to ensure a
-full cleanup when grpc_final_shutdown_library() is called.
+full cleanup when `grpc_final_shutdown_library()` is called.
 
 ## Open issues (if applicable)
 
