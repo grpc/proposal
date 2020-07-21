@@ -23,39 +23,38 @@ and per priority basis to allow different components of the distributed system
 to be tuned independently. Since gRPC xDS does not support [priority based
 routing](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/http_routing#arch-overview-http-routing-priority), 
 requests to a single upstream cluster conform to the single circuit breaking
-limit.
+configuration.
 
 Envoy handles HTTP traffic with [connection pooling](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/connection_pooling#connection-pooling),
-many circuit breaking limits are configured for connection/connection pool 
-management. Since each gRPC client creates at most one HTTP/2 connection to 
-a single upstream endpoint address, those configurations do not apply to gRPC
-and will be ignored. See more in [Other configurations considered](#other-configurations-considered).
+and many circuit breaking configurations are configured for
+connection/connection pool management. Since each gRPC client creates at most
+one HTTP/2 connection to a single upstream endpoint address, those
+configurations do not apply to gRPC and will be ignored. See more in
+[Other configurations considered](#other-configurations-considered).
 
-As per upstream cluster configurations, circuit breakers will be implemented as
-part of the CDS LB policy in [gRPC client's xDS architecture](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md).
-After the [RouteAction](https://github.com/grpc/proposal/pull/192) is 
-implemented for [traffic splitting and routing](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md),
-each CDS LB policy uniquely represents the load balancing logic for all requests
-sent to the upstream cluster.
+With the introduction of [gRFC A28: xDS Traffic Splitting and Routing](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md), 
+it became possible for there to be more than one CDS LB policy instance for a 
+given cluster (e.g., if one route pointed to a given cluster and a different 
+route split traffic between that cluster and other clusters).  However, after 
+implementing the changes described in [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/pull/192),
+there will be only one CDS LB policy instance for a given cluster, which will
+make the CDS LB policy the logical place to implement circuit breakers.
 
 ## Overview
 
-gRPC client receives circuit breaking configurations as part of the [Cluster](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cluster.proto#cluster) 
-resource configuration in Cluster Discovery Service (CDS) responses. Each
-circuit breaker [Thresholds](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cluster/circuit_breaker.proto#cluster-circuitbreakers-thresholds)
-defines settings for a RoutingPriority. gRPC only takes the first 
-_Thresholds_ with `priority` being [`DEFABUT`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/core/base.proto#enum-core-routingpriority).
+The `Cluster` resource encodes the circuit breaking configuration as a list of
+[Thresholds](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cluster/circuit_breaker.proto#cluster-circuitbreakers-thresholds)
+messages, where each message specifies the limits for a particular 
+RoutingPriority. gRPC will look only at the first entry in the list for 
+priority [`DEFAULT`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/core/base.proto#enum-core-routingpriority).
 
-As of the current gRPC design, only the `max_requests` field, which limits the 
-maximum number of requests that can be outstanding to all hosts in a cluster 
-at any given time, in `Thresholds` is considered. All the others are either 
-inapplicable to gRPC or the corresponding features are missing for now. The
-design and implementation section of this proposal mainly talks about the
-enforcement of the limit for maximum number of outstanding requests sent to
-an upstream cluster. See [Other configurations considered](#other-configurations-considered) 
-for rational.
+Of the configurations in the `Thresholds` message, gRPC will support only
+the `max_requests` configuration, which sets the maximum number of requests 
+that can be in flight to the cluster at any given time.  None of the other 
+configurations are applicable to gRPC; for details, see 
+[Other configurations considered](#other-configurations-considered).
 
-To match Envoy's implementation, circuit breaking limits will always be 
+To match Envoy's implementation, circuit breaking configurations will always be 
 enforced with certain defaults, even if the gRPC client receives no applicable 
 circuit breakers. Users can effectively turn circuit breaking off by setting
 thresholds to very high values, for example, to 
@@ -66,27 +65,27 @@ thresholds to very high values, for example, to
 ### Maintaining thresholds
 
 Each CDS LB policy maintains a threshold for the maximum number of outstanding 
-requests to hosts in the cluster that this policy is load balancing for. Make
-sure this threshold can be updated when receiving an update from the
-XdsClient cluster watch interface and the updated value can be dynamically 
-picked up by request limiting logic. By default, this value is set to 1024.
+requests to hosts in the cluster that this policy is load balancing for. This
+threshold will be updated when receiving an update from the XdsClient cluster 
+watch interface, and the updated value will be dynamically picked up by request
+limiting logic. By default, this value is set to 1024.
 
 ### Limiting outstanding requests
 
-Each CDS LB policy uses a counter to count the number of requests sent through
-the _subchannels_ picked by its _Picker_, which is the output of the CDS LB
-policy. The counter has the same lifecycle as the CDS LB policy. In the _Pick_
-operation, the outputted Picker instance should includes the logic of checking 
-if the counter's value reaches the threshold before delegating the pick to the 
-Picker of downstream LB policies. If the threshold is reached, it returns
-a result that leads to the request being dropped with `UNAVAIABLE` status and
-never gets retried. Also this drop is recorded and aggregated to the 
-`total_dropped_requests` in the cluster-level stats to be reported in
-load reporting via LRS.
+The CDS policy's picker will enforce the configured limit. Each CDS LB policy
+will maintain a counter of the number of requests currently in flight to 
+the associated cluster. The counter will be incremented when a request
+is started on a subchannel and decremented when the request is complete. 
+When the picker is going to start a call, it will check whether the current
+number of in-flight requests is lower than the configured limit. If so, the 
+picker will do the pick as usual, returning a subchannel. If not, it will 
+fail the call with status UNAVAILABLE. Such failed calls will not be retried,
+while they will be recorded to the total dropped requests counts and reported
+to the load reporting server.
 
 The counter is incremented when creating the stream for the request and 
 decremented the stream is closed. A general implementation can increment the
-counter at the _Pick_ operation of the outputted Picker for the case the 
+counter at the _Pick_ operation of the outputted picker for the case the 
 threshold is not reached. The callback of stream closed takes the 
 responsibility of decrementing the counter. Each language may have its own
 mechanism for tracking stream created/closed (e.g., in Java it has 
@@ -114,6 +113,10 @@ outstanding requests.
 policy with the logic of checking the counter and make pick decision.
 - Counter manipulation is done in `ClientStreamTracer`/`Factory`: increment
 in `newClientStreamTracer()` and decrement in `streamClosed()`.
+    - Note there will be check-and-allocate race as the pick method and stream
+    tracer are not run by the same thread. This will cause the threshold to
+    be exceeded. Since the race window is small, the value should be exceeded 
+    only by a small amount.
 
 ### C
 TODO
@@ -123,9 +126,9 @@ TODO
 
 ## Other configurations considered
 
-There are other configurations in the xDS circuit breakers, most of them do not
-apply to gRPC's use case and they will be ignored in the implementation. The
-following configurations have been considered:
+There are other configurations in the xDS circuit breakers, but most of them
+do not apply to gRPC's use case, and they will be ignored in the implementation.
+The following configurations have been considered:
 
 - `max_connections`: the maximum number of connections can be created to an 
 upstream cluster.
@@ -137,9 +140,10 @@ upstream cluster.
 - `max_pending_requests`: the maximum number of requests that will be queued
 while waiting for a connection to be established.
     - gRPC's _wait-for-ready_ semantics intend to avoid failing RPCs 
-    prematurely before a connection becomes available, requests are intended to
-    be buffered indefinitely when wait-for-ready feature is enabled. Dropping
-    queued requests conflicts with the usage of wait-for-ready.
+    prematurely before a connection becomes available, and requests are 
+    intended to be buffered indefinitely when wait-for-ready feature is
+    enabled. Dropping queued requests conflicts with the usage of
+    wait-for-ready.
     
 - `max_retries`: retry related configuration, the retry feature has not been 
 implemented in gRPC xDS.
