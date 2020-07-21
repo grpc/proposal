@@ -135,4 +135,3 @@ gRPC.
 
 Some of the above parameters may be reconsidered for gRPC xDS circuit
 breaking after we get more feedback and inquiries.
-
