@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
 
 This approach was chosen because it already works for libprotobuf for many years.
   
-It minimises the efford for the libary programmer as well as for the library user and
+It minimises the effort for the library programmer as well as for the library user and
 it is not a breaking change, only one new public function that can be called if needed.
 
 ## Implementation
