@@ -65,21 +65,27 @@ constructing a `ManagedChannelBuilder':
 
 ```java
 // instead of:
-ManagedChannelBuilder.forTarget("example.com")
-                     .build();
-ManagedChannelBuilder.forTarget("example.com").usePlaintext()
-                     .build();
+channel = ManagedChannelBuilder.forTarget("example.com")
+    .build();
+channel = ManagedChannelBuilder.forTarget("example.com").usePlaintext()
+    .build();
+channel = ManagedChannelBuilder.forAddress("example.com", 443)
+    .build();
 // the user would now:
-ManagedChannel.newBuilderForTarget("example.com", new TlsChannelCredentials())
-                     .build();
-ManagedChannel.newBuilderForTarget("example.com", new InsecureChannelCredentials())
-                     .build();
+channel = Grpc.newChannelBuilder("example.com", new TlsChannelCredentials())
+    .build();
+channel = Grpc.newChannelBuilder("example.com", new InsecureChannelCredentials())
+    .build();
+channel = Grpc.newChannelBuilderForAddress("example.com", 443, new TlsChannelCredentials())
+    .build();
 ```
 
-`newBuilderForTarget()` will iterate through the `ManagedChannelProviders`
+`newChannelBuilder()` will iterate through the `ManagedChannelProviders`
 trying to create a builder for each in turn. The first provider that succeeds
 will be used. If no provider is able to handle the credentials, then
-`newBuilderForTarget()` will throw.
+`newChannelBuilder()` will throw. `newChannelBuilderForAddress()` will be a
+convenience function that creates the target string and calls
+`newChannelBuilder()`, mirroring its current behavior.
 
 The new ChannelCredentials API cannot be mixed with the pre-existing
 `useTransportSecurity()` and `usePlaintext()` builder APIs. The old-style
@@ -393,11 +399,6 @@ additional configuration. ServerCredentials will be implemented shortly after
 ServerCredentials.
 
 ## Open issues (if applicable)
-
-Do we put the constructor in ManagedChannel instead of ManagedChannelBuilder?
-On io.grpc.Grpc? The static methods on ManagedChannelBuilder have been a
-problem, as they are exposed on all subclasses, but don’t operate within the
-scope of the subclass, unless they do.
 
 It would be very convenient to be able to share the TlsChannelCredential API on
 server-side, as it is quite a wide API and _almost_ the same. The consumer
