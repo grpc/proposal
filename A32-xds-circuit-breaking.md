@@ -44,7 +44,7 @@ make the CDS LB policy the logical place to implement circuit breakers.
 
 The `Cluster` resource encodes the circuit breaking parameters in a list of
 [Thresholds](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/cluster/circuit_breaker.proto#cluster-circuitbreakers-thresholds)
-messages, where each message specifies the limits for a particular 
+messages, where each message specifies the parameters for a particular 
 RoutingPriority. gRPC will look only at the first entry in the list for 
 priority [`DEFAULT`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/core/base.proto#enum-core-routingpriority).
 
@@ -58,20 +58,16 @@ application of the `max_requests` circuit breaking parameter in gRPC.
 To match Envoy's implementation, circuit breaking parameters will always be 
 enforced with certain defaults, even if the gRPC client receives no applicable 
 circuit breakers. Users can effectively turn circuit breaking off by setting
-thresholds to very high values, for example, to 
+limits to very high values, for example, to 
 `std::numeric_limits<uint32_t>::max()`.
 
 ## Detailed design
 
-### Maintaining thresholds
-
-Each CDS LB policy maintains a threshold for the maximum number of outstanding 
-requests to hosts in the cluster that this policy is load balancing for. This
-threshold will be updated when receiving an update from the XdsClient cluster 
-watch interface, and the updated value will be dynamically picked up by request
-limiting logic. By default, this value is set to 1024.
-
-### Limiting outstanding requests
+Each CDS LB policy maintains a configured limit for the maximum number of 
+outstanding requests to hosts in the cluster that this policy is load balancing
+for. This limit will be updated when receiving an update from the XdsClient
+cluster watch interface, and the updated value will be dynamically picked up 
+by request limiting logic. By default, this value is set to 1024.
 
 The CDS policy's picker will enforce the configured limit. Each CDS LB policy
 will maintain a counter of the number of requests currently in flight to 
@@ -94,7 +90,7 @@ EDS policy with the logic of checking the counter and make pick decision.
 - Counter manipulation is done in `ClientStreamTracer`/`Factory`: increment
 in `newClientStreamTracer()` and decrement in `streamClosed()`.
     - Note there will be check-and-allocate race as the pick method and stream
-    tracer are not run by the same thread. This will cause the threshold to
+    tracer are not run by the same thread. This will cause the limit to
     be exceeded. Since the race window is small, the value should be exceeded 
     only by a small amount.
 
