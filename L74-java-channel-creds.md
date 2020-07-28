@@ -381,6 +381,7 @@ public final class TlsServerCredentials extends ServerCredentials {
    */
   public TlsServerCredentials(File certChain, File privateKey)
       throws IOException {...}
+  // Will not auto-close InputStream, unlike existing transportSecurity()
   public TlsServerCredentials(InputStream certChain, InputStream privateKey)
       throws IOException {...}
 
