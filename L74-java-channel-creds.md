@@ -342,11 +342,76 @@ Server-side will be a clone of client-side, but using the `Server` instead of
 `CompositeServerCredentials` will be omitted. There is also currently no known
 use-case for `ChoiceServerCredentials`, so it will be omitted.
 
+```java
+// instead of:
+server = ServerBuilder.forPort(443)
+    .useTransportSecurity(new File("cert.pem"), new File("cert.key"))
+    .build().start();
+server = ServerBuilder.forPort(8080)
+    .build().start();
+// the user would now:
+ChannelCredentials tlsCreds = new TlsServerCredentials(
+    new File("cert.pem"), new File("cert.key"));
+server = Grpc.newServerBuilderForPort(443, tlsCreds)
+    .build().start();
+server = Grpc.newServerBuilderForPort(8080, new InsecureChannelCredentials())
+    .build().start();
+```
+
 
 ```java
 package io.grpc;
 
 public abstract class ServerCredentials {}
+```
+
+Since servers using TLS require a certificate, the `TlsServerCredentials`
+cannot have the simple no-arg configuration of `TlsChannelCredentials`. It will
+provide convenience constructors for providing a certificate and unencrypted
+key. If any other configuration is necessary, the `Builder` would be used.
+
+```java
+package io.grpc;
+
+public final class TlsServerCredentials extends ServerCredentials {
+  /**
+   * Creates an instance using provided certificate chain and private key.
+   * Generally they should be PEM-encoded and the key is an unencrypted PKCS#8
+   * key (file headers have "BEGIN CERTIFICATE" and "BEGIN PRIVATE KEY").
+   */
+  public TlsServerCredentials(File certChain, File privateKey)
+      throws IOException {...}
+  public TlsServerCredentials(InputStream certChain, InputStream privateKey)
+      throws IOException {...}
+
+  /** Same as client-side */
+  public Set<Feature> incomprehensible(EnumSet<Feature> understoodFeatures) {...}
+
+  public byte[] getCertificateChain() { return Arrays.copyOf(...); }
+  public byte[] getPrivateKey() { return Arrays.copyOf(...); }
+  public String getPassword() {...}
+
+  /* Other methods can be added to support various Features */
+
+  public enum Feature {}
+
+  public static Builder newBuilder() { return new Builder(); }
+
+  public final static class Builder {
+    public Builder keyManager(File certChain, File privateKey)
+        throws IOException {...}
+    public Builder keyManager(File certChain, File privateKey, String password)
+        throws IOException {...}
+    public Builder keyManager(InputStream certChain, InputStream privateKey)
+        throws IOException {...}
+    public Builder keyManager(
+        InputStream certChain, InputStream privateKey, String password)
+        throws IOException {...}
+
+    // Throws if no certificate was provided
+    public TlsChannelCredentials build() {...}
+  }
+}
 ```
 
 ## Rationale
