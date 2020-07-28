@@ -77,8 +77,8 @@ When the picker is going to start a call, it will check whether the current
 number of in-flight requests is lower than the configured limit. If so, the 
 picker will do the pick as usual, returning a subchannel. If not, it will 
 fail the call with status UNAVAILABLE. Such failed calls will not be retried,
-but they will be recorded to the `total_dropped_requests` counts and reported
-to the load reporting server.
+but they will be recorded to the `total_dropped_requests` counts in 
+cluster-level load reports and reported to the load reporting server.
 
 ## Implementation
 
