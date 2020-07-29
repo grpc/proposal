@@ -30,7 +30,6 @@ the problem, as it could impact performance for all gRPC users, increase our API
 surface, and grow our code base for features we otherwise do not intend to
 implement.
 
-
 ## Proposal
 
 This proposal is broken up into two sections: the addition of new functionality
@@ -89,17 +88,22 @@ is chosen for an RPC, retry attempts will only use this cluster.  This matches
 Envoy behavior, and also supersedes the behavior specified in [gRFC
 A28](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md).
 
-Because routing is happening in the Config Selector, the "xds_routing" Load
-Balancing Policy will no longer be needed.  Instead, the top-level Load
-Balancing Policy will be named "xds_cluster_manager", and will be a simple
-aggregator of child "cds" Load Balancing Policies.  The Load Balancing Config
-provided by the Resolver will be a [JSON
-representation](developers.google.com/protocol-buffers/docs/proto3#json) of the
-following proto message:
+Because routing is happening in the Config Selector, the "xds_routing"
+Load Balancing Policy will no longer be needed.  Instead, the
+top-level Load Balancing Policy will be named
+"xds_cluster_manager_experimental", and will be a simple aggregator of
+child "cds" Load Balancing Policies, although the config format allows
+for other types of child Load Balancing Policies for future-proofing.
+The Load Balancing Config provided by the Resolver will be a [JSON
+representation](developers.google.com/protocol-buffers/docs/proto3#json)
+of the following proto message:
 
 ```proto
-message XDSClusterManager {
-    repeated CDSConfig cds_config = 1;
+message XDSClusterManagerConfig {
+    message Child {
+      repeated LoadBalancingConfig child_policy = 1;
+    }
+    map<string, Child> children = 1;
 }
 ```
 
@@ -169,9 +173,11 @@ maximum RPC timeout for this route, with a default of 15s.
 
 If `max_grpc_timeout` is present, then `timeout` is ignored and
 `max_grpc_timeout` limits the maximum timeout for RPCs on this route.  A value
-of 0 indicates no limit should be applied.  In all cases, the RPC timeout set by
-the application may never be exceeded due to these settings.  For examples, see
-the following table:
+of 0 indicates no limit should be applied.
+
+In all cases, the RPC timeout set by the application may never be
+exceeded due to these settings.  For examples, see the following
+table:
 
 Application Deadline | `max_grpc_timeout` | `timeout` | Effective Timeout
 -------------------- | ------------------ | --------- | -----------------
