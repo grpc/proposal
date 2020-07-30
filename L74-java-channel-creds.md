@@ -201,6 +201,13 @@ public final class TlsChannelCredentials extends ChannelCredentials {
 }
 ```
 
+An example `Feature` could be `CLIENT_CERTIFICATE`. When the `Feature` is
+added, methods `getCertificateChain()`, `getPrivateKey()`, `getPassword()` can
+be added. Observing the contents of those methods would be a requirement for
+`CLIENT_CERTIFICATE`. An implementation understanding `CLIENT_CERTIFICATE`
+might not support encrypted private keys and so could consider the credential
+unsupported if `getPassword()` returned non-`null`.
+
 To support very advanced use cases, Netty will provide a credential that wraps
 a `ProtocolNegotiator`. This allows implementations like ALTS and XDS to use
 internal APIs without forcing their users to use experimental or internal APIs,
