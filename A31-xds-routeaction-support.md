@@ -169,7 +169,7 @@ so supporting it directly in the client is unnecessary and would be
 counter-productive.
 
 If `max_grpc_timeout` is not present, the `timeout` field will specify the
-maximum RPC timeout for this route, with a default of 15s.
+maximum RPC timeout for this route, with a default of 15s.  A value of 0 indicates no limit should be applied.
 
 If `max_grpc_timeout` is present, then `timeout` is ignored and
 `max_grpc_timeout` limits the maximum timeout for RPCs on this route.  A value
@@ -183,6 +183,7 @@ Application Deadline | `max_grpc_timeout` | `timeout` | Effective Timeout
 -------------------- | ------------------ | --------- | -----------------
 unset | unset | unset | 15s
 unset | unset | 10s | 10s
+unset | unset | 0s | infinite
 unset | 0s | any | infinite
 unset | 10s | any | 10s
 10s | unset | unset | 10s
