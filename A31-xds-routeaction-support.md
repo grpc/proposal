@@ -168,8 +168,13 @@ timeout is reached before the gRPC client cancels the RPC due to its deadline,
 so supporting it directly in the client is unnecessary and would be
 counter-productive.
 
-If `max_grpc_timeout` is not present, the `timeout` field will specify the
-maximum RPC timeout for this route, with a default of 15s.  A value of 0 indicates no limit should be applied.
+If `max_grpc_timeout` is not present, the `timeout` field will specify
+the maximum RPC timeout for this route, with a default of 15s.  A
+value of 0 indicates no limit should be applied.  **NOTE: in Envoy the
+timeout begins after the client sends end-of-stream to the server.  In
+gRPC we will begin from the start of the RPC.  This difference could
+result in unexpected timeouts for streaming RPCs or RPCs in which the
+client sends a very large request.**
 
 If `max_grpc_timeout` is present, then `timeout` is ignored and
 `max_grpc_timeout` limits the maximum timeout for RPCs on this route.  A value
