@@ -188,8 +188,12 @@ public final class TlsChannelCredentials extends ChannelCredentials {
    *
    * <p>An empty set does not imply that the credentials are fully understood.
    * There may be optional configuration that can be ignored if not understood.
+   *
+   * <p>Since {@code Feature} is an {@code enum}, {@code understoodFeatures}
+   * should generally be an {@link EnumSet}. {@code understoodFeatures} will not
+   * be modified.
    */
-  public Set<Feature> incomprehensible(EnumSet<Feature> understoodFeatures) {...}
+  public Set<Feature> incomprehensible(Set<Feature> understoodFeatures) {...}
 
   /* Other methods can be added to support various Features */
 
@@ -393,7 +397,7 @@ public final class TlsServerCredentials extends ServerCredentials {
       throws IOException {...}
 
   /** Same as client-side */
-  public Set<Feature> incomprehensible(EnumSet<Feature> understoodFeatures) {...}
+  public Set<Feature> incomprehensible(Set<Feature> understoodFeatures) {...}
 
   public byte[] getCertificateChain() { return Arrays.copyOf(...); }
   public byte[] getPrivateKey() { return Arrays.copyOf(...); }
