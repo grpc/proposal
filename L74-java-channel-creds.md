@@ -108,9 +108,9 @@ package io.grpc;
  * possible configurations for types that are partially supported, but they
  * <em>must</em> at least fully support ChoiceChannelCredentials.
  *
- * <p>A Credential provides client identity and authenticates the server. This
- * is different from CallCredentials, which only provides client identity. They
- * can also influence types of encryption used and similar security
+ * <p>A ChannelCredential provides client identity and authenticates the server.
+ * This is different from CallCredentials, which only provides client identity.
+ * They can also influence types of encryption used and similar security
  * configuration.
  */
 public abstract class ChannelCredentials {}
@@ -123,7 +123,7 @@ public final class TlsChannelCredentials extends ChannelCredentials {
 public final class InsecureChannelCredentials extends ChannelCredentials {}
 
 /**
-  * Provides a list of ChoiceChannelCredentials, where any one may be used. The
+  * Provides a list of ChannelCredentials, where any one may be used. The
   * credentials are in preference order.
   */
 public final class ChoiceChannelCredentials extends ChannelCredentials {
@@ -195,7 +195,7 @@ public final class TlsChannelCredentials extends ChannelCredentials {
 
   public enum Feature {}
 
-  public final static class Builder {
+  public static final class Builder {
     public TlsChannelCredentials build() {...}
   }
 }
