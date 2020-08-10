@@ -32,14 +32,6 @@ one HTTP/2 connection to a single upstream endpoint address, those
 parameters do not apply to gRPC and will be ignored. See more in
 [Other parameters considered](#other-parameters-considered).
 
-With the introduction of [gRFC A28: xDS Traffic Splitting and Routing](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md), 
-it became possible for there to be more than one CDS LB policy instance for a 
-given cluster (e.g., if one route pointed to a given cluster and a different 
-route split traffic between that cluster and other clusters).  However, after 
-implementing the changes described in [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/pull/192),
-there will be only one CDS LB policy instance for a given cluster, which will
-make the CDS LB policy the logical place to implement circuit breakers.
-
 ## Overview
 
 The `Cluster` resource encodes the circuit breaking parameters in a list of
@@ -63,14 +55,28 @@ limits to very high values, for example, to
 
 ## Detailed design
 
-Each CDS LB policy maintains a configured limit for the maximum number of 
-outstanding requests to hosts in the cluster that this policy is load balancing
-for. This limit will be updated when receiving an update from the XdsClient
-cluster watch interface, and the updated value will be dynamically picked up 
-by request limiting logic. By default, this value is set to 1024.
+With the introduction of [gRFC A28: xDS Traffic Splitting and Routing](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md), 
+it became possible for there to be more than one CDS LB policy instance for a 
+given cluster (e.g., if one route pointed to a given cluster and a different 
+route split traffic between that cluster and other clusters).  However, after 
+implementing the changes described in [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/pull/192),
+there will be only one CDS LB policy instance for a given cluster at any time
+in the LB policy tree. Since each CDS LB policy creates exactly one child EDS
+LB policy for endpoint discovery, both of them are part of the load balancing
+logic for requests sent to the specific cluster. Circuit breakers can be 
+implemented in either policies. In order to easily record and report requests 
+dropped by circuit breakers, we will implement circuit breaking in EDS LB
+policy.
 
-The CDS policy's picker will enforce the configured limit. Each CDS LB policy
-will maintain a counter of the number of requests currently in flight to 
+Each CDS LB policy will receive a configured limit for the maximum number of 
+outstanding requests to hosts in the cluster that this policy is load balancing
+for from the XdsClient cluster watch interface. This limit will be included in
+the LB config passed to its child EDS LB policy. The EDS LB policy will use
+this limit as the upper bound for the maximum number of in-flight requests
+it allows to send. By default, this value is set to 1024.
+
+The EDS policy's picker will enforce the configured limit. Each EDS LB policy
+will maintain a counter for the number of requests currently in flight to 
 the associated cluster. The counter will be incremented when a request
 is started on a subchannel and decremented when the request is complete. 
 When the picker is going to start a call, it will check whether the current
@@ -80,13 +86,21 @@ fail the call with status UNAVAILABLE. Such failed calls will not be retried,
 but they will be recorded to the `total_dropped_requests` counts in 
 cluster-level load reports and reported to the load reporting server.
 
+Note an EDS LB policy may be responsible for handling `service_name` switch
+used for endpoint discovery, requests sent to both the old and new services
+should be aggregated to the same counter and the total is restricted by the
+configured limit. Even though the failed requests will be recorded and reported
+in separate stats message.
+
 ## Implementation
 
 ### Java
-- Maintain a counter in the CDS LB policy for counting the number of 
+- Add a `max_requests` field in the EDS LB config. The value will be taken
+from the cluster watch interface pushed by the XdsClient.
+- Maintain a counter in the EDS LB policy for counting the number of 
 outstanding requests.
-- In CDS LB policy, wrap the `SubchannelPicker` propagated from its child 
-EDS policy with the logic of checking the counter and make pick decision.
+- Wrap the `SubchannelPicker` propagated from each of EDS policy's child LB 
+policy with the logic of checking the counter and make pick decision.
 - Counter manipulation is done in `ClientStreamTracer`/`Factory`: increment
 in `newClientStreamTracer()` and decrement in `streamClosed()`.
     - Note there will be check-and-allocate race as the pick method and stream
