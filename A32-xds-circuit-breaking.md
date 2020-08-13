@@ -64,9 +64,9 @@ there will be only one CDS LB policy instance for a given cluster at any time
 in the LB policy tree. Since each CDS LB policy creates exactly one child EDS
 LB policy for endpoint discovery, both of them are part of the load balancing
 logic for requests sent to the specific cluster. Circuit breakers can be 
-implemented in either policy. In order to easily record and report requests 
-dropped by circuit breakers, we will implement circuit breaking in EDS LB
-policy.
+implemented in either policy. Since cluster load assignment drops are handled 
+in EDS LB policy, it makes sense to handle circuit breaking drops in the same
+place.
 
 Each CDS LB policy will receive a configured limit for the maximum number of 
 outstanding requests to hosts in the cluster that this policy is load balancing
