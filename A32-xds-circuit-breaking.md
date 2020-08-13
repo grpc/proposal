@@ -64,16 +64,32 @@ there will be only one CDS LB policy instance for a given cluster at any time
 in the LB policy tree. Since each CDS LB policy creates exactly one child EDS
 LB policy for endpoint discovery, both of them are part of the load balancing
 logic for requests sent to the specific cluster. Circuit breakers can be 
-implemented in either policies. In order to easily record and report requests 
+implemented in either policy. In order to easily record and report requests 
 dropped by circuit breakers, we will implement circuit breaking in EDS LB
 policy.
 
 Each CDS LB policy will receive a configured limit for the maximum number of 
 outstanding requests to hosts in the cluster that this policy is load balancing
-for from the XdsClient cluster watch interface. This limit will be included in
-the LB config passed to its child EDS LB policy. The EDS LB policy will use
-this limit as the upper bound for the maximum number of in-flight requests
-it allows to send. By default, this value is set to 1024.
+for from the XdsClient cluster watch interface. A default value of 1024 is used
+if no such limit is specified by the management server. This limit will be 
+included in the LB config passed to its child EDS LB policy. The EDS LB config 
+will become
+
+```proto
+message EdsLoadBalancingPolicyConfig {
+  string cluster = 1;
+  string eds_service_name = 2;
+  google.protobuf.String lrs_load_reporting_server_name = 3;
+  repeated LoadBalancingConfig locality_picking_policy = 4;
+  repeated LoadBalancingConfig endpoint_picking_policy = 5;
+  
+  // Maximum number of outstanding requests can be made to the upstream cluster.
+  int32 max_requests = 6;
+}
+```
+
+The EDS LB policy will use this limit as the upper bound for the maximum number
+of in-flight requests it allows to send.
 
 The EDS policy's picker will enforce the configured limit. Each EDS LB policy
 will maintain a counter for the number of requests currently in flight to 
@@ -95,8 +111,6 @@ in separate stats message.
 ## Implementation
 
 ### Java
-- Add a `max_requests` field in the EDS LB config. The value will be taken
-from the cluster watch interface pushed by the XdsClient.
 - Maintain a counter in the EDS LB policy for counting the number of 
 outstanding requests.
 - Wrap the `SubchannelPicker` propagated from each of EDS policy's child LB 
