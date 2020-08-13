@@ -153,7 +153,8 @@ public final class ChoiceChannelCredentials extends ChannelCredentials {
 }
 ```
 
-`ChoiceChannelCredentials` is intended to be used in cases like
+`ChoiceChannelCredentials` allows code to use new credentials in the future without
+risk of breaking the existing code flow. It can also be used in cases like
 `GoogleDefaultCredentials`, where TLS may be satisfactory, but there may also
 be more optimal credentials if the transport is a certain type.
 
@@ -388,8 +389,7 @@ final class ProtocolNegotiators {
 
 Server-side will be a clone of client-side, but using the `Server` instead of
 `Channel`. `ServerCredentials` cannot contain `CallCredentials`, so
-`CompositeServerCredentials` will be omitted. There is also currently no known
-use-case for `ChoiceServerCredentials`, so it will be omitted.
+`CompositeServerCredentials` will be omitted.
 
 ```java
 // instead of:
