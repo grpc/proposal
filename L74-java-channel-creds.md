@@ -516,6 +516,15 @@ are set. Keeping track of which features were available at each version can be
 error-prone. It's also hard to produce a user-meaningful error message, so they
 are aware of which specific configuration is causing the incompatibility.
 
+It would seems to be very convenient to be able to share the
+TlsChannelCredential API on server-side, as it is quite a wide API and _almost_
+the same. However, on deeper inspection only the trust and key management is
+likely to be the same. This is partly because not _all_ the TLS configuration is
+expected to be exposed, and instead advanced use cases would use
+transport-specific configuration or potentially "all encompassing" configuration
+like providing a pre-configured SSLContext. Using separate APIs makes the APIs
+more clear and would have limited cost.
+
 ## Implementation
 
 ejona86 will implement. TLS will initially be bare-bones, with just the
@@ -525,13 +534,4 @@ ServerCredentials.
 
 ## Open issues (if applicable)
 
-It would be very convenient to be able to share the TlsChannelCredential API on
-server-side, as it is quite a wide API and _almost_ the same. The consumer
-would need to be slightly different, but much of the configuration can
-potentially be shared. Should we make TlsChannelCredential and
-TlsServerCredential just a holder for a TlsConfiguration class? For validation,
-it would need to know whether it was for server-side or client-side. It would
-also have the union of all client- and server-specific configuration. See
-[Netty's SslContextBuilder](
-https://netty.io/4.1/api/io/netty/handler/ssl/SslContextBuilder.html)
-for a view into how client and server differ.
+N/A
