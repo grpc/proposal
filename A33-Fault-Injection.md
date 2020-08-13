@@ -5,7 +5,7 @@ Client-Side Fault Injection
 * Status: In Review
 * Implemented in: all languages
 * Last updated: August 13th, 2020
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/d9dI5Hy9zzk
 
 ## Abstract
 
