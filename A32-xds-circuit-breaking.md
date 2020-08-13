@@ -130,9 +130,11 @@ TODO
 
 ## Other parameters considered
 
-There is a group of other parameters in the xDS circuit breakers, but most of
-them do not apply to gRPC's use case, and they will be ignored in the 
-implementation. The following parameters have been considered:
+There is a group of other parameters in the xDS circuit breakers, but they
+are either infeasible for gRPC's use case or having extraordinary 
+implementation complexity based on current gRPC architecture. They will be 
+ignored at the moment and to be reevaluated after we get more inquiries. 
+The following parameters have been considered:
 
 - `max_connections`: the maximum number of connections can be created to an 
 upstream cluster.
@@ -143,9 +145,11 @@ upstream cluster.
     case.
 - `max_pending_requests`: the maximum number of requests that will be queued
 while waiting for a connection to be established.
-    - As a proxy, Envoy drops queued requests from downstream entities to avoid
-    unbounded congestion and memory usage of the process. But as part of the
-    application, it makes little sense for gRPC to drop its own requests.
+    - There are some difficulties in integrating this limit with other existing
+     gRPC features. For example, a buffered request may be removed upon hitting
+     its deadline but there is no way to have the xDS plugin know this. It may
+     need a significant amount of changes for gRPC to support this and it is not
+     clear that the benefit is enough to justify the cost at this point.
 - `max_retries`: retry related parameter, the retry feature has not been 
 implemented in gRPC xDS.
 - `max_budget`: retry related parameter, the retry feature has not been 
@@ -156,6 +160,3 @@ architecture, will reconsider after getting usage feedback.
 - `max_requests_per_connection` (in `Cluster` configuration): lifetime limit 
 of maximum requests for a single upstream connection. No valuable use case for
 gRPC.
-
-Some of the above parameters may be reconsidered for gRPC xDS circuit
-breaking after we get more feedback and inquiries.
