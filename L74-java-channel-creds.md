@@ -530,7 +530,7 @@ more clear and would have limited cost.
 ejona86 will implement. TLS will initially be bare-bones, with just the
 compatibility checker. Over the long-term TLS will be fleshed out with
 additional configuration. ServerCredentials will be implemented shortly after
-ServerCredentials.
+ChannelCredentials.
 
 ## Open issues (if applicable)
 
