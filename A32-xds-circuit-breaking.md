@@ -113,8 +113,8 @@ in separate stats message.
 ### Java
 - Maintain a counter in the EDS LB policy for counting the number of 
 outstanding requests.
-- Wrap the `SubchannelPicker` propagated from each of EDS policy's child LB 
-policy with the logic of checking the counter and make pick decision.
+- Add the logic of enforcing `max_request` limit in wrapping the 
+`SubchannelPicker` propagated from each of EDS policy's child LB policy.
 - Counter manipulation is done in `ClientStreamTracer`/`Factory`: increment
 in `newClientStreamTracer()` and decrement in `streamClosed()`.
     - Note there will be check-and-allocate race as the pick method and stream
