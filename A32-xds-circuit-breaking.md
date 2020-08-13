@@ -143,6 +143,10 @@ upstream cluster.
     overflowed. On the other hand, gRPC creates at most one connection to each
     host. So this parameter does not have effective meaning in gRPC's use
     case.
+- `max_connection_pools`: gRPC does not use connection pooling.
+- `max_requests_per_connection` (in `Cluster` configuration): lifetime limit 
+of maximum requests for a single upstream connection. No valuable use case for
+gRPC at this point.
 - `max_pending_requests`: the maximum number of requests that will be queued
 while waiting for a connection to be established.
     - There are some difficulties in integrating this limit with other existing
@@ -150,13 +154,9 @@ while waiting for a connection to be established.
      its deadline but there is no way to have the xDS plugin know this. It may
      need a significant amount of changes for gRPC to support this and it is not
      clear that the benefit is enough to justify the cost at this point.
+- `connect_timeout` (in `Cluster` configuration): implementation may require
+transport layer change, will reconsider after getting usage feedback.
 - `max_retries`: retry related parameter, the retry feature has not been 
 implemented in gRPC xDS.
 - `max_budget`: retry related parameter, the retry feature has not been 
 implemented in gRPC xDS.
-- `max_connection_pools`: gRPC does not use connection pooling.
-- `connect_timeout` (in `Cluster` configuration): hard to implement in gRPC's 
-architecture, will reconsider after getting usage feedback.
-- `max_requests_per_connection` (in `Cluster` configuration): lifetime limit 
-of maximum requests for a single upstream connection. No valuable use case for
-gRPC.
