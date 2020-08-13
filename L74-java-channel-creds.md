@@ -95,7 +95,7 @@ Note that this new API does not allow: 1) creating a channel without a
 credential and supplying the credential later and 2) changing the credential
 after creating the builder. This is not expected to be much of an issue as
 users typically have the security information available before creating the
-builder and reusing a builder is rare, especially to change the security. 
+builder and reusing a builder is rare, especially to change the security.
 
 ```java
 package io.grpc;
@@ -112,22 +112,42 @@ package io.grpc;
  * This is different from CallCredentials, which only provides client identity.
  * They can also influence types of encryption used and similar security
  * configuration.
+ *
+ * The concrete credential type should not be relevant to most users of the API
+ * and may be an implementation decision. Users should generally use the {@code
+ * ChannelCredentials} type for variables instead of the concrete type.
+ * Freshly-constructed credentials should be returned as {@code
+ * ChannelCredentials} instead of a concrete type to encourage this pattern.
+ * Concrete types would only be used after {@code instanceof} checks (which must
+ * consider {@code ChoiceChannelCredentials}!).
  */
 public abstract class ChannelCredentials {}
 
 public final class TlsChannelCredentials extends ChannelCredentials {
+  public static ChannelCredentials create() {...}
+
   /* Complicated. Described separately below. */
 }
 
 /** No client identity, authentication, or encryption is to be used. */
-public final class InsecureChannelCredentials extends ChannelCredentials {}
+public final class InsecureChannelCredentials extends ChannelCredentials {
+  private InsecureChannelCredentials() {}
+
+  public ChannelCredentials create() {
+    return new InsecureChannelCredentials();
+  }
+}
 
 /**
   * Provides a list of ChannelCredentials, where any one may be used. The
   * credentials are in preference order.
   */
 public final class ChoiceChannelCredentials extends ChannelCredentials {
-  public ChoiceChannelCredentials(ChannelCredentials... creds) {...}
+  private ChoiceChannelCredentials(ChannelCredentials... creds) {...}
+
+  public static ChannelCredentials create(ChannelCredentials... creds) {
+    return new ChoiceChannelCredentials(creds);
+  }
 
   public List<ChannelCredentials> getCredentialsList() { return creds; }
 }
@@ -146,8 +166,12 @@ the behavior in other languages.
 package io.grpc;
 
 public final class CompositeChannelCredentials extends ChannelCredentials {
-  public CompositeChannelCredentials(
+  private CompositeChannelCredentials(
     ChannelCredentials chanCreds, CallCredentials callCreds) {...}
+  public static ChannelCredentials create(
+      ChannelCredentials chanCreds, CallCredentials callCreds) {
+    return new CompositeChannelCredentials(chanCreds, callCreds);
+  }
   public ChannelCredentials getChannelCredentials() { return channelCredentials; }
   public CallCredentials getCallCredentials() { return callCredentials; }
 }
@@ -169,6 +193,13 @@ be used.
 package io.grpc;
 
 public final class TlsChannelCredentials extends ChannelCredentials {
+  private TlsChannelCredentials(Builder builder) {...}
+
+  /** Use TLS with its defaults. */
+  public static ChannelCredentials create() { return newBuilder().build(); }
+
+  public static Builder newBuilder() { return new Builder(); }
+
   /**
    * Returns an empty set if this credential can be adequately understood via
    * the features listed, otherwise returns a hint of features that are lacking
@@ -200,7 +231,7 @@ public final class TlsChannelCredentials extends ChannelCredentials {
   public enum Feature {}
 
   public static final class Builder {
-    public TlsChannelCredentials build() {...}
+    public ChannelCredentials build() {...}
   }
 }
 ```
@@ -221,16 +252,23 @@ as their users would just interact with `ChannelCredentials`.
 package io.grpc.netty;
 
 final class NettyChannelCredentials extends ChannelCredentials {
-  public NettyChannelCredentials(ProtocolNegotiator.Factory negotiator) {...}
+  private NettyChannelCredentials(ProtocolNegotiator.Factory negotiator) {...}
+
+  public static ChannelCredentials create(ProtocolNegotiator.Factory negotiator) {
+    return new NettyChannelCredentials(negotiator);
+  }
+
   public ProtocolNegotiator.Factory getNegotiator() { return negotiator; }
 }
 
 @Internal
 public final class InternalNettyChannelCredentials {
-  private InternalNettyChannelCredentials() {}
+  private InternalNettyChannelCredentials() {} // prevent instantiation
 
-  public ChannelCredentials create(InternalProtocolNegotiator.Factory negotiator)
-    {...}
+  public static ChannelCredentials create(
+      InternalProtocolNegotiator.Factory negotiator) {
+    return NettyChannelCredentials.create(negotiator);
+  }
 
   /**
    * Converts credentials to a negotiator, in similar fashion as for a new
@@ -238,8 +276,8 @@ public final class InternalNettyChannelCredentials {
    *
    * @throws IllegalArgumentException if unable to convert
    */
-  public InternalProtocolNegotiator.Factory toNegotiator(ChannelCredentials creds)
-    {...}
+  public static InternalProtocolNegotiator.Factory toNegotiator(
+    ChannelCredentials creds) {...}
 }
 ```
 
@@ -250,7 +288,7 @@ demonstration.
 
 ```java
 public final class GoogleDefaultChannelCredentials {
-  private GoogleDefaultChannelCredentials() {}
+  private GoogleDefaultChannelCredentials() {} // prevent instantiation
 
   public static ChannelCredentials create() {
     return new ChoiceChannelCredentials(
@@ -270,7 +308,7 @@ demonstration.
 
 ```java
 public final class XdsChannelCredentials {
-  private XdsChannelCredentials() {}
+  private XdsChannelCredentials() {} // prevent instantiation
 
   /**
    * Creates credentials to be configured by xDS, falling back to other
@@ -338,7 +376,7 @@ final class ProtocolNegotiators {
     }
   }
 
-  public final class Result {
+  public static final class Result {
     public static Result error(String error) {...}
     public static Result negotiator(ProtocolNegotiator.Factory factory) {...}
     public Result withCallCredentials(CallCredentials callCreds) {...}
@@ -385,16 +423,24 @@ key. If any other configuration is necessary, the `Builder` would be used.
 package io.grpc;
 
 public final class TlsServerCredentials extends ServerCredentials {
+  private TlsServerCredentials(...) {}
+
   /**
    * Creates an instance using provided certificate chain and private key.
    * Generally they should be PEM-encoded and the key is an unencrypted PKCS#8
    * key (file headers have "BEGIN CERTIFICATE" and "BEGIN PRIVATE KEY").
    */
-  public TlsServerCredentials(File certChain, File privateKey)
-      throws IOException {...}
+  public static ServerCredentials create(File certChain, File privateKey)
+      throws IOException {
+    return newBuilder().keyManager(certChain, privateKey).build();
+  }
   // Will not auto-close InputStream, unlike existing transportSecurity()
-  public TlsServerCredentials(InputStream certChain, InputStream privateKey)
-      throws IOException {...}
+  public static ServerCredentials create(
+      InputStream certChain, InputStream privateKey) throws IOException {
+    return newBuilder().keyManager(certChain, privateKey).build();
+  }
+
+  public static Builder newBuilder() { return new Builder(); }
 
   /** Same as client-side */
   public Set<Feature> incomprehensible(Set<Feature> understoodFeatures) {...}
@@ -406,8 +452,6 @@ public final class TlsServerCredentials extends ServerCredentials {
   /* Other methods can be added to support various Features */
 
   public enum Feature {}
-
-  public static Builder newBuilder() { return new Builder(); }
 
   public final static class Builder {
     public Builder keyManager(File certChain, File privateKey)
@@ -421,7 +465,7 @@ public final class TlsServerCredentials extends ServerCredentials {
         throws IOException {...}
 
     // Throws if no certificate was provided
-    public TlsChannelCredentials build() {...}
+    public ChannelCredentials build() {...}
   }
 }
 ```
@@ -452,6 +496,10 @@ To support transport credentials like ALTS and TLS-offloading, there still
 needs to be a way to provide implementations. However, these implementations
 _can_ depend on the specific transport being used. Just the users of those
 implementations should avoid depending _explicitly_ on a particular transport.
+Such "credentials" will not extend ChannelCredentials but instead create
+pre-existing credentials types with specific configuration. To reduce the
+strangeness involved, all ChannelCredentials construction returns the generic
+ChannelCredentials type instead of the concrete type.
 
 The API surface should handle generic and transport-specific credentials in the
 same manner, so the user’s code should not care about the implementation
