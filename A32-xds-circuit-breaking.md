@@ -84,7 +84,7 @@ message EdsLoadBalancingPolicyConfig {
   repeated LoadBalancingConfig endpoint_picking_policy = 5;
   
   // Maximum number of outstanding requests can be made to the upstream cluster.
-  int32 max_requests = 6;
+  int32 max_concurrent_requests = 6;
 }
 ```
 
@@ -114,7 +114,7 @@ in separate stats message.
 - Maintain a counter in the EDS LB policy for counting the number of 
 outstanding requests.
 - Add the logic of enforcing `max_request` limit in wrapping the 
-`SubchannelPicker` propagated from each of EDS policy's child LB policy.
+`SubchannelPicker` propagated from the EDS policy's child LB policies.
 - Counter manipulation is done in `ClientStreamTracer`/`Factory`: increment
 in `newClientStreamTracer()` and decrement in `streamClosed()`.
     - Note there will be check-and-allocate race as the pick method and stream
