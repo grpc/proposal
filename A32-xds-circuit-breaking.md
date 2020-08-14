@@ -130,33 +130,33 @@ TODO
 
 ## Other parameters considered
 
-There is a group of other parameters in the xDS circuit breakers, but they
-are either infeasible for gRPC's use case or having extraordinary 
-implementation complexity based on current gRPC architecture. They will be 
-ignored at the moment and to be reevaluated after we get more inquiries. 
-The following parameters have been considered:
+There are two other categories of circuit breaking parameters we have 
+considered, but they are ignored at this point.
 
-- `max_connections`: the maximum number of connections can be created to an 
-upstream cluster.
-    - Envoy allows at least one connection to be allocated for each host 
-    selected by cluster load balancing, even if this circuit breaker is
-    overflowed. On the other hand, gRPC creates at most one connection to each
-    host. So this parameter does not have effective meaning in gRPC's use
-    case.
-- `max_connection_pools`: gRPC does not use connection pooling.
-- `max_requests_per_connection` (in `Cluster` configuration): lifetime limit 
-of maximum requests for a single upstream connection. No valuable use case for
-gRPC at this point.
-- `max_pending_requests`: the maximum number of requests that will be queued
-while waiting for a connection to be established.
-    - There are some difficulties in integrating this limit with other existing
-     gRPC features. For example, a buffered request may be removed upon hitting
-     its deadline but there is no way to have the xDS plugin know this. It may
-     need a significant amount of changes for gRPC to support this and it is not
-     clear that the benefit is enough to justify the cost at this point.
-- `connect_timeout` (in `Cluster` configuration): implementation may require
-transport layer change, will reconsider after getting usage feedback.
-- `max_retries`: retry related parameter, the retry feature has not been 
-implemented in gRPC xDS.
-- `max_budget`: retry related parameter, the retry feature has not been 
-implemented in gRPC xDS.
+The first category of parameters are those fundamentally not applicable to gRPC
+in its current form. It is possible that gRPC could evolve to make them 
+relevant, in which case we would reevaluate them, but it is also possible that 
+they will simply never be supported.
+
+- `max_requests_per_connection` (in the `Cluster` proto) and `max_connections`: 
+gRPC only ever creates a single connection to a given endpoint. But in the 
+future, we might provide a new LB policy to allow multiple connections to 
+address `MAX_CONCURRENT_STREAMS` limit, at which point it might make sense to 
+support this.
+- `max_connection_pools`: gRPC does not currently have a concept of connection
+pools the way that Envoy does. This will likely never apply to gRPC.
+
+The second category of parameters are those applicable to gRPC, but their 
+implementations are non-trivial. We do not want to invest the resources to 
+implement them until we know that they will be useful enough to make that 
+investment worthwhile. We will reevaluate them as we get feedback from users.
+
+- `max_pending_requests`: There are difficulties in integrating this with other
+existing gRPC features. For example, a buffered request may be removed upon 
+hitting its deadline but there is no way to have the xDS plugin know this. It 
+may need a significant amount of changes for gRPC to support this.
+- `connect_timeout` (in the `Cluster` proto): Implementation may require
+transport layer change, and it also has particular challenges in C-core due to
+the way we share subchannels between channels.
+- `max_retries` and `max_budget`: These will be addressed when we eventually
+add support for configuring retries via xDS.
