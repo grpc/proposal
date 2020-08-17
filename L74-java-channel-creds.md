@@ -23,11 +23,6 @@ This is to allow:
     credential needs to be provided by the user
 *   aligning with C core and Go implementations
 
-_The design focuses on channel credentials, since they are the most complex and
-most discussed._ Server credentials will mostly just mirror the channel
-credentials; they suffer from most of the same problems but at a smaller
-scale.
-
 ## Background
 
 Prior to gRPC v0.12.0, C core had a "unified" `Credential` type that was
@@ -54,7 +49,7 @@ credentials (`credentials.TransportCredentials`), but with a separate type to
 combine them (`credentials.Bundle`). The split credentials significantly
 predate `Bundle`.
 
-### Related Proposals: 
+### Related Proposals:
 
 N/A
 
