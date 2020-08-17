@@ -239,6 +239,45 @@ be added. Observing the contents of those methods would be a requirement for
 might not support encrypted private keys and so could consider the credential
 unsupported if `getPassword()` returned non-`null`.
 
+To support migration from existing builder options, Netty and OkHttp will
+provide transport-specific credentials. Note that neither transport will support
+reading the configuration after creation, except by the transport.
+
+```java
+package io.grpc.netty;
+
+/** A credential with full control over the security handshake. */
+public final class NettySslContextChannelCredentials {
+  private NettySslContextChannelCredentials() {}
+
+  /**
+   * Create a credential using Netty's SslContext as configuration. It must have
+   * been configured with {@link GrpcSslContexts}, but options could have been
+   * overridden.
+   */
+  public static ChannelCredentials create(SslContext sslContext) {...}
+}
+
+/** An insecure credential that upgrades from HTTP/1 to HTTP/2. */
+public final class InsecureFromHttp1ChannelCredentials {
+  private InsecureFromHttp1ChannelCredentials() {}
+
+  /** Creates an insecure credential that will upgrade from HTTP/1 to HTTP/2. */
+  public static ChannelCredentials create() {...}
+}
+```
+
+```java
+package io.grpc.okhttp;
+
+/** A credential with full control over the SSLSocketFactory. */
+public final class SslSocketFactoryChannelCredentials {
+  private SslSocketFactoryChannelCredentials() {}
+
+  public static ChannelCredentials create(SSLSocketFactory factory) {...}
+}
+```
+
 To support very advanced use cases, Netty will provide a credential that wraps
 a `ProtocolNegotiator`. This allows implementations like ALTS and XDS to use
 internal APIs without forcing their users to use experimental or internal APIs,
