@@ -394,7 +394,7 @@ server = ServerBuilder.forPort(443)
 server = ServerBuilder.forPort(8080)
     .build().start();
 // the user would now:
-ChannelCredentials tlsCreds = new TlsServerCredentials(
+ServerCredentials tlsCreds = new TlsServerCredentials(
     new File("cert.pem"), new File("cert.key"));
 server = Grpc.newServerBuilderForPort(443, tlsCreds)
     .build().start();
