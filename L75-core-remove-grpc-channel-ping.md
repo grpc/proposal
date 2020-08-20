@@ -1,9 +1,9 @@
-Title
+Remove grpc_channel_ping from Core Surface API
 ----
 * Author(s): yashykt
 * Approver: markdroth
 * Status: In Review
-* Implemented in: <language, ...>
+* Implemented in: Core https://github.com/grpc/grpc/pull/23894
 * Last updated: 2020-08-19
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/suC7gw_WOa4
 
@@ -29,7 +29,7 @@ Remove `grpc_channel_ping` from the core surface API.
 
 ## Implementation
 
-Core:
+Core: https://github.com/grpc/grpc/pull/23894
 
 ## Open issues (if applicable)
 
