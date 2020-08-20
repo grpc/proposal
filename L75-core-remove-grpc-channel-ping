@@ -1,0 +1,37 @@
+Title
+----
+* Author(s): yashykt
+* Approver: markdroth
+* Status: Draft
+* Implemented in: <language, ...>
+* Last updated: 2020-08-19
+* Discussion at: <google group thread> (filled after thread exists)
+
+## Abstract
+
+Remove `grpc_channel_ping` from the core surface API.
+
+## Background
+
+`grpc_channel_ping` allows for the application to send a ping over the channel.
+
+### Related Proposals:
+
+N/A
+
+## Proposal
+
+Remove `grpc_channel_ping` from the core surface API.
+
+## Rationale
+
+`grpc_channel_ping` is not used outside of tests, so there is no reason for it to be a part of the surface API.
+
+## Implementation
+
+Core:
+
+## Open issues (if applicable)
+
+N/A
+
