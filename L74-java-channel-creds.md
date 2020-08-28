@@ -2,9 +2,9 @@ Java: Channel and Server Credentials
 ----
 * Author(s): [Eric Anderson](https://github.com/ejona86)
 * Approver: sanjaypujare
-* Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
+* Status: Ready for Implementation {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2020-06-17
+* Last updated: 2020-08-27
 * Discussion at: https://groups.google.com/g/grpc-io/c/GNU9svnDsQs/m/kG6XsUy9BwAJ
 
 ## Abstract
@@ -561,11 +561,6 @@ more clear and would have limited cost.
 
 ## Implementation
 
-ejona86 will implement. TLS will initially be bare-bones, with just the
-compatibility checker. Over the long-term TLS will be fleshed out with
-additional configuration. ServerCredentials will be implemented shortly after
-ChannelCredentials.
-
-## Open issues (if applicable)
-
-N/A
+ejona86 will implement. ServerCredentials will be implemented shortly after
+ChannelCredentials. ChannelCredentials will be implemented in
+https://github.com/grpc/grpc-java/pull/7294
