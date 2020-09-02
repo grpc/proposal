@@ -84,7 +84,8 @@ message EdsLoadBalancingPolicyConfig {
   repeated LoadBalancingConfig endpoint_picking_policy = 5;
   
   // Maximum number of outstanding requests can be made to the upstream cluster.
-  int32 max_concurrent_requests = 6;
+  // Default is 1024.
+  google.protobuf.UInt32Value max_concurrent_requests = 6;
 }
 ```
 
