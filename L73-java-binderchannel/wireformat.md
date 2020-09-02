@@ -25,37 +25,59 @@ There are two types of transactions, control and stream.
 For general transport lifecycle, using one of 1000 reserved transaction codes.
 
 *   Setup Transport
-    *   Transaction code: BinderTransport.SETUP_TRANSPORT
+    *   Transaction code: BinderTransport.SETUP_TRANSPORT (1)
     *   From ClientTransport to host binder, and from ServerTransport to client
         binder.
 *   Shutdown Transport
-    *   Transaction code: BinderTransport.SHUTDOWN_TRANSPORT
+    *   Transaction code: BinderTransport.SHUTDOWN_TRANSPORT (2)
     *   From ClientTransport to server binder, or ServerTransport to client
         binder.
 *   Acknowledge bytes.
-    *   Transaction code: BinderTransport.ACKNOWLEDGE_BYTES
+    *   Transaction code: BinderTransport.ACKNOWLEDGE_BYTES (3)
     *   From either transport to its peer's binder. Reports reception of
         transaction data for flow control.
 *   Ping
-    *   Transaction code: BinderTransport.PING
-    *   From ClientTransport to server binder.
+    *   Transaction code: BinderTransport.PING (4)
+    *   Currently only sent from ClientTransport to server binder.
 *   Ping Response:
-    *   Transaction code: BinderTransport.PING_RESPONSE
-    *   From SeverTransport to client binder, in response to a ping.
+    *   Transaction code: BinderTransport.PING_RESPONSE (5)
+    *   From SeverTransport to client binder or ClientTransport to server binder,
+        in response to a ping message.
+
+If either side of a transport receives an unrecognized control transacton,
+it will shutdown the transport gracefully.
 
 #### Transaction Data
 
 ```
-version = int; (* Currently always 1 *)
+major version = int;
+minor version = int;
+protocol extension flags = int;
+version extras = minor version, protocol extension flags
 num bytes = int;
 ping id = int;
+version info = major version, [version extras] (* If major version is at least 2. *)
 
-setup transport transaction = version, binder;
+
+setup transport transaction = version info, binder;
 shutdown transport transaction = nothing;
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
 ping response transaction = ping id;
 ```
+
+The setup transaction sends version information as a major version followed by
+optional extras, which are only includede if the major version is at
+least 2.
+
+The extras are a minor version number, and a set of protocol extension flags.
+
+During transport setup, the client transport should provide the set of
+extension flags it supports, and the server should respond with the intersecion
+of those extensions _it_ supports. From that point those protocol extensions
+may be used.
+
+Currenly none of these flags are in use, so they're always zero.
 
 ### Stream Transactions
 
@@ -66,11 +88,12 @@ transactions relating to that stream (in both directions).
 IDs are allocated sequentially from FIRST_CALL_ID to LAST_CALL_ID, wrapping
 around at the end. Since there are roughly 2^24 available IDs, there’s no chance
 of a collision except in pathological cases. If we _do_ detect a collision
-however, we immediately shut down the transport with an INTERNAL error code.
+however, we will fail the new call with UNAVAILABLE, and shut down the
+transport gracefully.
 
 Each normally-completed stream transmits (in both directions) a prefix, 0 or
 more blocks of message data, and a suffix. The contents of prefix and suffix
-data are direction dependenet, and all three may can be sent in a single
+data are direction dependenet, and all three can be sent in a single
 transaction.
 
 #### Transaction Data
@@ -84,7 +107,7 @@ status = [string] (* The status code is in the flags. The description is only
 count = int;
 bytes data = count, [byte array]; (* byte array included iff count > 0 *)
 metadata = count, { metadata key, metadata val }; (* repeated count times *)
-metadata sentinel = int (* -1 = Parcelable, -2 = bad metadata. *)
+metadata sentinel = int (* -1 = Parcelable. *)
 metadata key = bytes data;
 metadata value = (count | metadata sentinel), [parcelable], [byte array];
 
@@ -111,17 +134,28 @@ rpc transaction = flags, sequence no, rpc data;
 
 #### Flag fields
 
-*   FLAG_PREFIX - Indicates the transaction contains the streams prefix.
-*   FLAG_MESSAGE_DATA - Indicates the transaction contains message data.
-*   FLAG_SUFFIX - Indicate the transaction contains streams suffix.
-*   FLAG_OUT_OF_BAND_CLOSE - Indicates this transaction contains out of band
+*   FLAG_PREFIX (0x1) - Indicates the transaction contains the streams prefix.
+*   FLAG_MESSAGE_DATA (0x2) - Indicates the transaction contains message data.
+*   FLAG_SUFFIX (0x4) - Indicate the transaction contains streams suffix.
+*   FLAG_OUT_OF_BAND_CLOSE (0x8) - Indicates this transaction contains out of band
     close data. (This type is only ever sent in a transaction by itself).
-*   FLAG_MESSAGE_DATA_IS_PARCELABLE - Indicates the message is a parcelable
-    object.
-*   FLAG_STATUS_DESCRIPTION - Indicates the status description string is
+*   FLAG_EXPECT_SINGLE_MESSAGE (0x10) - When set with client-prefix data, provides a hint
+    to the server-side transport that the client expects only a single message in response.
+    (I.e. The call is UNARY or CLIENT_STREAMING). This allows the server-side transport to
+    combine the response message and status in a single transaction. Should the server
+    responds will multiple messages _anyway_, the hint will be ignored, and messages will be
+    delivered normally.
+*   FLAG_STATUS_DESCRIPTION (0x20)- Indicates the status description string is
     included.
+*   FLAG_MESSAGE_DATA_IS_PARCELABLE (0x40) - Indicates the message is a parcelable
+    object.
 *   status - If a status is included in the data, the status code will be
     present in the top 16 bits of the flags value.
+
+To allow for potential additions to the protocol, any any unrecognized flags may
+be ignored. However, since a set flag can indicate the presence of following data
+in the parcel, flags are implicitly ordered by increasing bit value, and an implementation
+may never ignore a bit with a lower numerical value than a bit it does not ignore.
 
 #### Sequence number
 
@@ -163,7 +197,7 @@ ungraceful shutdown will occur. If the Android Service hosting the server is
 destroyed, a graceful shutdown will occur, though if the host process also dies,
 that will lead to a binder death in the client, shutting the client-side down
 ungracefully. If the Android component hosting the Channel is destroyed, an
-ungraceful shutdown will occur, with the status code ABORTED. The remote
+ungraceful shutdown will occur, with the status code CANCELLED. The remote
 transport will be notified, cancelling all ongoing remote calls on the server
 side.
 

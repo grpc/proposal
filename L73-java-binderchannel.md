@@ -130,12 +130,12 @@ the entire application, or tied to the lifecycle of one component via an
 optional [Lifecycle] instance.
 
 ```java
-BinderChannelBuilder.create(
+BinderChannelBuilder.forAndroidComponent(
       applicationContext,
       AndroidComponentAddress.forRemoteComponent("pkg", "pkg.ServiceClass"))
     .build();
 
-BinderChannelBuilder.create(
+BinderChannelBuilder.forAndroidComponent(
       activity,
       activity.getLifecycle(),
       AndroidComponentAddress.forRemoteComponent("pkg", "pkg.ServiceClass"))
@@ -181,26 +181,15 @@ entire application, or tied to the lifecycle of one component via a [Lifecycle]
 instance.
 
 ```java
-OnDeviceChannelBuilder.create(
+OnDeviceChannelBuilder.forTarget(
         application,
         "ondevice://example")
     .build();
 
-OnDeviceChannelBuilder.create(
+OnDeviceChannelBuilder.forTarget(
         activity,
         activity.getLifecycle(),
         "ondevice://example")
-    .build();
-```
-
-Creating a channel directly to an external AndroidComponentAddress is also
-supported.
-
-```java
-OnDeviceChannelBuilder.create(
-        activity,
-        activity.getLifecycle(),
-        AndroidComponentAddress.forRemoteComponent("pkg", "pkg.ServiceClass"))
     .build();
 ```
 
