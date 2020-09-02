@@ -103,11 +103,15 @@ fail the call with status UNAVAILABLE. Such failed calls will not be retried,
 but they will be recorded to the `total_dropped_requests` counts in 
 cluster-level load reports and reported to the load reporting server.
 
-Note an EDS LB policy may be responsible for handling `service_name` switch
-used for endpoint discovery, requests sent to both the old and new services
-should be aggregated to the same counter and the total is restricted by the
-configured limit. Even though the failed requests will be recorded and reported
-in separate stats message.
+Note in Envoy's definition, cluster resources are immutable and any change in
+the cluster resource implies replacing the old cluster with a new one with 
+the latest configurations. The new cluster starts with new circuit breaker
+tracking states. However, in gRPC this only happens when the cluster's EDS
+service name changes. This could result in a surprising behavior compared to
+Enovy: if the current number of RPCs in flight is 105 and we receive an CDS
+update lowering the limit to 100, new RPCs will still fail even if 5 of the
+currently in-flight RPCs have finished. In the contrast, Envoy will allow 
+another 100 new RPCs to be sent immediately.
 
 ## Implementation
 
