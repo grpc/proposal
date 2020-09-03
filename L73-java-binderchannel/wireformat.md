@@ -62,7 +62,7 @@ ping transaction = ping id;
 ping response transaction = ping id;
 ```
 
-==setup transport transaction== is guaranteed to be backward-compatible and so
+`setup transport transaction` is guaranteed to be backward-compatible and so
 is safe to process even if the version number is unknown to an implementation.
 During transport setup, the version sent by the client should be the largest
 version it supports. The server should respond with the actual version to be
