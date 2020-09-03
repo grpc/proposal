@@ -123,9 +123,8 @@ like this:
     {
       "server_uri": <string containing URI of xds server>,
       // List of channel creds; client will stop at the first type it
-      // supports.  This field is optional; if not specified, xDS will use
-      // the same channel creds as the backends, but with any associated
-      // call creds stripped off.
+      // supports.  This field is required and must contain at least one
+      // channel creds type that the client supports.
       "channel_creds": [
         {
           "type": <string containing channel cred type>,
@@ -140,10 +139,10 @@ like this:
 }
 ```
 
-Initially, the only type of channel creds we support will be
-`google_default`.  In the future, we will add a general-purpose
-mechanism for configuring arbitrary channel creds types with arbitrary
-configuration.
+Initially, the only types of channel creds we support will be
+`google_default` and `insecure`.  In the future, we will add a
+general-purpose mechanism for configuring arbitrary channel creds types
+with arbitrary configuration.
 
 The `node` field will be populated with the [xDS `Node`
 proto](https://github.com/envoyproxy/data-plane-api/blob/1adb5d54abb0e28ca409254d26fad1cf5535239b/envoy/api/v2/core/base.proto#L85).
