@@ -68,9 +68,9 @@ During transport setup, the version sent by the client should be the largest
 version it supports. The server should respond with the actual version to be
 used, which will be equal to or less than the client-advertised version. The
 server must not fail if the client-advertised version is higher than supported.
-The server may fail if the client-advertised version is too low to be
-supported. The client may fail if the server-selected version is too low to be
-supported.
+The server may respond with SHUTDOWN_TRANSPORT if the client-advertised version
+is too low to be supported. The client may respond with SHUTDOWN_TRANSPORT if
+the server-selected version is too low to be supported.
 
 Both client and server transport may also include protocol extension flags at
 the end of their setup transport transaction. This is reserved for potential
