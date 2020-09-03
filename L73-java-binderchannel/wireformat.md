@@ -51,33 +51,25 @@ it will shutdown the transport gracefully.
 
 ```
 major version = int;
-minor version = int;
 protocol extension flags = int;
-version extras = minor version, protocol extension flags
 num bytes = int;
 ping id = int;
-version info = major version, [version extras] (* If major version is at least 2. *)
 
-
-setup transport transaction = version info, binder;
+setup transport transaction = major version, binder, [protocol extension flags];
 shutdown transport transaction = nothing;
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
 ping response transaction = ping id;
 ```
 
-The setup transaction sends version information as a major version followed by
-optional extras, which are only includede if the major version is at
-least 2.
+During transport setup, if a server receves a setup transaction with a higher
+protocol version, it should respond with the protocol version _it_ supports.
 
-The extras are a minor version number, and a set of protocol extension flags.
-
-During transport setup, the client transport should provide the set of
-extension flags it supports, and the server should respond with the intersecion
-of those extensions _it_ supports. From that point those protocol extensions
-may be used.
-
-Currenly none of these flags are in use, so they're always zero.
+Both client and server transport may also include protocol extension flags at
+the end of their setup transport transaction. This is reserved for potential
+future protocol extensions, though no flags are currently specified. Since some
+features may be non-symetric, the expected behavior when a flag is only set by
+one transport will be specific to that flag.
 
 ### Stream Transactions
 
@@ -170,7 +162,8 @@ transactions are independent of each other.
 The setup of a new transport occurs in the following steps.
 
 1.  The ClientTransport first binds to the endpoint Android Service, to obtain
-    an endpoint binder.
+    an endpoint binder. When binding, the client will use the intent action
+    "grpc.io.action.BIND".
 2.  The ClientTransport sends a _setup transport_ transaction to the endpoint
     binder, passing the client binder in the parcel, then discarding the
     reference to the endpoint binder.
