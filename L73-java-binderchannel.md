@@ -1,10 +1,10 @@
 # BinderChannel for native cross-process communication on Android
 
 *   Author(s): markb74
-*   Approver:
-*   Status: In Review
+*   Approver: ejona86
+*   Status: Ready for Implementation
 *   Implemented in: Java
-*   Last updated: July 14, 2020
+*   Last updated: September 3, 2020
 *   Discussion at: https://groups.google.com/g/grpc-io/c/RFmjrxdtwzE
 
 ## Abstract

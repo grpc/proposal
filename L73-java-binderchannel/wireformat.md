@@ -50,26 +50,32 @@ it will shutdown the transport gracefully.
 #### Transaction Data
 
 ```
-major version = int;
+version = int;
 protocol extension flags = int;
 num bytes = int;
 ping id = int;
 
-setup transport transaction = major version, binder, [protocol extension flags];
+setup transport transaction = version, binder, [protocol extension flags];
 shutdown transport transaction = nothing;
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
 ping response transaction = ping id;
 ```
 
-During transport setup, if a server receves a setup transaction with a higher
-protocol version, it should respond with the protocol version _it_ supports.
+==setup transport transaction== is guaranteed to be backward-compatible and so
+is safe to process even if the version number is unknown to an implementation.
+During transport setup, the version sent by the client should be the largest
+version it supports. The server should respond with the actual version to be
+used, which will be equal to or less than the client-advertised version. The
+server must not fail if the client-advertised version is higher than supported.
+The server may fail if the client-advertised version is too low to be
+supported. The client may fail if the server-selected version is too low to be
+supported.
 
 Both client and server transport may also include protocol extension flags at
 the end of their setup transport transaction. This is reserved for potential
-future protocol extensions, though no flags are currently specified. Since some
-features may be non-symetric, the expected behavior when a flag is only set by
-one transport will be specific to that flag.
+future protocol extensions, though no flags are currently specified.
+Unrecognized flags must be ignored.
 
 ### Stream Transactions
 
@@ -144,10 +150,11 @@ rpc transaction = flags, sequence no, rpc data;
 *   status - If a status is included in the data, the status code will be
     present in the top 16 bits of the flags value.
 
-To allow for potential additions to the protocol, any any unrecognized flags may
-be ignored. However, since a set flag can indicate the presence of following data
-in the parcel, flags are implicitly ordered by increasing bit value, and an implementation
-may never ignore a bit with a lower numerical value than a bit it does not ignore.
+To allow for potential additions to the protocol, any unrecognized flags must be
+ignored. However, since a set flag can indicate the presence of following data
+in the parcel, flags are implicitly ordered by increasing bit value, and an
+implementation may never ignore a bit with a lower numerical value than a bit
+it does not ignore.
 
 #### Sequence number
 
