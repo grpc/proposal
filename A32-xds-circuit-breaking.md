@@ -103,12 +103,12 @@ fail the call with status UNAVAILABLE. Such failed calls will not be retried,
 but they will be recorded to the `total_dropped_requests` counts in 
 cluster-level load reports and reported to the load reporting server.
 
-Note in Envoy's definition, cluster resources are immutable and any change in
-the cluster resource implies replacing the old cluster with a new one with 
-the latest configurations. The new cluster starts with new circuit breaker
+Note that in Envoy's implementation, cluster resources are immutable and any 
+change in the cluster resource implies replacing the old cluster with a new one
+with the latest configuration. The new cluster starts with new circuit breaker
 tracking states. However, in gRPC this only happens when the cluster's EDS
 service name changes. This could result in a surprising behavior compared to
-Enovy: if the current number of RPCs in flight is 105 and we receive an CDS
+Enovy: if the current number of RPCs in flight is 105 and we receive a CDS
 update lowering the limit to 100, new RPCs will still fail even if 5 of the
 currently in-flight RPCs have finished. In the contrast, Envoy will allow 
 another 100 new RPCs to be sent immediately.
