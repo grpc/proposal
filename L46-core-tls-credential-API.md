@@ -24,7 +24,7 @@ The current [TLS credential API](https://github.com/grpc/grpc/blob/master/src/co
 We recently have the following two use cases that we want to support:
 
 1. In gRPC Proxyless Service Mesh, gRPC client has no initial credential to bootstrap with, which means the credentials fetching may not be instantaneous. Therefore, the current TLS credentials reloading mechanism cannot be used directly.
-2. In some internal use cases, the credentials are stored in certain file locations and updated asynchronously. Application does not need to be notified of when/how the credentials are updated. gRPC core would be responsible for reading credentials from files and reloading the credentials.
+2. In some internal use cases, the credentials are stored in certain file locations and updated asynchronously. Application does not need to be notified of when/how the credentials are updated. gRPC core would be responsible for routinely reading credentials from files and reloading the credentials.
 
 These two cases indicate the following design requirements:
 1. Support both use cases above. We cannot assume there are bootstrapping key materials. 
@@ -38,7 +38,7 @@ If that doesn't meet users' requirements, they could implement their own provide
 
 Besides major credential reloading change, we are also planning to:
 1. make the server authorization original designed for client side only applicable to both the client side and the server side. 
-This is based on some recent user requirement, and it may also be used as the CRL check since CRL is not officially supported in gRPC. 
+This is based on some recent user requirement, and it may also be used as the CRL check since CRL is not supported in gRPC core. 
 2. add the options to configure the min/max TLS version that will be used in handshake
 
 ### Related Proposals:
@@ -51,7 +51,8 @@ This is based on some recent user requirement, and it may also be used as the CR
 This part of the proposal introduces changes made to existing TLS credential APIs. Changes include:
 1. Replacing all the occurrence of "*_server_authorization_*" to "*_authorization_"
 2. Removing `grpc_tls_key_materials_config`, `grpc_tls_credential_reload_config` and `grpc_tls_credential_reload_arg` 
-3. Adding API `grpc_tls_credentials_options_set_certificate_provider`, `grpc_ssl_server_credentials_set_min_tls_version` and `grpc_ssl_server_credentials_set_max_tls_version`
+3. Adding API `grpc_tls_credentials_options_set_certificate_provider`, `grpc_tls_server_credentials_set_min_tls_version` and `grpc_tls_server_credentials_set_max_tls_version`
+4. Adding API `grpc_tls_credentials_options_set_root_cert_name` and `grpc_tls_credentials_options_set_identity_cert_name`
 
 Here is how the API would look like after these changes. For simplicity, all the comments are omitted.
 
@@ -71,13 +72,21 @@ GRPCAPI int grpc_tls_credentials_options_set_cert_request_type(
     grpc_tls_credentials_options* options,
     grpc_ssl_client_certificate_request_type type);
 
-GRPCAPI int grpc_tls_credentials_options_set_verification_option(
+GRPCAPI int grpc_tls_credentials_options_set_server_verification_option(
     grpc_tls_credentials_options* options,
-    grpc_tls_verification_option verification_option);
+    grpc_tls_server_verification_option server_verification_option);
 
 GRPCAPI int grpc_tls_credentials_options_set_authorization_check_config(
     grpc_tls_credentials_options* options,
     grpc_tls_authorization_check_config* config);
+
+GRPCAPI int grpc_tls_credentials_options_set_root_cert_name(
+    grpc_tls_credentials_options* options,
+    const char* root_cert_name);
+
+GRPCAPI int grpc_tls_credentials_options_set_identity_cert_name(
+    grpc_tls_credentials_options* options,
+    const char* identity_cert_name);
 
 /** Sets the credential provider. */
 GRPCAPI int grpc_tls_credentials_options_set_certificate_provider(
@@ -86,12 +95,12 @@ GRPCAPI int grpc_tls_credentials_options_set_certificate_provider(
 
 /** Sets the minimum TLS version that will be negotiated during the TLS
     handshake.  */
-GRPCAPI void grpc_ssl_server_credentials_set_min_tls_version(grpc_tls_credentials_options* options,
+GRPCAPI void grpc_tls_server_credentials_set_min_tls_version(grpc_tls_credentials_options* options,
     grpc_tls_version min_tls_version);
 
 /** Sets the maximum TLS version that will be negotiated during the TLS
     handshake. */
-GRPCAPI void grpc_ssl_server_credentials_set_max_tls_version(grpc_tls_credentials_options* options, 
+GRPCAPI void grpc_tls_server_credentials_set_max_tls_version(grpc_tls_credentials_options* options, 
     grpc_tls_version max_tls_version);
 
 typedef struct grpc_tls_authorization_check_arg grpc_tls_authorization_check_arg;
@@ -203,11 +212,13 @@ Each wrap language needs to wrap these APIs in a way that meets the inherent cor
 ```c
 /* Create option and set basic security primitives. */
 grpc_tls_credentials_options* options = grpc_tls_credentials_options_create();
-grpc_tls_credentials_options_set_verification_option(options, GRPC_TLS_SKIP_HOSTNAME_VERIFICATION);
+grpc_tls_credentials_options_set_server_verification_option(options, GRPC_TLS_SKIP_HOSTNAME_VERIFICATION);
 grpc_tls_authorization_check_config* config = grpc_tls_authorization_check_config_create(.....);
 grpc_tls_credentials_options_set_authorization_check_config(options, config);
-grpc_ssl_server_credentials_set_min_tls_version(options, TLS1_2);
-grpc_ssl_server_credentials_set_max_tls_version(options, TLS1_3);
+grpc_tls_server_credentials_set_min_tls_version(options, TLS1_2);
+grpc_tls_server_credentials_set_max_tls_version(options, TLS1_3);
+grpc_tls_credentials_options_set_root_cert_name(options, "root_PEM_certs");
+grpc_tls_credentials_options_set_identity_cert_name(options, "identity_PEM_certs");
 /* Use the file-based provider for reloading certificates. */
 grpc_tls_certificate_provider* file_provider = grpc_tls_certificate_provider_file_watcher_create(...);
 grpc_tls_credentials_options_set_certificate_provider(options, file_provider);
