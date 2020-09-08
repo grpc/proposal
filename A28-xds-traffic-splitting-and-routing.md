@@ -2,8 +2,8 @@
 ----
 * Author(s): Menghan Li
 * Approver: markdroth
-* Status: Draft
-* Implemented in: (in progress in C-core, Java, and Go)
+* Status: Final
+* Implemented in: C-core, Java, and Go
 * Last updated: 2020-05-20
 * Discussion at: https://groups.google.com/g/grpc-io/c/2Ot9HA3Rjeg
 
