@@ -250,6 +250,12 @@ second route is an exact match. It is this way because Envoy always picks the
 first matched route. And with header matching, finding the exact match can be
 tricky.
 
+Note that only [custom
+metadata](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests)
+is considered during header matching, unlike in Envoy, where all headers
+(including HTTP/2 pseudo-headers) are included. This is because pick happens
+above gRPC’s transport (HTTP/2) layer, so transport headers are not accessible.
+
 The pick will consider the child policies that are not reporting READY (unlike
 in most gRPC LB policies, e.g. weighted_target, where only the READY child
 policies will be considered during pick). So the pick will always be delegated
