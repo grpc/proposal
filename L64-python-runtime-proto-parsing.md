@@ -2,7 +2,7 @@ gRPC Python Runtime Proto Parsing
 ----
 * Author(s): gnossen
 * Approver: lidizheng
-* Status: Draft
+* Status: Implemented
 * Implemented in: Python
 * Last updated: April 9, 2020
 * Discussion at: https://groups.google.com/g/grpc-io/c/fuvDt-jZL2k
