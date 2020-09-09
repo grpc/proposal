@@ -42,7 +42,7 @@ priority [`DEFAULT`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/c
 
 Of the parameters in the `Thresholds` message, gRPC will support only
 `max_requests`, which sets the maximum number of requests that can be in flight
-to the cluster at any given time.  None of the other parameters are applicable
+to the cluster at any given time. None of the other parameters are applicable
 to gRPC; for details, see [Other parameters considered](#other-parameters-considered).
 The design and implementation parts of this doc will mainly focus on the
 application of the `max_requests` circuit breaking parameter in gRPC.
@@ -61,12 +61,12 @@ given cluster (e.g., if one route pointed to a given cluster and a different
 route split traffic between that cluster and other clusters).  However, after 
 implementing the changes described in [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/pull/192),
 there will be only one CDS LB policy instance for a given cluster at any time
-in the LB policy tree. Since each CDS LB policy creates exactly one child EDS
-LB policy for endpoint discovery, both of them are part of the load balancing
-logic for requests sent to the specific cluster. Circuit breakers can be 
-implemented in either policy. Since cluster load assignment drops are handled 
-in EDS LB policy, it makes sense to handle circuit breaking drops in the same
-place.
+in the LB policy tree. Since the EDS LB policy is the counterpart for endpoint
+discovery of the cluster, both of CDS and EDS LB policies comprise the load
+balancing logic for requests sent to the specific cluster. Circuit breakers can
+be implemented in either policy. Since cluster load assignment drops are 
+handled in EDS LB policy, it makes sense to handle circuit breaking drops in 
+the same place.
 
 Each CDS LB policy will receive a configured limit for the maximum number of 
 outstanding requests to hosts in the cluster that this policy is load balancing
@@ -110,7 +110,7 @@ tracking states. However, in gRPC this only happens when the cluster's EDS
 service name changes. This could result in a surprising behavior compared to
 Enovy: if the current number of RPCs in flight is 105 and we receive a CDS
 update lowering the limit to 100, new RPCs will still fail even if 5 of the
-currently in-flight RPCs have finished. In the contrast, Envoy will allow 
+currently in-flight RPCs have finished. In contrast, Envoy will allow 
 another 100 new RPCs to be sent immediately.
 
 ## Implementation
