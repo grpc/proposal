@@ -8,9 +8,16 @@ L46: C-core: New TLS Credentials API
 
 ## Abstract
 
-This proposal aims to provide the following security features in a new TLS credential API:
+This proposal aims to provide the following features in a new TLS credential API:
 1. credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without shutting down
-2. custom authorization check: optionally bypass the certificate check, bypass the hostname check on the client side, and perform an additional per-connection authorization callback at the end of authentication
+2. custom authorization check: support the following cases
+    - on the client side:
+        - perform both the certificate and default hostname check(default option)
+        - perform certificate check but skip default hostname check(a custom authorization check is mandatory)
+        - skip both certificate check and default hostname check(a custom authorization check is mandatory)
+        - perform a custom authorization check, if needed 
+    - on the server side:
+        - perform a custom authorization check, if needed    
 3. TLS version configuration: optionally configure the minimum and maximum of the TLS version that will be used in the handshake
 
 ## Background
@@ -18,17 +25,20 @@ This proposal aims to provide the following security features in a new TLS crede
 The current TLS implementation in gRPC C core has some restrictions:
 1. lack of the credential reloading support. Once an application starts, it can never reload its identity key/cert-chain and root certificates without shutting down
 2. inflexibility in the peer verification. In a mutual TLS scenario, servers would always perform certificate verification, and clients would always perform certificate verification as well as default hostname check. No customized checks can be introduced.
-3. inability to choose the TLS version that will be used
+3. inability to choose the maximum/minimum TLS version supported in OpenSSL/BoringSSL for use
 
 There have always been some ad hoc requests on GitHub Issue Page for supporting these features. The demands for a more flexible and configurable API have increased with the emerging needs in cloud platform.
-One common example is to support SPIFFE ID as the identity format, which requires us to disable the default hostname check on the client side.
-Another example is to reload the identity certificates without shutting down the server, because certificates will eventually expire and the ability to rotate the certificates is essential to a cloud application.
 
-Hence we proposed an API that will meet the following requirements:  
+One common example is to support SPIFFE ID as the identity format, which requires us to disable the default hostname check on the client side. 
+The default hostname check is an exact check on the hostname sent from client and the identity shown on server's certificate, but in SPIFFE world, the identity on server's certificate is a SPIFEE ID, which doesn't necessarily match up with the host name. 
 
-1. Flexible enough to support multiple use cases. Users should be able to use their own implementations if the provided ones don't fit their needs
-2. C core API needs to be simple, so that it can be easily wrapped by different languages
-3. The credentials reloading should be efficient. We shall reload only when needed rather than reloading per handshake
+Another example is to reload the root and identity credentials without shutting down the server, because certificates will eventually expire and the ability to rotate the certificates is essential to a cloud application.
+
+Hence we propose an API that will meet the following requirements:  
+
+1. Flexible enough to support multiple use cases. Users should be able to write their own reloading or authorization logic if the provided ones doesn't fit their needs
+2. The credentials reloading should be efficient. We shall reload only when needed rather than reloading per TLS connection
+3. C core API needs to be simple enough, so that most of existing SSL credentials in wrapped languages can migrate to call this new API
 
 ### Related Proposals:
 
