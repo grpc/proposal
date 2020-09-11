@@ -62,7 +62,7 @@ route split traffic between that cluster and other clusters).  However, after
 implementing the changes described in [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/pull/192),
 there will be only one CDS LB policy instance for a given cluster at any time
 in the LB policy tree. Since the EDS LB policy is the counterpart for endpoint
-discovery of the cluster, both of CDS and EDS LB policies comprise the load
+discovery of the cluster, both the CDS and EDS LB policies comprise the load
 balancing logic for requests sent to the specific cluster. Circuit breakers can
 be implemented in either policy. Since cluster load assignment drops are 
 handled in EDS LB policy, it makes sense to handle circuit breaking drops in 
