@@ -27,12 +27,14 @@ The current TLS implementation in gRPC C core has some restrictions:
 2. inflexibility in the peer verification. In a mutual TLS scenario, servers would always perform certificate verification, and clients would always perform certificate verification as well as default hostname check. No customized checks can be introduced.
 3. inability to choose the maximum/minimum TLS version supported in OpenSSL/BoringSSL for use
 
-There have always been some ad hoc requests on GitHub Issue Page for supporting these features. The demands for a more flexible and configurable API have increased with the emerging needs in cloud platform.
+There have always been some ad hoc requests on GitHub Issue Page for supporting these features. The demands for a more flexible and configurable API have increased with the emerging needs in the cloud platform.
 
-One common example is to support SPIFFE ID as the identity format, which requires us to disable the default hostname check on the client side. 
-The default hostname check is an exact check on the hostname sent from client and the identity shown on server's certificate, but in SPIFFE world, the identity on server's certificate is a SPIFEE ID, which doesn't necessarily match up with the host name. 
+One common requirement is to skip the hostname verification check if a client has a different way of validating the server's identity in different platforms. 
+For example, it's becoming more and more popular to use SPIFFE ID as the identity format, but a valid certificate using SPIFFE ID doesn't necessarily contain the dnsName in the SAN field, which might cause hostname verification to fail.
 
-Another example is to reload the root and identity credentials without shutting down the server, because certificates will eventually expire and the ability to rotate the certificates is essential to a cloud application.
+Another requirement is to reload the root and identity credentials without shutting down the server, because certificates will eventually expire and the ability to rotate the certificates is essential to a cloud application.
+
+Beisdes requests from Open Source Community, with the growth of GCP, we've seen more and more internal use cases of these features.   
 
 Hence we propose an API that will meet the following requirements:  
 
