@@ -13,7 +13,7 @@
 Adopt Envoy's [circuit breaking](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/circuit_breaking#circuit-breaking) 
 component that comes with the xDS protocol to
 fail network operations quickly and apply back pressure downstream as soon as
-possible. This allows gRPC clients to received distributed traffic limit 
+possible. This allows gRPC clients to receive distributed traffic limit 
 configurations that prevent cascaded service overload failures. 
 
 ## Background
