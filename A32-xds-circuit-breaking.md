@@ -1,10 +1,10 @@
 # gRPC xDS circuit breaking
 
 * Author(s): Chengyuan Zhang (voidzcy)
-* Approver: markdroth
-* Status: In Review
+* Approver: markdroth, ejona86, dfawley
+* Status: Approved
 * Implemented in:
-* Last updated: 2020-07-20
+* Last updated: 2020-09-14
 * Discussion at: https://groups.google.com/g/grpc-io/c/NEx70p8mcjg
 
 
