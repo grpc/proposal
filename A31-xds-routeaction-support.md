@@ -2,7 +2,7 @@ A31: gRPC xDS RouteAction Support
 ----
 * Author(s): Doug Fawley (dfawley)
 * Approver: markdroth, ejona86
-* Status: In Review
+* Status: Final
 * Implemented in:
 * Last updated: 2020-07-13
 * Discussion at: https://groups.google.com/g/grpc-io/c/iujkovEFSJU
@@ -157,42 +157,42 @@ red box represents the top-level Load Balancing Policy and its children.
 
 #### Supported Fields
 
-Initially, only timeout-related `RouteAction` settings will be supported:
-[`timeout`](https://github.com/envoyproxy/envoy/blob/7abb0e0bbed4f6b6304403b93762614ad385f80d/api/envoy/api/v2/route/route_components.proto#L886)
+Initially, only the timeout-related `RouteAction` settings of
+[`max_stream_duration.max_stream_duration`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L775)
 and
-[`max_grpc_timeout`](https://github.com/envoyproxy/envoy/blob/7abb0e0bbed4f6b6304403b93762614ad385f80d/api/envoy/api/v2/route/route_components.proto#L979).
-gRPC's xDS support will completely ignore
-[`grpc_timeout_offset`](https://github.com/envoyproxy/envoy/blob/7abb0e0bbed4f6b6304403b93762614ad385f80d/api/envoy/api/v2/route/route_components.proto#L988).
-This field is used in Envoy for shortening timeouts set by clients to ensure the
-timeout is reached before the gRPC client cancels the RPC due to its deadline,
-so supporting it directly in the client is unnecessary and would be
+[`max_stream_duration.grpc_max_timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L781)
+will be supported.  gRPC will not support
+[`timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L952)
+and
+[`max_stream_duration.grpc_timeout_offset`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L789).
+The `timeout` field begins the timeout counter from a point in time
+incompatible with gRPC's timeout model.
+`max_stream_duration.grpc_timeout_offset` is used in Envoy for ensuring the
+proxy detects timeouts before the gRPC client cancels the RPC due to its
+deadline, so supporting it directly in the client is unnecessary and would be
 counter-productive.
 
-If `max_grpc_timeout` is not present, the `timeout` field will specify
-the maximum RPC timeout for this route, with a default of 15s.  A
-value of 0 indicates no limit should be applied.  **NOTE: in Envoy the
-timeout begins after the client sends end-of-stream to the server.  In
-gRPC we will begin from the start of the RPC.  This difference could
-result in unexpected timeouts for streaming RPCs or RPCs in which the
-client sends a very large request.**
+If `max_stream_duration.grpc_max_timeout` is not set, the
+`max_stream_duration.max_stream_duration` field will specify the maximum RPC
+timeout for this route, with a default of unlimited.
 
-If `max_grpc_timeout` is present, then `timeout` is ignored and
-`max_grpc_timeout` limits the maximum timeout for RPCs on this route.  A value
-of 0 indicates no limit should be applied.
+If `max_stream_duration.grpc_max_timeout` is present, then
+`max_stream_duration.max_stream_duration` is ignored and
+`max_stream_duration.grpc_max_timeout` limits the maximum timeout for RPCs on
+this route instead.  A value of 0 indicates the application's deadline is used
+without modification.
 
 In all cases, the RPC timeout set by the application may never be
 exceeded due to these settings.  For examples, see the following
 table:
 
-Application Deadline | `max_grpc_timeout` | `timeout` | Effective Timeout
--------------------- | ------------------ | --------- | -----------------
-unset | unset | unset | 15s
+Application Deadline | `grpc_max_timeout` | `max_stream_duration` | Effective Timeout
+-------------------- | ------------------ | --------------------- | -----------------
+unset | unset | unset | infinite
 unset | unset | 10s | 10s
-unset | unset | 0s | infinite
 unset | 0s | any | infinite
 unset | 10s | any | 10s
-10s | unset | unset | 10s
-20s | unset | unset | 15s
+20s | unset | unset | 20s
 20s | unset | 10s | 10s
 20s | 0s | any | 20s
 20s | 10s | any | 10s
