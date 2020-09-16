@@ -10,14 +10,7 @@ L46: C-core: New TLS Credentials API
 
 This proposal aims to provide the following features in a new TLS credential API:
 1. credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without shutting down
-2. custom authorization check: support the following cases
-    - on the client side:
-        - perform both the certificate and default hostname check(default option)
-        - perform certificate check but skip default hostname check(a custom authorization check is mandatory)
-        - skip both certificate check and default hostname check(a custom authorization check is mandatory)
-        - perform a custom authorization check, if needed 
-    - on the server side:
-        - perform a custom authorization check, if needed    
+2. custom authorization check: perform a user-specified check at the end of authentication, and allow the client side to disable certificate verification and hostname verification check    
 3. TLS version configuration: optionally configure the minimum and maximum of the TLS version that will be used in the handshake
 
 ## Background
@@ -78,14 +71,14 @@ GRPCAPI int grpc_tls_credentials_options_set_server_verification_option(
     grpc_tls_server_verification_option server_verification_option);
 
 /**
- * Sets the minimum TLS version that will be negotiated during the TLS handshake.
+ * Sets the minimum supported TLS protocol version for SSL CTX.
  * If not set, the underlying SSL library will pick the version automatically.
  */
 GRPCAPI void grpc_tls_credentials_options_set_min_tls_version(grpc_tls_credentials_options* options,
     grpc_tls_version min_tls_version);
 
 /**
- * Sets the maximum TLS version that will be negotiated during the TLS handshake.
+ * Sets the maximum supported TLS protocol version for SSL CTX.
  * If not set, the underlying SSL library will pick the version automatically.
  */
 GRPCAPI void grpc_tls_credentials_options_set_max_tls_version(grpc_tls_credentials_options* options, 
