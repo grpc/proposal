@@ -46,8 +46,8 @@ publicly-visible API, similarly to how the xDS Client is provided to the Load
 Balancing Policy.
 
 If present, this Config Selector will be invoked once at the beginning of every
-RPC (after the name resolver has produced a result), and it will produce four
-things:
+RPC (after the name resolver has produced a result).  It will be passed the RPC
+method name and the RPC's headers, and it will produce four things:
 
 1.  The same per-RPC configuration which is currently determined by the Service
     Config's MethodConfig.  A default implementation will return the Service
