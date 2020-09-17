@@ -1,4 +1,4 @@
-A31: gRPC xDS RouteAction Support
+A31: gRPC xDS Timeout Support and Config Selector Design
 ----
 * Author(s): Doug Fawley (dfawley)
 * Approver: markdroth, ejona86
@@ -107,8 +107,8 @@ message XDSClusterManagerConfig {
 }
 ```
 
-The "xds_cluster_manager" policy will maintain a map from cluster name (in each
-`cds_config` entry) to child Policy in order to route Picks.
+The "xds_cluster_manager" policy will maintain a map from cluster name to child
+Policy in order to route Picks.
 
 The Resolver and Config Selector need to coordinate removal of clusters when
 they are deleted by xDS.  In order to prevent deleted clusters from being
@@ -150,41 +150,45 @@ cluster name provided to it, which should not be possible when following the
 steps above in that order, it will drop the RPC with an INTERNAL status code.
 
 The following drawing shows which parts of the system will contain which current
-Load Balancing Policies.  The blue box represents the Config Selector and the
-red box represents the top-level Load Balancing Policy and its children.
+Load Balancing Policies.
 
 ![xDS Architecture](A31_graphics/xds_architecture.png "xDS Architecture")
 
 #### Supported Fields
 
-Initially, only the timeout-related `RouteAction` settings of
-[`max_stream_duration.max_stream_duration`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L775)
-and
-[`max_stream_duration.grpc_max_timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L781)
-will be supported.  gRPC will not support
-[`timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L952)
-and
-[`max_stream_duration.grpc_timeout_offset`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L789).
+Only some xDS timeout-related settings will be supported:
+
+- [`RouteActions.max_stream_duration.max_stream_duration`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L775)
+- [`RouteActions.max_stream_duration.grpc_max_timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L781)
+- [`max_stream_duration`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/core/v3/protocol.proto#L95) from the [`HttpConnectionManager.common_http_options`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L289) as a default if `RouteActions.max_stream_duration.max_stream_duration` is unset.
+
+Notably, gRPC will not support
+[`RouteActions.timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L952)
+or
+[`RouteActions.max_stream_duration.grpc_timeout_offset`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L789).
 The `timeout` field begins the timeout counter from a point in time
 incompatible with gRPC's timeout model.
-`max_stream_duration.grpc_timeout_offset` is used in Envoy for ensuring the
+`RouteActions.max_stream_duration.grpc_timeout_offset` is used in Envoy for ensuring the
 proxy detects timeouts before the gRPC client cancels the RPC due to its
 deadline, so supporting it directly in the client is unnecessary and would be
 counter-productive.
 
-If `max_stream_duration.grpc_max_timeout` is not set, the
-`max_stream_duration.max_stream_duration` field will specify the maximum RPC
-timeout for this route, with a default of unlimited.
+If `RouteActions.max_stream_duration.grpc_max_timeout` is not set, the
+`RouteActions.max_stream_duration.max_stream_duration` field will specify the
+maximum RPC timeout for this route (or fall-back to the HTTP Connection Manager
+setting), with a default of unlimited.
 
-If `max_stream_duration.grpc_max_timeout` is present, then
-`max_stream_duration.max_stream_duration` is ignored and
-`max_stream_duration.grpc_max_timeout` limits the maximum timeout for RPCs on
-this route instead.  A value of 0 indicates the application's deadline is used
-without modification.
+If `RouteActions.max_stream_duration.grpc_max_timeout` is present, then
+`RouteActions.max_stream_duration.max_stream_duration` is ignored and
+`RouteActions.max_stream_duration.grpc_max_timeout` limits the maximum timeout
+for RPCs on this route instead.  A value of 0 indicates the application's
+deadline is used without modification.
 
-In all cases, the RPC timeout set by the application may never be
-exceeded due to these settings.  For examples, see the following
-table:
+In all cases, the RPC timeout set by the application may never be exceeded due
+to these settings.  For examples, see the following table.  Note that the
+`max_stream_duration` column refers to the effective setting based on both
+`RouteActions.max_stream_duration.max_stream_duration` and the
+`max_stream_duration` from the HTTP Connection Manager's `common_http_options`.
 
 Application Deadline | `grpc_max_timeout` | `max_stream_duration` | Effective Timeout
 -------------------- | ------------------ | --------------------- | -----------------
