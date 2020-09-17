@@ -179,7 +179,8 @@ gRPC will not support:
 If `RouteAction.max_stream_duration.grpc_max_timeout` is not set, the
 `RouteAction.max_stream_duration.max_stream_duration` field will specify the
 maximum RPC timeout for this route (or fall-back to the HTTP Connection Manager
-setting), with a default of unlimited.
+setting).  If it is unset or set to zero, the application's deadline is used
+without modification.
 
 If `RouteAction.max_stream_duration.grpc_max_timeout` is present, then
 `RouteAction.max_stream_duration.max_stream_duration` is ignored and
@@ -196,10 +197,12 @@ to these settings.  For examples, see the following table.  Note that the
 Application Deadline | `grpc_max_timeout` | `max_stream_duration` | Effective Timeout
 -------------------- | ------------------ | --------------------- | -----------------
 unset | unset | unset | infinite
+unset | unset | 0 | infinite
 unset | unset | 10s | 10s
 unset | 0s | any | infinite
 unset | 10s | any | 10s
 20s | unset | unset | 20s
+20s | unset | 0 | 20s
 20s | unset | 10s | 10s
 20s | 0s | any | 20s
 20s | 10s | any | 10s
