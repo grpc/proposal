@@ -1,8 +1,8 @@
 Integrate the grpc-gateway as a multi-language option to allow for REST endpoint support
 ----
 * Author(s): Keith Adler (Talador12)
-* Approver: a11r
-* Status: Draft --- {Draft, In Review, Ready for Implementation, Implemented}
+* Approver: wenbozhu and/or gnossen
+* Status: In Review --- {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: Core (C++), Java, Python, and Go.
 * Last updated: 2020-09-14
 * Discussion at: https://groups.google.com/u/1/g/grpc-io/c/rEfqlLL9Emw (filled after thread exists)
@@ -15,7 +15,11 @@ Based on this [gRPC issue](https://github.com/grpc/grpc/issues/23979), the goal 
 grpc-gateway is a separate binary/process from your server. It can be deployed alongside a server of any language, which (I assume) is what's happening in the gist you linked above. We have talked about in-library support for this sort of thing in the past. That way, you wouldn't have to orchestrate a separate gateway process. But that would be a pretty substantial effort.
 ```
 
-As gRPC has grown in popularity and usage, an option to run in-library support would be a huge win for many teams. Instead of a sidecar, this gateway could be run alongside the gRPC server instance itself. As it would be a substantial effort, the background section will detail out the complexity of implementing across all languages and the steps required to start this process.
+As gRPC has grown in popularity and usage, an option to run in-library support would be a huge win for many teams.
+
+Instead of a separate package, this gateway could be run alongside the gRPC server instance itself. This would allow for support to be built into packages like KFServing, BentoML, and Seldon Core for both gRPC and REST/JSON traffic (that is ultimately routed to gRPC through this Gateway). The above packages are just ones used in a machine learning space, but there are many other microservices that have clients that could request via REST/JSON if the gateway functionality was enabled. For teams using gRPC, it is uncommon to build out the separate gateway, as it is a separate feature level effort for each team to implement. Generally, adding the `grpc-gateway` as a package to an open source project as an entirely different component is not intuitive or as accessible as a built into gRPC option would be. If this component was built into gRPC, it would be much easier to add an optional HTTP/JSON endpoint to your existing gRPC implementation. This should save a lot of duplicated development effort for many teams, projects, and libraries.
+
+As this feature request would be a substantial effort, the background section will detail out the complexity of implementing across all languages and the steps required to start this process.
 
 
 ## Background
@@ -47,13 +51,15 @@ and:
 The first step would be for the interested party to start a gRFC in https://github.com/grpc/proposal. There, you'd want to get relevant people from all of the languages to chime in on the requirements for the cross-language feature. Then, we'd need to get into per-language details. Finally, we'd need to ensure that support is added across the language matrix, which will entail at least three different implementations: Core (C++), Java, and Go.
 ```
 
+More implementation details in `Implementation`.
+
 ### Related Proposals: 
 
 * N/A - none was referenced by the gRPC team, although they have discussed implementing this feature informally in the past.
 
 ## Proposal
 
-Add a [grpc-gateway](https://github.com/grpc-ecosystem/grpc-gateway) like component that is a separate binary/process from the gRPC server. It can be deployed alongside a server of any language. This should be in-library support, and not a `grpc-ecosystem` project. That way, you wouldn't have to orchestrate a separate gateway process. To implement this, it is necessary to ensure that support is added across the language matrix, which will entail four different implementations: Core (C++), Java, Python, and Go.
+Add a [grpc-gateway](https://github.com/grpc-ecosystem/grpc-gateway) like component that able to REST+JSON towards the gRPC server. It can be deployed alongside a server of any language. This should be in-library support, and not a `grpc-ecosystem` project. To implement this, it is necessary to ensure that support is added across the language matrix, which will entail four different implementations: Core (C++), Java, Python, and Go. Core should come first so that as much as possible is language agnostic.
 
 ## Rationale
 
@@ -69,10 +75,20 @@ To implement this, it is necessary to ensure that support is added across the la
 
 First draft of an order:
 
-1. C++
+1. C++ (Core) `If possible, the runtime aspect should be implemented entirely in Core, so that it won't have to be reimplemented for Python, Ruby, PHP, and C#.` - @gnossen
 2. Python
 3. Go
 4. Java
+
+Credit to @gnossen on this:
+
+```
+There are two big chunks to this feature:
+
+1) Codegen - Codegen is definitely language-specific, but the runtime aspect doesn't have to be.
+
+2) The runtime HTTP/1 server - If possible, the runtime aspect should be implemented entirely in Core, so that it won't have to be reimplemented for Python, Ruby, PHP, and C#.
+```
 
 Looking for help on additional implementation requirements.
 
