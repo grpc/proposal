@@ -1,4 +1,4 @@
-`weighted_round_robin` lb_policy for per endpoint weight from `ClusterLoadAssignment` response
+`weighted_round_robin` lb_policy for per endpoint `load_balancing_weight` from `ClusterLoadAssignment` response
 ----
 * Author(s): Yi-Shu Tai (echo80313@gmail.com)
 * Approver: a11r, markdroth
@@ -13,18 +13,17 @@ This proposal is for carrying per endpoint weight in address attribute from [`Cl
 This proposal is based on [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md).
 
 ## Background
-
-[A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md) describes resolver/LB architecture and xDS client behavior. This proposal specifically extends the behavior of EDS to pass [`load_balancing_weight`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L108) of [`LbEndpoint`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L76) in per-address attribute to `lb_policy`, so that `lb_policy` can make use of the information for better load balancing.
+[A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md) describes resolver/LB architecture and xDS client behavior. This proposal specifically extends the behavior of EDS section in [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md). We pass [`load_balancing_weight`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L108) of [`LbEndpoint`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L76) to `lb_policy` by carrying per endpoint `load_balancing_weight` in per-address attribute. `lb_policy` can make use of the information provided by per endpoint `load_balancing_weight` for better load balancing.
 
 To best utilize the information, we also propose a new `lb_policy`, `weighted_round_robin` which works on `LbEndpoint`s within same [`LocalityLbEndpoints`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L116).
 
+This proposal has two parts. The first part is the new `lb_policy`, `weighted_round_robin`. The second part discuss how we handle per endpoint `load_balancing_weight` from `ClusterLoadAssignment` response.
 
 ### Related Proposals:
 * [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md).
 
 ## Proposal
-
-The proposal is to carry [`load_balancing_weight`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L108) of [`LbEndpoint`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L76) from [`ClusterLoadAssignment`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint.proto#L34) response to `lb_policy` and implement a `weighted_round_robin` policy based on Earliest deadline first scheduling algorithm picker [EDF](https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling). Each endpoint will get fraction equal to the [`load_balancing_weight`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L108) for the [`LbEndpoint`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L76) divided by the sum of the `load_balancing_weight` of all `LbEndpoint` within the same [`LocalityLbEndpoints`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L116) of traffic routed to the locality.
+The proposal is to carry [`load_balancing_weight`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L108) of [`LbEndpoint`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L76) from [`ClusterLoadAssignment`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint.proto#L34) response to `lb_policy` and introduce a new `weighted_round_robin` policy based on Earliest deadline first scheduling algorithm picker [EDF](https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling). Each endpoint will get fraction equal to the [`load_balancing_weight`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L108) for the [`LbEndpoint`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L76) divided by the sum of the `load_balancing_weight` of all `LbEndpoint` within the same [`LocalityLbEndpoints`](https://github.com/envoyproxy/envoy/blob/2dcf20f4baf5de71ba1d8afbd76b0681613e13f2/api/envoy/config/endpoint/v3/endpoint_components.proto#L116) of traffic routed to the locality.
 
 ### Overview of `weighted_round_robin` policy
 The core of `weighted_round_robin` is [EDF](https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling) picker.
@@ -72,11 +71,19 @@ The service config for `weighted_round_robin` is very similar to `round_robin`
 }
 ```
 
-### On update of `ClusterLoadAssignment`
+### Handling per endpoint `load_balancing_weight` from `ClusterLoadAssignment` response
+
+This part extends the behavior of EDS section in [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md). Instead of discarding the per endpoint `load_balancing_weight`, we want to add it to per-address attibute and pass it along to `lb_policy`.
+
+#### `lb_policy` for per endpoint `load_balancing_weight` from `ClusterLoadAssignment`
+When the `lb_policy` field in CDS response is `ROUND_ROBIN`, we use `weighted_round_robin` as the `lb_policy`.
+
+As of today, we only accept `ROUND_ROBIN` as `lb_policy` in CDS response per [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md). Therefore, `weighted_round_robin` will always be used.
+
+#### On update of `ClusterLoadAssignment`
 When an EDS update is received, an update will be sent to the `lb_policy`. The `lb_policy` will create a new picker. This is slightly Different from [Envoy](https://github.com/envoyproxy/envoy/blob/51551ae944c642e6fc61563cbea8653087e70f1f/source/common/upstream/load_balancer_impl.cc#L733-L737). We'd like to udpate EDF priority queue so that new weights applied immediately even endpoints list is not changed.
 
-
-### NOTE
+#### NOTE
 - `weighted_round_robin` should always be updated to the lastest `ClusterLoadAssignment`. It's xDS server's responsibility to maintain consistency.
 
 ## Rationale
@@ -94,3 +101,4 @@ The reasons to introduce a new algorithm instead of re-using the same algorithm 
 N/A
 
 ## Open issues (if applicable)
+- Do we need a way to opt out WRR even per endpoint weight is assigned by ClusterLoadAssignment?
