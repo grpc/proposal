@@ -164,29 +164,29 @@ support fields use to control the first timer, but not the second timer.
 Specifically, the following xDS timeout-related settings will be supported:
 
 - [`RouteAction.max_stream_duration.max_stream_duration`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L775)
-- [`RouteAction.max_stream_duration.grpc_max_timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L781)
+- [`RouteAction.max_stream_duration.grpc_timeout_header_max`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L781)
 - [`max_stream_duration`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/core/v3/protocol.proto#L95) from the [`HttpConnectionManager.common_http_options`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L289) as a default if `RouteAction.max_stream_duration.max_stream_duration` is unset.
 
 gRPC will not support:
 
 - [`RouteAction.timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L952).
   This field begins the timeout counter from a point in time incompatible with gRPC's timeout model.
-- [`RouteAction.max_stream_duration.grpc_timeout_offset`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L789).
+- [`RouteAction.max_stream_duration.grpc_timeout_header_offset`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L789).
   This field is used in Envoy for ensuring the proxy detects timeouts before
   the gRPC client cancels the RPC due to its deadline, so supporting it
   directly in the client is unnecessary and would be counter-productive.
 
-If `RouteAction.max_stream_duration.grpc_max_timeout` is not set, the
+If `RouteAction.max_stream_duration.grpc_timeout_header_max` is not set, the
 `RouteAction.max_stream_duration.max_stream_duration` field will specify the
 maximum RPC timeout for this route (or fall-back to the HTTP Connection Manager
 setting).  If it is unset or set to zero, the application's deadline is used
 without modification.
 
-If `RouteAction.max_stream_duration.grpc_max_timeout` is present, then
+If `RouteAction.max_stream_duration.grpc_timeout_header_max` is present, then
 `RouteAction.max_stream_duration.max_stream_duration` is ignored and
-`RouteAction.max_stream_duration.grpc_max_timeout` limits the maximum timeout
-for RPCs on this route instead.  A value of 0 indicates the application's
-deadline is used without modification.
+`RouteAction.max_stream_duration.grpc_timeout_header_max` limits the maximum
+timeout for RPCs on this route instead.  A value of 0 indicates the
+application's deadline is used without modification.
 
 In all cases, the RPC timeout set by the application may never be exceeded due
 to these settings.  For examples, see the following table.  Note that the
@@ -194,8 +194,8 @@ to these settings.  For examples, see the following table.  Note that the
 `RouteAction.max_stream_duration.max_stream_duration` and the
 `max_stream_duration` from the HTTP Connection Manager's `common_http_options`.
 
-Application Deadline | `grpc_max_timeout` | `max_stream_duration` | Effective Timeout
--------------------- | ------------------ | --------------------- | -----------------
+Application Deadline | `grpc_timeout_header_max` | `max_stream_duration` | Effective Timeout
+-------------------- | ------------------------- | --------------------- | -----------------
 unset | unset | unset | infinite
 unset | unset | 0 | infinite
 unset | unset | 10s | 10s
