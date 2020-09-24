@@ -164,14 +164,14 @@ support fields use to control the first timer, but not the second timer.
 Specifically, the following xDS timeout-related settings will be supported:
 
 - [`RouteAction.max_stream_duration.max_stream_duration`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L775)
-- [`RouteAction.max_stream_duration.grpc_timeout_header_max`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L781)
+- [`RouteAction.max_stream_duration.grpc_timeout_header_max`](https://github.com/envoyproxy/envoy/blob/1fb4db754eabb9d659d255d1801b0bfc1a31cd9c/api/envoy/config/route/v3/route_components.proto#L781)
 - [`max_stream_duration`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/core/v3/protocol.proto#L95) from the [`HttpConnectionManager.common_http_options`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L289) as a default if `RouteAction.max_stream_duration.max_stream_duration` is unset.
 
 gRPC will not support:
 
 - [`RouteAction.timeout`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L952).
   This field begins the timeout counter from a point in time incompatible with gRPC's timeout model.
-- [`RouteAction.max_stream_duration.grpc_timeout_header_offset`](https://github.com/envoyproxy/envoy/blob/6f2ad057f8655e2688a195337f7520dbd77015fa/api/envoy/config/route/v3/route_components.proto#L789).
+- [`RouteAction.max_stream_duration.grpc_timeout_header_offset`](https://github.com/envoyproxy/envoy/blob/1fb4db754eabb9d659d255d1801b0bfc1a31cd9c/api/envoy/config/route/v3/route_components.proto#L789).
   This field is used in Envoy for ensuring the proxy detects timeouts before
   the gRPC client cancels the RPC due to its deadline, so supporting it
   directly in the client is unnecessary and would be counter-productive.
