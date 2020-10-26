@@ -382,10 +382,12 @@ field](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/r
         be evalulated). We may add support for this feature later, but the
         service owners need to be careful how they start using it, because the
         older clients will ignore it
-*   Must not have
+*   Can have
     [case\_sensitive](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L410)
-    set to false (OK to be unset, default value is true)
-    *   Setting this to false will cause a NACK
+    *   If the config explicitly sets case\_sensitive to false, the client will
+        do case\_insensitive matches (e.g. "MyService/MyMethod" will match a
+        route on "/myservice/mymethod"). But note that the gRPC backend will
+        still do case\_sensitive matches.
 
 The route’s [action
 field](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L181)
