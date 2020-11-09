@@ -66,6 +66,9 @@ Notes
 - If all endpoints have the same `load_balancing_weight`, `EDF` picker degenerates to `round_robin` picker. The order of picked subschannel is purely decided by `order_offset`. It's easier to reason and consistent with envoy.
 - Endpoints do not have `load_balancing_weight` is assigned to 1 (the smallest possible weight). This is to be consistent with the [behavior of envoy on missing weight assignment](https://github.com/envoyproxy/envoy/blob/5d95032baa803f853e9120048b56c8be3dab4b0d/source/common/upstream/upstream_impl.cc#L359)
 
+#### Subchannel connectivity management
+`edf_weighted_round_robin` proactively monitors the connectivity of each subchannel. `edf_weighted_round_robin` always tries to keep one connection open to each address in the address list at all times. When `edf_weighted_round_robin` is first instantiated, it immediately tries to connect to all addresses, and whenever a subchannel becomes disconnected, it immediately tries to reconnect.
+
 #### Service Config
 The service config for the `edf_weighted_round_robin` LB policy is an empty proto message
 ```
@@ -97,11 +100,11 @@ The reason to refresh EDF picker even there is only weight change on some endpoi
 
 The reasons to introduce a new algorithm instead of re-using the same algorithm of `weighted_target` policy are
 - [EDF](https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling) maintains FIFO order for endpoints with same weight which is easier to reason.
-- We want to be consistent with the behavior of Envoy.
+- We want to be consistent with the behavior of Envoy on how lb_policy picks the backend for sending the request. However, there is a difference between `edf_weighted_round_robin` and `edf_scheduler` of Envoy. `edf_weighted_round_robin` actively monitors the connectivity of each subchannel but `edf_scheduler` of Envoy does not.
 
 ## Implementation
 
 N/A
 
 ## Open issues (if applicable)
-- Do we need a way to opt out WRR even per endpoint weight is assigned by ClusterLoadAssignment?
+N/A
