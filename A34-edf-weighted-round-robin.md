@@ -49,22 +49,23 @@ struct EdfEntry {
     uint64 order_offset;
 
     // `load_balancing_weight` of this endpoint from address attribute of this endpoint.
-    double weight;
+    uint32 weight;
 
     // Subchannel data structure of this endpoint.
     Subchannel subchannel;
 }
 ```
 Initialization
-- At the very beginning, `deadline` of an entry `e` is equal to `1/e.weight`.
+- At the very beginning, `deadline` of an entry `e` is equal to `1.0/e.weight`.
 - We assign `order_offset` to each entry while constructing the priority queue. `order_offset` assigned to an entry is distinct and nonnegative integer. During the whole lifecycle of this picker, `order_offset` of an entry is unchanged.
 
 Pick
-- On each call to the `Pick`, EDF picker picks the entry `e` on the top of the queue, returns the subchannel associated with the entry. After that, picker updates the `deadline` of `e` to `e.deadline + 1/weight` and either performs a pop and push the entry back to the queue or key increase operation.
+- On each call to the `Pick`, EDF picker picks the entry `e` on the top of the queue, returns the subchannel associated with the entry. After that, picker updates the `deadline` of `e` to `e.deadline + 1.0/weight` and either performs a pop and push the entry back to the queue or key increase operation.
 
 Notes
 - If all endpoints have the same `load_balancing_weight`, `EDF` picker degenerates to `round_robin` picker. The order of picked subschannel is purely decided by `order_offset`. It's easier to reason and consistent with envoy.
 - Endpoints do not have `load_balancing_weight` is assigned to 1 (the smallest possible weight). This is to be consistent with the [behavior of envoy on missing weight assignment](https://github.com/envoyproxy/envoy/blob/5d95032baa803f853e9120048b56c8be3dab4b0d/source/common/upstream/upstream_impl.cc#L359)
+
 
 #### Subchannel connectivity management
 `edf_weighted_round_robin` proactively monitors the connectivity of each subchannel. `edf_weighted_round_robin` always tries to keep one connection open to each address in the address list at all times. When `edf_weighted_round_robin` is first instantiated, it immediately tries to connect to all addresses, and whenever a subchannel becomes disconnected, it immediately tries to reconnect.
@@ -107,4 +108,4 @@ The reasons to introduce a new algorithm instead of re-using the same algorithm 
 N/A
 
 ## Open issues (if applicable)
-N/A
+* How to desync to avoid all clients do synchronized pick?
