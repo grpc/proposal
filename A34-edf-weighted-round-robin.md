@@ -74,7 +74,7 @@ Notes
 The service config for the `edf_weighted_round_robin` LB policy is an empty proto message
 ```
 {
-  load_balancing_config: { edf_weighted_round_robin: {}}
+  load_balancing_config: {edf_weighted_round_robin: {}}
 }
 ```
 
@@ -108,4 +108,4 @@ The reasons to introduce a new algorithm instead of re-using the same algorithm 
 N/A
 
 ## Open issues (if applicable)
-* How to desync to avoid all clients do synchronized pick?
+* How to desync to avoid all clients do synchronized pick? i.e. xDS server sends out a new list of endpoints, then `edf_weighted_round_robin` rebuilds the picker. All clients will start sending requests to endpoints in the same order, so instead of spreading load, clients start slamming endpoints one by one. To fix the issue, we can randomize the starting index in simpler round robin, but can we do the same thing in `edf_weighted_round_robin`?
