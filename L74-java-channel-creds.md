@@ -2,8 +2,8 @@ Java: Channel and Server Credentials
 ----
 * Author(s): [Eric Anderson](https://github.com/ejona86)
 * Approver: sanjaypujare
-* Status: Ready for Implementation {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in: <language, ...>
+* Status: Implemented
+* Implemented in: Java
 * Last updated: 2020-11-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/GNU9svnDsQs/m/kG6XsUy9BwAJ
 
@@ -562,6 +562,6 @@ more clear and would have limited cost.
 
 ## Implementation
 
-ejona86 will implement. ServerCredentials will be implemented shortly after
-ChannelCredentials. ChannelCredentials will be implemented in
-https://github.com/grpc/grpc-java/pull/7294
+ChannelCredentials were added in https://github.com/grpc/grpc-java/pull/7294 .
+ServerCredentials were added in https://github.com/grpc/grpc-java/pull/7601 .
+It was released as an ExperimentalApi in grpc-java 1.34.0.
