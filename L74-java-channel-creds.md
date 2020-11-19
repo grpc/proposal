@@ -4,7 +4,7 @@ Java: Channel and Server Credentials
 * Approver: sanjaypujare
 * Status: Ready for Implementation {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2020-08-27
+* Last updated: 2020-11-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/GNU9svnDsQs/m/kG6XsUy9BwAJ
 
 ## Abstract
@@ -233,11 +233,12 @@ public final class TlsChannelCredentials extends ChannelCredentials {
 ```
 
 An example `Feature` could be `CLIENT_CERTIFICATE`. When the `Feature` is
-added, methods `getCertificateChain()`, `getPrivateKey()`, `getPassword()` can
-be added. Observing the contents of those methods would be a requirement for
-`CLIENT_CERTIFICATE`. An implementation understanding `CLIENT_CERTIFICATE`
-might not support encrypted private keys and so could consider the credential
-unsupported if `getPassword()` returned non-`null`.
+added, methods `getCertificateChain()`, `getPrivateKey()`,
+`getPrivateKeyPassword()` can be added. Observing the contents of those methods
+would be a requirement for `CLIENT_CERTIFICATE`. An implementation understanding
+`CLIENT_CERTIFICATE` might not support encrypted private keys and so could
+consider the credential unsupported if `getPrivateKeyPassword()` returned
+non-`null`.
 
 To support migration from existing builder options, Netty and OkHttp will
 provide transport-specific credentials. Note that neither transport will support
@@ -481,7 +482,7 @@ public final class TlsServerCredentials extends ServerCredentials {
 
   public byte[] getCertificateChain() { return Arrays.copyOf(...); }
   public byte[] getPrivateKey() { return Arrays.copyOf(...); }
-  public String getPassword() {...}
+  public String getPrivateKeyPassword() {...}
 
   /* Other methods can be added to support various Features */
 
