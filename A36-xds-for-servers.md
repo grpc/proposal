@@ -11,9 +11,9 @@ A36: xDS-Enabled Servers
 ## Abstract
 
 Bring xDS-based configuration to Servers. xDS has many features and this gRFC
-will not provide support for any of them in particular. However, it will be
-provide the central plumbing and APIs to add support for specific features and
-have them work without additional user code changes.
+will not provide support for any of them in particular. However, it will provide
+the central plumbing and APIs to add support for specific features and have them
+work without additional user code changes.
 
 There's multiple pieces involved:
 
@@ -95,8 +95,8 @@ is _not_ percent encoded, as this string is not a URI.
 
 The xDS-returned Listener must have an [`address`][Listener.address] that
 matches the listening address provided. The Listener's `address` would be a TCP
-`SocketAddress` with matching `address` and `port_value`. The XdsClient must NAK
-the resource if the address does not match.
+`SocketAddress` with matching `address` and `port_value`. The XdsClient must
+NACK the resource if the address does not match.
 
 Although `Filter`s will not be observed initially, the `FilterChain` contains
 data that may be used. When looking for a FilterChain, the standard matching
@@ -229,15 +229,15 @@ FilterChainMatch for the specific connection.
 
 ### Go
 
-Create an `xds.Server` struct that would internally contain a `grpc.Server`. It
-would inject its own `StreamServerInterceptor` and `UnaryServerInterceptor`s
+Create an `xds.GRPCServer` struct that would internally contain a `grpc.Server`.
+It would inject its own `StreamServerInterceptor` and `UnaryServerInterceptor`s
 into the `grpc.Server`. The interceptors would be controlled by an
-`atomic.Value` that would update with the configuration. When
-`Serve(net.Listener)` is called it creates an XdsClient and observes the
-`Addr()` to create a watch.  Before `Serve(net.Listener)` returns, it will shut
-down the XdsClient. Note that configuration is nominally per-address, but there
-is only one set of interceptors, so the interceptors will need to look up the
-per-address configuration each RPC.
+`atomic.Value` or mutex-protected field that would update with the
+configuration. When `Serve(net.Listener)` is called it creates an XdsClient and
+observes the `Addr()` to create a watch.  Before `Serve(net.Listener)` returns,
+it will shut down the XdsClient. Note that configuration is nominally
+per-address, but there is only one set of interceptors, so the interceptors will
+need to look up the per-address configuration each RPC.
 
 TODO: It looks like there is a lifetime issue for the XdsClient, as RPCs can
 continue after the listener is closed and Serve() returns.
@@ -251,7 +251,7 @@ Because service registration is done on a method in the generated code, and
 s := grpc.NewServer()
 pb.RegisterGreeterServer(s, &server{})
 // it'd be
-s := xds.NewServer()
+s := xds.NewGRPCServer()
 pb.RegisterGreeterServer(s.Server(), &server{})
 ```
 
