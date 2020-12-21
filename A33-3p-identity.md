@@ -20,9 +20,9 @@ N/A
 
 ## Proposal
 
-This doc propases to extend the access to Google APIS directly with 3p identities. The crednetials of the 3p identities with be in one of the 3 following formats:
+This doc proposes to extend the access to Google APIS directly with 3p identities. The crednetials of the 3p identities with be in one of the 3 following formats:
 
-File-source credentials
+**File-source credentials**
 ```
 {
   "type": "external_account",
@@ -37,7 +37,7 @@ File-source credentials
 }
 ```
 
-Url-sourced credentials
+**Url-sourced credentials**
 ```
 {
   "type": "external_account",
@@ -55,7 +55,7 @@ Url-sourced credentials
 }
 ```
 
-AWS credentials
+**AWS credentials**
 ```
 {
   "type": "external_account",
@@ -74,10 +74,12 @@ AWS credentials
 }
 ```
 
-Implicit flow
+**Implicit flow**
+
 In core, the underlying credentials retrieval process of `grpc::GoogleDefaultCredentials()` will be extended to accept 3p identity credentials implicitly.
 
-Explicit flow
+**Explicit flow**
+
 In core and cpp, a public api will be added to create an `ExternalAccountCredentials` with explicit 3p identity credentials.
 ```
 // .../include/grpcpp/security/credentials.h
