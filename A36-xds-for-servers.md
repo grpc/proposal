@@ -54,16 +54,18 @@ also allow it access to the server to change behavior (e.g., via an
 interceptor). Users will use the XdsServer API to construct the server instead
 of the existing API.
 
-Credential configuration will be managed separately by providing a
-XdsServerCredential, similar to client-side. The user must pass the
-XdsServerCredential to the XdsServer API to enable control-plane managed TLS
-certificates. The user is free to pass other ServerCredential types to XdsServer
-and they will be honored. Note that RBAC is authz, not authn, so it would be
-enabled by using the XdsServer, even without XdsServerCredential.
+Credential configuration will be managed separately by providing
+XdsServerCredentials, similar to client-side. The user must pass the
+XdsServerCredentials to the XdsServer API to enable control-plane managed TLS
+certificates. While the user-facing API is discussed here, the precise
+implementation details are covered in gRFC A29. The user is free to pass other
+ServerCredentials types to XdsServer and they will be honored. Note that RBAC is
+authz, not authn, so it would be enabled by using the XdsServer, even without
+XdsServerCredentials.
 
 When starting the XdsServer, it will start communication with xDS to receive
-initial configuration. `bind()` and `listen()` can happen immediately, but
-`accept()`ing on the port will be delayed until the initial configuration is
+initial configuration. `bind()` and `listen()` may happen immediately, but
+`accept()`ing on the port must be delayed until the initial configuration is
 received. `listen()` should be delayed if possible, but commonly needs to happen
 immediately after `bind()` for implementation-specific reasons. If initial
 configuration fails, the server will continue delaying and server startup will
@@ -71,8 +73,14 @@ stall until it succeeds. Each language will provide an XdsServer-specific API to
 inform the application of initial communication failures. If the user does not
 configure the API, gRPC should log the errors at a default-visible log level. If
 the xds bootstrap is missing or invalid, implementations would ideally fail
-server startup, but a permanent hang is also acceptable. "Initial configuration"
-does not have to include server credentials.
+server startup, but a permanent hang is also acceptable.
+
+The XdsServer does not have to wait until server credentials (e.g., TLS certs)
+are available before accepting connections; since XdsServerCredentials might not
+be used, the server is free to lazily load credentials. However, the XdsServer
+should keep the credentials cache fresh and up-to-date after that initial
+lazy-loading, as it is clear at that point that XdsServerCredentials are being
+used.
 
 The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
 ```json
@@ -101,10 +109,10 @@ NACK the resource if the address does not match.
 Although `Filter`s will not be observed initially, the `FilterChain` contains
 data that may be used. When looking for a FilterChain, the standard matching
 logic must be used. Each `filter_chain_match` of the repeated
-[`filter_chains`][Listener.filter_chains] should be checked and if none match,
-the `default_filter_chain` must be used.  The following is a snippet of [all
-current fields of FilterChainMatch][FilterChainMatch], and if they will be
-handled specially:
+[`filter_chains`][Listener.filter_chains] should be checked for the specific
+connection and if none match, the `default_filter_chain` must be used.  The
+following is a snippet of [all current fields of
+FilterChainMatch][FilterChainMatch], and if they will be handled specially:
 
 [Listener.address]: https://github.com/envoyproxy/envoy/blob/11dee4e9c37c244f9de4bc339fdc8695e5de2c5d/api/envoy/config/listener/v3/listener.proto#L108
 [Listener.filter_chains]: https://github.com/envoyproxy/envoy/blob/11dee4e9c37c244f9de4bc339fdc8695e5de2c5d/api/envoy/config/listener/v3/listener.proto#L117
@@ -122,7 +130,7 @@ message FilterChainMatch {
   ConnectionSourceType source_type = 12;
   repeated core.v3.CidrRange source_prefix_ranges = 6;
   repeated uint32 source_ports = 7;
-  repeated string server_names = 11; // May always fail match if TLS unsupported
+  repeated string server_names = 11; // Always fail match for non-TLS connections
   string transport_protocol = 9; // Always fail match
   repeated string application_protocols = 10; // Always fail match
 }
@@ -194,7 +202,7 @@ will not need this notification.
 Create an `XdsServerBuilder` that extends `ServerBuilder` and delegates to a
 "real" builder. The server returned from `builder.build()` would be an xDS-aware
 server delegating to a "real" server instance. The `XdsServerBuilder` would
-install an `AtomicReference&lt;ServerInterceptor>`-backed interceptor in the
+install an `AtomicReference<ServerInterceptor>`-backed interceptor in the
 built server and pass the listening port and interceptor reference to the
 xDS-aware server when constructed. Since interceptors cannot be removed once
 installed, the builder may only be used once (`build()` should throw if called a
