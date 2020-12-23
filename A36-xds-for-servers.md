@@ -83,23 +83,27 @@ lazy-loading, as it is clear at that point that XdsServerCredentials are being
 used.
 
 The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
-```json
+```
 {
-  "grpc_server_resource_name_id": "example/resource",
+  // A template for the name of the Listener resource to subscribe to for a gRPC
+  // server. If the token `%s` is present in the string, it will be replaced
+  // with the server's listening "IP:port" (e.g., "0.0.0.0:8080", "[::]:8080").
+  "server_listener_resource_name_template": "example/resource/%s",
   // ...
 }
 ```
 
 XdsServer will use the normal `XdsClient` to communicate with the xDS server.
+There is no default value for `server_listener_resource_name_template` so if it
+is not present in the bootstrap then server creation or start will fail.
 The XdsServer will pass the listening address (commonly using a wildcard IP
 address, like `::` or `0.0.0.0`) to a new XdsClient API to start a watch for a
-`envoy.config.listener.v3.Listener` resource. XdsClient will concatenate the
-value of `grpc_server_resource_name_id` from the bootstrap,
-`?udpa.resource.listening_address=`, and the listening address to construct the
-resource name. For example, with an address of `[::]:80` and the example
-bootstrap field above, the resource name would be
-`example/resource?udpa.resource.listening_address=[::]:80`. Note that the `[]`
-is _not_ percent encoded, as this string is not a URI.
+`envoy.config.listener.v3.Listener` resource. XdsClient will perform the `%s`
+replacement if the token is present and watch the corresponding listener
+resource. No special character handling of the template or its replacement is
+performed. For example, with an address of `[::]:80` and a template of
+`grpc/server?xds.resource.listening_address=%s`, the resource name would be
+`grpc/server?xds.resource.listening_address=[::]:80`.
 
 The xDS-returned Listener must have an [`address`][Listener.address] that
 matches the listening address provided. The Listener's `address` would be a TCP
