@@ -104,13 +104,15 @@ is _not_ percent encoded, as this string is not a URI.
 The xDS-returned Listener must have an [`address`][Listener.address] that
 matches the listening address provided. The Listener's `address` would be a TCP
 `SocketAddress` with matching `address` and `port_value`. The XdsClient must
-NACK the resource if the address does not match.
+NACK the resource if the address does not match. The xDS client must also NACK
+the resource if `Listener.listener_filters` is non-empty.
 
-Although `Filter`s will not be observed initially, the `FilterChain` contains
-data that may be used. When looking for a FilterChain, the standard matching
-logic must be used. Each `filter_chain_match` of the repeated
+Although `FilterChain.filters`s will not be observed initially, the
+`FilterChain` contains data that may be used like TLS configuration in
+`transport_socket`. When looking for a FilterChain, the standard matching logic
+must be used. Each `filter_chain_match` of the repeated
 [`filter_chains`][Listener.filter_chains] should be checked for the specific
-connection and if none match, the `default_filter_chain` must be used.  The
+connection and if none match, the `default_filter_chain` must be used. The
 following is a snippet of [all current fields of
 FilterChainMatch][FilterChainMatch], and if they will be handled specially:
 
@@ -130,15 +132,17 @@ message FilterChainMatch {
   ConnectionSourceType source_type = 12;
   repeated core.v3.CidrRange source_prefix_ranges = 6;
   repeated uint32 source_ports = 7;
-  repeated string server_names = 11; // Always fail match for non-TLS connections
-  string transport_protocol = 9; // Always fail match
+  repeated string server_names = 11; // Always fail match
+  string transport_protocol = 9; // Only matches "raw_buffer"
   repeated string application_protocols = 10; // Always fail match
 }
 ```
 
-All fields are "supported," however, we know that some features are unsupported.
-Fields depending on missing features are either guaranteed a result that can be
-hard-coded or are unsafe to match (e.g., because we don't support filters).
+All fields are "supported," however, we know that some features separate from
+the match are unsupported. Fields depending on missing features are guaranteed a
+result that can be hard-coded. This applies to `destination_port` which relies
+on `use_original_dst`. It also applies to `server_names`, `transport_protocol`,
+`application_protocols` which depend on `Listener.listener_filters`.
 
 XdsClients may be shared without impacting this design. If shared, any mentions
 of "creating" or "shutting down" a XdsClient would simply mean "acquire a
