@@ -4,12 +4,12 @@
 * Approver: a11r
 * Status: Draft
 * Implemented in: core, cpp
-* Last updated: 2020-12-21
+* Last updated: 2021-01-20
 * Discussion at: 
 
 ## Abstract
 
-Enable access to Google APIs directly with 3p identities.
+The purpose of this proposal is to enable access to Google APIs directly with 3p identities.
 
 ## Background
 
