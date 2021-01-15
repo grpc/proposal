@@ -92,8 +92,13 @@ XdsServer should continue using the most recent configuration until connectivity
 is restored. However, XdsServer must accept configuration changes provided by
 the xDS server, including resource deletions. If that causes the XdsServer to
 lack essential configuration (e.g., the Listener was deleted) the server would
-need to enter "not serving" mode. The XdsServer is free to use a different "not
-serving" strategy post-startup than for the initial startup.
+need to enter "not serving" mode. "Not serving" requires existing connections to
+be closed, but already-started RPCs should not fail. The XdsServer is permitted
+to use the previously-existing configuration to service RPCs during a two-phase
+GOAWAY to avoid any RPC failures, or it may use a one-phase GOAWAY which will
+fail racing RPCs but in a way that the client may transparently retry. The
+XdsServer is free to use a different "not serving" strategy post-startup than
+for the initial startup.
 
 The XdsServer does not have to wait until server credentials (e.g., TLS certs)
 are available before accepting connections; since XdsServerCredentials might not
