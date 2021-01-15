@@ -15,7 +15,7 @@ will not provide support for any of them in particular. However, it will provide
 the central plumbing and APIs to add support for specific features and have them
 work without additional user code changes.
 
-There's multiple pieces involved:
+There are multiple pieces involved:
 
 *  The API surface exposed to users to enable the new system.
 *  The gRPC-internal plumbing to allow injecting behavior into servers, and
