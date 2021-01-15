@@ -49,10 +49,11 @@ xDS-powered gRPC features can be used without code changes.
 ## Proposal
 
 Each language will create an "XdsServer" API that will wrap the normal "Server"
-API. This will allow it to see the listening ports, start event, stop event, and
-also allow it access to the server to change behavior (e.g., via an
-interceptor). Users will use the XdsServer API to construct the server instead
-of the existing API.
+API. This will allow the implementation to see the listening ports, start event,
+stop event, and also allow it access to the server to change behavior (e.g., via
+an interceptor). Users will use the XdsServer API to construct the server
+instead of the existing API. XdsServer will not support ephemeral ports as part
+of this gRFC but may be enhanced in the future.
 
 Credential configuration will be managed separately by providing
 XdsServerCredentials, similar to client-side. The user must pass the
@@ -63,17 +64,36 @@ ServerCredentials types to XdsServer and they will be honored. Note that RBAC is
 authz, not authn, so it would be enabled by using the XdsServer, even without
 XdsServerCredentials.
 
-When starting the XdsServer, it will start communication with xDS to receive
-initial configuration. `bind()` and `listen()` may happen immediately, but
-`accept()`ing on the port must be delayed until the initial configuration is
-received. `listen()` should be delayed if possible, but commonly needs to happen
-immediately after `bind()` for implementation-specific reasons. If initial
-configuration fails, the server will continue delaying and server startup will
-stall until it succeeds. Each language will provide an XdsServer-specific API to
-inform the application of initial communication failures. If the user does not
-configure the API, gRPC should log the errors at a default-visible log level. If
-the xds bootstrap is missing or invalid, implementations would ideally fail
-server startup, but a permanent hang is also acceptable.
+### Serving and Not Serving
+
+To serve RPCs, the XdsServer must have its xDS configuration, provided via a
+Listener resource and potentialy other related resources. When its xDS
+configuration is unavailable the server must be in a "not serving" mode. This is
+ideally implemented by not `listen()`ing on the port. If that is impractical an
+implementation may be `listen()`ing on the port, but it must also `accept()` and
+immediately `close()` connections, making sure to not send any data to the
+client (e.g., no TLS ServerHello nor HTTP/2 SETTINGS). With either behavior,
+client connection attempts will quickly fail and clients would not perform
+further attempts without a backoff. Load balancing policies like `pick_first`
+would naturally attempt connections to any remaining addresses to quickly find
+an operational backend. However, the `accept()`+`listen()` approach will be
+improperly detected as server liveness for TCP heath checking.
+
+If the xDS bootstrap is missing or invalid implementations would ideally fail
+XdsServer startup, but it is also acceptable to consider it a lack of xDS
+configuration and enter a permanent "not serving" mode.
+
+If the server is unable to open serving ports, XdsServer startup may fail or it
+may enter "not serving" mode. If entering "not serving" mode, opening the port
+must be retried automatically (e.g., retry every minute).
+
+Communication failures do not impact the XdsServer's xDS configuration; the
+XdsServer should continue using the most recent configuration until connectivity
+is restored. However, XdsServer must accept configuration changes provided by
+the xDS server, including resource deletions. If that causes the XdsServer to
+lack essential configuration (e.g., the Listener was deleted) the server would
+need to enter "not serving" mode. The XdsServer is free to use a different "not
+serving" strategy post-startup than for the initial startup.
 
 The XdsServer does not have to wait until server credentials (e.g., TLS certs)
 are available before accepting connections; since XdsServerCredentials might not
@@ -81,6 +101,22 @@ be used, the server is free to lazily load credentials. However, the XdsServer
 should keep the credentials cache fresh and up-to-date after that initial
 lazy-loading, as it is clear at that point that XdsServerCredentials are being
 used.
+
+The XdsServer API will allow applications to register a "serving state" callback
+to be invoked when the server begins serving and when the server encounters
+errors that force it to be "not serving". If "not serving", the callback must be
+provided error information, for debugging use by developers. The error
+information should generally be language-idiomatic, but determining the cause of
+the error does not need to be machine-friendly. If the application does not
+register the callback, XdsServer should log any errors and each serving
+resumption after an error, all at a default-visible log level.
+
+XdsServer's start must not fail due to transient xDS issues, like missing xDS
+configuration from the xDS server. If XdsServer's start blocks waiting for xDS
+configuration an application can use the serving state callback to be notified
+of issues preventing startup progress.
+
+### xDS Protocol
 
 The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
 ```
@@ -95,23 +131,27 @@ The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
 
 XdsServer will use the normal `XdsClient` to communicate with the xDS server.
 There is no default value for `server_listener_resource_name_template` so if it
-is not present in the bootstrap then server creation or start will fail.
-The XdsServer will pass the listening address (commonly using a wildcard IP
-address, like `::` or `0.0.0.0`) to a new XdsClient API to start a watch for a
-`envoy.config.listener.v3.Listener` resource. XdsClient will perform the `%s`
-replacement if the token is present and watch the corresponding listener
-resource. No special character handling of the template or its replacement is
-performed. For example, with an address of `[::]:80` and a template of
-`grpc/server?xds.resource.listening_address=%s`, the resource name would be
-`grpc/server?xds.resource.listening_address=[::]:80`.
+is not present in the bootstrap then server creation or start will fail or the
+XdsServer will become "not serving". The XdsServer will pass the listening
+address (commonly using a wildcard IP address, like `::` or `0.0.0.0`) to a new
+XdsClient API to start a watch for a `envoy.config.listener.v3.Listener`
+resource. XdsClient will perform the `%s` replacement if the token is present
+and watch the corresponding listener resource. No special character handling of
+the template or its replacement is performed. For example, with an address of
+`[::]:80` and a template of `grpc/server?xds.resource.listening_address=%s`, the
+resource name would be `grpc/server?xds.resource.listening_address=[::]:80`.
 
-The xDS-returned Listener must have an [`address`][Listener.address] that
-matches the listening address provided. The Listener's `address` would be a TCP
-`SocketAddress` with matching `address` and `port_value`. The XdsClient must
-NACK the resource if the address does not match. The xDS client must also NACK
-the resource if `Listener.listener_filters` is non-empty.
+To be useful, the xDS-returned Listener must have an
+[`address`][Listener.address] that matches the listening address provided. The
+Listener's `address` would be a TCP `SocketAddress` with matching `address` and
+`port_value`. The XdsClient must be "not serving" if the address does not match.
 
-Although `FilterChain.filters`s will not be observed initially, the
+The xDS client must NACK the Listener resource if `Listener.listener_filters` is
+non-empty.
+
+### FilterChainMatch
+
+Although `FilterChain.filters`s will not be used as part of this gRFC, the
 `FilterChain` contains data that may be used like TLS configuration in
 `transport_socket`. When looking for a FilterChain, the standard matching logic
 must be used. Each `filter_chain_match` of the repeated
@@ -148,14 +188,16 @@ result that can be hard-coded. This applies to `destination_port` which relies
 on `use_original_dst`. It also applies to `server_names`, `transport_protocol`,
 `application_protocols` which depend on `Listener.listener_filters`.
 
+### Language-specifics
+
+The overall "wrapping" server API has many language-specific ramifications. We
+show each individual language's approach.
+
 XdsClients may be shared without impacting this design. If shared, any mentions
-of "creating" or "shutting down" a XdsClient would simply mean "acquire a
+of "creating" or "shutting down" an XdsClient would simply mean "acquire a
 reference" and "release a reference" on the shared instance, or similar
 behavior. Such sharing does not avoid the need of shutting down XdsClients when
 no longer in use; they are a resource and must not be leaked.
-
-This overall "wrapping" server API has many language-specific ramifications. We
-show each individual language's approach.
 
 ### C++
 
@@ -213,22 +255,38 @@ server delegating to a "real" server instance. The `XdsServerBuilder` would
 install an `AtomicReference<ServerInterceptor>`-backed interceptor in the
 built server and pass the listening port and interceptor reference to the
 xDS-aware server when constructed. Since interceptors cannot be removed once
-installed, the builder may only be used once (`build()` should throw if called a
-second time).
+installed, the builder may only be used once; `build()` should throw if called a
+second time. To allow the `XdsServerBuilder` to create addition servers if
+necessary, mutation of the builder after `build()` should also throw.
 
 The xDS-aware server’s `start()` will create the `XdsClient` with the passed
 port and wait for initial configuration before delegating to the real `start()`.
 If the xDS bootstrap is missing it will throw an IOException within `start()`.
-The `XdsClient` will be shut down on `shutdownNow()`/termination. When new or
-updated configuration is received, it will create a new intercepter and update
-the interceptor reference.
+The `XdsClient` will be shut down when the server is terminated (generally
+noticed via `shutdownNow()`/`awaitTermination()`). When new or updated
+configuration is received, it will create a new intercepter and update the
+interceptor reference.
 
-XdsServerBuilder will have an `xdsInitListener(XdsInitListener)`.
-`XdsInitListener` will have the one method `xdsLoadFailure(IOException)` that is
-called for failures loading the initial configuration within `start()`, since
-`start()` itself does not fail in that case. A default implementation will log
-the exception. If a user sets the listener, it will replace the default logging
-implementation.
+XdsServerBuilder will have an
+`xdsServingStatusListener(XdsServingStatusListener)` method.
+`XdsServingStatusListener` will be defined as:
+
+```java
+package io.grpc.xds;
+
+public interface XdsServingStatusListener {
+  void onServing();
+  void onNotServing(Throwable t);
+}
+```
+
+It is an interface instead of an abstract class as additional methods are not
+expected to be added before Java 8 language features are permitted in the code
+base. If this proves incorrect, an additional interface can be added.
+
+If not specified, a default implementation of `XdsServingStatusListener` will be
+used. It will log the exception and log calls to `onServing()` following a call
+to `onNotServing()` at WARNING level.
 
 In order to allow transport-specific configuration, the `XdsServerBuilder` will
 have a `@ExperimentalApi ServerBuilder transportBuilder()` method whose return
@@ -284,26 +342,11 @@ configuration.
 
 ## Rationale
 
-XdsServer server startup is delayed waiting on initial configuration from xDS to
+XdsServer server startup does not fail due to configuration from xDS server to
 avoid applications getting hung in the rare event of an issue during startup. If
 the start API was one-shot, then users would need to loop themselves and many
 might introduce bugs in the rarely-run code path or simply not handle the case
 at all.
-
-Ideally `listen()` would be delayed until just before `accept()` to avoid
-hanging new client connections. However, the kernel does not fully initialize
-the port details until `listen()` and some gRPC implementations have behavior
-and APIs that makes this infeasible. This may cause serious problems for
-specific clients using pick-first but is essentially unavoidable today. The
-impact is hoped to be low as servers will generally receive their initial
-configuration quickly (on the order of a second) and most clients will likely be
-using a variant of round-robin. We'd also encourge the xDS control plane to
-avoid handing out addresses of not-yet-started servers. There are a few possible
-remedies, for example using [Happy Eyeballs][RFC8305] for pick-first or having
-the server `accept()` and immediately `close()` connections, but any such
-mitigations would be future work.
-
-[RFC8305]: https://tools.ietf.org/html/rfc8305
 
 We chose the XdsServer approach over an "xDS Interceptor." In such a design, the
 user would just construct an XdsInterceptor and add it to their server.
