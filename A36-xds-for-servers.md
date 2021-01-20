@@ -3,7 +3,7 @@ A36: xDS-Enabled Servers
 * Author(s): [Eric Anderson](https://github.com/ejona86), [Doug
   Fawley](https://github.com/dfawley), [Mark Roth](https://github.com/markdroth)
 * Approver: markdroth
-* Status: Draft {Draft, In Review, Ready for Implementation, Implemented}
+* Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2020-11-19
 * Discussion at: <google group thread> (filled after thread exists)
@@ -196,7 +196,9 @@ on `use_original_dst`. It also applies to `server_names`, `transport_protocol`,
 ### Language-specifics
 
 The overall "wrapping" server API has many language-specific ramifications. We
-show each individual language's approach.
+show each individual language's approach. For C++ and wrapped languages we just
+show a rough sketch of how they would be done and expect a followup gRFC for
+more implementation details.
 
 XdsClients may be shared without impacting this design. If shared, any mentions
 of "creating" or "shutting down" an XdsClient would simply mean "acquire a
@@ -206,11 +208,13 @@ no longer in use; they are a resource and must not be leaked.
 
 ### C++
 
+This section is a sketch to convey the "feel" of the API. But details may vary.
+
 C will need to expose an API for C++ to utilize. We expect there will be an xDS
 filter that will be injected into the server. But we do not focus on that here
-and leave that as an implementation detail. Since C is monolithic and we are
-fine with xDS using internal APIs, there is quite a bit more flexibility in
-design options available for C than Java and Go.
+and leave that as an implementation detail to be part of a future gRFC. Since C
+is monolithic and we are fine with xDS using internal APIs, there is quite a bit
+more flexibility in design options available for C than Java and Go.
 
 Create an `XdsServerBuilder` that mirrors the `ServerBuilder` API. It may be
 possible to implement it via delegating to a `ServerBuilder` instance, but that
@@ -235,13 +239,15 @@ templates. If this becomes a problem more methods could become `virtual`.
 
 ### Wrapped Languages
 
+This section is a sketch to convey the "feel" of the API. But details may vary.
+
 C will expose an API for wrapped languages to utilize. We do not focus on that
-here and leave that as an implementation detail.
+here and leave that as an implementation detail to be part of a future gRFC.
 
 Each wrapped language will need a custom "xds server" creation API. This will
 vary per-language. We use Python here just as an example of how it may look.
 
-Python would add a `grpc.xds_server(...)` that mirrors `grpc.server(...)`. Since
+Python could add a `grpc.xds_server(...)` that mirrors `grpc.server(...)`. Since
 ports are added after the server is created, the returned `grpc.Server` object
 may be an xds-aware `Server` to coordinate with the C API when `server.start()`
 is called. However, its implementation should be trivial as it could mostly
@@ -347,8 +353,7 @@ received from the xDS server. The user is expected to provide this credentials
 as part of the `grpc.ServerOption`s passed to `xds.NewGRPCServer()`, if they are
 interested in sourcing their security configuration from the xDS server. It is
 the responsibility of the `xds.GRPCServer` implementation to forward the most
-recently received security
-configuration to the credentials implementation.
+recently received security configuration to the credentials implementation.
 
 ## Rationale
 
@@ -378,8 +383,18 @@ ServerCredential to use, which is unclear how that would be accomplished.
 
 ## Implementation
 
-[A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
+All prototyping work occurred in Java so it is furthest along, with only smaller
+changes necessary to converge with the design presented here. Go is expected to
+be complete very soon after Java. C++/wrapped languages are expected to lag
+waiting on the C core implementation.
 
-## Open issues (if applicable)
+* C++/wrapped languages. The surface APIs should be relatively easy compared to
+  the C core changes. The C core changes are being investigated by @markdroth
+  and the plan is to cover them in a separate gRFC. So this gRFC just tries to
+  show that the API design would work for C++/wrapped languages but there is no
+  associated implementation work.
 
-Go needs some final decisions made. C needs to be fleshed out.
+* Java. Implementation work primarily by @sanjaypujare, along with gRFC A29.
+  Added classes are in the `grpc-xds` artifact and `io.grpc.xds` package.
+
+* Go. Implementation work by @easwars
