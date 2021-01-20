@@ -6,7 +6,7 @@ A36: xDS-Enabled Servers
 * Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2020-11-19
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/CDjGypQi1J0
 
 ## Abstract
 
