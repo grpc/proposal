@@ -308,21 +308,27 @@ FilterChainMatch for the specific connection.
 
 ### Go
 
-Create an `xds.GRPCServer` struct that would internally contain a `grpc.Server`.
-It would inject its own `StreamServerInterceptor` and `UnaryServerInterceptor`s
-into the `grpc.Server`. The interceptors would be controlled by an
-`atomic.Value` or mutex-protected field that would update with the
-configuration. When `Serve(net.Listener)` is called it creates an XdsClient and
-observes the `Addr()` to create a watch.  Before `Serve(net.Listener)` returns,
-it will shut down the XdsClient. Note that configuration is nominally
-per-address, but there is only one set of interceptors, so the interceptors will
-need to look up the per-address configuration each RPC.
+Create an `xds.GRPCServer` struct that would internally contain an unexported
+`grpc.Server`. It would inject its own `StreamServerInterceptor` and
+`UnaryServerInterceptor`s into the `grpc.Server`. The interceptors would be
+controlled by an `atomic.Value` or mutex-protected field that would update with
+the configuration. 
 
-TODO: It looks like there is a lifetime issue for the XdsClient, as RPCs can
-continue after the listener is closed and Serve() returns.
+`GRPCServer.Serve()` takes a `net.Listener` instead of a `host:port` string to
+listen on, so as to be consistent with the `Serve()` method on the
+`grpc.Server`. The implementation expects the `Addr()` method on the passed in
+`net.Listener` to return an address of type `net.TCPAddr`. It then creates an
+XdsClient and observes the `Addr()` to create a watch.  Before
+`Serve(net.Listener)` returns, it will cancel the watch registered on the
+XdsClient. As part of `Stop()/GracefulStop()`, the XdsClient is shut down. Note
+that configuration is nominally per-address, but there is only one set of
+interceptors, so the interceptors will need to look up the per-address
+configuration for each RPC.
 
-Because service registration is done on a method in the generated code, and
-`grpc.Server` is a struct, the underlying `grpc.Server` will need to be exposed.
+Service registration is done on a method in the generated code which
+accepts a `grpc.ServiceRegistrar` interface. Both `grpc.Server` and 
+`xds.GRPCServer` implement this interface and therefore the latter can be passed to
+service registration methods just like the former.
 
 
 ```
@@ -331,19 +337,18 @@ s := grpc.NewServer()
 pb.RegisterGreeterServer(s, &server{})
 // it'd be
 s := xds.NewGRPCServer()
-pb.RegisterGreeterServer(s.Server(), &server{})
+pb.RegisterGreeterServer(s, &server{})
 ```
 
 
-To allow passing configuration, the `xds.Server` will be responsible for
-creating the actual `XdsTransportCredentials`. There will be a façade
-`XdsTransportCredentials` for the user to provide as a `ServerOption`.
-`xds.Server` will look through the `ServerOptions`, do a type assertion on the
-`TransportCredential`, and if it is the façade `XdsTransportCredentials` it will
-replace the credentials with the real `XdsTransportCredential`. The real
-`XdsTransportCredential` will need to use the local IP to find the port-specific
-configuration.
-
+Package `credentials/xds` exports a `NewServerCredentials()` function which
+returns a transport credentials implementation which uses security configuration
+received from the xDS server. The user is expected to provide this credentials
+as part of the `grpc.ServerOption`s passed to `xds.NewGRPCServer()`, if they are
+interested in sourcing their security configuration from the xDS server. It is
+the responsibility of the `xds.GRPCServer` implementation to forward the most
+recently received security
+configuration to the credentials implementation.
 
 ## Rationale
 
