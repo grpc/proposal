@@ -79,7 +79,7 @@ would naturally attempt connections to any remaining addresses to quickly find
 an operational backend. However, the `accept()`+`listen()` approach will be
 improperly detected as server liveness for TCP heath checking.
 
-If the xDS bootstrap is missing or invalid implementations would ideally fail
+If the xDS bootstrap is missing or invalid, implementations would ideally fail
 XdsServer startup, but it is also acceptable to consider it a lack of xDS
 configuration and enter a permanent "not serving" mode.
 
