@@ -83,9 +83,10 @@ If the xDS bootstrap is missing or invalid, implementations would ideally fail
 XdsServer startup, but it is also acceptable to consider it a lack of xDS
 configuration and enter a permanent "not serving" mode.
 
-If the server is unable to open serving ports, XdsServer startup may fail or it
-may enter "not serving" mode. If entering "not serving" mode, opening the port
-must be retried automatically (e.g., retry every minute).
+If the server is unable to open serving ports (e.g., because the port is already
+in use by another process), XdsServer startup may fail or it may enter "not
+serving" mode. If entering "not serving" mode, opening the port must be retried
+automatically (e.g., retry every minute).
 
 Communication failures do not impact the XdsServer's xDS configuration; the
 XdsServer should continue using the most recent configuration until connectivity
@@ -137,11 +138,10 @@ The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
 XdsServer will use the normal `XdsClient` to communicate with the xDS server.
 There is no default value for `server_listener_resource_name_template` so if it
 is not present in the bootstrap then server creation or start will fail or the
-XdsServer will become "not serving". The XdsServer will pass the listening
-address (commonly using a wildcard IP address, like `::` or `0.0.0.0`) to a new
-XdsClient API to start a watch for a `envoy.config.listener.v3.Listener`
-resource. XdsClient will perform the `%s` replacement if the token is present
-and watch the corresponding listener resource. No special character handling of
+XdsServer will become "not serving". XdsServer will perform the `%s` replacement
+in the template (if the token is present) to produce a listener name. The
+XdsServer will start an XdsClient watch on the listener name for a
+`envoy.config.listener.v3.Listener` resource. No special character handling of
 the template or its replacement is performed. For example, with an address of
 `[::]:80` and a template of `grpc/server?xds.resource.listening_address=%s`, the
 resource name would be `grpc/server?xds.resource.listening_address=[::]:80`.
@@ -149,7 +149,7 @@ resource name would be `grpc/server?xds.resource.listening_address=[::]:80`.
 To be useful, the xDS-returned Listener must have an
 [`address`][Listener.address] that matches the listening address provided. The
 Listener's `address` would be a TCP `SocketAddress` with matching `address` and
-`port_value`. The XdsClient must be "not serving" if the address does not match.
+`port_value`. The XdsServer must be "not serving" if the address does not match.
 
 The xDS client must NACK the Listener resource if `Listener.listener_filters` is
 non-empty.
@@ -197,8 +197,7 @@ on `use_original_dst`. It also applies to `server_names`, `transport_protocol`,
 
 The overall "wrapping" server API has many language-specific ramifications. We
 show each individual language's approach. For C++ and wrapped languages we just
-show a rough sketch of how they would be done and expect a followup gRFC for
-more implementation details.
+show a rough sketch of how they would be done.
 
 XdsClients may be shared without impacting this design. If shared, any mentions
 of "creating" or "shutting down" an XdsClient would simply mean "acquire a
@@ -390,9 +389,10 @@ waiting on the C core implementation.
 
 * C++/wrapped languages. The surface APIs should be relatively easy compared to
   the C core changes. The C core changes are being investigated by @markdroth
-  and the plan is to cover them in a separate gRFC. So this gRFC just tries to
-  show that the API design would work for C++/wrapped languages but there is no
-  associated implementation work.
+  and the plan is to flesh them out later when we have a better idea of the
+  appropriate structure. So the gRFC just tries to show that the API design
+  would work for C++/wrapped languages but there is currently no associated
+  implementation work.
 
 * Java. Implementation work primarily by @sanjaypujare, along with gRFC A29.
   Added classes are in the `grpc-xds` artifact and `io.grpc.xds` package.
