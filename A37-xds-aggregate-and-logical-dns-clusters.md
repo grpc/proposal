@@ -5,7 +5,7 @@ A37: xDS Aggregate and Logical DNS Clusters
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2021-01-26
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/bZ7wLIdNCVY
 
 ## Abstract
 
