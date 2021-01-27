@@ -1,11 +1,11 @@
-3p Identity Supoort
+L77: Core and C++ Third Party Identity Support for Call Credentials
 ----
 * Author(s): Chuan Ren
-* Approver: a11r
+* Approver: markdroth
 * Status: Draft
 * Implemented in: core, cpp
-* Last updated: 2021-01-20
-* Discussion at: 
+* Last updated: 2021-01-27
+* Discussion at: https://groups.google.com/g/grpc-io/c/xQn4gSW8LSU
 
 ## Abstract
 
@@ -23,7 +23,7 @@ N/A
 This doc proposes to extend the access to Google APIS directly with 3p identities. The crednetials of the 3p identities with be in one of the 3 following formats:
 
 **File-source credentials**
-```
+```JSON
 {
   "type": "external_account",
   "audience": "//iam.googleapis.com/project/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/providers/$PROVIDER_ID",
@@ -38,7 +38,7 @@ This doc proposes to extend the access to Google APIS directly with 3p identitie
 ```
 
 **Url-sourced credentials**
-```
+```JSON
 {
   "type": "external_account",
   "audience": "//iam.googleapis.com/project/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/providers/$PROVIDER_ID",
@@ -56,7 +56,7 @@ This doc proposes to extend the access to Google APIS directly with 3p identitie
 ```
 
 **AWS credentials**
-```
+```JSON
 {
   "type": "external_account",
   "audience": "//iam.googleapis.com/project/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL_ID/providers/"$PROVIDER_ID",
@@ -76,32 +76,47 @@ This doc proposes to extend the access to Google APIS directly with 3p identitie
 
 **Implicit flow**
 
-In core, the underlying credentials retrieval process of `grpc::GoogleDefaultCredentials()` will be extended to accept 3p identity credentials implicitly.
+In core, `grpc::GoogleDefaultCredentials()` follows the ADC (Application Default Credentials) credentials retrieval process. It will be extended to accept 3p identity credentials. More information on ADC and how they work can be found here: https://developers.google.com/identity/protocols/application-default-credentials
 
 **Explicit flow**
 
-In core and cpp, a public api will be added to create an `ExternalAccountCredentials` with explicit 3p identity credentials.
-```
+The downside with `GoogleDefaultCredentials()` is that customers will have to use a json credentials file. So besides the implicit flow, in core and C++, a public api will be added to create an `ExternalAccountCredentials` with explicit 3p identity credentials.
+```h
 // .../include/grpcpp/security/credentials.h
 
+/// Builds External Account credentials.
+/// json_string is the JSON string containing the credentials options.
+/// scopes contains the scopes to be binded with the credentials.
 std::shared_ptr<CallCredentials>
 ExternalAccountCredentials(const grpc::string& json_string, const std::vector<grpc::string>& scopes);
+```
+
+```h
+// .../include/grpc/grpc_security.h
+
+/** Builds External Account credentials.
+ - json_string is the JSON string containing the credentials options.
+ - scopes_string contains the scopes to be binded with the credentials.
+   This API is used for experimental purposes for now and may change in the
+ future. */
+GRPCAPI grpc_call_credentials* grpc_external_account_credentials_create(
+    const char* json_string, const char* scopes_string);
 ```
 
 ## Implementation
 
 1. Base external account credentials class
    https://github.com/grpc/grpc/pull/24208
-2. Subclasses to base external account credentials
-   a. url-sourced credentials
+1. Subclasses to base external account credentials
+   1. url-sourced credentials
       https://github.com/grpc/grpc/pull/24411
-   b. file-sourced credentials
+   1. file-sourced credentials
       https://github.com/grpc/grpc/pull/24526
-   c-prerequisites. utility to sign Aws requests
+   1. c-prerequisites. utility to sign Aws requests
       https://github.com/grpc/grpc/pull/24618
-   c. aws-sourced credentials
+   1. aws-sourced credentials
       https://github.com/grpc/grpc/pull/24733
-3. Internal and public apis
+1. Internal and public apis
    https://github.com/grpc/grpc/pull/24814
 
 ## Open issues (if applicable)
