@@ -5,7 +5,7 @@ gRPC Python Major Version Bump from 1.x to 2.x
 * Status: In-Review
 * Implemented in: Python
 * Last updated: 2021-01-26
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/ZiFK3j9H0Zc
 
 ## Abstract
 
