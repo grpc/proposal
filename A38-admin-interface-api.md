@@ -2,10 +2,10 @@ Admin Interface API
 ----
 * Author(s): lidiz
 * Approver: markroth
-* Status: Draft
+* Status: In-Review
 * Implemented in: C++, Golang, Java
 * Last updated: 2021-01-27
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/0B2f9ha5HoM
 
 ## Abstract
 
