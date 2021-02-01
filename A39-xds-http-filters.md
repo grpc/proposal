@@ -43,9 +43,17 @@ where gRPC implements the xDS routing functionality.
 In C-core, the xDS HTTP filters will be implemented as C-core filters.
 In Java and Go, they will be implemented as interceptors.
 
+### Limitations
+
 gRPC will support HTTP filters in xDS v3 only.  Filters will continue to
 be ignored when speaking xDS v2.  This will avoid the need to support
 both v2 and v3 type names in filter config message types.
+
+In Envoy, HTTP filters have access to an API to tell Envoy to recompute
+the route, which they can use after modifying request state that can
+affect the choice of route (e.g., changing a header).  Initially, gRPC will
+not support any such mechanism, although this is something that we may
+add later, if/when it becomes necessary.
 
 ### xDS API Fields
 
@@ -82,6 +90,9 @@ response, it will validate the list of filters as follows:
   resource to be NACKed.
 - Every filter in the list must have a unique instance name.  Any
   duplicate instance names will cause the Listener resource to be NACKed.
+
+Note that gRPC will support configuring multiple instances of the same
+filter implementation, each with its own name and config.
 
 In each of the `VirtualHost`, `Route`, and `WeightedCluster.ClusterWeight`
 protos, there is a field called `typed_per_filter_config`, which is a map
