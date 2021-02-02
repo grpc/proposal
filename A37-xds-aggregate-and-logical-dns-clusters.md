@@ -32,8 +32,9 @@ https://github.com/envoyproxy/envoy/issues/13134.
 ### Related Proposals: 
 
 This proposal builds on the earlier xDS work described in the following
-proposal:
+proposals:
 - [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
+- [A32: xDS Circuit Breaking](https://github.com/grpc/proposal/blob/master/A32-xds-circuit-breaking.md)
 
 ## Proposal
 
@@ -107,9 +108,8 @@ Also, if a cluster is used both by itself and via an aggregate cluster,
 gRPC will create duplicate connections to the endpoints in that cluster.
 This is not ideal but is considered acceptable (and if it becomes a
 problem, we might be able to fix this later via subchannel pooling
-functionality).  However, it will require sharing the atomic used for
-circuit breaking thresholds between the two policies, as discussed
-below.
+functionality).  However, we will share the atomic used for circuit breaking
+thresholds across all connections for a given cluster, as discussed below.
 
 ### Splitting up EDS LB Policy
 
