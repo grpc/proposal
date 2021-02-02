@@ -3,8 +3,8 @@
 * Author(s): Chengyuan Zhang (voidzcy)
 * Approver: markdroth, ejona86, dfawley
 * Status: Approved
-* Implemented in:
-* Last updated: 2020-09-14
+* Implemented in: C-core, Java, Go 
+* Last updated: 2021-02-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/NEx70p8mcjg
 
 
@@ -53,13 +53,23 @@ circuit breakers. Users can effectively turn circuit breaking off by setting
 limits to very high values, for example, to 
 `std::numeric_limits<uint32_t>::max()`.
 
+## Related Proposals: 
+
+This proposal builds on the earlier xDS work described in
+- [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
+
+Related design changes made after this proposal in
+- [A37: xDS Aggregate and Logical DNS Clusters](https://github.com/grpc/proposal/pull/216)
+
 ## Detailed design
 
+### Threshold enforcement in LB policy
+
 With the introduction of [gRFC A28: xDS Traffic Splitting and Routing](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md), 
-it became possible for there to be more than one CDS LB policy instance for a 
-given cluster (e.g., if one route pointed to a given cluster and a different 
-route split traffic between that cluster and other clusters).  However, after 
-implementing the changes described in [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/pull/192),
+it became possible for each client channel to have more than one CDS LB policy 
+instances for a given cluster (e.g., if one route pointed to a given cluster 
+and a different route split traffic between that cluster and other clusters). 
+However, after implementing the changes described in [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md),
 there will be only one CDS LB policy instance for a given cluster at any time
 in the LB policy tree. Since the EDS LB policy is the counterpart for endpoint
 discovery of the cluster, both the CDS and EDS LB policies comprise the load
@@ -93,15 +103,45 @@ The EDS LB policy will use this limit as the upper bound for the maximum number
 of in-flight requests it allows to send.
 
 The EDS policy's picker will enforce the configured limit. Each EDS LB policy
-will maintain a counter for the number of requests currently in flight to 
-the associated cluster. The counter will be incremented when a request
-is started on a subchannel and decremented when the request is complete. 
+will use a counter to aggregate the number of requests currently in flight to
+the associated cluster. The counter will be incremented when a request is
+started on a subchannel and decremented when the request is complete. 
 When the picker is going to start a call, it will check whether the current
 number of in-flight requests is lower than the configured limit. If so, the 
 picker will do the pick as usual, returning a subchannel. If not, it will 
 fail the call with status UNAVAILABLE. Such failed calls will not be retried,
 but they will be recorded to the `total_dropped_requests` counts in 
 cluster-level load reports and reported to the load reporting server.
+
+Recent changes to the load balancing policy hierarchy in gRPC split up the EDS
+LB policy into `xds_cluster_resolver_experimental` policy and
+`xds_cluster_impl_experimental` policy. The latter is the place where circuit
+breaking is implemented. See more details in [A37: xDS Aggregate and Logical DNS Clusters](https://github.com/grpc/proposal/pull/216).
+
+### Per cluster requests aggregation
+
+Although with [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md)
+each client channel would not create more than one CDS LB policy instances for a
+given top-level cluster (e.g., if one route pointed to a given cluster and a
+different route split traffic between that cluster and other clusters). Here
+a top-level cluster refers to a cluster that is directly pointed
+by a route. With the introduction of aggregate clusters, it became possible
+for there to be more than one `xds_cluster_resolver_experimental` LB policy
+instances for the same underlying cluster (e.g., cluster is used both
+by itself and via an aggregate cluster). This requires us to use the same
+counter for aggregating requests sent to the same upstream cluster across
+different `xds_cluster_resolver_experimental` LB policy instances.
+
+Besides that, in Envoy circuit breakers are applied to the entire traffic of 
+the process sent to upstream clusters as all traffic goes through the sidecar
+proxy. To achieve the same behavior, counters used to aggregate in-flight requests
+should be globally shared for channels in the client process.
+
+Therefore, we will use a global map to hold call counters per {cluster, EDS
+service name} pair. Counters reference counted and lazily created upon being
+accessed for the first time.
+
+### Behavioral difference between Envoy and gRPC
 
 Note that in Envoy's implementation, cluster resources are immutable and any 
 change in the cluster resource implies replacing the old cluster with a new one
@@ -116,16 +156,9 @@ another 100 new RPCs to be sent immediately.
 ## Implementation
 
 ### Java
-- Maintain a counter in the EDS LB policy for counting the number of 
-outstanding requests.
-- Add the logic of enforcing `max_request` limit in wrapping the 
-`SubchannelPicker` propagated from the EDS policy's child LB policies.
-- Counter manipulation is done in `ClientStreamTracer`/`Factory`: increment
-in `newClientStreamTracer()` and decrement in `streamClosed()`.
-    - Note there will be check-and-allocate race as the pick method and stream
-    tracer are not run by the same thread. This will cause the limit to
-    be exceeded. Since the race window is small, the value should be exceeded 
-    only by a small amount.
+- Initial implementation in EDS LB policy: [grpc-java#7517](https://github.com/grpc/grpc-java/pull/7517).
+- Use a global map for per-cluster atomics: [grpc-java#7588](https://github.com/grpc/grpc-java/pull/7588).
+- Move implementation into xds_cluster_impl LB policy: [grpc-java#7631](https://github.com/grpc/grpc-java/pull/7631).
 
 ### C
 TODO
