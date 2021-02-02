@@ -114,6 +114,13 @@ RDS response, it will validate the contents of each
   cannot know which `HttpConnectionManager` config is currently being
   used.
 
+Unlike Envoy, which provides an API that filters must call to access their
+per-{VirtualHost,Route,ClusterWeight} config overrides, gRPC will
+require filters to construct a merged configuration, applying any
+necessary overrides, when the xDS config is applied.  The filters will
+then use this merged configuration at run-time.  However, this approach
+is an implementation detail that could change in the future.
+
 ### Initially Supported Filter: Router
 
 Initially, gRPC will support only one filter, the [router
