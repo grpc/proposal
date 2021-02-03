@@ -17,14 +17,7 @@ Fault injection is an essential feature that assists developers in building faul
 
 Envoy has a network level filter named HTTP Connection Manager. It is responsible to handle common functionalities against HTTP connections and requests. In its `http_filters` field, users can set up multiple HTTPFilters. Each HTTPFilter requires at least a name. The name will be the identifier that assists future updates of filter configuration. For example, users can specify an `{"name": "envoy.cors"}` filter in `http_filters` with no content, then update the CORS filter’s configuration with the `typed_per_filter_config` field of a VirtualHost in RDS.
 
-There are currently four ways to set the filter configuration, ordered by ascending priority:
-
-Defining filter config in `http_filters` of HTTP Connection Manager;
-Overriding filter config with `typed_per_filter_config` of VirtualHost from RDS;
-Overriding filter config with `typed_per_filter_config` of Route from RDS;
-Overriding filter config with `typed_per_filter_config` of ClusterWeight from RDS;
-
-Also, there is the upcoming Filter Config Discovery Service (FCDS) (see [issue](https://github.com/envoyproxy/envoy/issues/7867)). It allows application to stream / delta / fetch filter configs. It’s not yet released and lacks documentation. From its source code, it updates the global `http_filters`. So, its priority should be between item 1 and item 2.
+Please refer to [A39: xDS HTTP Filters](https://github.com/grpc/proposal/pull/219) for how xDS HTTP Filters is processed in gRPC.
 
 ### Fault Injection in Envoy xDS API
 
