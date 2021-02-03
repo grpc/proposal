@@ -43,12 +43,13 @@ The full definition of Envoy v3 fault injection proto can be found [here](https:
 
 1. Fixed delay before forwarding the request;
 1. Overridden gRPC status code;
-1. Traffic matcher (upstream cluster name, downstream cluster name, and headers);
+1. Traffic matcher - headers;
 1. Max active faults;
 1. Per-Stream Response rate limit (kbps, and selected by percentage);
 1. Options to override global runtime settings. 
+1. Traffic matcher - cluster name
 
-Feature 1-4 should be implemented to make gRPC compatible with OSS control planes, and we should aim to ship them in the initial implementation. Feature 5 is postponed until we have a consensence on its behavior (see timeout issue below). Feature 6 is ignored since there is no plan to support Runtime settings.
+Feature 1-4 should be implemented to make gRPC compatible with OSS control planes, and we should aim to ship them in the initial implementation. Feature 5 is postponed until we have a consensence on its behavior (see timeout issue below). Feature 6 is ignored since there is no plan to support Runtime settings. Feature 7 is postponed until we have a clear ask for it.
 
 To support all features above, it requires an API as powerful as the interceptors, which can intercept each individual RPC in their early stages and apply fault injection policy.
 
