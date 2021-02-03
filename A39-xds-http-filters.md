@@ -4,8 +4,8 @@ A39: xDS HTTP Filter Support
 * Approver: ejona86, dfawley
 * Status: In Review
 * Implemented in: 
-* Last updated: 2021-01-28
-* Discussion at: 
+* Last updated: 2021-02-03
+* Discussion at: https://groups.google.com/g/grpc-io/c/M-l8k2v5snY
 
 ## Abstract
 
