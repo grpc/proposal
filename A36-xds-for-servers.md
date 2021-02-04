@@ -161,8 +161,8 @@ Although `FilterChain.filters`s will not be used as part of this gRFC, the
 `transport_socket`. When looking for a FilterChain, the standard matching logic
 must be used. The [most specific `filter_chain_match`][matching logic] of the
 repeated [`filter_chains`][Listener.filter_chains] should be found for the
-specific connection and if none match, the `default_filter_chain` must be used.
-The following is a snippet of [all current fields of
+specific connection and if one is not found, the `default_filter_chain` must be
+used. The following is a snippet of [all current fields of
 FilterChainMatch][FilterChainMatch], and if they will be handled specially:
 
 [Listener.address]: https://github.com/envoyproxy/envoy/blob/11dee4e9c37c244f9de4bc339fdc8695e5de2c5d/api/envoy/config/listener/v3/listener.proto#L108
