@@ -126,7 +126,7 @@ is an implementation detail that could change in the future.
 Initially, gRPC will support only one filter, the [router
 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter),
 which is used for the proto message type
-[`extensions.filters.http.router.v3.Router`](https://github.com/envoyproxy/envoy/blob/18db4c90e3295fb2c39bfc7b2ce641cfd6c3fbed/api/envoy/extensions/filters/http/router/v3/router.proto#L23).
+[`envoy.extensions.filters.http.router.v3.Router`](https://github.com/envoyproxy/envoy/blob/18db4c90e3295fb2c39bfc7b2ce641cfd6c3fbed/api/envoy/extensions/filters/http/router/v3/router.proto#L23).
 As in Envoy, this filter is required and must be last in the filter list.
 
 Note that gRPC will not actually have a discrete filter implementation
