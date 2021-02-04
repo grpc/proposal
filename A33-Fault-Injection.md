@@ -4,30 +4,31 @@ Client-Side Fault Injection
 * Approver: roth, ejona, dfawley
 * Status: In Review
 * Implemented in: all languages
-* Last updated: August 13th, 2020
+* Last updated: Feb 4th, 2021
 * Discussion at: https://groups.google.com/g/grpc-io/c/d9dI5Hy9zzk
 
 ## Abstract
 
 Fault injection is an essential feature that assists developers in building fault-tolerant applications. To keep gRPC’s competitive advantage, this doc aims to design a fault injection mechanism on the client side for gRPC while allowing transparent transition from Envoy configuration.
 
+
 ## Background
 
 ### Envoy HTTPFilter
 
-Envoy has a network level filter named HTTP Connection Manager. It is responsible to handle common functionalities against HTTP connections and requests. In its `http_filters` field, users can set up multiple HTTPFilters. Each HTTPFilter requires at least a name. The name will be the identifier that assists future updates of filter configuration. For example, users can specify an `{"name": "envoy.cors"}` filter in `http_filters` with no content, then update the CORS filter’s configuration with the `typed_per_filter_config` field of a VirtualHost in RDS.
+Please refer to [HTTP connection management](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/http_connection_management#arch-overview-http-conn-man) section in Envoy document for how the filters are setup in xDS.
+
+Please refer to [HTTP filters](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/http_filters) for how HTTP filters process traffic in xDS.
 
 Please refer to [A39: xDS HTTP Filters](https://github.com/grpc/proposal/pull/219) for how xDS HTTP Filters is processed in gRPC.
+
 
 ### Fault Injection in Envoy xDS API
 
 Fault injection in xDS API is an HTTPFilter named `HTTPFault`. As mentioned above, the fault injection config can be provided by **LDS** (HTTP Connection Manager) and **RDS** (VirtualHost, Route, ClusterWeight). Besides, the fault injection filter offers [global Runtime settings](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/fault_filter#runtime) that can override global default fault injection filter config. For the explanation of Envoy Runtime, see section below.
 
-Currently, the Traffic Director (TD) isn’t forwarding HTTPFilter configs in HTTP Connection Manager from LDS, and there isn’t an exposed API allowing users to directly config fault injection for all HTTP connections. To pave gRPC’s way for more extensive control plane compatibility, we need to support fetching filter config from HTTP Connection Manager among LDS responses.
+This design doc focuses on getting fault injection filter config from LDS and RDS.
 
-The Envoy Runtime isn’t yet supported by TD or gRPC. The Runtime path also has a lower priority to implement.
-
-On the other hand, TD has a released support for fault injection via route configuration for HTTP. So, **this design doc focuses on getting fault injection filter config from LDS and RDS**.
 
 ### Fault Injection Features
 
@@ -37,12 +38,12 @@ The full definition of Envoy v3 fault injection proto can be found [here](https:
 1. Fixed delay before forwarding the request;
 1. Overridden gRPC status code;
 1. Traffic matcher - headers;
-1. Max active faults;
+1. Maximum active faults;
 1. Per-Stream Response rate limit (kbps, and selected by percentage);
 1. Options to override global runtime settings. 
-1. Traffic matcher - cluster name
+1. Traffic matcher - upstream cluster name, downstream node names
 
-Feature 1-4 should be implemented to make gRPC compatible with OSS control planes, and we should aim to ship them in the initial implementation. Feature 5 is postponed until we have a consensence on its behavior (see timeout issue below). Feature 6 is ignored since there is no plan to support Runtime settings. Feature 7 is postponed until we have a clear ask for it.
+Feature 1-4 should be implemented to make gRPC compatible with OSS control planes, and we should aim to ship them in the initial implementation. Feature 5 is postponed until we have a consensus on its behavior (see timeout issue below). Feature 6 is ignored since there is no plan to support Runtime settings. Feature 7 is postponed until we have a clear ask for it.
 
 To support all features above, it requires an API as powerful as the interceptors, which can intercept each individual RPC in their early stages and apply fault injection policy.
 
@@ -54,28 +55,8 @@ Each token permits to write `(max_kbps * 1024) / SecondDivisor` of bytes. The `S
 
 Only the body of the HTTP stream is throttled by the response rate limit algorithm. Not headers or trailers.
 
-**Response rate limit and timeout:** Envoy implements fault injection is an `HTTPFilter`, which can choose to operate on bytes or HTTP messages or events. It is unclear if gRPC can perform the precise same behavior, since gRPC generally operates on proto messages (Core has visibility to bytes). The timeout timer may start at the beginning of an RPC, or the receival of the first bytes from peer, or after the entire message is received.
+**Response rate limit and timeout:** Envoy implements fault injection is an `HTTPFilter`, which can choose to operate on bytes or HTTP messages or events. It is unclear if gRPC can perform the precise same behavior, since gRPC generally operates on proto messages (Core has visibility to bytes). The timeout timer may start at the beginning of an RPC, or the receipt of the first bytes from peer, or after the entire message is received.
 
-### Fault Injection in Traffic Director
-
-The traffic director implemented a fraction of Envoy’s fault injections features (see [TD’s urlMap](https://cloud.google.com/compute/docs/reference/rest/v1/urlMaps)). It only exposed two configurations: **fixed delay injection**, **RPC abort**.
-
-Here is the available config for TD configuration:
-```json
-"faultInjectionPolicy": {
-        "delay": {
-                "fixedDelay": {
-                        "seconds": string,
-                        "nanos": integer
-                },
-                "percentage": number
-        },
-        "abort": {
-                "httpStatus": integer,
-                "percentage": number
-        }
-}
-```
 
 ### Absence of Envoy Runtime in gRPC
 
@@ -101,16 +82,18 @@ Based on a local experiment, if an RPC is delayed and failed by peer (not fault 
 
 In summary, **if retry and delay both take effect, only delay once before sending any traffic; if retry and abort both take effect, retry will be disabled; if retry, delay and abort all take effect, the RPC will be delayed then aborted without retry.**
 
+
 ### Enforce Fault Injection
 
 Take Envoy as examples, it utilizes a powerful traffic interception API to implement fault injection. Here are possible solutions to implement FI:
 
-1. **Returning an interceptor from the ConfigSelector.** In the [ConfigSelector design doc](https://github.com/grpc/proposal/pull/192/files/b2fe83ad515e8a72f669dd3f84d185b7f00c07f3#diff-560d8f55a3a659fca6dfaa0823d4e1d1R56), supporting interceptor is one of the proposed features. But it’s not available in actual implementations yet. (Viable for Java, Go)
+1. **Returning an interceptor from the ConfigSelector.** In the [ConfigSelector design doc](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md), supporting interceptor is one of the proposed features. But it’s not available in actual implementations yet. (Viable for Java, Go)
 2. **Defining a fault injection global interceptor.** The interceptor inspects the method config of each RPC. Then it makes the decision whether to delay or to abort. (Viable for Java, Go, possibly for filters in Core)
 3. **Implementing fault injection as a new RPC feature controlled by service config.** In this way, fault injection will have similar architecture as timeout, wait for ready, and retry (gRFC A6). The logic needs to be implemented in native RPC call processing code path. (Viable for Core, Java, Go)
 4. **Using load balancer policy.** Load balancer is capable of aborting an RPC, and able to mimic delay by returning “no subchannel, but wait for X seconds before trying again”. (Viable for Core, Java, Go)
 
 **Java and Go will implement via solution 1 (ConfigSelector)**, and **Core will implement fault injection in client channel** with an non-service-config mechanism to fetch the FI config.
+
 
 ### Fault Injection Features
 
@@ -129,6 +112,7 @@ Also, once an RPC is aborted, the enforcer should push back on following retry a
 This feature limits the maximum number of concurrent active fault injected RPC for the entire process. Apparently, this requires a global counter (gauge). This value is designed to be updated via multiple channels. So, **it needs to be thread-safe**, but the actual implementation depends on each stack. For example, volatile variable, atomic variable, memory order, locking. Anything works best for the language.
 
 The way to implement the tracking of RPC lifespan also depends on the language. For example, Core & Java may use the deallocation method of the RPC object or enforcer. Go’s Finalizer might not work well enough, so the enforcer (interceptor) needs to update the active fault counter when RPC is finished.
+
 
 #### Header matching
 
@@ -159,11 +143,13 @@ X-envoy-fault-throughput-response-percentage=''
 
 **Fault inject config in HTTP filter and headers won’t be conflicted**, because the header only being evaluated if the delay or abort is set to `HeaderDelay` or `HeaderAbort` instead of concrete values.
 
+
 ### Status Code Mapping
 
 `grpc_status` is only available in xDS v3 API. In xDS v2 API, no matter TD or Envoy, they all only allow `http_status`. Mapping between HTTP status code and gRPC status code is well defined (see [doc](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md)), but that means users are limited to inject only 7 out of 16 gRPC status codes (including `OK`). The underlying schema for abort looks like [FaultAbort](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/fault/v3/fault.proto#extensions-filters-http-fault-v3-faultabort). **This doc proposes to update TD configuration to allow more expressive status code injection, once xDS v3 API is rolled out.**
 
 We still accept fault injection settings with only HTTP status code. **The ConfigSelector should translate the HTTP status code into gRPC status code** before sending the config to the fault injection enforcer.
+
 
 ### No multiple fault injection filter
 
@@ -171,9 +157,11 @@ Multiple fault injection is allowed in Envoy. Fault injection filters are normal
 
 In TD and Istio, there could only be one fault injection setting in routing configuration. Each RPC can only have 1 matched routing configuration. The fault injection policy in the routing configuration will be executed. For simplicity, **this doc proposes to only allow one fault injection filter**.
 
+
 ### Evaluate Possibility Fraction
 
 According to the [Envoy implementation](https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/http/fault/fault_filter.cc;l=223), each feature of fault injection is checked with a different random number. Compared to using a single random number for all features, this affects the probability of an RPC being affected by fault injection. For example, the fault injection has 20% chance to delay and 5% chance to abort. Under the single random number solution, only 20% RPC will be affected. But if two features are independent, 24% RPC will be affected. So, **this doc suggests to make each feature independent by using a different random number each time.**
+
 
 ## Alternatives
 
@@ -186,6 +174,7 @@ grpc-fault-injection-policy-bin=<...>  # The encoded FI config proto message
 ```
 
 However, setting additional metadata may leak implementation details onto wire, which is undesired.
+
 
 ### Alternative 2: Fault Injection Config via Multiple Metadata
 
@@ -201,6 +190,7 @@ grpc-fault-injection-abort-percent=0.5  # This call has 50% chance to be rejecte
 In this way, users can utilize fault injection without configuring xDS. It also allows decouple the enforcement of FI from xDS control path.
 
 But similar to above approach, adding extra metadata is not a good idea.
+
 
 ### Alternative 3: Fault Injection Config via ServiceConfig
 
@@ -224,9 +214,9 @@ message MethodConfig {
    // delay feature is disabled and delay_fraction will be ignored.
    google.protobuf.Duration delay = 1;
 
-   // The possibility that this RPC will be delayed.
+   // The probability that this RPC will be delayed.
    //
-   // The default value is 0. The possibility is represented as a fraction over
+   // The default value is 0. The probability is represented as a fraction over
    // 1 million (1000000). For example, 0.625% will be 6250, 12.5% will be
    // 125000. Its value should be clamped into the interval [0, 1000000].
    uint32 delay_fraction = 2;
@@ -243,9 +233,9 @@ message MethodConfig {
    // to the aborted RPC.
    google.rpc.Status abort_status = 3;
 
-   // The possibility that this RPC will be aborted.
+   // The probability that this RPC will be aborted.
    //
-   // The default value is 0. The possibility is represented as a fraction over
+   // The default value is 0. The probability is represented as a fraction over
    // 1 million (1000000). For example, 0.625% will be 6250, 12.5% will be
    // 125000. Its value should be clamped into the interval [0, 1000000].
    uint32 abort_fraction = 4;
@@ -256,6 +246,7 @@ message MethodConfig {
 ```
 
 This approach requires more engineering effort, but provides the fault injection feature to non-xDS gRPC applications.
+
 
 ## Implementation
 
