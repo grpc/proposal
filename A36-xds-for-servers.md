@@ -159,8 +159,8 @@ non-empty.
 Although `FilterChain.filters`s will not be used as part of this gRFC, the
 `FilterChain` contains data that may be used like TLS configuration in
 `transport_socket`. When looking for a FilterChain, the standard matching logic
-must be used. Each `filter_chain_match` of the repeated
-[`filter_chains`][Listener.filter_chains] should be checked for the specific
+must be used. The most specific `filter_chain_match` of the repeated
+[`filter_chains`][Listener.filter_chains] should be found for the specific
 connection and if none match, the `default_filter_chain` must be used. The
 following is a snippet of [all current fields of
 FilterChainMatch][FilterChainMatch], and if they will be handled specially:
