@@ -1,10 +1,10 @@
 Client-Side Fault Injection
 ----
 * Author(s): lidiz
-* Approver: roth, ejona, dfawley
+* Approver: markdroth, ejona, dfawley
 * Status: In Review
 * Implemented in: all languages
-* Last updated: Feb 4th, 2021
+* Last updated: Feb 5th, 2021
 * Discussion at: https://groups.google.com/g/grpc-io/c/d9dI5Hy9zzk
 
 ## Abstract
@@ -40,7 +40,7 @@ The full definition of Envoy v3 fault injection proto can be found at [HTTPFault
 1. Injecting delays before starting a request;
 1. Failing RPC with a particular gRPC status code;
 1. Imposing a limit on the maximum number of currently active faults;
-1. Controlling fault injection policies via HTTP headers (or gRPC metadata).
+1. Controlling fault injection policies via HTTP headers (aka. gRPC metadata).
 
 
 #### Deferred Fault Injection Features
@@ -52,11 +52,6 @@ The full definition of Envoy v3 fault injection proto can be found at [HTTPFault
 #### Unsupported Fault Injection Features
 
 1. Configuring fault injection based on global runtime settings (because gRPC doesn't have the concept of a global runtime);
-
-
-#### Fault Injection HTTP Headers in Envoy
-
-Envoy allows applications to specify [HTTP headers](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/fault_filter#controlling-fault-injection-via-http-headers) to enable fault injection. This feature still needs a fault injection filter to be specified, and the delay or the abort field needs to explicitly say `HeaderDelay` or `HeaderAbort`.
 
 
 ### Priority Between Fault Injection And Retry
@@ -91,7 +86,9 @@ The way to implement the tracking of RPC lifespan also depends on the language. 
 
 #### Header matching
 
-This doc proposes to support as many metadata as we can (see [detailed definitions](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/fault_filter.html?#controlling-fault-injection-via-http-headers)):
+Envoy allows applications to specify [HTTP headers](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/fault_filter#controlling-fault-injection-via-http-headers) to enable fault injection. This feature still needs a fault injection filter to be specified in the HTTP connection manager, and the delay or the abort field needs to explicitly say `HeaderDelay` or `HeaderAbort`.
+
+Here is the set of fault injection policy configuring HTTP headers that gRPC will support:
 
 ```bash
 # Aborts HTTP requests with status code 503
