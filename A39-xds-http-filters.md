@@ -88,6 +88,9 @@ response, it will validate the list of filters as follows:
 - Every filter in the list must be of a known type, as identified by the
   `type_url` field.  Any unknown config type will cause the Listener
   resource to be NACKed.
+- The fields in the filter config should be validated by the filter
+  implementation.  Any validation error will cause the Listener resource
+  to be NACKed.
 - Every filter in the list must have a unique instance name.  Any
   duplicate instance names will cause the Listener resource to be NACKed.
 
@@ -108,6 +111,8 @@ RDS response, it will validate the contents of each
 - Every config in the list must be of a known type, as identified by the
   map value proto message type.  Any unknown config type will cause the
   resource to be NACKed.
+- The fields in the filter config should be validated by the filter
+  implementation.  Any validation error will cause the resource to be NACKed.
 - Note that gRPC will *not* fail validation if the map key specifies a
   filter instance name that does not exist in the `HttpConnectionManager`
   filter list.  This is because during an update, the xDS client code
@@ -120,6 +125,14 @@ require filters to construct a merged configuration, applying any
 necessary overrides, when the xDS config is applied.  The filters will
 then use this merged configuration at run-time.  However, this approach
 is an implementation detail that could change in the future.
+
+Note that, for a given request, the filter's configuration will come
+from the top-level filter list in the `HttpConnectionManager` config
+and the most specific override.  In other words, if a given filter
+instance has an override in the `ClusterWeight` proto, that will be
+used; otherwise, if it has an override in the `Route` proto, that will
+be used; otherwise, if it has an override in the `VirtualHost` proto,
+that will be used; otherwise, no override will be used.
 
 ### Initially Supported Filter: Router
 
