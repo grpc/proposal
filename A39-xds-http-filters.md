@@ -162,4 +162,4 @@ config.  All fields will be ignored.
 
 C-core implementation:
 - Add dynamic filters between name resolution and load balancing: https://github.com/grpc/grpc/pull/24920
-- Add xDS HTTP filter support: (in progress)
+- Add xDS HTTP filter support: https://github.com/grpc/grpc/pull/25310
