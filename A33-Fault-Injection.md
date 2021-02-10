@@ -117,6 +117,11 @@ gRPC should accept fault injection settings with either HTTP status code or gRPC
 According to the [Envoy implementation](https://github.com/envoyproxy/envoy/blob/main/source/extensions/filters/http/fault/fault_filter.cc#L222), each feature of fault injection is checked with a different random number. Compared to using a single random number for all features, this affects the probability of an RPC being affected by fault injection. For example, the fault injection has 20% chance to delay and 5% chance to abort. Under the single random number solution, only 20% RPC will be affected. But if two features are independent, 24% RPC will be affected. So, **this doc suggests to make each feature independent by using a different random number each time.**
 
 
+### Environment Variable Protection
+
+`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION` as an environment variable will be used to guard this feature for the initial release. Once it is set, gRPC will start to interpret xDS HTTP filters ([A39: xDS HTTP Filters](https://github.com/grpc/proposal/pull/219)) and enforce fault injection if configured.
+
+
 ## Alternatives
 
 ### Alternative 1: Fault Injection Config via ProtoBuf Metadata
@@ -191,11 +196,6 @@ Turned out, this approach requires more engineering effort, but makes the fault 
 Envoy uses the token bucket algorithm to throttle the speed of letting response pass through this filter. It will try to write as much as possible from the buffer, then it will schedule another write when the next token is available. Each token permits to write `(max_kbps * 1024) / SecondDivisor` of bytes. The `SecondDivisor` is a constant 16, which splits 1 second into 16 segments (~63ms apart). Only the body of the HTTP stream is throttled by the response rate limit algorithm. Not headers or trailers.
 
 Envoy implements fault injection is an `HTTPFilter`, which can choose to operate on bytes or HTTP messages or events. It is unclear if gRPC can perform the precise same behavior, since gRPC generally operates on proto messages (only Core has visibility to bytes, not Java/Golang). More importantly, there is not enough consensus for if the timeout timer should start at the beginning of an RPC, or the receipt of the first bytes from peer, or after the entire message is received.
-
-
-### Environment variable protection
-
-`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION` as an environment variable will be used to guard this feature for the initial release. Once it is set, gRPC will start to interpret xDS HTTP filters ([A39: xDS HTTP Filters](https://github.com/grpc/proposal/pull/219)) and enforce fault injection if configured.
 
 
 ## Implementation
