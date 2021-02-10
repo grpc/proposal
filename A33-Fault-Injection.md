@@ -4,7 +4,7 @@ Client-Side Fault Injection
 * Approver: markdroth, ejona86, dfawley
 * Status: In Review
 * Implemented in: all languages
-* Last updated: Feb 9th, 2021
+* Last updated: Feb 10th, 2021
 * Discussion at: https://groups.google.com/g/grpc-io/c/d9dI5Hy9zzk
 
 ## Abstract
@@ -193,6 +193,11 @@ Envoy uses the token bucket algorithm to throttle the speed of letting response 
 Envoy implements fault injection is an `HTTPFilter`, which can choose to operate on bytes or HTTP messages or events. It is unclear if gRPC can perform the precise same behavior, since gRPC generally operates on proto messages (only Core has visibility to bytes, not Java/Golang). More importantly, there is not enough consensus for if the timeout timer should start at the beginning of an RPC, or the receipt of the first bytes from peer, or after the entire message is received.
 
 
+### Environment variable protection
+
+`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION` as an environment variable will be used to guard this feature for the initial release. Once it is set, gRPC will start to interpret xDS HTTP filters ([A39: xDS HTTP Filters](https://github.com/grpc/proposal/pull/219)) and enforce fault injection if configured.
+
+
 ## Implementation
 
-TBD
+gRPC Core: https://github.com/grpc/grpc/pull/24354
