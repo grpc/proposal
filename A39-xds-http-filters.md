@@ -4,7 +4,7 @@ A39: xDS HTTP Filter Support
 * Approver: ejona86, dfawley
 * Status: In Review
 * Implemented in: 
-* Last updated: 2021-02-03
+* Last updated: 2021-02-10
 * Discussion at: https://groups.google.com/g/grpc-io/c/M-l8k2v5snY
 
 ## Abstract
@@ -32,6 +32,7 @@ authorization), which we also want to be provided out-of-the-box in gRPC.
 - [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
 - [A30: xDS v3 Support](https://github.com/grpc/proposal/blob/master/A30-xds-v3.md)
 - [A31: gRPC xDS Timeout Support and Config Selector Design](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md)
+- [A33: xDS Client-Side Fault Injection](https://github.com/grpc/proposal/pull/201) (pending)
 
 ## Proposal
 
@@ -157,6 +158,14 @@ validated when the config is received from the xDS server.
 
 For now, gRPC will not support any of the fields in the router filter's
 config.  All fields will be ignored.
+
+### Environment Variable for Initial Testing
+
+Initially, this feature will be released at the same time as the fault
+injection functionality described in
+[gRFC A33](https://github.com/grpc/proposal/pull/201), so it will be
+guarded by the same environment variable.  That env var is
+`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION`.
 
 ## Implementation
 
