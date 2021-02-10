@@ -117,9 +117,9 @@ gRPC should accept fault injection settings with either HTTP status code or gRPC
 According to the [Envoy implementation](https://github.com/envoyproxy/envoy/blob/main/source/extensions/filters/http/fault/fault_filter.cc#L222), each feature of fault injection is checked with a different random number. Compared to using a single random number for all features, this affects the probability of an RPC being affected by fault injection. For example, the fault injection has 20% chance to delay and 5% chance to abort. Under the single random number solution, only 20% RPC will be affected. But if two features are independent, 24% RPC will be affected. So, **this doc suggests to make each feature independent by using a different random number each time.**
 
 
-### Environment Variable Protection
+### Experimental Environment Variable Protection
 
-`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION` as an environment variable will be used to guard this feature for the initial release. Once it is set, gRPC will start to interpret xDS HTTP filters ([A39: xDS HTTP Filters](https://github.com/grpc/proposal/pull/219)) and enforce fault injection if configured.
+`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION` as an environment variable will be used to guard this feature for the initial release. Once it is set, gRPC will start to interpret xDS HTTP filters ([A39: xDS HTTP Filters](https://github.com/grpc/proposal/pull/219)) and enforce fault injection if configured. This environment variable protection will be removed once the new feature has proven to be stable.
 
 
 ## Alternatives
