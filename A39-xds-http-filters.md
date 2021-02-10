@@ -159,13 +159,14 @@ validated when the config is received from the xDS server.
 For now, gRPC will not support any of the fields in the router filter's
 config.  All fields will be ignored.
 
-### Environment Variable for Initial Testing
+### Experimental Environment Variable for Initial Testing
 
 Initially, this feature will be released at the same time as the fault
 injection functionality described in
 [gRFC A33](https://github.com/grpc/proposal/pull/201), so it will be
 guarded by the same environment variable.  That env var is
-`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION`.
+`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION`.  This env var protection will
+be removed once the new feature has proven to be stable.
 
 ## Implementation
 
