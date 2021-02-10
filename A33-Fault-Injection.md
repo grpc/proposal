@@ -1,10 +1,10 @@
 Client-Side Fault Injection
 ----
 * Author(s): lidiz
-* Approver: markdroth, ejona, dfawley
+* Approver: markdroth, ejona86, dfawley
 * Status: In Review
 * Implemented in: all languages
-* Last updated: Feb 5th, 2021
+* Last updated: Feb 9th, 2021
 * Discussion at: https://groups.google.com/g/grpc-io/c/d9dI5Hy9zzk
 
 ## Abstract
@@ -54,34 +54,23 @@ The full definition of Envoy v3 fault injection proto can be found at [HTTPFault
 1. Configuring fault injection based on global runtime settings (because gRPC doesn't have the concept of a global runtime);
 
 
-### Priority Between Fault Injection And Retry
-
-In Envoy, HTTP filters (including fault injection filter) are executed before router filters. Retry is part of the router filter. If an RPC is aborted, the router filter won’t see this RPC and the RPC won’t be retried. In gRPC, we will align our behavior with Envoy.
-
-Based on a local experiment, if an RPC is delayed and failed by peer (not fault injected), Envoy will retry without any additional delay. There is an ongoing GitHub thread about the conflict between fault injection and retry at [istio/istio#13705](https://github.com/istio/istio/issues/13705).
-
-In summary, **if retry and delay both take effect, only delay once before sending any traffic; if retry and abort both take effect, retry will be disabled; if retry, delay and abort all take effect, the RPC will be delayed then aborted without retry.**
-
-
 ### Fault Injection Features
 
 #### RPC delay injection
 
-The injection of RPC delay translates to **injecting delay before sending any traffic for an RPC**. As discussed above, the delay should be injected only once regardless of how many following retries await.
+The injection of RPC delay translates to **injecting delay before sending any traffic for an RPC**.
+
 
 #### RPC abort injection
 
 This feature aborts RPC with given status code (see status code mapping section below for more details). In Envoy, the abort behavior in HTTP/2 happens immediately after the stream reaches the fault injection filter and the injected delay. In gRPC, it translates to that for **both unary and streaming RPCs the abort will happen before sending any traffic**.
 
-Also, once an RPC is aborted, the enforcer should push back on following retry attempts.
 
 #### Maximum active faults
 
-Active fault number is a gauge representing the number of ongoing fault injected RPCs. The gauge increases when an RPC is injected by one or more faults, and it decreases when the injected RPC is finished (see [FaultFilter::onDestroy](https://github.com/envoyproxy/envoy/blob/main/source/extensions/filters/http/fault/fault_filter.cc#L427)).
+Active fault number is a gauge representing the number of ongoing fault injected RPCs. The gauge increases when an RPC is injected by one or more faults, and it decreases when the injected fault is finished. For example, the delay injection is considered finished after the delay is finished, the abort injection is considered finished after the RPC is aborted.
 
 This feature limits the maximum number of concurrent active fault injected RPC for the entire process. Apparently, this requires a global counter (gauge). This value is designed to be updated via multiple channels. So, **it needs to be thread-safe**, but the actual implementation depends on each stack. For example, volatile variable, atomic variable, memory order, locking. Anything works best for the language.
-
-The way to implement the tracking of RPC lifespan also depends on the language. For example, Core & Java may use the deallocation method of the RPC object or enforcer. Go’s Finalizer might not work well enough, so the enforcer (interceptor) needs to update the active fault counter when RPC is finished.
 
 
 #### Header matching
@@ -194,7 +183,7 @@ message MethodConfig {
 }
 ```
 
-Turned out, this approach requires more engineering effort, but makes the fault injection feature to non-xDS gRPC applications. gRPC team does consider to improve service config with fault injection settings, and will carry-on this work in a separate proposal in future.
+Turned out, this approach requires more engineering effort, but makes the fault injection feature available to non-xDS gRPC applications. gRPC team does consider to improve service config with fault injection settings, and will carry-on this work in a separate proposal in future.
 
 
 ### Support for Response Rate Limit Algorithm
