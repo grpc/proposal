@@ -67,22 +67,55 @@ affect the choice of route (e.g., changing a header).  Initially, gRPC will
 not support any such mechanism, although this is something that we may
 add later, if/when it becomes necessary.
 
+### HTTP Filter Registry
+
+gRPC will have a filter registry that tells it the set of supported
+xDS HTTP filters.
+
+Each filter will be registered by the protobuf message type(s) that
+represent its configuration in xDS.  Note that a given filter may have
+more than one associated protobuf message type, since many filters use a
+different message type for their top-level configuration than for their
+per-route override configuration.
+
+Each filter implementation will provide the following:
+- Method(s) for validating the config protos when parsing an xDS response.
+- An indication of whether it is supported on the gRPC client and/or gRPC
+  server.
+- Methods to generate and configure the appropriate filters or
+  interceptors in gRPC to perform the necessary functionality on the
+  data plane.
+
 ### xDS API Fields
 
 gRPC will add support for the following fields in the xDS APIs:
-- [`HttpConnectionManager.http_filters`](https://github.com/envoyproxy/envoy/blob/2ee9543fbb0fccdb69d4dcd8cb57a19743afb94b/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L273)
-- [`VirtualHost.typed_per_filter_config`](https://github.com/envoyproxy/envoy/blob/2ee9543fbb0fccdb69d4dcd8cb57a19743afb94b/api/envoy/config/route/v3/route_components.proto#L142)
-- [`Route.typed_per_filter_config`](https://github.com/envoyproxy/envoy/blob/2ee9543fbb0fccdb69d4dcd8cb57a19743afb94b/api/envoy/config/route/v3/route_components.proto#L252)
-- [`WeightedCluster.ClusterWeight.typed_per_filter_config`](https://github.com/envoyproxy/envoy/blob/2ee9543fbb0fccdb69d4dcd8cb57a19743afb94b/api/envoy/config/route/v3/route_components.proto#L366)
+- [`HttpConnectionManager.http_filters`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L271)
+- [`VirtualHost.typed_per_filter_config`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/config/route/v3/route_components.proto#L144)
+- [`Route.typed_per_filter_config`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/config/route/v3/route_components.proto#L257)
+- [`WeightedCluster.ClusterWeight.typed_per_filter_config`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/config/route/v3/route_components.proto#L374)
+
+gRPC will support configuring multiple instances of the same filter
+implementation, each with its own name and config.  (Envoy supports this
+in the `HttpConnectionManager` config but does not yet support per-route
+config overrides in such cases, as per
+https://github.com/envoyproxy/envoy/issues/12274.)
+
+gRPC will also support the ability to indicate that a given filter
+is optional, as recently added in
+https://github.com/envoyproxy/envoy/pull/14982.  (Envoy does not yet
+support this feature, but it is being tracked in
+https://github.com/envoyproxy/envoy/issues/15025.)
+
+#### Top-Level Filter Configs
 
 The `HttpConnectionManager.http_filters` field is an ordered list of
 filters.  In each entry, gRPC will look at the following fields:
-- [`name`](https://github.com/envoyproxy/envoy/blob/2ee9543fbb0fccdb69d4dcd8cb57a19743afb94b/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L833):
+- [`name`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L831):
   A logical name for the filter instance.  This name will be used when
   applying overrides from the virtual host, route, or weighted cluster entry.
   The logical instance name also allows configuring multiple instances of the
   same filter, which can be useful for cases like authorization policies.
-- [`typed_config`](https://github.com/envoyproxy/envoy/blob/2ee9543fbb0fccdb69d4dcd8cb57a19743afb94b/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L838):
+- [`typed_config`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L836):
   This field contains the configuration message for the filter.  gRPC
   will contain a registry of filter implementations, keyed by the proto
   message type used for its configuration; thus, when gRPC sees an entry
@@ -94,39 +127,65 @@ filters.  In each entry, gRPC will look at the following fields:
   plugins to encode their configurations as a `google.protobuf.Struct`
   proto instead of using a concrete proto message type that the client
   may not be able to handle.
+- [`is_optional`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L836):
+  If set to true, if the filter config type is unknown, then the filter
+  will be ignored instead of causing the resource to be NACKed.
 
 When gRPC receives the `HttpConnectionManager` proto in the LDS
 response, it will validate the list of filters as follows:
-- Every filter config in the list must be of a known type, as identified
-  by the `type_url` field.  Any unknown config type will cause the Listener
-  resource to be NACKed.  Note that the set of known filter config types
-  will be different on the gRPC client and server; if the
-  `HttpConnectionManager` proto is inside an HTTP API Listener, it will
-  use the client set, whereas if it is inside a TCP Listener, it will
-  use the server set.
-- The fields in the filter config should be validated by the filter
-  implementation.  Any validation error will cause the Listener resource
-  to be NACKed.
 - Every filter in the list must have a unique instance name.  Any
   duplicate instance names will cause the Listener resource to be NACKed.
+- Every filter config in the list must be of a type (as identified by the
+  `type_url` field) that is present in the filter registry.  Note that the
+  set of known filter config types will be different on the gRPC client and
+  server; if the `HttpConnectionManager` proto is inside an HTTP API Listener,
+  it will look only at filters registered for the gRPC client, whereas if it
+  is inside a TCP Listener, it will look only at filters registered for
+  the gRPC server.  Any unknown config type will cause the Listener
+  resource to be NACKed, unless the `is_optional` field is true, in which
+  case the individual filter will be ignored.
+- The fields in the filter config will be validated by the filter
+  implementation.  Any validation error will cause the Listener resource
+  to be NACKed.
 
-Note that gRPC will support configuring multiple instances of the same
-filter implementation, each with its own name and config.
+#### Filter Config Overrides
 
 In each of the `VirtualHost`, `Route`, and `WeightedCluster.ClusterWeight`
-protos, there is a field called `typed_per_filter_config`, which is a map
-from filter instance name to a corresponding filter-specific configuration
-proto message.  (Note that Envoy currently keys these maps by legacy
-filter names instead of by filter instance names, but this is expected
-to change, as per https://github.com/envoyproxy/envoy/issues/12274; gRPC
-will directly implement the desired semantics here.)
+protos, there is a field called `typed_per_filter_config` that contains
+per-filter overrides.  Each entry in the map will be used as follows:
+- The entry's key is the filter instance name to which the config override
+  applies.  The entry will be used for the filter in the
+  `HttpConnectionManager.http_filters` list with the same `name` field.
+- The entry's value contains the override config for the filter.  As with
+  the `HttpConnectionManager.http_filters.typed_config` field, the type
+  of the protobuf message determines which filter is used, based on the
+  filters known to the filter registry.
+- If the value protobuf message type is `envoy.config.route.v3.FilterConfig`,
+  then gRPC will look inside that type's
+  [`config`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/config/route/v3/route_components.proto#L1966)
+  field to determine the actual type.  In addition, gRPC will look at the
+  [`is_optional`](https://github.com/envoyproxy/envoy/blob/9ed95162ce11a09a56c1743d0a6e342d9bbfd2b6/api/envoy/config/route/v3/route_components.proto#L1971)
+  field to determine how to handle unknown protobuf message types.
+- Whether or not the `FilterConfig` wrapper is used, if the type is
+  `udpa.type.v1.TypedStruct`, then gRPC will look inside that type's
+  [`type_url`](https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38)
+  field to determine the actual type; this allows for third-party
+  plugins to encode their configurations as a `google.protobuf.Struct`
+  proto instead of using a concrete proto message type that the client
+  may not be able to handle.
+
+Note that Envoy currently keys these maps by legacy filter names instead
+of by filter instance names, but this is expected to change, as per
+https://github.com/envoyproxy/envoy/issues/12274.  gRPC will directly
+implement the desired semantics here.
 
 When gRPC receives the `RouteConfiguration` proto, either in the LDS or
 RDS response, it will validate the contents of each
 `typed_per_filter_config` map as follows:
 - Every config in the list must be of a known type, as identified by the
   map value proto message type.  Any unknown config type will cause the
-  resource to be NACKed.
+  resource to be NACKed, unless the `is_optional` field is true, in which
+  case the individual entry will be ignored.
 - The fields in the filter config should be validated by the filter
   implementation.  Any validation error will cause the resource to be NACKed.
 - Note that gRPC will *not* fail validation if the map key specifies a
