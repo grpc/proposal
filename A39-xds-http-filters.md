@@ -33,6 +33,7 @@ authorization), which we also want to be provided out-of-the-box in gRPC.
 - [A30: xDS v3 Support](https://github.com/grpc/proposal/blob/master/A30-xds-v3.md)
 - [A31: gRPC xDS Timeout Support and Config Selector Design](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md)
 - [A33: xDS Client-Side Fault Injection](https://github.com/grpc/proposal/pull/201) (pending)
+- [A36: xDS-Enabled Servers](https://github.com/grpc/proposal/pull/214) (pending)
 
 ## Proposal
 
@@ -43,6 +44,16 @@ where gRPC implements the xDS routing functionality.
 
 In C-core, the xDS HTTP filters will be implemented as C-core filters.
 In Java and Go, they will be implemented as interceptors.
+
+We will also support xDS HTTP filters in the gRPC server.  However,
+unlike Envoy, gRPC cannot use the same filter implementations on the
+client and server side, because the operations are inverse (e.g., a
+fault-injection filter on the client side needs to take action on send
+operations, whereas the same filter on the server side needs to take
+action on receive operations).  Therefore, gRPC will effectively have
+independent sets of supported filters on the client and server side
+(i.e., just because a filter is supported on the client side does not
+mean that it will also be accepted on the server side, and vice-versa).
 
 ### Limitations
 
@@ -86,9 +97,13 @@ filters.  In each entry, gRPC will look at the following fields:
 
 When gRPC receives the `HttpConnectionManager` proto in the LDS
 response, it will validate the list of filters as follows:
-- Every filter in the list must be of a known type, as identified by the
-  `type_url` field.  Any unknown config type will cause the Listener
-  resource to be NACKed.
+- Every filter config in the list must be of a known type, as identified
+  by the `type_url` field.  Any unknown config type will cause the Listener
+  resource to be NACKed.  Note that the set of known filter config types
+  will be different on the gRPC client and server; if the
+  `HttpConnectionManager` proto is inside an HTTP API Listener, it will
+  use the client set, whereas if it is inside a TCP Listener, it will
+  use the server set.
 - The fields in the filter config should be validated by the filter
   implementation.  Any validation error will cause the Listener resource
   to be NACKed.
@@ -119,6 +134,11 @@ RDS response, it will validate the contents of each
   filter list.  This is because during an update, the xDS client code
   cannot know which `HttpConnectionManager` config is currently being
   used.
+- Similarly, gRPC will *not* fail validation if a map entry uses a
+  config for a filter that is supported on only the gRPC client but is
+  used on the gRPC server, or vice-versa.  This is because the xDS
+  client code cannot know whether a given RDS update will be used by a
+  gRPC client or server.
 
 Unlike Envoy, which provides an API that filters must call to access their
 per-{VirtualHost,Route,ClusterWeight} config overrides, gRPC will
@@ -135,9 +155,9 @@ used; otherwise, if it has an override in the `Route` proto, that will
 be used; otherwise, if it has an override in the `VirtualHost` proto,
 that will be used; otherwise, no override will be used.
 
-### Initially Supported Filter: Router
+### The Router Filter
 
-Initially, gRPC will support only one filter, the [router
+gRPC will support the [router
 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter),
 which is used for the proto message type
 [`envoy.extensions.filters.http.router.v3.Router`](https://github.com/envoyproxy/envoy/blob/18db4c90e3295fb2c39bfc7b2ce641cfd6c3fbed/api/envoy/extensions/filters/http/router/v3/router.proto#L23).
@@ -161,12 +181,18 @@ config.  All fields will be ignored.
 
 ### Experimental Environment Variable for Initial Testing
 
-Initially, this feature will be released at the same time as the fault
-injection functionality described in
+On the gRPC client side, this feature will be released at the same time as
+the fault injection functionality described in
 [gRFC A33](https://github.com/grpc/proposal/pull/201), so it will be
 guarded by the same environment variable.  That env var is
 `GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION`.  This env var protection will
 be removed once the new feature has proven to be stable.
+
+On the gRPC server side, this feature will be released as part of the
+initial support for xDS in the gRPC server, as described in
+[gRFC A36Servers](https://github.com/grpc/proposal/pull/214).  Because
+xDS support in the gRPC server is enabled via the application API, there
+is no environment variable guard needed in that case.
 
 ## Implementation
 
