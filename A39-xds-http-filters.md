@@ -244,14 +244,20 @@ On the gRPC client side, this feature will be released at the same time as
 the fault injection functionality described in
 [gRFC A33](https://github.com/grpc/proposal/pull/201), so it will be
 guarded by the same environment variable.  That env var is
-`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION`.  This env var protection will
-be removed once the new feature has proven to be stable.
+`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION`.
 
 On the gRPC server side, this feature will be released as part of the
 initial support for xDS in the gRPC server, as described in
-[gRFC A36Servers](https://github.com/grpc/proposal/pull/214).  Because
-xDS support in the gRPC server is enabled via the application API, there
-is no environment variable guard needed in that case.
+[gRFC A36](https://github.com/grpc/proposal/pull/214), where the
+first feature is mTLS support, which is guarded by the
+`GRPC_XDS_EXPERIMENTAL_SECURITY_SUPPORT` env var.
+
+Note that since the xDS resource validation code is shared between the
+gRPC client and server, the relevant xDS fields will be processed
+whenever either of these environment variables are set.
+
+This env var protection will be removed once this new feature has proven to
+be stable.
 
 ## Implementation
 
