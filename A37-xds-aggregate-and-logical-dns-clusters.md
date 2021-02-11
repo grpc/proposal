@@ -2,9 +2,9 @@ A37: xDS Aggregate and Logical DNS Clusters
 ----
 * Author(s): Mark D. Roth (roth@google.com)
 * Approver: ejona86
-* Status: {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in: <language, ...>
-* Last updated: 2021-01-26
+* Status: Implemented
+* Implemented in: C-core, Java
+* Last updated: 2021-02-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/bZ7wLIdNCVY
 
 ## Abstract
@@ -321,5 +321,5 @@ themselves.
 
 ## Implementation
 
-This functionality is mostly implemented in C-core and Java.  It will be
+This functionality is implemented in C-core and Java.  It will be
 implemented in Go in the near future.
