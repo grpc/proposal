@@ -84,23 +84,27 @@ Here is the set of fault injection policy configuring HTTP headers that gRPC wil
 x-envoy-fault-abort-request=503
 
 # Aborts gRPC requests with INVALID_ARGUMENT
-X-envoy-fault-abort-grpc-request=3
+x-envoy-fault-abort-grpc-request=3
 
 # The percentage of requests to be failed. This header only sets numerator. The denominator was set in the HTTPFault filter, which by default is 100.
 # 5% of requests should fail.
-X-envoy-fault-abort-request-percentage=5
+x-envoy-fault-abort-request-percentage=5
 
 # Delays request for 53 milliseconds.
-X-envoy-fault-delay-request=53
+x-envoy-fault-delay-request=53
 
 # The percentage of requests to be delayed. This header only sets numerator. The denominator was set in the HTTPFault filter, which by default is 100.
 # 20% of requests should delay
-X-envoy-fault-delay-request-percentage=20
+x-envoy-fault-delay-request-percentage=20
 
 # Not supported
-X-envoy-fault-throughput-response=''
-X-envoy-fault-throughput-response-percentage=''
+x-envoy-fault-throughput-response=''
+x-envoy-fault-throughput-response-percentage=''
 ```
+
+Note that for both `X-envoy-fault-abort-request-percentage` and `x-envoy-fault-delay-request-percentage`, the percentage value is capped by the percentage value provided by the effective fault injection filter config. For example, if the abort fractional percentage is 500000/1000000 based on LDS and RDS, and the header can only change the fractional percentage to [0, 500000], above 500000 will be limited to 500000. Here is the quote from the [HTTP headers](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/fault_filter#controlling-fault-injection-via-http-headers) section:
+
+> ...the percentage of request to apply aborts to and must be greater or equal to 0 and its maximum value is capped by the value of the numerator of percentage field.
 
 **Fault inject config in HTTP filter and headers won’t be conflicted**, because the header only being evaluated if the delay or abort is set to `HeaderDelay` or `HeaderAbort` instead of concrete values.
 
