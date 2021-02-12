@@ -220,7 +220,9 @@ gRPC will support the [router
 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter),
 which is used for the proto message type
 [`envoy.extensions.filters.http.router.v3.Router`](https://github.com/envoyproxy/envoy/blob/18db4c90e3295fb2c39bfc7b2ce641cfd6c3fbed/api/envoy/extensions/filters/http/router/v3/router.proto#L23).
-As in Envoy, this filter is required and must be last in the filter list.
+In practice, in order for gRPC to function properly, this filter is
+required and must be last in the filter list, although that is not
+enforced at config validation time.
 
 Note that gRPC will not actually have a discrete filter implementation
 for the router filter; instead, this filter will simply trigger the
