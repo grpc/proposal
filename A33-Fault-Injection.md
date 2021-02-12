@@ -1,8 +1,8 @@
 Client-Side Fault Injection
 ----
 * Author(s): lidiz
-* Approver: markdroth, ejona86, dfawley
-* Status: In Review
+* Approver: markdroth
+* Status: Approved
 * Implemented in: all languages
 * Last updated: Feb 10th, 2021
 * Discussion at: https://groups.google.com/g/grpc-io/c/d9dI5Hy9zzk
