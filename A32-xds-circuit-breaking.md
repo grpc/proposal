@@ -59,7 +59,7 @@ limits to very high values, for example, to
 
 With the introduction of [gRFC A28: xDS Traffic Splitting and Routing](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md), 
 it became possible for each client channel to have more than one CDS LB policy 
-instances for a given cluster (e.g., if one route pointed to a given cluster
+instance for a given cluster (e.g., if one route pointed to a given cluster
 and a different route split traffic between that cluster and other clusters). 
 However, after implementing the changes described in [gRPC A31: xDS RouteActions Support](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md),
 there will be only one CDS LB policy instance for a given cluster at any time
@@ -112,8 +112,8 @@ the process sent to upstream clusters as all traffic goes through the sidecar
 proxy. To achieve the same behavior, counters used to aggregate outstanding
 requests should be globally shared for channels in the client process.
 Therefore, we will use a global map to hold call counters per {cluster, EDS
-service name} pair. Counters reference counted and lazily created upon being
-accessed for the first time.
+service name} pair. Counters are reference counted and lazily created upon
+being accessed for the first time.
 
 ### Behavioral difference between Envoy and gRPC
 
