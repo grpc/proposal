@@ -144,9 +144,13 @@ response, it will validate the list of filters as follows:
   the gRPC server.  Any unknown config type will cause the Listener
   resource to be NACKed, unless the `is_optional` field is true, in which
   case the individual filter will be ignored.
-- The fields in the filter config will be validated by the filter
-  implementation.  Any validation error will cause the Listener resource
-  to be NACKed.
+- If the filter config type is present in the filter registry (i.e., we
+  have not NACKed or ignored the entry, depending on the value of
+  `is_optional`), the fields in the filter config will be validated by
+  the filter implementation.  The filter implementation will also verify
+  that the config is of the right type (e.g., if it uses different types
+  for its top-level config and its override config).  Any validation error
+  will cause the Listener resource to be NACKed.
 
 #### Filter Config Overrides
 
@@ -186,8 +190,13 @@ RDS response, it will validate the contents of each
   map value proto message type.  Any unknown config type will cause the
   resource to be NACKed, unless the `is_optional` field is true, in which
   case the individual entry will be ignored.
-- The fields in the filter config should be validated by the filter
-  implementation.  Any validation error will cause the resource to be NACKed.
+- If the filter config type is present in the filter registry (i.e., we
+  have not NACKed or ignored the entry, depending on the value of
+  `is_optional`), the fields in the filter config will be validated by
+  the filter implementation.  The filter implementation will also verify
+  that the config is of the right type (e.g., if it uses different types
+  for its top-level config and its override config).  Any validation error
+  will cause the resource to be NACKed.
 - Note that gRPC will *not* fail validation if the map key specifies a
   filter instance name that does not exist in the `HttpConnectionManager`
   filter list.  This is because during an update, the xDS client code
@@ -232,10 +241,12 @@ in order to retain compatibility with Envoy, gRPC will still accept
 this filter configuration and treat it similarly to the way that Envoy
 does.
 
-Specifically, if the router filter is not present, gRPC will fail all
-requests.  In addition, any filters in the list after the router filter
-will not actually be used, although their configurations will still be
-validated when the config is received from the xDS server.
+Specifically, if the router filter is not present, then gRPC will insert
+a special filter at the end of the filter chain that fails all RPCs.
+In addition, if the router filter *is* present, any filters in the list
+after the router filter will not actually be used, although their
+configurations will still be validated when the config is received from
+the xDS server.
 
 For now, gRPC will not support any of the fields in the router filter's
 config.  All fields will be ignored.
