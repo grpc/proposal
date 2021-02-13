@@ -2,9 +2,9 @@ A39: xDS HTTP Filter Support
 ----
 * Author(s): Mark D. Roth (markdroth)
 * Approver: ejona86, dfawley
-* Status: In Review
-* Implemented in: 
-* Last updated: 2021-02-10
+* Status: Approved
+* Implemented in: C-core
+* Last updated: 2021-02-12
 * Discussion at: https://groups.google.com/g/grpc-io/c/M-l8k2v5snY
 
 ## Abstract
@@ -276,4 +276,4 @@ be stable.
 
 C-core implementation:
 - Add dynamic filters between name resolution and load balancing: https://github.com/grpc/grpc/pull/24920
-- Add xDS HTTP filter support: https://github.com/grpc/grpc/pull/25310
+- Add xDS HTTP filter support for gRPC client: https://github.com/grpc/grpc/pull/25310
