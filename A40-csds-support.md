@@ -2,10 +2,10 @@ xDS Configuration Dump via Client Status Discovery Service in gRPC
 ----
 * Author(s): lidizheng
 * Approver: markdroth
-* Status: Draft
+* Status: In-Review
 * Implemented in: All languages
 * Last updated: 2021-02-16
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/zL45YyxtJ08
 
 ## Abstract
 
@@ -171,7 +171,7 @@ to not support xDS v2 for CSDS.
 
 #### Detail: Cache Lifecycle
 
-gRPC doesn't use xDS messages directly, but interpret them into language-native
+gRPC doesn't use xDS messages directly, but interprets them into language-native
 class/struct. The lifecycle of the cached xDS messages should be identical to
 the interpreted structure in each stack, so there is no memory management logic
 change needed.
