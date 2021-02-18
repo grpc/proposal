@@ -20,7 +20,9 @@ interceptor cannot take action based on any of those properties.
 
 ## Proposal
 
-We will add three methods to the servicer context objects:
+We will add three methods to the servicer context interface
+(`grpc.ServicerContext`), and synchronous (`grpc._server._Context`)
+and AIO server (`grpc.aio.ServicerContext`) implementations:
 
 * `code()` returns the status code.
 * `details()` returns the state details.
@@ -75,8 +77,5 @@ iteration of this.
 
 ## Implementation
 
-1. Add the new API calls to the interface (`grpc.ServicerContext`),
-and synchronous (`grpc._server._Context`) and AIO server
-(`grpc.aio.ServicerContext`)
-implementations. https://github.com/grpc/grpc/pull/25457 holds an
+1. Add the new API calls. https://github.com/grpc/grpc/pull/25457 holds an
 incomplete draft.
