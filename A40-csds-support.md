@@ -106,17 +106,29 @@ Here is an example of NACK information handling with new ADS changes:
 # Imagine we have endpoint A, B, C
 EDS -> {A, B, C}, version 1
 gRPC -> ACK
-CSDS -> {Endpoint A, version 1}, {Endpoint B, version 1}, {Endpoint C, version 1}
+CSDS -> [
+  {Endpoint A, ACK, version 1},
+  {Endpoint B, ACK, version 1},
+  {Endpoint C, ACK, version 1}
+]
 
 # The newer endpoint B contains parsing error
 EDS -> {A, B}, version 2
 gRPC -> NACK, Failed to parse endpoint B 
-CSDS -> {Endpoint A, version 1, rejected version 2, rejected reason: Failed to parse endpoint B } {Endpoint B, version 1, rejected version 2, rejected reason: Failed to parse endpoint B} {Endpoint C, version 1}
+CSDS -> [
+  {Endpoint A, NACK, version 1, rejected version 2, rejected reason: Failed to parse endpoint B},
+  {Endpoint B, NACK, version 1, rejected version 2, rejected reason: Failed to parse endpoint B},
+  {Endpoint C, ACK, version 1}
+]
 
 # Accepted update will clean error states
 EDS -> {B, C} version 3
 gRPC -> ACK
-CSDS -> {Endpoint A, version 1, rejected version 2, rejected reason: Failed to parse endpoint B } {Endpoint B, version 3}, {Endpoint C, version 3}
+CSDS -> [
+  {Endpoint A, NACK, version 1, rejected version 2, rejected reason: Failed to parse endpoint B},
+  {Endpoint B, ACK, version 3},
+  {Endpoint C, ACK, version 3}
+]
 ```
 
 
@@ -124,7 +136,9 @@ CSDS -> {Endpoint A, version 1, rejected version 2, rejected reason: Failed to p
 
 When an ADS response is rejected, gRPC should provide debug information via
 CSDS. This is done via `UpdateFailureState` within the `config_dump.proto`,
-which includes the version, timestamp, and the reason of the rejected update:
+which includes the version, timestamp, and the reason of the rejected update
+(see [proto
+definition](https://github.com/envoyproxy/envoy/blob/main/api/envoy/admin/v3/config_dump.proto#L72)):
 
 ```proto
 message UpdateFailureState {
@@ -190,7 +204,13 @@ gRPC receives them**.
 #### Detail: Node Matching
 
 The node matching mechanism is not designed for gRPC’s use case, but for
-querying the control plane. This doc proposes to ignore the Node matching query.
+querying the control plane. Technically, gRPC application only serves as one xDS
+node, so there is no need to differentiate with xDS client's status to reply.
+However, gRPC should reject the request with Node Matcher that failed to match
+with the Node information of the gRPC application. This feature has lower
+priority. To preserve forward compatibility, this doc proposes to throw an
+[INVALID_ARGUMENT](https://github.com/grpc/grpc/blob/master/doc/statuscodes.md)
+if the CSDS implementation observe an non-empty Node Matcher.
 
 
 ## Alternatives
@@ -235,7 +255,8 @@ more engineering resources but yield less functionality.
   config dump protos to allow CSDS to return information about the rejected
   update.
 * [envoy#14900]: this PR adds two additional status to client configs, the
-  REQUESTED and the DOES_NOT_EXIST (read more).
+  REQUESTED and the DOES_NOT_EXIST ([read
+  more](https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist)).
 
 ### CSDS Implementation
 
