@@ -51,7 +51,7 @@ statuses from a control plane point of view, and it only works at the
 granularity of xDS config type.
 
 This gRFC proposes adding following status enum to
-([config_dump.proto](https://github.com/envoyproxy/envoy/blob/main/api/envoy/admin/v3/config_dump.proto).
+[config_dump.proto](https://github.com/envoyproxy/envoy/blob/main/api/envoy/admin/v3/config_dump.proto).
 `ClientResourceStatus` better represents the viewpoint of xDS clients and it can
 be as specific as per individual xDS resources.
 
