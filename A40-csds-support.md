@@ -4,7 +4,7 @@ xDS Configuration Dump via Client Status Discovery Service in gRPC
 * Approver: markdroth
 * Status: In-Review
 * Implemented in: All languages
-* Last updated: 2021-02-16
+* Last updated: 2021-02-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/zL45YyxtJ08
 
 ## Abstract
@@ -188,8 +188,7 @@ design:
   version, etc.);
 * Assemble cached resources into the gigantic config dump response.
 
-Note that xDS config should include the `config.core.v3.Node` information
-obtained from the bootstrap file in the
+Note that xDS config should include the `config.core.v3.Node` information in the
 `envoy.service.status.v3.ClientConfig.node` field. Unlike other xDS configs,
 this information is static and may require extra logic to integrate into the
 CSDS service.
@@ -228,6 +227,36 @@ gRPC doesn't use xDS messages directly, but interprets them into language-native
 class/struct. The lifecycle of the cached xDS messages should be identical to
 the interpreted structure in each stack, so there is no memory management logic
 change needed.
+
+#### Detail: Generated Node Information
+
+gRPC loads Node information from a [bootstrap
+file](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md#xdsclient-and-bootstrap-file),
+which includes the identification that will be used in the control plane. gRPC's
+xDS client also generates `user_agent_name`, `user_agent_version`, and
+`client_features` before sending the `Node` information to the control plane.
+These information can be very helpful to debugging. This doc recommends the
+implementation to provide the `ClientStatusResponse.ClientConfig.node` field
+with the `Node` information that the control plane will receive. Here is an
+example of filled `Node`:
+
+```json
+{
+  "node": {
+    "id": "c591240a-b3b6-4761-aada-3fa43ec6a852",
+    "cluster": "cluster",
+    "metadata": {
+      "...": "..."
+    },
+    "locality": {
+      "zone": "zone"
+    },
+    "userAgentName": "gRPC Java",
+    "userAgentVersion": "1.35.1-SNAPSHOT",
+    "clientFeatures": ["envoy.lb.does_not_support_overprovisioning"]
+  }
+}
+```
 
 #### Detail: Node Matching
 
