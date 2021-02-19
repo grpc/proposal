@@ -235,10 +235,10 @@ file](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing
 which includes the identification that will be used in the control plane. gRPC's
 xDS client also generates `user_agent_name`, `user_agent_version`, and
 `client_features` before sending the `Node` information to the control plane.
-These information can be very helpful to debugging. This doc recommends the
-implementation to provide the `ClientStatusResponse.ClientConfig.node` field
-with the `Node` information that the control plane will receive. Here is an
-example of filled `Node`:
+This information can be very helpful to locate the culprit release and
+debugging. This doc recommends the implementation to provide the
+`ClientStatusResponse.ClientConfig.node` field with the `Node` information that
+the control plane will receive. Here is an example of a filled `Node`:
 
 ```json
 {
