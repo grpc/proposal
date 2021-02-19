@@ -15,7 +15,7 @@ Service](https://github.com/envoyproxy/envoy/blob/main/api/envoy/service/status/
 used to query control planes for the synced xDS config of a particular sidecar
 proxy. However, it can also be used to query an xDS-compliant application for
 its received xDS configuration. This doc proposes a solution to implement a CSDS
-servicer in gRPC, so our users can debug their service mesh easily.
+service in gRPC, so our users can debug their service mesh easily.
 
 
 ## Background
@@ -29,17 +29,38 @@ interface](https://www.envoyproxy.io/docs/envoy/latest/operations/admin) for
 years. There is no visible plan for Envoy to support serving CSDS directly as a
 proxy.
 
+The CSDS service accepts two methods, one for unary, one for streaming. The
+expected behavior of the two methods is the same, but the streaming method can
+reuse the stream. According to the service description below, this is not a
+watch-style API.
+
+```proto
+// CSDS is Client Status Discovery Service. It can be used to get the status of
+// an xDS-compliant client from the management server's point of view. It can
+// also be used to get the current xDS states directly from the client.
+service ClientStatusDiscoveryService {
+  rpc StreamClientStatus(stream ClientStatusRequest) returns (stream ClientStatusResponse) {
+  }
+
+  rpc FetchClientStatus(ClientStatusRequest) returns (ClientStatusResponse) {
+  }
+}
+```
 
 ### Related Proposals: 
+* [A27 - xDS-Based Global Load
+  Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
 * [A38 - Admin Interface API](https://github.com/grpc/proposal/pull/218)
+
 
 ## Proposal
 
 ### CSDS in gRPC
-The goal of adding a CSDS servicer to gRPC is to enable programmatic access to
+
+The goal of adding a CSDS service to gRPC is to enable programmatic access to
 the operating xDS configs of a running gRPC application. To make this more
 clear, an xDS-compliant application receives many xDS configs, which may be
-rejected or ignored or obsoleted. **The gRPC CSDS servicer should always return
+rejected or ignored or obsoleted. **The gRPC CSDS service should always return
 the currently accepted xDS configs.**
 
 ### Config Status in gRPC
@@ -95,10 +116,10 @@ expected behavior under scenarios:
 * If the entire message won’t parse: no need to record anything in CSDS, since
   we don’t know what type of xDS config or what resources are being updated;
 * If one resource won’t parse: don’t abort the parsing, record the error in the
-  error string. The error string will be attached to other resources that are
-  successfully recognized;
+  `error_state.details` field. The error string will be attached to other
+  resources that are successfully recognized;
 * If one resource has validation error: record the error, and attach the error
-  string to all resources including itself.
+  string to all resources in the ADS update including itself.
 
 Here is an example of NACK information handling with new ADS changes:
 
@@ -138,7 +159,7 @@ When an ADS response is rejected, gRPC should provide debug information via
 CSDS. This is done via `UpdateFailureState` within the `config_dump.proto`,
 which includes the version, timestamp, and the reason of the rejected update
 (see [proto
-definition](https://github.com/envoyproxy/envoy/blob/main/api/envoy/admin/v3/config_dump.proto#L72)):
+definition](https://github.com/envoyproxy/envoy/blob/a4024a578b3f2611fe26229f5d0de99eb0c56895/api/envoy/admin/v3/config_dump.proto#L72)):
 
 ```proto
 message UpdateFailureState {
@@ -155,11 +176,11 @@ message UpdateFailureState {
 }
 ```
 
-### CSDS Servicer Design
+### CSDS Service Design
 
-Ideally, the CSDS servicer should be reusable by our users, instead of just an
-internal tool for the gRPC library. So, the CSDS servicer should be implemented
-in wrapper languages and Java/Go. There are three major parts in the servicer
+Ideally, the CSDS service should be reusable by our users, instead of just an
+internal tool for the gRPC library. So, the CSDS service should be implemented
+in wrapper languages and Java/Go. There are three major parts in the service
 design:
 
 * Cache resources in the global XdsClient;
@@ -167,11 +188,18 @@ design:
   version, etc.);
 * Assemble cached resources into the gigantic config dump response.
 
+Note that xDS config should include the `config.core.v3.Node` information
+obtained from the bootstrap file in the
+`envoy.service.status.v3.ClientConfig.node` field. Unlike other xDS configs,
+this information is static and may require extra logic to integrate into the
+CSDS service.
+
 For Java and Go, it’s straightforward that this feature can be implemented
 bottom-up in the same language, and it’s possible to avoid an additional copy of
 the message itself. But Core needs to transport the collected xDS configs across
 the language boundary. The API needs to convert proto messages into C-compatible
 types (e.g. `char *`, either bytes or JSON).
+
 
 #### Detail: No xDS v2 Support
 
@@ -183,13 +211,6 @@ improve the CSDS service to meet our standard. The updates are made to xDS v3
 and xDS v4 (alpha) only, since xDS v2 is in deprecated state. This doc proposes
 to not support xDS v2 for CSDS.
 
-#### Detail: Cache Lifecycle
-
-gRPC doesn't use xDS messages directly, but interprets them into language-native
-class/struct. The lifecycle of the cached xDS messages should be identical to
-the interpreted structure in each stack, so there is no memory management logic
-change needed.
-
 #### Detail: Expose xDS Config As Is
 
 To date, gRPC supports the majority of xDS config but not all. Alternatively, we
@@ -200,6 +221,13 @@ dump, Envoy also dumps its entire configuration even if it doesn’t understand
 some of the configuration fields (think of fields for Envoy extensions). So, for
 correctness and simplicity, we should **cache and expose the xDS config the way
 gRPC receives them**.
+
+#### Detail: Cache Lifecycle
+
+gRPC doesn't use xDS messages directly, but interprets them into language-native
+class/struct. The lifecycle of the cached xDS messages should be identical to
+the interpreted structure in each stack, so there is no memory management logic
+change needed.
 
 #### Detail: Node Matching
 
@@ -268,4 +296,4 @@ more engineering resources but yield less functionality.
 
 [envoy#14689]: https://github.com/envoyproxy/envoy/pull/14689
 
-[envoy#14900]:https://github.com/envoyproxy/envoy/pull/14900
+[envoy#14900]: https://github.com/envoyproxy/envoy/pull/14900
