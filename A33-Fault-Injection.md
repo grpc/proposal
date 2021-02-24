@@ -4,7 +4,7 @@ Client-Side Fault Injection
 * Approver: markdroth
 * Status: Approved
 * Implemented in: all languages
-* Last updated: Feb 10th, 2021
+* Last updated: Feb 23rd, 2021
 * Discussion at: https://groups.google.com/g/grpc-io/c/d9dI5Hy9zzk
 
 ## Abstract
@@ -106,6 +106,10 @@ Note that for both `X-envoy-fault-abort-request-percentage` and `x-envoy-fault-d
 
 > ...the percentage of request to apply aborts to and must be greater or equal to 0 and its maximum value is capped by the value of the numerator of percentage field.
 
+Note that if any header is invalid, for example, passing non-numerical value as percentage header, the invalid headers will be ignored.
+
+Note if there are multiple valid headers with the same key name, gRPC doesn't make no promise about which one will be picked at the end.
+
 **Fault inject config in HTTP filter and headers won’t be conflicted**, because the header only being evaluated if the delay or abort is set to `HeaderDelay` or `HeaderAbort` instead of concrete values.
 
 
@@ -114,6 +118,11 @@ Note that for both `X-envoy-fault-abort-request-percentage` and `x-envoy-fault-d
 Both `http_status` and `grpc_status` are available in xDS v3 API. Mapping between HTTP status code and gRPC status code is well defined (see [doc](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md)), but using HTTP status code means users are limited to inject only 7 out of 16 gRPC status codes (including `OK`). The underlying schema for abort looks like [FaultAbort](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/fault/v3/fault.proto#extensions-filters-http-fault-v3-faultabort).
 
 gRPC should accept fault injection settings with either HTTP status code or gRPC status code. **The ConfigSelector should translate the HTTP status code into gRPC status code** before sending the config to the fault injection enforcer.
+
+
+### 200/OK Error Injection
+
+xDS allows users to set `http_status` to 200 and `grpc_status` to `OK`, and still performs fault injection. There are valid use cases for injecting an OK status with no payload. Notably, in above HTTP-gRPC status mapping spec, 200 is mapped to `UNKNOWN` because gRPC libraries expect the application to set true gRPC status in the `grpc_status` field. So, in case of injection `OK` status, gRPC libraries should abort the RPC with the status code `OK`, just like any other status code. However, a successful RPC not only requires the final status code to be `OK`, it also requires minimum header or message frames (see [spec](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)). A gRPC client may treat this kind of RPC as `INTERNAL_ERROR` or `UNIMPLEMENTED` depends on implementation details of each language.
 
 
 ### Evaluate Possibility Fraction
