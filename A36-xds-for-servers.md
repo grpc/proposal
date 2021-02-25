@@ -296,8 +296,8 @@ server delegating to a "real" server instance. The `XdsServerBuilder` would
 install an `AtomicReference<ServerInterceptor>`-backed interceptor in the
 built server and pass the listening port and interceptor reference to the
 xDS-aware server when constructed. Since interceptors cannot be removed once
-installed, the builder may only be used once; `build()` should throw if called a
-second time. To allow the `XdsServerBuilder` to create addition servers if
+installed, the builder may only be used once; `build()` should throw if called
+more than once. To allow the `XdsServerBuilder` to create additional servers if
 necessary, mutation of the builder after `build()` should also throw.
 
 The xDS-aware server’s `start()` will create the `XdsClient` with the passed
