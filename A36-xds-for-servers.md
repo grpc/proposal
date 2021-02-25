@@ -157,7 +157,8 @@ Listener's `address` would be a TCP `SocketAddress` with matching `address` and
 `port_value`. The XdsServer must be "not serving" if the address does not match.
 
 The xDS client must NACK the Listener resource if `Listener.listener_filters` is
-non-empty.
+non-empty. It must also NACK the Listener resource if
+`Listener.use_original_dst` is present and `true`.
 
 The xDS client must NACK the Listener resource if any entry in
 [`filter_chains`][Listener.filter_chains] or `default_filter_chain` is invalid.
