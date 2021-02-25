@@ -70,16 +70,17 @@ XdsServerCredentials.
 
 To serve RPCs, the XdsServer must have its xDS configuration, provided via a
 Listener resource and potentialy other related resources. When its xDS
-configuration is missing or unknown the server must be in a "not serving" mode.
-This is ideally implemented by not `listen()`ing on the port. If that is
-impractical an implementation may be `listen()`ing on the port, but it must also
-`accept()` and immediately `close()` connections, making sure to not send any
-data to the client (e.g., no TLS ServerHello nor HTTP/2 SETTINGS). With either
-behavior, client connection attempts will quickly fail and clients would not
-perform further attempts without a backoff. Load balancing policies like
-`pick_first` would naturally attempt connections to any remaining addresses to
-quickly find an operational backend. However, the `accept()`+`listen()` approach
-will be improperly detected as server liveness for TCP heath checking.
+configuration does not exist or has not yet been received the server must be in
+a "not serving" mode. This is ideally implemented by not `listen()`ing on the
+port. If that is impractical an implementation may be `listen()`ing on the port,
+but it must also `accept()` and immediately `close()` connections, making sure
+to not send any data to the client (e.g., no TLS ServerHello nor HTTP/2
+SETTINGS). With either behavior, client connection attempts will quickly fail
+and clients would not perform further attempts without a backoff. Load balancing
+policies like `pick_first` would naturally attempt connections to any remaining
+addresses to quickly find an operational backend. However, the
+`accept()`+`listen()` approach will be improperly detected as server liveness
+for TCP heath checking.
 
 If the xDS bootstrap is missing or invalid, implementations would ideally fail
 XdsServer startup, but it is also acceptable to consider it a lack of xDS
