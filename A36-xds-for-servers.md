@@ -42,9 +42,11 @@ xDS-powered gRPC features can be used without code changes.
 
  * [A27: xDS-Based Global Load Balancing][A27]
  * [A29: xDS-Based Security for gRPC Clients and Servers][A29]
+ * [A39: xDS HTTP Filter Support][A39]
 
 [A27]: A27-xds-global-load-balancing.md
 [A29]: A29-xds-tls-security.md
+[A39]: A39-xds-http-filters.md
 
 ## Proposal
 
@@ -153,6 +155,32 @@ Listener's `address` would be a TCP `SocketAddress` with matching `address` and
 
 The xDS client must NACK the Listener resource if `Listener.listener_filters` is
 non-empty.
+
+The xDS client must NACK the Listener resource if any entry in
+[`filter_chains`][Listener.filter_chains] or `default_filter_chain` is invalid.
+`FilterChain`s are valid if all of their network `filters` are supported by the
+implementation, the network filters' configuration is valid, and the filter
+names are unique within the `filters` list. Additionally, the
+`envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager`
+filter, HttpConnectionManager hereafter, must be present. Any filters after
+HttpConnectionManager should be ignored during connection processing but must
+still be considered for validity.
+
+`Filter` types are the type contained in the
+[`typed_config`][Filter.typed_config] Any. If the type is
+`udpa.type.v1.TypedStruct`, then its [`type_url`][TypedStruct.type_url] is used
+instead. There is not an equivalent of `envoy.config.route.v3.FilterConfig` for
+network filters. Note that this disagrees with the current documentation in
+`listener_components.proto`, but that documentation is trailing a change to
+Envoy's behavior.
+
+HttpConnectionManager support is required. HttpConnectionManager must have valid
+`http_filters`, as defined by [A39: xDS HTTP Filter Support][A39].
+RouteConfiguration (via `route_config` or indirect fields like `rds`) is not
+used nor validated at this time, but may be in the future.
+
+[Filter.typed_config]: https://github.com/envoyproxy/envoy/blob/928a62b7a12c4d87ce215a7c4ebd376f69c2e080/api/envoy/config/listener/v3/listener_components.proto#L40
+[TypedStruct.type_url]: https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38
 
 ### FilterChainMatch
 
