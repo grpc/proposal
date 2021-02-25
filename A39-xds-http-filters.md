@@ -73,10 +73,12 @@ gRPC will have a filter registry that tells it the set of supported
 xDS HTTP filters.
 
 Each filter will be registered by the protobuf message type(s) that
-represent its configuration in xDS.  Note that a given filter may have
-more than one associated protobuf message type, since many filters use a
-different message type for their top-level configuration than for their
-per-route override configuration.
+represent its configuration in xDS.  Note that every filter has a
+message type for its top-level configuration, but not all filters
+support override configuration at all, and those that do may or may not
+use the same message type for their override configuration as for their
+top-level configuration.  Therefore, every filter will be registered
+one or more message types.
 
 Each filter implementation will provide the following:
 - Method(s) for validating the config protos when parsing an xDS response.
@@ -194,9 +196,11 @@ RDS response, it will validate the contents of each
   have not NACKed or ignored the entry, depending on the value of
   `is_optional`), the fields in the filter config will be validated by
   the filter implementation.  The filter implementation will also verify
-  that the config is of the right type (e.g., if it uses different types
-  for its top-level config and its override config).  Any validation error
-  will cause the resource to be NACKed.
+  that the config is of the right type (i.e., it will fail validation if
+  the override config is of the filter's top-level config type and
+  either the filter does not support an override config or it uses
+  different types for its top-level config and its override config).
+  Any validation error will cause the resource to be NACKed.
 - Note that gRPC will *not* fail validation if the map key specifies a
   filter instance name that does not exist in the `HttpConnectionManager`
   filter list.  This is because during an update, the xDS client code
