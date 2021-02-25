@@ -138,6 +138,8 @@ The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
 ```
 
 XdsServer will use the normal `XdsClient` to communicate with the xDS server.
+xDS v3 support is required. xDS v2 support is optional and may have lower
+quality standards when adhering to the specifics of v2 when they differ from v3.
 There is no default value for `server_listener_resource_name_template` so if it
 is not present in the bootstrap then server creation or start will fail or the
 XdsServer will become "not serving". XdsServer will perform the `%s` replacement
