@@ -45,7 +45,7 @@ xDS-powered gRPC features can be used without code changes.
  * [A39: xDS HTTP Filter Support][A39]
 
 [A27]: A27-xds-global-load-balancing.md
-[A29]: A29-xds-tls-security.md
+[A29]: https://github.com/grpc/proposal/pull/184
 [A39]: A39-xds-http-filters.md
 
 ## Proposal
