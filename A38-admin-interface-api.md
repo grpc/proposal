@@ -3,7 +3,7 @@ Admin Interface API
 * Author(s): lidiz
 * Approver: markdroth
 * Status: In-Review
-* Implemented in: C++, Golang, Java
+* Implemented in: all languages
 * Last updated: 2021-02-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/0B2f9ha5HoM
 
@@ -14,23 +14,18 @@ This proposal describes a convenience API in each gRPC language to improve the u
 
 ## Background
 
-### Services Exposing gRPC Internal States
+There exists a class of RPC services whose purpose is to expose the overall state of all gRPC activity in a given binary. This set of services may grow over time, and some services may want to be exposed only conditionally, to avoid adding unnecessary dependencies (e.g., CSDS should be used only when xDS is used in gRPC).
 
-gRPC provides a set of official gRPC services that serve gRPC internal states. This proposal will focus on the ones that expose the state of the entire gRPC library, which is agnostic to which gRPC server they were bound to:
-
-* Channelz: the channel tracing library that collects stats about a channel’s traffic, underlying sockets, and credentials ([gRFC A14](https://github.com/grpc/proposal/blob/master/A14-channelz.md));
-* [Client Status Discovery Service](https://github.com/envoyproxy/envoy/blob/main/api/envoy/service/status/v3/csds.proto): the xDS config dump library that dumps the accepted xDS configuration with config status;
-
+The goal of this proposal is to provide a mechanism where applications can tell gRPC to add all relevant admin services to a given server, allowing gRPC to automatically determine which specific admin services are relevant. This way, individual applications don't need to change when the set of desired admin services changes.
 
 ## Proposal
 
-The admin interface API is a set of API that registers available admin services to a given gRPC server. There will be more gRPC services boosting debuggability of gRPC down the road. With this API, applications will automatically get the update as they pulling in the latest gRPC library.
+Initially, the following admin services will be supported:
 
-There are several different options for the convenience API design. Each option is a tradeoff between simplicity to use and flexibility. The simplicity to use is defined by lines of code to create a serving gRPC server with admin services, and the additional cognitive cost to learn the new API or manage dependencies. The flexibility is defined by how can users provide additional server creation options. To date, users can specify one or more **listening addresses, credentials, TCP/HTTP config, codec, interceptors and service implementations** during the server creation process. Not to mention the potential  impact on the threading model during the start of the server. If we want to bundle as many options as possible into one line of code, we will inevitably sacrifice some flexibility. For other alternative designs, see section below.
+* [Channelz](https://github.com/grpc/proposal/blob/master/A14-channelz.md), which exposes internal state of channels, servers, and sockets;
+* [Client Status Discovery Service](https://github.com/grpc/proposal/pull/223), which exposes the state of xDS resources requested by gRPC.
 
-This proposal recommend the admin interface API design to be **a function that combines admin services from different packages**.
-
-Here are the usage snippets of admin interface API in each language:
+This proposal recommend the admin interface API design to be **a function that combines admin services from different packages**. Here are the usage snippets of admin interface API in four languages (Java/Golang/C++/Python):
 
 
 ### Java
@@ -120,6 +115,7 @@ builder.AddListeningPort(":50051", grpc::ServerCredentials(...));
 std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 ```
 
+
 ### Dependency-based Admin Services List
 
 In addition, by providing new APIs, we abstract away the individual services with the concept admin services. We can also achieve **dynamic admin services selection**, for example, we **only add CSDS service if the xDS package is pulled in as a dependency of the application**. In this way, the application can avoid adding unnecessary dependencies.
@@ -137,6 +133,8 @@ In other softwares, like Envoy, it’s common to see a pattern that specifying a
 
 ### Alternative Admin Interface API Designs
 
+There are several different options for the convenience API design. Each option is a tradeoff between simplicity to use and flexibility. The simplicity to use is defined by lines of code to create a serving gRPC server with admin services, and the additional cognitive cost to learn the new API or manage dependencies. The flexibility is defined by how can users provide additional server creation options. To date, users can specify one or more **listening addresses, credentials, TCP/HTTP config, codec, interceptors and service implementations** during the server creation process. Not to mention the potential  impact on the threading model during the start of the server. If we want to bundle as many options as possible into one line of code, we will inevitably sacrifice some flexibility. For other alternative designs, see section below.
+
 Here are the usage snippets for other API Designs in Java:
 
 #### A method of the gRPC server class that adds admin services
@@ -149,7 +147,9 @@ server = ServerBuilder.forPort(50051)
 server.awaitTermination();
 ```
 
-The drawback for this option is dependency management. To date, the gRPC official admin services Channelz/Reflection/Health are distributed as separated package to keep the main package focus as a network library. If we apply this option, then we will void the separate effort.
+This approach is more invasive than the selected solution. Expanding server class increases the complexity of surface API and yet didn't further reduce the minimum LOC needed to create an admin server.
+
+Another drawback for this option is dependency management. To date, the gRPC Channelz service is distributed as a separated package to keep the main package focus as a network library. If we apply this option, then we will void the separate effort. Auto-register pattern doesn't work here, because the add admin service method could be a no-op if users didn't add Channelz as a dependency. Then the documentation needs to explain that the no-op is intended, and the application has to perform following maneuver to add admin services that the application intend to use, which worsen the usability of creating an admin server.
 
 
 #### A function that creates the gRPC server object bound with admin services;
