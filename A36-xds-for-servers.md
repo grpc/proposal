@@ -3,9 +3,9 @@ A36: xDS-Enabled Servers
 * Author(s): [Eric Anderson](https://github.com/ejona86), [Doug
   Fawley](https://github.com/dfawley), [Mark Roth](https://github.com/markdroth)
 * Approver: markdroth
-* Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
+* Status: Ready for Implementation
 * Implemented in: <language, ...>
-* Last updated: 2020-11-19
+* Last updated: 2021-02-25
 * Discussion at: https://groups.google.com/g/grpc-io/c/CDjGypQi1J0
 
 ## Abstract
