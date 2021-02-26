@@ -3,8 +3,8 @@ xDS Configuration Dump via Client Status Discovery Service in gRPC
 * Author(s): lidizheng
 * Approver: markdroth
 * Status: In-Review
-* Implemented in: All languages
-* Last updated: 2021-02-19
+* Implemented in: Core/C++/Java/Golang (1st release)
+* Last updated: 2021-02-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/zL45YyxtJ08
 
 ## Abstract
@@ -27,7 +27,7 @@ understand this service, only the control plane does. Envoy already provides
 config dump via its [admin
 interface](https://www.envoyproxy.io/docs/envoy/latest/operations/admin) for
 years. There is no visible plan for Envoy to support serving CSDS directly as a
-proxy.
+proxy (see [envoy#13181](https://github.com/envoyproxy/envoy/issues/13181)).
 
 The CSDS service accepts two methods, one for unary, one for streaming. The
 expected behavior of the two methods is the same, but the streaming method can
@@ -63,45 +63,6 @@ clear, an xDS-compliant application receives many xDS configs, which may be
 rejected or ignored or obsoleted. **The gRPC CSDS service should always return
 the currently accepted xDS configs.**
 
-### Config Status in gRPC
-
-One critical field in CSDS responses is the config status. The config status is
-an additional signal to help users debug, which indicates **the synchronization
-state of the given xDS resources with the control plane**. CSDS designed config
-statuses from a control plane point of view, and it only works at the
-granularity of xDS config type.
-
-This gRFC proposes adding following status enum to
-[config_dump.proto](https://github.com/envoyproxy/envoy/blob/main/api/envoy/admin/v3/config_dump.proto).
-`ClientResourceStatus` better represents the viewpoint of xDS clients and it can
-be as specific as per individual xDS resources.
-
-```protobuf
-// Resource status from the view of a xDS client, which tells the synchronization
-// status between the xDS client and the xDS server.
-enum ClientResourceStatus {
-  // Resource status is not available/unknown.
-  UNKNOWN = 0;
-
-  // Client requested this resource but hasn't received any update from management
-  // server. The client will not fail requests, but will queue them until update
-  // arrives or the client times out waiting for the resource.
-  REQUESTED = 1;
-
-  // This resource has been requested by the client but has either not been
-  // delivered by the server or was previously delivered by the server and then
-  // subsequently removed from resources provided by the server. For more
-  // information, please refer to the :ref:`"Knowing When a Requested Resource
-  // Does Not Exist" <xds_protocol_resource_not_existed>` section.
-  DOES_NOT_EXIST = 2;
-
-  // Client received this resource and replied with ACK.
-  ACKED = 3;
-
-  // Client received this resource and replied with NACK.
-  NACKED = 4;
-}
-```
 
 ### ADS Parsing Logic Update: Continue After First Error
 
@@ -161,20 +122,6 @@ which includes the version, timestamp, and the reason of the rejected update
 (see [proto
 definition](https://github.com/envoyproxy/envoy/blob/a4024a578b3f2611fe26229f5d0de99eb0c56895/api/envoy/admin/v3/config_dump.proto#L72)):
 
-```proto
-message UpdateFailureState {
-  ...
-
-  // Time of the latest failed update attempt.
-  google.protobuf.Timestamp last_update_attempt = 2;
-
-  // Details about the last failed update attempt.
-  string details = 3;
-
-  // This is the version of the rejected resource.
-  string version_info = 4;
-}
-```
 
 ### CSDS Service Design
 
@@ -265,7 +212,7 @@ querying the control plane. Technically, gRPC application only serves as one xDS
 node, so there is no need to differentiate with xDS client's status to reply.
 However, gRPC should reject the request with Node Matcher that failed to match
 with the Node information of the gRPC application. This feature has lower
-priority. To preserve forward compatibility, this doc proposes to throw an
+priority. To preserve forward compatibility, this doc proposes to return an
 [INVALID_ARGUMENT](https://github.com/grpc/grpc/blob/master/doc/statuscodes.md)
 if the CSDS implementation observe an non-empty Node Matcher.
 
@@ -288,9 +235,9 @@ configs, **the users won’t have the ability to query the set of effective xDS
 configs for a channel**. The CSDS is not designed for finer granularity than
 individual processes.
 
-If we decided to support sharing XdsClient across multiple channels, the
-boundary of each channel’s xDS config will be blurry. Injecting xDS info into a
-channel tracing service won’t be the right direction in the long term.
+gRPC supports sharing XdsClient across multiple channels, the boundary of each
+channel’s xDS config will be blurry. Injecting xDS info into a channel tracing
+service won’t be the right direction in the long term.
 
 ### Solution: Config Dump via File
 
