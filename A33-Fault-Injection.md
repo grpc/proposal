@@ -108,7 +108,7 @@ Note that for both `X-envoy-fault-abort-request-percentage` and `x-envoy-fault-d
 
 Note that if any header is invalid, for example, passing non-numerical value as percentage header, the invalid headers will be ignored.
 
-Note if there are multiple valid headers with the same key name, gRPC doesn't make no promise about which one will be picked at the end.
+Note if there are multiple valid headers with the same key name, gRPC implementations may choose any one of them.
 
 **Fault inject config in HTTP filter and headers won’t be conflicted**, because the header only being evaluated if the delay or abort is set to `HeaderDelay` or `HeaderAbort` instead of concrete values.
 
@@ -122,7 +122,7 @@ gRPC should accept fault injection settings with either HTTP status code or gRPC
 
 ### 200/OK Error Injection
 
-xDS allows users to set `http_status` to 200 and `grpc_status` to `OK`, and still performs fault injection. There are valid use cases for injecting an OK status with no payload. Notably, in above HTTP-gRPC status mapping spec, 200 is mapped to `UNKNOWN` because gRPC libraries expect the application to set true gRPC status in the `grpc_status` field. So, in case of injection `OK` status, gRPC libraries should abort the RPC with the status code `OK`, just like any other status code. However, a successful RPC not only requires the final status code to be `OK`, it also requires minimum header or message frames (see [spec](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)). A gRPC client may treat this kind of RPC as `INTERNAL_ERROR` or `UNIMPLEMENTED` depends on implementation details of each language.
+xDS allows users to set `http_status` to 200 and `grpc_status` to `OK`, and still performs fault injection. There are valid use cases for injecting an OK status with no payload. Notably, in above HTTP-gRPC status mapping spec, 200 is mapped to `UNKNOWN` because gRPC libraries expect the application to set true gRPC status in the `grpc_status` field. However, in case of injection `OK` status, gRPC libraries should abort the RPC with the status code `OK`, just like any other status code. A successful RPC not only requires the final status code to be `OK`, it also requires minimum header or message frames (see [spec](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)). A gRPC client may treat this kind of RPC as `INTERNAL_ERROR` or `UNIMPLEMENTED` depending on implementation details of each language.
 
 
 ### Evaluate Possibility Fraction
