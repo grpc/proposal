@@ -122,7 +122,7 @@ gRPC should accept fault injection settings with either HTTP status code or gRPC
 
 ### 200/OK Error Injection
 
-xDS allows users to set `http_status` to 200 and `grpc_status` to `OK`, and still performs fault injection. There are valid use cases for injecting an OK status with no payload. Notably, in above HTTP-gRPC status mapping spec, 200 is mapped to `UNKNOWN` because gRPC libraries expect the application to set true gRPC status in the `grpc_status` field.
+xDS allows users to set `http_status` to 200 and `grpc_status` to `OK`, and still performs fault injection. There are valid use cases for injecting an OK status with no payload. Notably, in above HTTP-gRPC status mapping spec, 200 is mapped to `UNKNOWN` because gRPC libraries expect the application to set true gRPC status in the `grpc_status` field (see [doc]((https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md))). So, if the filter config sets 200 as `http_status`, gRPC will abort with gRPC status `UNKNOWN`.
 
 However, a successful RPC not only requires the final status code to be `OK`, it also requires minimum header or message frames (see [spec](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)). Merely aborting the RPC with the status code `OK` immediately won't necessarily result in an `OK` status. A gRPC client may treat this kind of RPC as `INTERNAL_ERROR` or `UNIMPLEMENTED` depending on implementation details of each language.
 
