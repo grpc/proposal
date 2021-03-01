@@ -4,7 +4,7 @@ Client-Side Fault Injection
 * Approver: markdroth
 * Status: Approved
 * Implemented in: all languages
-* Last updated: Feb 10th, 2021
+* Last updated: Feb 23rd, 2021
 * Discussion at: https://groups.google.com/g/grpc-io/c/d9dI5Hy9zzk
 
 ## Abstract
@@ -106,6 +106,10 @@ Note that for both `X-envoy-fault-abort-request-percentage` and `x-envoy-fault-d
 
 > ...the percentage of request to apply aborts to and must be greater or equal to 0 and its maximum value is capped by the value of the numerator of percentage field.
 
+Note that if any header is invalid, for example, passing non-numerical value as percentage header, the invalid headers will be ignored.
+
+Note if there are multiple valid headers with the same key name, gRPC implementations may choose any one of them.
+
 **Fault inject config in HTTP filter and headers won’t be conflicted**, because the header only being evaluated if the delay or abort is set to `HeaderDelay` or `HeaderAbort` instead of concrete values.
 
 
@@ -114,6 +118,15 @@ Note that for both `X-envoy-fault-abort-request-percentage` and `x-envoy-fault-d
 Both `http_status` and `grpc_status` are available in xDS v3 API. Mapping between HTTP status code and gRPC status code is well defined (see [doc](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md)), but using HTTP status code means users are limited to inject only 7 out of 16 gRPC status codes (including `OK`). The underlying schema for abort looks like [FaultAbort](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/fault/v3/fault.proto#extensions-filters-http-fault-v3-faultabort).
 
 gRPC should accept fault injection settings with either HTTP status code or gRPC status code. **The ConfigSelector should translate the HTTP status code into gRPC status code** before sending the config to the fault injection enforcer.
+
+
+### 200/OK Error Injection
+
+In order for gRPC to provide behavior consistent with Envoy, there are two counter-intuitive edge cases that are worth calling out explicitly.
+
+If the filter config sets `http_status` to 200, gRPC will abort with gRPC status `UNKNOWN`.  This is consistent with what gRPC would do if it received an HTTP 200 status with no `grpc-status` header, because this is the normal mapping for the HTTP 200 status in the [HTTP-gRPC status mapping](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md) mentioned above.
+
+If the filter config sets `grpc_status` to `OK`, gRPC will react as if it has immediately received trailing metadata from the server with the status `OK`. Note that in this case, the exact behavior seen by the application depends on the type of the RPC and implementation of gRPC. For unary and client-streaming RPCs, the client may return a non-OK status to the application, because it was expecting to receive exactly one message from the server, which never arrived. For server-streaming and bidi-streaming RPCs, the client may return status `OK` to the application without returning any messages from the server.
 
 
 ### Evaluate Possibility Fraction
