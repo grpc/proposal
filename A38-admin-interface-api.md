@@ -9,7 +9,7 @@ Admin Interface API
 
 ## Abstract
 
-This proposal describes a convenience API in each gRPC language to improve the usability of creating a gRPC server with admin services to expose states in the gRPC library.
+This proposal describes a convenient API in each gRPC language to improve the usability of creating a gRPC server with admin services to expose states in the gRPC library.
 
 
 ## Background
@@ -133,7 +133,7 @@ In other softwares, like Envoy, it’s common to see a pattern that specifying a
 
 ### Alternative Admin Interface API Designs
 
-There are several different options for the convenience API design. Each option is a tradeoff between simplicity to use and flexibility. The simplicity to use is defined by lines of code to create a serving gRPC server with admin services, and the additional cognitive cost to learn the new API or manage dependencies. The flexibility is defined by how can users provide additional server creation options. To date, users can specify one or more **listening addresses, credentials, TCP/HTTP config, codec, interceptors and service implementations** during the server creation process. Not to mention the potential  impact on the threading model during the start of the server. If we want to bundle as many options as possible into one line of code, we will inevitably sacrifice some flexibility. For other alternative designs, see section below.
+There are several different options for the convenient API design. Each option is a tradeoff between simplicity to use and flexibility. The simplicity to use is defined by lines of code to create a serving gRPC server with admin services, and the additional cognitive cost to learn the new API or manage dependencies. The flexibility is defined by how can users provide additional server creation options. To date, users can specify one or more **listening addresses, credentials, TCP/HTTP config, codec, interceptors and service implementations** during the server creation process. Not to mention the potential  impact on the threading model during the start of the server. If we want to bundle as many options as possible into one line of code, we will inevitably sacrifice some flexibility. For other alternative designs, see section below.
 
 Here are the usage snippets for other API Designs in Java:
 
