@@ -124,7 +124,7 @@ gRPC should accept fault injection settings with either HTTP status code or gRPC
 
 In order for gRPC to provide behavior consistent with Envoy, there are two counter-intuitive edge cases that are worth calling out explicitly.
 
-If the filter config sets `http_status` to 200, gRPC will abort with gRPC status `UNKNOWN`.  This is consistent with what gRPC would do if it received an HTTP 200 status with no `grpc-status` header, because this is the normal mapping for the HTTP 200 status in the [HTTP-gRPC status mapping]((https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md)) mentioned above.
+If the filter config sets `http_status` to 200, gRPC will abort with gRPC status `UNKNOWN`.  This is consistent with what gRPC would do if it received an HTTP 200 status with no `grpc-status` header, because this is the normal mapping for the HTTP 200 status in the [HTTP-gRPC status mapping](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md) mentioned above.
 
 If the filter config sets `grpc_status` to `OK`, gRPC will react as if it has immediately received trailing metadata from the server with the status `OK`. Note that in this case, the exact behavior seen by the application depends on the type of the RPC and implementation of gRPC. For unary and client-streaming RPCs, the client may return a non-OK status to the application, because it was expecting to receive exactly one message from the server, which never arrived. For server-streaming and bidi-streaming RPCs, the client may return status `OK` to the application without returning any messages from the server.
 
