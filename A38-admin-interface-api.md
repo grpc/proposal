@@ -3,7 +3,7 @@ Admin Interface API
 * Author(s): lidiz
 * Approver: markdroth
 * Status: In-Review
-* Implemented in: all languages
+* Implemented in:
 * Last updated: 2021-02-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/0B2f9ha5HoM
 
@@ -148,8 +148,6 @@ server.awaitTermination();
 ```
 
 This approach is more invasive than the selected solution. Expanding server class increases the complexity of surface API and yet didn't further reduce the minimum LOC needed to create an admin server.
-
-Another drawback for this option is dependency management. To date, the gRPC Channelz service is distributed as a separated package to keep the main package focus as a network library. If we apply this option, then we will void the separate effort. Auto-register pattern doesn't work here, because the add admin service method could be a no-op if users didn't add Channelz as a dependency. Then the documentation needs to explain that the no-op is intended, and the application has to perform following maneuver to add admin services that the application intend to use, which worsen the usability of creating an admin server.
 
 
 #### A function that creates the gRPC server object bound with admin services;
