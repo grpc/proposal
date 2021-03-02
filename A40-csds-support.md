@@ -147,15 +147,22 @@ the language boundary. The API needs to convert proto messages into C-compatible
 types (e.g. `char *`, either bytes or JSON).
 
 
-#### Detail: No xDS v2 Support
+#### Detail: xDS v2/v3/v4
 
 CSDS was meant to be a RPC service made for xDS management servers before this
 proposal. But the service itself has the potential to serve client status on xDS
 clients. However, during development, we found several constraints about the
 existing service protocol, hence we merged several updates (see above) to
 improve the CSDS service to meet our standard. The updates are made to xDS v3
-and xDS v4 (alpha) only, since xDS v2 is in deprecated state. This doc proposes
-to not support xDS v2 for CSDS.
+and xDS v4 (alpha) only, since xDS v2 is in deprecated state.
+
+For xDS CSDS v2 (the RPC service itself), this doc proposes to not support, so
+we only provide v3 CSDS service and CSDS client requesting for v2 service will
+get UNIMPLEMENTED error.
+
+There are edge cases that v2 and v3 xDS resources are mixed together. This doc
+proposes to keep them as-is in the CSDS responses. So, the CSDS service can
+accurately reflect the xDS configs received from the control plane.
 
 #### Detail: Expose xDS Config As Is
 
