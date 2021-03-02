@@ -3,7 +3,7 @@ xDS Configuration Dump via Client Status Discovery Service in gRPC
 * Author(s): lidizheng
 * Approver: markdroth
 * Status: In-Review
-* Implemented in: Core/C++/Java/Golang (1st release)
+* Implemented in: TBD
 * Last updated: 2021-02-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/zL45YyxtJ08
 
@@ -120,7 +120,7 @@ When an ADS response is rejected, gRPC should provide debug information via
 CSDS. This is done via `UpdateFailureState` within the `config_dump.proto`,
 which includes the version, timestamp, and the reason of the rejected update
 (see [proto
-definition](https://github.com/envoyproxy/envoy/blob/a4024a578b3f2611fe26229f5d0de99eb0c56895/api/envoy/admin/v3/config_dump.proto#L72)):
+definition](https://github.com/envoyproxy/envoy/blob/a4024a578b3f2611fe26229f5d0de99eb0c56895/api/envoy/admin/v3/config_dump.proto#L72)).
 
 
 ### CSDS Service Design
