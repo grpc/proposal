@@ -138,6 +138,8 @@ According to the [Envoy implementation](https://github.com/envoyproxy/envoy/blob
 
 `GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION` as an environment variable will be used to guard this feature for the initial release. Once it is set, gRPC will start to interpret xDS HTTP filters ([A39: xDS HTTP Filters](https://github.com/grpc/proposal/pull/219)) and enforce fault injection if configured. This environment variable protection will be removed once the new feature has proven to be stable.
 
+`GRPC_XDS_EXPERIMENTAL_FAULT_INJECTION_HEADER_CONTROL` as an environment variable will be used to guard the header control feature of client-side fault injection. If this feature is not enabled, gRPC should reject filter configs containing `HeaderDelay` and `HeaderAbort`. This environment variable protection will be removed once the header control feature is proven to be stable in interop tests between gRPC implementations.
+
 
 ## Alternatives
 
