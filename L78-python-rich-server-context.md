@@ -1,7 +1,7 @@
 Title
 ----
 * Author(s): stpierre
-* Approver: a11r, gnossen
+* Approver: gnossen
 * Status: Draft
 * Implemented in: [python](https://github.com/grpc/grpc/pull/25457)
 * Last updated: 2021-02-17
