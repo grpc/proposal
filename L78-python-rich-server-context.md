@@ -75,6 +75,10 @@ the two interfaces.
 https://github.com/grpc/grpc/issues/24605 sketches out an earlier
 iteration of this.
 
+https://github.com/grpc/grpc/pull/25600 is an (unrelated but relevant)
+PR that adds most of the functionality for asyncio; that work will be
+used in the implementation.
+
 ## Implementation
 
 1. Add the new API calls. https://github.com/grpc/grpc/pull/25457 holds an
