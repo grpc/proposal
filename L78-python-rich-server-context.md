@@ -1,4 +1,4 @@
-Title
+Expose rich server context
 ----
 * Author(s): stpierre
 * Approver: gnossen
