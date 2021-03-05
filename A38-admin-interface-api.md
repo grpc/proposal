@@ -2,7 +2,7 @@ Admin Interface API
 ----
 * Author(s): lidiz
 * Approver: markdroth
-* Status: In-Review
+* Status: Approved
 * Implemented in:
 * Last updated: 2021-02-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/0B2f9ha5HoM
