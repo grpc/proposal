@@ -2,7 +2,7 @@ xDS Configuration Dump via Client Status Discovery Service in gRPC
 ----
 * Author(s): lidizheng
 * Approver: markdroth
-* Status: In-Review
+* Status: Approved
 * Implemented in: TBD
 * Last updated: 2021-02-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/zL45YyxtJ08
