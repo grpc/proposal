@@ -131,8 +131,9 @@ The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
 ```
 {
   // A template for the name of the Listener resource to subscribe to for a gRPC
-  // server. If the token `%s` is present in the string, it will be replaced
-  // with the server's listening "IP:port" (e.g., "0.0.0.0:8080", "[::]:8080").
+  // server. If the token `%s` is present in the string, all instances of the
+  // token will be replaced with the server's listening "IP:port" (e.g.,
+  // "0.0.0.0:8080", "[::]:8080").
   "server_listener_resource_name_template": "example/resource/%s",
   // ...
 }
