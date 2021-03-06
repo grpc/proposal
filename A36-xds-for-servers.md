@@ -185,11 +185,12 @@ used nor validated at this time, but may be in the future.
 
 If the `envoy.extensions.filters.http.router.v3.Router` is not present in
 `http_filters`, A39 calls for inserting a special filter that fails all RPCs. If
-an XdsServer implementation does not support any HTTP filters other than the
-hard-coded Router behavior called for in A39, then the special filter that fails
-all RPCs is not required.  This is to allow implementations that only support L4
-xDS features to avoid L7 plumbing and implementation. This has no impact on the
-resource validation and NACKing behavior called for in A39.
+an XdsServer implementation does not use RouteConfiguration (as is expected
+today) and does not support any HTTP filters other than the hard-coded Router
+behavior called for in A39, then the special filter that fails all RPCs is not
+required. This is to allow implementations that only support L4 xDS features to
+avoid L7 plumbing and implementation. This has no impact on the resource
+validation and NACKing behavior called for in A39.
 
 [Filter.typed_config]: https://github.com/envoyproxy/envoy/blob/928a62b7a12c4d87ce215a7c4ebd376f69c2e080/api/envoy/config/listener/v3/listener_components.proto#L40
 [TypedStruct.type_url]: https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38
