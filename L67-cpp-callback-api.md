@@ -1,10 +1,10 @@
 C++ callback-based asynchronous API
 ----
 * Author(s): vjpai, sheenaqotj, yang-g
-* Approver:
+* Approver: markdroth
 * Status: Proposed
 * Implemented in: https://github.com/grpc/grpc/projects/12
-* Last updated: June 1, 2020
+* Last updated: March 19, 2021
 * Discussion at
 
 ## Abstract
@@ -23,11 +23,10 @@ Since its initial release, gRPC has provided two C++ APIs:
    - The library posts the tag of a completed action onto a completion queue
    - The application must poll the completion queue to determine which asynchronously-initiated actions have completed
 
-The goal of the synchronous version is to be easy to program. However, this comes at the cost of high thread-switching overhead and high thread storage for systems with many concurrent RPCs. On the other hand, the asynchronous API allows the application full control over its threading and thus can scale further. It does, however, present challenges in deciding how many completion queues to use and how many threads to use for polling them, as one can either optimize for reducing thread hops, avoiding stranding, reducing CQ contention, or improving locality. These goals are often in conflict and require substantial tuning.
+The goal of the synchronous version is to be easy to program. However, this comes at the cost of high thread-switching overhead and high thread storage for systems with many concurrent RPCs. On the other hand, the asynchronous API allows the application full control over its threading and thus can scale further. The biggest problem with the asynchronous API is that it is just difficult to use. Server RPCs must be explicitly requested, RPC polling must be explicitly controlled by the application, lifetime management is complicated, etc. These have proved sufficiently difficult that the full features of the asynchronous API are basically never used by applications. Even if one can use the async API correctly, it also presents challenges in deciding how many completion queues to use and how many threads to use for polling them, as one can either optimize for reducing thread hops, avoiding stranding, reducing CQ contention, or improving locality. These goals are often in conflict and require substantial tuning.
 
 ### Related proposals
 
-* The [EventManager](https://www.github.com/grpc/proposal/XXX) is critical to the operation of the callback API.
 * The C++ callback API is built on top of a new [callback completion queue in core](https://github.com/grpc/proposal/pull/181)
 * The API structure has substantial similarities to the gRPC-Node and gRPC-Java APIs
 
@@ -39,7 +38,7 @@ The callback API is designed to have the performance and thread scalability of a
 * No explicit polling required for notification of completion of RPC actions.
    - In practice, these requirements mean that there must be a library-controlled poller for monitoring such actions. This _EventManager_ is described in another gRFC.
 * As in the synchronous API, server RPCs have an application-defined method handler function as part of their service definition. The library invokes this method handler when a new server RPC starts.
-* LIke the synchronnous API and unlike the completion-queue-based asynchronous API, there is no need for the application to "request" new server RPCs. Server RPC context structures will be allocated and have their resources allocated as and when RPCs arrive at the server.
+* Like the synchronous API and unlike the completion-queue-based asynchronous API, there is no need for the application to "request" new server RPCs. Server RPC context structures will be allocated and have their resources allocated as and when RPCs arrive at the server.
 
 ### Reactor model
 
@@ -67,14 +66,17 @@ These base classes provide three types of methods:
    - `OnReadInitialMetadataDone`: notifying client RPCs that the server has sent initial metadata. It has a bool `ok` argument to indicate whether the completion was successful. This is automatically invoked by the library for all RPCs; it is uncommonly used however
    - `OnCancel`: for server RPCs only, called if an RPC is canceled before it has a chance to successfully send status to the client side
    - `OnDone`: called when all outstanding RPC operations are completed. Provides status on the client side. 
+   - **IMPORTANT USAGE NOTE** : code in any reaction must not block for an arbitrary amount of time since reactions are executed on a finite-sized library-controlled threadpool. If any long-term blocking operations (like sleeps, file I/O, synchronous RPCs, or waiting on a condition variable) must be invoked as part of the application logic, then it is important to push that outside the reaction so that the reaction can complete in a timely fashion. One way of doing this is to push that code to a separate application-controlled thread.
 1. RPC completion prevention methods. These are methods provided by the class and are not virtual.
    - `AddHold`, `RemoveHold`: for client RPCs, prevents the RPC from being considered complete (ready for `OnDone`) until each AddHold is matched to a corresponding RemoveHold. These are used to perform _extra-reaction flows_, which refers to  streaming operations initiated from outside a reaction method or method handler.
 
+Examples are provided in [the PR to de-experimentalize the callback API](https://github.com/grpc/grpc/pull/25728).
+
 ### Unary RPC shortcuts
 
-As a shortcut, client-side unary RPCs _may_ bypass the reactor model by directly providing a `std::function` for the library to call at completion rather than a reactor object pointer. This is semantically equivalent to a reactor in which the `OnDone` function simply invokes the specified function (but can be implemented in a slightly faster way since such an RPC will definitely not wait separately for initial metadata from the server). In practice, this is the common and recommended model for client-side unary RPCs, unless they have a specific need to wait for initial metadata before getting their full response message.
+As a shortcut, client-side unary RPCs _may_ bypass the reactor model by directly providing a `std::function` for the library to call at completion rather than a reactor object pointer. This is semantically equivalent to a reactor in which the `OnDone` function simply invokes the specified function (but can be implemented in a slightly faster way since such an RPC will definitely not wait separately for initial metadata from the server). In practice, this is the common and recommended model for client-side unary RPCs, unless they have a specific need to wait for initial metadata before getting their full response message. As in the reactor model, the function provided as a callback may not include operations that block for an arbitrary amount of time.
 
-Server-side unary RPCs have the option of returning a library-provided default reactor when there method handler is invoked. This default reactor provides a Finish method, but does not provide a user callback for `OnCancel` and `OnDone`. In practice, this is the common and recommended model for most server-side unary RPCs unless they specifically need to react to an `OnCancel` callback or do cleanup work after the RPC fully completes.
+Server-side unary RPCs have the option of returning a library-provided default reactor when their method handler is invoked. This default reactor provides a Finish method, but does not provide a user callback for `OnCancel` and `OnDone`. In practice, this is the common and recommended model for most server-side unary RPCs unless they specifically need to react to an `OnCancel` callback or do cleanup work after the RPC fully completes.
 
 ### ServerContext extensions
 
@@ -97,7 +99,7 @@ Method-by-method specification of API type
 
 ## Implementation
 
-Implemented via the core callback API, discussed in a separate gRFC
+Implemented using the core callback API, discussed in a separate gRFC
 
 ## Open issues (if applicable)
 
