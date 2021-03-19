@@ -205,9 +205,54 @@ must be used. The [most specific `filter_chain_match`][matching logic] of the
 repeated [`filter_chains`][Listener.filter_chains] should be found for the
 specific connection and if one is not found, the `default_filter_chain` must be
 used if it is provided. If there is no `default_filter_chain` and no chain
-matches, then the connection should be closed without any bytes being sent. The
-following is a snippet of [all current fields of
-FilterChainMatch][FilterChainMatch], and if they will be handled specially:
+matches, then the connection should be closed without any bytes being sent.
+
+If the most-specific matching logic might not produce a unique result, then the
+Listener must be NACKed. This case can only occur if there are duplicate
+matchers. However, when checking for duplicates the matchers need to be
+normalized.
+
+For normalization, each matcher should be replaced with the Cartesian product of
+its present fields, which avoids repeating fields and converts the matchers into
+disjunctive normal form. That is, the matcher:
+
+```
+destination_ports: 80, 8080
+prefix_ranges: 192.168.0.0/16, 10.0.0.0/8
+source_type: EXTERNAL
+```
+
+Should be treated as four matchers:
+
+```
+destination_ports: 80
+prefix_ranges: 192.168.0.0/16
+source_type: EXTERNAL
+
+destination_ports: 80
+prefix_ranges: 10.0.0.0/8
+source_type: EXTERNAL
+
+destination_ports: 8080
+prefix_ranges: 192.168.0.0/16
+source_type: EXTERNAL
+
+destination_ports: 8080
+prefix_ranges: 10.0.0.0/8
+source_type: EXTERNAL
+```
+
+CIDRs need mulitple normalizations. The `prefix_len` should be adjusted to the
+valid range of 0-32 (inclusive) for IPv4 and 0-128 (inclusive) for IPv6. An
+absent `prefix_len` should be considered equivalent to 32 for IPv4 and 128 for
+IPv6. Unused low bits of the `address_prefix` must be ignored, which can be
+achieved by replacing it with the network mask. Note that a CIDR with
+`prefix_len` of `0` is not the same as a full wildcard, because it still matches
+a network type (IPv4 vs IPv6).
+
+The following is a snippet of [all current fields of
+FilterChainMatch][FilterChainMatch], and if they will be handled specially
+during connection matching:
 
 [Listener.address]: https://github.com/envoyproxy/envoy/blob/11dee4e9c37c244f9de4bc339fdc8695e5de2c5d/api/envoy/config/listener/v3/listener.proto#L108
 [Listener.filter_chains]: https://github.com/envoyproxy/envoy/blob/11dee4e9c37c244f9de4bc339fdc8695e5de2c5d/api/envoy/config/listener/v3/listener.proto#L117
@@ -237,6 +282,11 @@ the match are unsupported. Fields depending on missing features are guaranteed a
 result that can be hard-coded. This applies to `destination_port` which relies
 on `use_original_dst`. It also applies to `server_names`, `transport_protocol`,
 `application_protocols` which depend on `Listener.listener_filters`.
+
+While an always-failing matcher may be pruned and ignored when matching a new
+connection, it must still be checked when verifying that the most-specific
+matching logic is guaranteed to produce a unique result during Listener
+validation.
 
 ### Language-specifics
 
