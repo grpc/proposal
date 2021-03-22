@@ -1,6 +1,6 @@
 C++ callback-based asynchronous API
 ----
-* Author(s): vjpai, sheenaqotj, yang-g
+* Author(s): vjpai, sheenaqotj, yang-g, zhouyihaiding
 * Approver: markdroth
 * Status: Proposed
 * Implemented in: https://github.com/grpc/grpc/projects/12
@@ -68,7 +68,7 @@ These base classes provide three types of methods:
    - `OnDone`: called when all outstanding RPC operations are completed. Provides status on the client side. 
    - **IMPORTANT USAGE NOTE** : code in any reaction must not block for an arbitrary amount of time since reactions are executed on a finite-sized library-controlled threadpool. If any long-term blocking operations (like sleeps, file I/O, synchronous RPCs, or waiting on a condition variable) must be invoked as part of the application logic, then it is important to push that outside the reaction so that the reaction can complete in a timely fashion. One way of doing this is to push that code to a separate application-controlled thread.
 1. RPC completion prevention methods. These are methods provided by the class and are not virtual.
-   - `AddHold`, `RemoveHold`: for client RPCs, prevents the RPC from being considered complete (ready for `OnDone`) until each AddHold is matched to a corresponding RemoveHold. These are used to perform _extra-reaction flows_, which refers to  streaming operations initiated from outside a reaction method or method handler.
+   - `AddHold`, `RemoveHold`: for client RPCs, prevents the RPC from being considered complete (ready for `OnDone`) until each `AddHold` is matched to a corresponding `RemoveHold`. These are used to perform _extra-reaction flows_, which refers to  streaming operations initiated from outside a reaction method or method handler.
 
 Examples are provided in [the PR to de-experimentalize the callback API](https://github.com/grpc/grpc/pull/25728).
 
@@ -85,21 +85,37 @@ Server-side unary RPCs have the option of returning a library-provided default r
 * `DefaultReactor` may be used by a method handler to return a default reactor from a unary RPC.
 * `GetRpcAllocatorState`: see advanced topics section
 
-Additionally, the `AsyncNotifyWhenDone` function is not present in the `CallbackServerContext`. All method handler functions for the callback API take a `CallbackServerContext*` as their first argument. `ServerContext` (used for the sync and CQ-based async APIs) and `CallbackServerContext` (used for the callback API) actually use the same underlying structure and thus their object pointers are meaningfully convertible to each other via a `static_cast` to `ServerContextBase*`. We recommend that any helper functions that need to work across API variants should use a `ServerContextBase` pointer or reference as their argument rather than a `ServerContext` or `CallbackServerContext` pointer or reference.
+Additionally, the `AsyncNotifyWhenDone` function is not present in the `CallbackServerContext`. All method handler functions for the callback API take a `CallbackServerContext*` as their first argument. `ServerContext` (used for the sync and CQ-based async APIs) and `CallbackServerContext` (used for the callback API) actually use the same underlying structure and thus their object pointers are meaningfully convertible to each other via a `static_cast` to `ServerContextBase*`. We recommend that any helper functions that need to work across API variants should use a `ServerContextBase` pointer or reference as their argument rather than a `ServerContext` or `CallbackServerContext` pointer or reference. For example, `ClientContext::FromServerContext` now uses a `ServerContextBase*` as its argument; this is not a breaking API change since the argument is now a parent class of the previous argument's class.
 
 ### Advanced topics
 
-Message allocator
+** Application-managed server memory allocation **
+
+Callback services must allocate an object for the `CallbackServerContext` and for the request and response objects of a unary call.  Applications can supply a per-method custom memory allocator for gRPC server to use to allocate and deallocate the request and response messages, as well as a per-server custom memory allocator for context objects. These can be used for purposes like early or delayed release, freelist-based allocation, or arena-based allocation. For each unary RPC method, there is a generated method in the server called `SetMessageAllocatorFor_*MethodName*` . For each server, there is a method called `SetContextAllocator`. Each of these has numerous classes involved, and the best examples for how to use these features lives in the gRPC tests directory.
+
+* [Message allocator usage](https://github.com/grpc/grpc/blob/master/test/cpp/end2end/message_allocator_end2end_test.cc)
+* [Context allocator usage](https://github.com/grpc/grpc/blob/master/test/cpp/end2end/context_allocator_end2end_test.cc)
+
+** Generic (non-code-generated) services **
 
 `RegisterCallbackGenericService` is a new method of `ServerBuilder` to allow for processing of generic (unparsed) RPCs. This is similar to the pre-existing `RegisterAsyncGenericService` but uses the callback API and reactors rather than the CQ-based async API. It is expected to be used primarily for generic gRPC proxies where the exact serialization format or list of supported methods is unknown.
 
-Method-by-method specification of API type
+** Per-method specification **
+
+Just as with async services, callback services may also be specified on a method-by-method basis (using the syntax `WithCallbackMethod_*MethodName*`), with any unlisted methods being treated as sync RPCs. The shorthand `CallbackService` declares every method as being processed by the callback API. For example:
+
+* `Foo::Service` -- purely synchronous service
+* `Foo::CallbackService` -- purely callback service
+* `Foo::WithCallbackMethod_Bar<Service>` -- synchronous service except for callback method `Bar`
+* `Foo::WithCallbackMethod_Bar<WithCallbackMethod_Baz<Service>>` -- synchronous service except for callback methods `Bar` and `Baz`
 
 ## Rationale
 
+Besides the content described in the background section, the rationale also includes early and consistent user demand for this feature as well as the fact that many users were simply spinning up a callback model on top of gRPC's completion queue-based asynchronous model.
+
 ## Implementation
 
-Implemented using the core callback API, discussed in a separate gRFC
+This has been implemented using the [core callback API](https://github.com/grpc/proposal/pull/181) as well as numerous pull requests in the [project associated with the callback API](https://github.com/grpc/grpc/projects/12).
 
 ## Open issues (if applicable)
 
