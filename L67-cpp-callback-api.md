@@ -89,18 +89,18 @@ Additionally, the `AsyncNotifyWhenDone` function is not present in the `Callback
 
 ### Advanced topics
 
-** Application-managed server memory allocation **
+#### Application-managed server memory allocation
 
 Callback services must allocate an object for the `CallbackServerContext` and for the request and response objects of a unary call.  Applications can supply a per-method custom memory allocator for gRPC server to use to allocate and deallocate the request and response messages, as well as a per-server custom memory allocator for context objects. These can be used for purposes like early or delayed release, freelist-based allocation, or arena-based allocation. For each unary RPC method, there is a generated method in the server called `SetMessageAllocatorFor_*MethodName*` . For each server, there is a method called `SetContextAllocator`. Each of these has numerous classes involved, and the best examples for how to use these features lives in the gRPC tests directory.
 
-* [Message allocator usage](https://github.com/grpc/grpc/blob/master/test/cpp/end2end/message_allocator_end2end_test.cc)
-* [Context allocator usage](https://github.com/grpc/grpc/blob/master/test/cpp/end2end/context_allocator_end2end_test.cc)
+* [Message allocator usage example](https://github.com/grpc/grpc/blob/master/test/cpp/end2end/message_allocator_end2end_test.cc)
+* [Context allocator usage example](https://github.com/grpc/grpc/blob/master/test/cpp/end2end/context_allocator_end2end_test.cc)
 
-** Generic (non-code-generated) services **
+#### Generic (non-code-generated) services
 
 `RegisterCallbackGenericService` is a new method of `ServerBuilder` to allow for processing of generic (unparsed) RPCs. This is similar to the pre-existing `RegisterAsyncGenericService` but uses the callback API and reactors rather than the CQ-based async API. It is expected to be used primarily for generic gRPC proxies where the exact serialization format or list of supported methods is unknown.
 
-** Per-method specification **
+#### Per-method specification
 
 Just as with async services, callback services may also be specified on a method-by-method basis (using the syntax `WithCallbackMethod_*MethodName*`), with any unlisted methods being treated as sync RPCs. The shorthand `CallbackService` declares every method as being processed by the callback API. For example:
 
