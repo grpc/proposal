@@ -76,7 +76,7 @@ Examples are provided in [the PR to de-experimentalize the callback API](https:/
 
 As a shortcut, client-side unary RPCs _may_ bypass the reactor model by directly providing a `std::function` for the library to call at completion rather than a reactor object pointer. This is semantically equivalent to a reactor in which the `OnDone` function simply invokes the specified function (but can be implemented in a slightly faster way since such an RPC will definitely not wait separately for initial metadata from the server). In practice, this is the common and recommended model for client-side unary RPCs, unless they have a specific need to wait for initial metadata before getting their full response message. As in the reactor model, the function provided as a callback may not include operations that block for an arbitrary amount of time.
 
-Server-side unary RPCs have the option of returning a library-provided default reactor when their method handler is invoked. This default reactor provides a Finish method, but does not provide a user callback for `OnCancel` and `OnDone`. In practice, this is the common and recommended model for most server-side unary RPCs unless they specifically need to react to an `OnCancel` callback or do cleanup work after the RPC fully completes.
+Server-side unary RPCs have the option of returning a library-provided default reactor when their method handler is invoked. This default reactor provides a `Finish` method, but does not provide a user callback for `OnCancel` and `OnDone`. In practice, this is the common and recommended model for most server-side unary RPCs unless they specifically need to react to an `OnCancel` callback or do cleanup work after the RPC fully completes.
 
 ### ServerContext extensions
 
