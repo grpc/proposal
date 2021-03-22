@@ -4,8 +4,8 @@ C++ callback-based asynchronous API
 * Approver: markdroth
 * Status: Proposed
 * Implemented in: https://github.com/grpc/grpc/projects/12
-* Last updated: March 19, 2021
-* Discussion at
+* Last updated: March 22, 2021
+* Discussion at https://groups.google.com/g/grpc-io/c/rXLdWWiosWg
 
 ## Abstract
 
