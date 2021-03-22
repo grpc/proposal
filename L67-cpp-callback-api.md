@@ -36,7 +36,7 @@ The callback API is designed to have the performance and thread scalability of a
 
 * Library directly calls user-specified code at the completion of RPC actions.
 * No explicit polling required for notification of completion of RPC actions.
-   - In practice, these requirements mean that there must be a library-controlled poller for monitoring such actions. This _EventManager_ is described in another gRFC.
+   - In practice, these requirements mean that there must be a library-controlled poller for monitoring such actions.
 * As in the synchronous API, server RPCs have an application-defined method handler function as part of their service definition. The library invokes this method handler when a new server RPC starts.
 * Like the synchronous API and unlike the completion-queue-based asynchronous API, there is no need for the application to "request" new server RPCs. Server RPC context structures will be allocated and have their resources allocated as and when RPCs arrive at the server.
 
