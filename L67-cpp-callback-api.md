@@ -58,17 +58,17 @@ Client RPC invocations from a stub provide a reactor pointer as one of their arg
 These base classes provide three types of methods:
 
 1. Operation-initiation methods: start an asynchronous activity in the RPC. These are methods provided by the class and are not virtual.
-   - `StartRead`, `StartWrite`, `StartWritesDone`: streaming operations as appropriate to the RPC variety
-   - `StartSendInitialMetadata`: for server responses where the application wants to send the metadata separately from the first response message (uncommonly used)
-   - `Finish`: for server RPCs to provide completion status. This initiates the asynchronous transmission of the status to the client.
+   - `StartRead`, `StartWrite`, `StartWritesDone`: streaming operations as appropriate to the RPC variety. *Client and server*.
+   - `StartSendInitialMetadata`: for server responses where the application wants to send the metadata separately from the first response message (uncommonly used). *Server only*.
+   - `Finish`: for server RPCs to provide completion status. This initiates the asynchronous transmission of the status to the client. Must be used for all server RPCs, including those that have already been cancelled. *Server only*.
 1. Operation-completion reaction methods: notification of completion of asynchronous RPC activity. These are all virtual methods that default to an empty function (i.e., `{}`) but may be overridden by the application's reactor definition.
-   - `OnReadDone`, `OnWriteDone`, `OnWritesDoneDone`: methods invoked by the library at the completion of an explicitly-specified streaming RPC operation. Provides a `bool ok` argument to indicate whether the completion was successful.
-   - `OnReadInitialMetadataDone`: notifying client RPCs that the server has sent initial metadata. It has a bool `ok` argument to indicate whether the completion was successful. This is automatically invoked by the library for all RPCs; it is uncommonly used however
-   - `OnCancel`: for server RPCs only, called if an RPC is canceled before it has a chance to successfully send status to the client side
-   - `OnDone`: called when all outstanding RPC operations are completed. Provides status on the client side. 
+   - `OnReadDone`, `OnWriteDone`, `OnWritesDoneDone`: methods invoked by the library at the completion of an explicitly-specified streaming RPC operation. Provides a `bool ok` argument to indicate whether the completion was successful. *Client and server*. 
+   - `OnReadInitialMetadataDone`: notifying client RPCs that the server has sent initial metadata. It has a bool `ok` argument to indicate whether the completion was successful. This is automatically invoked by the library for all RPCs; it is uncommonly used however. *Client only*
+   - `OnCancel`: for server RPCs only, called if an RPC is canceled before it has a chance to successfully send status to the client side. Should be used for any cleanup associated with cancellation. Note that even cancelled RPCs _must_ get a `Finish` call to cleanup all their library state. *Server only*
+   - `OnDone`: called when all outstanding RPC operations are completed for both client and server RPCs. For the client-side, it additionally provides the status that the server sent with its `Finish` call. Should be used for any application-level RPC-specific cleanup. *Client and server.*
    - **IMPORTANT USAGE NOTE** : code in any reaction must not block for an arbitrary amount of time since reactions are executed on a finite-sized library-controlled threadpool. If any long-term blocking operations (like sleeps, file I/O, synchronous RPCs, or waiting on a condition variable) must be invoked as part of the application logic, then it is important to push that outside the reaction so that the reaction can complete in a timely fashion. One way of doing this is to push that code to a separate application-controlled thread.
 1. RPC completion prevention methods. These are methods provided by the class and are not virtual.
-   - `AddHold`, `RemoveHold`: for client RPCs, prevents the RPC from being considered complete (ready for `OnDone`) until each `AddHold` is matched to a corresponding `RemoveHold`. These are used to perform _extra-reaction flows_, which refers to  streaming operations initiated from outside a reaction method or method handler.
+   - `AddHold`, `RemoveHold`: for client RPCs, prevents the RPC from being considered complete (ready for `OnDone`) until each `AddHold` is matched to a corresponding `RemoveHold`. These are used to perform _extra-reaction flows_, which refers to  streaming operations initiated from outside a reaction method or method handler. *Client only*. (These are not needed at the server because even if there are extra-reaction flows, the end of the application's involvement with a server RPC is very clearly documented by the invocation of the `Finish` call.)
 
 Examples are provided in [the PR to de-experimentalize the callback API](https://github.com/grpc/grpc/pull/25728).
 
