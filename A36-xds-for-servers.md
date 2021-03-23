@@ -244,11 +244,10 @@ source_type: EXTERNAL
 
 CIDRs need mulitple normalizations. The `prefix_len` should be adjusted to the
 valid range of 0-32 (inclusive) for IPv4 and 0-128 (inclusive) for IPv6. An
-absent `prefix_len` should be considered equivalent to 32 for IPv4 and 128 for
-IPv6. Unused low bits of the `address_prefix` must be ignored, which can be
-achieved by replacing it with the network mask. Note that a CIDR with
-`prefix_len` of `0` is not the same as an unspecified CIDR, because it still
-matches a network type (IPv4 vs IPv6).
+absent `prefix_len` should be considered equivalent to 0. Unused low bits of the
+`address_prefix` must be ignored, which can be achieved by replacing it with the
+network mask. Note that a CIDR with `prefix_len` of `0` is not the same as an
+unspecified CIDR, because it still matches a network type (IPv4 vs IPv6).
 
 The following is a snippet of [all current fields of
 FilterChainMatch][FilterChainMatch], and if they will be handled specially
