@@ -5,7 +5,7 @@ C++ API changes on ByteBuffer and Slice
 * Status: Draft
 * Implemented in: C++
 * Last updated: 2021-04-19
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/OsAYW1mDJ9w
 
 ## Abstract
 
