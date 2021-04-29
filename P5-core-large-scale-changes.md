@@ -5,7 +5,7 @@ Title
 * Status: Draft
 * Implemented in: N/A
 * Last updated: 4/29/2021
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/q11WFj3KQOs
 
 ## Abstract
 
