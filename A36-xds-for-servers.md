@@ -79,7 +79,7 @@ SETTINGS). With either behavior, client connection attempts will quickly fail
 and clients would not perform further attempts without a backoff. Load balancing
 policies like `pick_first` would naturally attempt connections to any remaining
 addresses to quickly find an operational backend. However, the
-`accept()`+`listen()` approach will be improperly detected as server liveness
+`accept()`+`close()` approach will be improperly detected as server liveness
 for TCP heath checking.
 
 If the xDS bootstrap is missing or invalid, implementations would ideally fail
@@ -290,7 +290,7 @@ validation.
 ### Language-specifics
 
 The overall "wrapping" server API has many language-specific ramifications. We
-show each individual language's approach. For C++ and wrapped languages we just
+show each individual language's approach. For wrapped languages we just
 show a rough sketch of how they would be done.
 
 XdsClients may be shared without impacting this design. If shared, any mentions
@@ -299,36 +299,94 @@ reference" and "release a reference" on the shared instance, or similar
 behavior. Such sharing does not avoid the need of shutting down XdsClients when
 no longer in use; they are a resource and must not be leaked.
 
+### Core
+
+Core will expose a new opaque type `grpc_server_config_fetcher` and API to
+create a server config fetcher for xDS, and register it with a server
+thereafter. The xDS server config fetcher will also create the `XdsClient`
+object needed to communicate with the control plane.
+
+```C
+typedef struct {
+  void (*on_serving_status_update)(void* user_data, const char* uri,
+                                   grpc_status_code code,
+                                   const char* error_message);
+  void* user_data;
+} grpc_server_xds_status_notifier;
+
+typedef struct grpc_server_config_fetcher grpc_server_config_fetcher;
+
+/** Creates an xDS config fetcher. */
+GRPCAPI grpc_server_config_fetcher* grpc_server_config_fetcher_xds_create(
+    grpc_server_xds_status_notifier notifier, const grpc_channel_args* args);
+
+/** Destroys a config fetcher. */
+GRPCAPI void grpc_server_config_fetcher_destroy(
+    grpc_server_config_fetcher* config_fetcher);
+
+/** Sets the server's config fetcher.  Takes ownership. Must be called before 
+    adding ports. */
+GRPCAPI void grpc_server_set_config_fetcher(
+    grpc_server* server, grpc_server_config_fetcher* config_fetcher);
+```
+
+The server needs to be configured with the config fetcher before we add ports to
+the server. Additionally, when using a server config fetcher, the bound port
+might not be available immediately as a return value of the
+`grpc_server_add_secure_http2_port()` or the
+`grpc_server_add_insecure_http2_port()` API when using a wildcard port input.
+This arises from implementation details where Core currently invokes both
+`bind()` and `listen()` as part of `grpc_tcp_server_add_port()`, and as detailed
+earlier, since we would ideally not want to invoke `listen()` until we have a
+valid xDS configuration, `grpc_tcp_server_add_port()` is only invoked when the
+server is first ready to serve. (Note that any future transitions to the not
+serving state are still dealt with the `accept()`+`close()` method.) This
+behavior might change in the future by splitting `grpc_tcp_server_add_port` so
+that `bind()` and `listen()` are done separately, allowing `bind()` to be
+invoked when ports are added to the server and allowing the API to return the
+bound port for wildcard port inputs. Alternatively, Core might choose to follow
+the `accept()`+`close()` from the start.
+
+`grpc_server_config_fetcher_xds_create` takes a `notifier` arg of the type
+`grpc_server_xds_status_notifier`. The function pointer
+`on_serving_status_update` if not NULL configures the xDS server config fetcher
+to invoke when the serving status of the server changes. A status code of
+`GRPC_STATUS_OK` signifies that the server is serving, and not-serving
+otherwise. The API does not provide any guarantees around duplicate updates.
+
 ### C++
 
-This section is a sketch to convey the "feel" of the API. But details may vary.
+C++ will expose a new type `XdsServerBuilder` that mirrors the `ServerBuilder`
+API. The `XdsServerBuilder` will use the C core API described above to configure
+the server with the xDS server config fetcher. The server created after
+`BuildAndStart()` on the `XdsServerBuilder` will be xDS enabled.
 
-C will need to expose an API for C++ to utilize. We expect there will be an xDS
-filter that will be injected into the server. But we do not focus on that here
-and leave that as an implementation detail to be part of a future gRFC. Since C
-is monolithic and we are fine with xDS using internal APIs, there is quite a bit
-more flexibility in design options available for C than Java and Go.
+```C++
+class XdsServerServingStatusNotifierInterface {
+ public:
+  virtual ~XdsServerServingStatusNotifierInterface() = default;
 
-Create an `XdsServerBuilder` that mirrors the `ServerBuilder` API. It may be
-possible to implement it via delegating to a `ServerBuilder` instance, but that
-is an implementation detail.
+  // \a uri contains the listening target associated with the notification. Note
+  // that a single target provided to XdsServerBuilder can get resolved to
+  // multiple listening addresses.
+  // The callback is invoked each time there is an update to the serving status.
+  // The API does not provide any guarantees around duplicate updates.
+  // Status::OK signifies that the server is serving, while a non-OK status
+  // signifies that the server is not serving.
+  virtual void OnServingStatusUpdate(std::string uri, grpc::Status status) = 0;
+};
 
-The `XdsServerBuilder` will need to use a C core API (e.g., a channel arg to
-pass a plugin instance) to enable xDS support in the built `Server`. The
-`XdsServerBuilder` can indirectly create the `XdsClient` and plumb it to filters
-or other code that may need it. Notably, it will _not_ be passed to the
-`ServerCredential`; the `ServerCredential` will be passed the configuration to
-use for each connection, like `ChannelCredential`, so won’t need to use the
-`XdsClient` for watches on the ADS stream. Since many `Server` methods are not
-`virtual`, the `Server` will _not_ be wrapped to add xDS functionality. This
-means the C server will need to be responsible for shutting down the
-`XdsClient`.
+class XdsServerBuilder : public ::grpc::ServerBuilder {
+ public:
+  // It is the responsibility of the application to make sure that \a notifier
+  // outlasts the life of the server. Notifications will start being made
+  // asynchronously once `BuildAndStart()` has been called. Note that it is
+  // possible for notifications to be made before `BuildAndStart()` returns.
+  void set_status_notifier(XdsServerServingStatusNotifierInterface* notifier);
+```
 
-Since `ServerBuilder` has few virtual methods, the `XdsServerBuilder` will not
-be directly interchangeable. We believe users will be minimally impacted by
-needing to refer to the precise type, especially with the availability of
-templates. If this becomes a problem more methods could become `virtual`.
-
+The same consideration for bound port number not being available for wildcard
+port inputs provided via `AddListeningPort` applies to `XdsServerBuilder`.
 
 ### Wrapped Languages
 
