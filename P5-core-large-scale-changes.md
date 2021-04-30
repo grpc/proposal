@@ -23,7 +23,7 @@ These teams form a community that needs to find consensus on overall direction o
 As such, the core API should no longer be considered a cut point for gRFC's, and instead any larger change ought to be considered for such a process.
 
 ### Related Proposals: 
-* This change extends P3 to expect gRFC's for changes to gRPC Cores internals and not just it's public API.
+* This change extends P3 to expect gRFC's for changes to gRPC Core's internals and not just its public API.
 
 ## Proposal
 
