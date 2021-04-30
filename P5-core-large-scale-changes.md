@@ -42,7 +42,7 @@ Such changes include:
 ## Rationale
 
 This gRFC will slow down progress on some kinds of changes for gRPC Core.
-At this point in gRPC's lifetime this is probably appropriate: gRPC is a widely used product, multiple teams contribute to it's development, and any single person cannot cover all of the impact of changes on the myriad use cases for which gRPC is deployed.
+At this point in gRPC's lifetime this is probably appropriate: gRPC is a widely used product, multiple teams contribute to its development, and any single person cannot cover all of the impact of changes on the myriad use cases for which gRPC is deployed.
 
 By moving the design process to written discussion we lessen the need for meetings.
 This helps us include more voices in the design process - people who may not work at Google, or may be intimidated to speak up in large groups.
