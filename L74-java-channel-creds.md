@@ -438,7 +438,7 @@ ServerCredentials tlsCreds = TlsServerCredentials.create(
     new File("cert.pem"), new File("cert.key"));
 server = Grpc.newServerBuilderForPort(443, tlsCreds)
     .build().start();
-server = Grpc.newServerBuilderForPort(8080, InsecureChannelCredentials.create())
+server = Grpc.newServerBuilderForPort(8080, InsecureServerCredentials.create())
     .build().start();
 ```
 
@@ -500,7 +500,7 @@ public final class TlsServerCredentials extends ServerCredentials {
         throws IOException {...}
 
     // Throws if no certificate was provided
-    public ChannelCredentials build() {...}
+    public ServerCredentials build() {...}
   }
 }
 ```
