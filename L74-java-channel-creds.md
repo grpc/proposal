@@ -67,11 +67,11 @@ channel = ManagedChannelBuilder.forTarget("example.com").usePlaintext()
 channel = ManagedChannelBuilder.forAddress("example.com", 443)
     .build();
 // the user would now:
-channel = Grpc.newChannelBuilder("example.com", new TlsChannelCredentials())
+channel = Grpc.newChannelBuilder("example.com", TlsChannelCredentials.create())
     .build();
-channel = Grpc.newChannelBuilder("example.com", new InsecureChannelCredentials())
+channel = Grpc.newChannelBuilder("example.com", InsecureChannelCredentials.create())
     .build();
-channel = Grpc.newChannelBuilderForAddress("example.com", 443, new TlsChannelCredentials())
+channel = Grpc.newChannelBuilderForAddress("example.com", 443, TlsChannelCredentials.create())
     .build();
 ```
 
@@ -434,11 +434,11 @@ server = ServerBuilder.forPort(443)
 server = ServerBuilder.forPort(8080)
     .build().start();
 // the user would now:
-ServerCredentials tlsCreds = new TlsServerCredentials(
+ServerCredentials tlsCreds = TlsServerCredentials.create(
     new File("cert.pem"), new File("cert.key"));
 server = Grpc.newServerBuilderForPort(443, tlsCreds)
     .build().start();
-server = Grpc.newServerBuilderForPort(8080, new InsecureChannelCredentials())
+server = Grpc.newServerBuilderForPort(8080, InsecureChannelCredentials.create())
     .build().start();
 ```
 
