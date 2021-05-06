@@ -4,7 +4,7 @@ A37: xDS Aggregate and Logical DNS Clusters
 * Approver: ejona86
 * Status: Implemented
 * Implemented in: C-core, Java
-* Last updated: 2021-02-11
+* Last updated: 2021-05-06
 * Discussion at: https://groups.google.com/g/grpc-io/c/bZ7wLIdNCVY
 
 ## Abstract
@@ -59,6 +59,7 @@ New fields will be added to the data structure reported to the ClusterWatcher
 to represent logical DNS and aggregate clusters.  Specifically:
 
 - cluster type (EDS, logical DNS, or aggregate)
+- for logical DNS clusters, the DNS name to resolve (in "host:port" form)
 - for aggregate clusters, a prioritized list of underlying cluster names
 
 The existing field for the EDS service name will be used only when the
@@ -163,6 +164,10 @@ message XdsClusterResolverLoadBalancingPolicyConfig {
     // EDS service name, as returned in CDS.
     // May be unset if not specified in CDS.
     string eds_service_name = 5;
+
+    // For type LOGICAL_DNS only.
+    // DNS name to resolve in "host:port" form.
+    string dns_hostname = 6;
   }
 
   // Ordered list of discovery mechanisms.
@@ -201,12 +206,12 @@ There will be two discovery mechanism implementations:
   override the child policy for its priorities, and it will not support
   re-resolution.
 - Logical DNS.  This will use a DNS resolver to obtain the endpoint
-  information by resolving the name of the virtual host that was used to
-  create the channel.  The DNS resolver will not fetch a service config;
-  only the address information will be used.  All endpoints will be reported
-  in a single priority and a single locality, whose fields are empty.
-  It will override the child policy for its priority to be `pick_first`,
-  and it will support re-resolution.
+  information by resolving the DNS name encoded in the LOGICAL_DNS CDS
+  resource.  The DNS resolver will not fetch a service config; only the
+  address information will be used.  All endpoints will be reported in a
+  single priority and a single locality, whose fields are empty.  It will
+  override the child policy for its priority to be `pick_first`, and it
+  will support re-resolution.
 
 The `xds_cluster_resolver_experimental` policy will be gracefully switched
 whenever its config changes, so it will not need to process config updates.
