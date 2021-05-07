@@ -299,9 +299,9 @@ reference" and "release a reference" on the shared instance, or similar
 behavior. Such sharing does not avoid the need of shutting down XdsClients when
 no longer in use; they are a resource and must not be leaked.
 
-### Core
+### C-Core
 
-Core will expose a new opaque type `grpc_server_config_fetcher` and API to
+C-Core will expose a new opaque type `grpc_server_config_fetcher` and API to
 create a server config fetcher for xDS, and register it with a server
 thereafter. The xDS server config fetcher will also create the `XdsClient`
 object needed to communicate with the control plane.
@@ -331,21 +331,19 @@ GRPCAPI void grpc_server_set_config_fetcher(
 ```
 
 The server needs to be configured with the config fetcher before we add ports to
-the server. Additionally, when using a server config fetcher, the bound port
-might not be available immediately as a return value of the
-`grpc_server_add_secure_http2_port()` or the
-`grpc_server_add_insecure_http2_port()` API when using a wildcard port input.
-This arises from implementation details where Core currently invokes both
+the server. Note that we will initially not support ephemeral ports on an
+xDS-enabled server, but we might add that later.
+This arises from implementation details where C-Core currently invokes both
 `bind()` and `listen()` as part of `grpc_tcp_server_add_port()`, and as detailed
 earlier, since we would ideally not want to invoke `listen()` until we have a
 valid xDS configuration, `grpc_tcp_server_add_port()` is only invoked when the
 server is first ready to serve. (Note that any future transitions to the not
-serving state are still dealt with the `accept()`+`close()` method.) This
+serving state are still dealt with via the `accept()`+`close()` method.) This
 behavior might change in the future by splitting `grpc_tcp_server_add_port` so
 that `bind()` and `listen()` are done separately, allowing `bind()` to be
 invoked when ports are added to the server and allowing the API to return the
-bound port for wildcard port inputs. Alternatively, Core might choose to follow
-the `accept()`+`close()` from the start.
+bound port for wildcard port inputs. Alternatively, C-Core might choose to
+follow the `accept()`+`close()` from the start.
 
 `grpc_server_config_fetcher_xds_create` takes a `notifier` arg of the type
 `grpc_server_xds_status_notifier`. The function pointer
@@ -385,15 +383,12 @@ class XdsServerBuilder : public ::grpc::ServerBuilder {
   void set_status_notifier(XdsServerServingStatusNotifierInterface* notifier);
 ```
 
-The same consideration for bound port number not being available for wildcard
-port inputs provided via `AddListeningPort` applies to `XdsServerBuilder`.
+The support for ephemeral ports on an xDS-enabled server is based on the support
+provided by C-Core, and hence not supported at the moment.
 
 ### Wrapped Languages
 
 This section is a sketch to convey the "feel" of the API. But details may vary.
-
-C will expose an API for wrapped languages to utilize. We do not focus on that
-here and leave that as an implementation detail to be part of a future gRFC.
 
 Each wrapped language will need a custom "xds server" creation API. This will
 vary per-language. We use Python here just as an example of how it may look.
