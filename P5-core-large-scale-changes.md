@@ -9,7 +9,7 @@ Title
 
 ## Abstract
 
-Assert that gRFC's are needed before large scale changes to gRPC Core are undertaken.
+Assert that gRFCs are needed before large scale changes to gRPC Core are undertaken.
 
 ## Background
 
@@ -20,10 +20,10 @@ The gRFC process was intended to (quoting from README.md in this repository):
 
 There are now multiple teams contributing to gRPC Core, each with different motivations and organizational aims.
 These teams form a community that needs to find consensus on overall direction of the gRPC core codebase.
-As such, the core API should no longer be considered a cut point for gRFC's, and instead any larger change ought to be considered for such a process.
+As such, the core API should no longer be considered a cut point for gRFCs, and instead any larger change ought to be considered for such a process.
 
 ### Related Proposals: 
-* This change extends P3 to expect gRFC's for changes to gRPC Core's internals and not just its public API.
+* This change extends [P3](https://github.com/grpc/proposal/blob/master/P3-grfcs-for-core-api-changes.md) to expect gRFCs for changes to gRPC Core's internals and not just its public API.
 
 ## Proposal
 
@@ -39,9 +39,9 @@ Such changes include:
 * Changes that constrain future development.
 * Changes that modify system architecture.
 
-Since implementation experience can affect how a large scale change may proceed, it's additionally proposed that LSC gRFC's may be updated by later PR's against the approved change.
+Since implementation experience can affect how a large scale change may proceed, it's additionally proposed that LSC gRFCs may be updated by later PR's against the approved change.
 Such updates would be subject to a minimum five business day approval process, rather than the usual ten as it's assumed that stake holders would already be identified and have sufficient context.
-Updates to LSC gRFC's must add or extend a final section 'Change Log' with a summary of what has changed from version to version of the gRFC.
+Updates to LSC gRFCs must add or extend a final section 'Change Log' with a summary of what has changed from version to version of the gRFC.
 
 Finally, since the five day period has been somewhat arbitrarily chosen, as has what is included and excluded - this gRFC may be updated with the same process as for LSC's.
 
