@@ -33,11 +33,10 @@ A large scale change is one that has a wide-ranging impact on the implementation
 
 Such changes include:
 * Changes to extensibility points, or the types used by extensibility points.
-* Changes that require downstream consumers of gRPC Core to modify their code.
 * Changes with a significant performance impact.
 * Changes to vocabulary types - types that are used broadly within the library.
-* Changes that constrain future development.
-* Changes that modify system architecture.
+* Changes that constrain future development, e.g. changes that they would likely need a large scale change to undo.
+* Changes that modify basic assumptions - where memory is coming from, implied lock orderings across components.
 
 Since implementation experience can affect how a large scale change may proceed, it's additionally proposed that LSC gRFCs may be updated by later PR's against the approved change.
 Such updates would be subject to a minimum five business day approval process, rather than the usual ten as it's assumed that stake holders would already be identified and have sufficient context.
