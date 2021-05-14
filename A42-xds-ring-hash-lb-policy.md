@@ -5,7 +5,7 @@ A42: xDS Ring Hash LB Policy
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2021-05-13
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/_Z_oiWVXf6k
 
 ## Abstract
 
