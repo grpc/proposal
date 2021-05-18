@@ -27,7 +27,7 @@ xDS supports two hash-based LB policies, `RING_HASH` and `MAGLEV`.  For
 now, gRPC will support only `RING_HASH`, although we could add support
 for `MAGLEV` in the future.
 
-### Related Proposals: 
+### Related Proposals:
 
 This proposal builds on earlier work described in the following gRFCs:
 * [gRFC A27: xDS-based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
@@ -65,7 +65,8 @@ are skipped.
 These semantics allow gRPC to support only a subset of xDS hash policy
 types in a forward-compatible way.  For any hash policy type that gRPC
 does not support, that hash policy is treated as simply not returning any
-result for the request.
+result for the request.  (Note that this differs from Envoy's behavior,
+which is to reject a config with an unsupported hash policy.)
 
 Here is how gRPC will handle each type of hash policy:
 
@@ -93,6 +94,10 @@ Here is how gRPC will handle each type of hash policy:
   called `io.grpc.channel_id`, which will hash to the same value for all
   requests on a given gRPC channel.  This can be used in similar situations
   to where Envoy uses `connection_properties` to hash on the source IP address.
+  (Note that we do not recommend that applications create multiple gRPC
+  channels to the same virtual host, but if you do that, then the
+  behavior here will not be exactly the same as using `connection_properties`,
+  because each channel may use a different endpoint.)
 
 #### XdsClient Changes
 
@@ -122,9 +127,10 @@ The `XdsClient` will populate these fields from the fields of the
 The `XdsConfigSelector` is created by the xds resolver and is responsible
 for performing routing for each request.  The `XdsConfigSelector` will
 therefore be responsible for using the hash policies in the chosen route
-to compute the hash for the request.  The computed hash will be
-communicated from the `XdsConfigSelector` to the LB policy using the same
-mechanism described in [gRFC
+to compute the hash for the request.  The hash will be computed using
+`XX_HASH`, as defined in https://github.com/Cyan4973/xxHash in the `XXH64()`
+function with seed 0.  The computed hash will be communicated from the
+`XdsConfigSelector` to the LB policy using the same mechanism described in [gRFC
 A31](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md)
 for passing the cluster name to the LB policy.
 
