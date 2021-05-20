@@ -94,15 +94,19 @@ rule contains references to things that don't generally match; it is not trivial
 to "optimize out" the never-matching rules.
 
 The `header` field is not entirely 1:1 with gRPC Metadata. To begin with, gRPC
-Metadata isn't 100% consistent cross-language in its handling of hop-to-hop
-headers (e.g., `TE`) and pseudo-headers. For this design, `headers` can include
-`:method`, `:scheme`, `:authority`, and`:path` matchers and they must match the
-values received on-the-wire independent of whether they are stored in Metadata
-or in separate APIs. It is unspecified whether hop-to-hop headers are matched.
+Metadata isn't 100% consistent cross-language in its handling of [hop-by-hop
+headers][] (e.g., `TE`; RFC 2616 has [a convenient list][hop-by-hop header
+list]) and pseudo-headers. For this design, `headers` can include `:method`,
+`:scheme`, `:authority`, and`:path` matchers and they must match the values
+received on-the-wire independent of whether they are stored in Metadata or in
+separate APIs. It is unspecified whether hop-by-hop headers are matched.
 Multi-valued metadata is represented as the concatenation of the values along
 with a `,` (comma, no added spaces) separator, as permitted by HTTP and gRPC.
 Binary headers are represented in their base64-encoded form, although we rarely
 expect binary header matchers.
+
+[hop-by-hop headers]: https://datatracker.ietf.org/doc/html/rfc7230#section-6.1
+[hop-by-hop header list]: https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1
 
 TODO: Clearly define differences compared to client-side. Align with client-side
 routing (maybe changing behavior) to allow reusing code, have a strong grip on
