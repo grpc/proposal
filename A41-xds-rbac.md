@@ -82,14 +82,13 @@ The following fields of `Permission` may not be obvious how they map to gRPC:
 
 | Permission Field | gRPC Equivalent |
 | ---------------- | --------------- |
-| header           | Metadata (with caveats) |
+| header           | Metadata (with caveats below) |
 | url_path         | Fully-qualified RPC method name with leading slash |
 | destination_ip   | Local address for this connection |
 | destination_port | Local port for this connection |
 | metadata         | Hard-coded as empty; never matches |
 | requested_server_name | Hard-coded as empty string |
 
-Be strongly aware that Envoy Metadata has no relation to gRPC's Metadata.
 Because matching supports NOT, the matcher must still be processed even if a
 rule contains references to things that don't generally match; it is not trivial
 to "optimize out" the never-matching rules.
@@ -134,11 +133,11 @@ since gRPC generally doesn't observe this header yet the RBAC policy could.
 Options: deny such requests, move Host header to :authority, drop Host header.
 Host and :authority could also disagree, and that needs to be handled.
 
-TODO: Should MetadataMatcher's NullMatch match? Need to check not present vs
-present-but-null behavior.
+`metadata` will never match as `ValueMatcher` can only match if the value is
+present (even `NullMatch`). Be strongly aware that Envoy Metadata has no
+relation to gRPC's Metadata.
 
-Note that `requested_server_name` can match if the matcher accepts empty string.
-TODO: does Envoy default to empty string or null?
+`requested_server_name` can match if the matcher accepts empty string.
 
 The following fields of `Principal` may not be obvious how they map to gRPC:
 
@@ -148,9 +147,9 @@ The following fields of `Principal` may not be obvious how they map to gRPC:
 | source_ip        | Peer address for this connection |
 | direct_remote_ip | Peer address for this connection |
 | remote_ip        | Peer address for this connection |
-| header           | Metadata (with caveats) |
-| url_path         | Fully-qualified RPC method name with leading slash |
-| metadata         | Hard-coded as empty; never matches |
+| header           | Same as in Permission |
+| url_path         | Same as in Permission |
+| metadata         | Same as in Permission |
 
 TODO: Need to NACK to be consistent on `remote_ip` `source_ip` if
 x-forwarded-for, proxy protocol, etc is configured.
