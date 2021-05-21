@@ -124,7 +124,8 @@ Host and :authority could also disagree, and that needs to be handled.
 
 `metadata` will never match as `ValueMatcher` can only match if the value is
 present (even `NullMatch`). Be strongly aware that Envoy Metadata has no
-relation to gRPC's Metadata.
+relation to gRPC Metadata. Envoy Metadata is generic state shared between
+filters which has no gRPC equivalent.
 
 `requested_server_name` can match if the matcher accepts empty string.
 
