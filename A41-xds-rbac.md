@@ -83,7 +83,7 @@ The following fields of `Permission` may not be obvious how they map to gRPC:
 | Permission Field | gRPC Equivalent |
 | ---------------- | --------------- |
 | header           | Metadata (with caveats below) |
-| url_path         | Fully-qualified RPC method name with leading slash |
+| url_path         | Fully-qualified RPC method name with leading slash. Same as `:path` header |
 | destination_ip   | Local address for this connection |
 | destination_port | Local port for this connection |
 | metadata         | Hard-coded as empty; never matches |
@@ -133,7 +133,7 @@ The following fields of `Principal` may not be obvious how they map to gRPC:
 
 | Principal Field  | gRPC Equivalent |
 | ---------------- | --------------- |
-| authenticated.principal_name | The first URI/DNS SAN; same as Envoy |
+| authenticated.principal_name | The first URI/DNS Subject Alternative Name in the client's certificate; same as Envoy |
 | source_ip        | Peer address for this connection |
 | direct_remote_ip | Peer address for this connection |
 | remote_ip        | Peer address for this connection |
@@ -151,7 +151,7 @@ x-forwarded-for, proxy protocol, etc is configured.
 
 The environment variable `GRPC_XDS_EXPERIMENTAL_RBAC` will be used to gate
 the feature until it is deemed stable for a particular implementation. If unset
-or not `true`, all RBAC logic presented in this gRFC will not come into effect.
+or not `true`, all logic presented in this gRFC will not come into effect.
 
 ## Rationale
 
