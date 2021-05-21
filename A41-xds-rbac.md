@@ -97,40 +97,25 @@ The `header` field is not entirely 1:1 with gRPC Metadata. To begin with, gRPC
 Metadata isn't 100% consistent cross-language in its handling of [hop-by-hop
 headers][] (e.g., `TE`; RFC 2616 has [a convenient list][hop-by-hop header
 list]) and pseudo-headers. For this design, `headers` can include `:method`,
-`:scheme`, `:authority`, and`:path` matchers and they must match the values
+`:scheme`, `:authority`, and`:path` matchers and they should match the values
 received on-the-wire independent of whether they are stored in Metadata or in
-separate APIs. It is unspecified whether hop-by-hop headers are matched.
+separate APIs. `:scheme` is not universally available in gRPC APIs, so it may be
+hard-coded to `http` if unavailable. `:method` can be hard-coded to `POST` if
+unavailable and a code audit confirms the server denies requests for all other
+method types. It is unspecified whether hop-by-hop headers are matched.
 Multi-valued metadata is represented as the concatenation of the values along
 with a `,` (comma, no added spaces) separator, as permitted by HTTP and gRPC.
-Binary headers are represented in their base64-encoded form, although we rarely
-expect binary header matchers.
+The Content-Type provided by the client must be used; not a hard-coded value.
+(TODO: support binary headers?) Binary headers are represented in their
+base64-encoded form, although we rarely expect binary header matchers.
 
 [hop-by-hop headers]: https://datatracker.ietf.org/doc/html/rfc7230#section-6.1
 [hop-by-hop header list]: https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1
-
-TODO: Clearly define differences compared to client-side. Align with client-side
-routing (maybe changing behavior) to allow reusing code, have a strong grip on
-client vs server differences, and notice 'gotcha's.  Content-Type is probably
-not a problem on server-side.
 
 As documented for `HeaderMatcher`, Envoy aliases `:authority` and `Host` in its
 header map implementation, so they should be treated equivalent for the RBAC
 matchers; there must be no behavior change depending on which of the two header
 names is used in the _RBAC policy_.
-
-TODO: We've had no reason to care about :scheme in our APIs and so is not
-present in all languages. It could be inferred from whether the connection used
-security, but that's technically different from :scheme, as if you go through a
-TLS-terminating proxy and use plaintext to the backend the :scheme is used to
-re-create the original URL which would be 'https', not 'http'. This may be a
-problem for Java and Go. We can maybe copy whatever Envoy does for HTTP/1
-traffic. You might think :scheme doesn't matter, and maybe it doesn't, but it
-might be used to detect "is the client using TLS". Although note that in that
-case such a check is trusting the client to provide the correct value.
-
-TODO: Need to audit that server implementations check that :method=POST before
-accepting the RPC. This was already a requirement but it is an appropriate time
-to double-check.
 
 TODO: Determine how to handle _requests_ (not policies) that have Host header,
 since gRPC generally doesn't observe this header yet the RBAC policy could.
