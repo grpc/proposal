@@ -30,7 +30,7 @@ server and for which gRPC methods (i.e., whether the client was permitted).
 
 Envoy defines the [RBAC HTTP filter][RBAC filter] that is well-suited for
 limiting which nodes can access which services within a mesh as encouraged by
-the principal of least privilege.
+the principle of least privilege.
 
 Resources in REST are present in the HTTP path so it would seem RBAC could be
 used in non-gRPC environments as a precise service-level resource authz engine.
@@ -62,7 +62,7 @@ Supporting the RBAC HTTP filter on server-side leverages [A36: xDS-Enabled
 Servers][A36] and [A39: xDS HTTP Filter Support][A39]. Server-side HTTP filters
 are less common than client-side at this point in time, so this may be the first
 usage of `RouteConfiguration` on server-side and so likely involves adding more
-complete support for A39 by creating+executing filters on server-side and
+complete support for A39 by creating and executing filters on server-side and
 processing `VirtualHost`s and `RoutMatch`es to determine which configuration
 should be provided to each filter. A39 should be consulted for the expected
 behavior.
@@ -163,8 +163,8 @@ decision and does not impact applicability at this time.
 Fuller-fledged authz policy supporting end-user authorization for
 application-specific resources would be useful, but needs to be future work as
 it has multiple technical challenges including need for delayed authz policy
-loading (i.e., delegating to a remote authz server) to be able scale, a way to
-extract the application-level resource from the request, and support for
+loading (i.e., delegating to a remote authz server) to be able to scale, a way
+to extract the application-level resource from the request, and support for
 authenticating end users.
 
 Envoy also defines an [RBAC network filter][]. Such a filter is helpful for TCP
