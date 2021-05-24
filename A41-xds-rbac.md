@@ -133,13 +133,26 @@ The following fields of `Principal` may not be obvious how they map to gRPC:
 
 | Principal Field  | gRPC Equivalent |
 | ---------------- | --------------- |
-| authenticated.principal_name | The first URI/DNS Subject Alternative Name in the client's certificate; same as Envoy |
+| authenticated.principal_name | The URI/DNS SAN or Subject; same as Envoy |
 | source_ip        | Peer address for this connection |
 | direct_remote_ip | Peer address for this connection |
 | remote_ip        | Peer address for this connection |
 | header           | Same as in Permission |
 | url_path         | Same as in Permission |
 | metadata         | Same as in Permission |
+
+The `authenticated.principal_name` will use the same definition as its
+`rbac.proto` comment, although it checks multiple values which isn't clear from
+the comment. All values being checked are derived from the client's certificate.
+The process is:
+
+1. Check if any SubjectAltName entry with URI type (type 6) matches. If any
+   entry matches, the `principal_name` is said to match
+2. If there is no SAN with URI type, check if any SAN entry with DNS type (type
+   2) matches. If any entry matches, the `principal_name` is said to match
+3. If there are no SAN with URI or DNS types, check if the Subject's
+   distinguished name formatted as an RFC 2253 Name matches. If it matches, the
+   `principal_name` is said to match
 
 TODO: Need to NACK to be consistent on `remote_ip` `source_ip` if
 x-forwarded-for, proxy protocol, etc is configured.
