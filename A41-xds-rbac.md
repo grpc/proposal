@@ -108,6 +108,7 @@ with a `,` (comma, no added spaces) separator, as permitted by HTTP and gRPC.
 The Content-Type provided by the client must be used; not a hard-coded value.
 (TODO: support binary headers?) Binary headers are represented in their
 base64-encoded form, although we rarely expect binary header matchers.
+(TODO: what about 'grpc-'-prefixed headers?)
 
 [hop-by-hop headers]: https://datatracker.ietf.org/doc/html/rfc7230#section-6.1
 [hop-by-hop header list]: https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1
