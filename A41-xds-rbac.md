@@ -67,6 +67,12 @@ processing `VirtualHost`s and `RoutMatch`es to determine which configuration
 should be provided to each filter. A39 should be consulted for the expected
 behavior.
 
+New validation should occur for `HttpConnectionManager` to allow equating
+`direct_remote_ip` and `remote_ip`. If the implementation does not distinguish
+between these fields, then `xff_num_trusted_hops` must be verified to be unset
+or zero. If it is any other value, the Listener must be NACKed. (TODO: Do this
+only on server-side, or both client and server?)
+
 The core policy matching logic should be split into an "RBAC engine" to allow
 reuse with non-xDS environments. However, there is no requirement that the RBAC
 engine have a specialized API; it could simply be an interceptor.
@@ -155,11 +161,17 @@ The process is:
    distinguished name formatted as an RFC 2253 Name matches. If it matches, the
    `principal_name` is said to match
 
-TODO: Need to NACK to be consistent on `remote_ip` `source_ip` if
-x-forwarded-for, proxy protocol, etc is configured.
+`source_ip` is the same as `direct_remote_ip` only as long as
+[envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol][] is
+unsupported. If a future gRFC adds ProxyProtocol support it must also update
+`source_ip` and `remote_ip` handling in RBAC.
+
+`remote_ip` is the same as `direct_remote_ip` only as long as ProxyProtocol and
+`xff_num_trusted_hops` are unsupported.
 
 [RBAC policy]: https://github.com/envoyproxy/envoy/blob/10c17a7cd90b013c38dfbfbf715d3c24fdd0477c/api/envoy/config/rbac/v3/rbac.proto
 [RBAC network filter]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/network/rbac/v3/rbac.proto
+[envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.proto
 
 ### Temporary environment variable protection
 
