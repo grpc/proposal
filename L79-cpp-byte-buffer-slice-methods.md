@@ -10,6 +10,7 @@ C++ API changes on ByteBuffer and Slice
 ## Abstract
 
 To better support custom serialization protocols besides protobuf, additional methods will be added to `grpc::ByteBuffer` and `grpc::Slice` those serialization protocols to access data without copying data.
+This proposal purely addes new features so there shouldn't be any breaking changes.
 
 ## Background
 
