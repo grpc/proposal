@@ -5,7 +5,7 @@ L81: Custom Audience in JWT Access Credentials and Google Default Credentials
 * Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: Core, C++
 * Last updated: 2021-05-26
-* Discussion at: https://groups.google.com/g/grpc-io/c/o0Kkwc2JDa4
+* Discussion at: https://groups.google.com/g/grpc-io/c/MgSP5tNrM0Q
 
 ## Abstract
 
@@ -58,7 +58,9 @@ std::shared_ptr<CallCredentials> ServiceAccountJWTAccessCredentials(
 /// Builds credentials with reasonable defaults.
 /// user_provided_audience is an optional field for user to override the
 /// auidence in the JWT token. If user_provided_audience is empty, the service
-/// URL will be used as the audience.
+/// URL will be used as the audience. Note that user_provided_audience will
+/// only be used if a service account JWT access credential is created by
+/// the application default credentials mechanism.
 std::shared_ptr<ChannelCredentials> GoogleDefaultCredentials(
     const grpc::string& user_provided_audience = "");
 ```
@@ -99,7 +101,11 @@ grpc_service_account_jwt_access_credentials_create(
 
    user_provided_audience is an optional field for user to override the
    audience in the JWT token if used. If user_provided_audience is empty,
-   the service URL will be used as the audience.
+   the service URL will be used as the audience. Note that 
+   user_provided_audience will only be used if a service account JWT access
+   credential is created by the application default credentials mechanism. Also
+   note that user_provided_audience will be ignored if the call_credentials is
+   not nullptr.
 */
 GRPCAPI grpc_channel_credentials* grpc_google_default_credentials_create(
     grpc_call_credentials* call_credentials,
