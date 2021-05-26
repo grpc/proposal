@@ -2,10 +2,10 @@ L81: Custom Audience in JWT Access Credentials and Google Default Credentials
 ----
 * Author(s): [Jiangtao Li](https://github.com/jiangtaoli2016), [Yihua Zhang](https://github.com/yihuazhang)
 * Approver: markdroth
-* Status: Draft {Draft, In Review, Ready for Implementation, Implemented}
+* Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: Core, C++
-* Last updated: 2021-05-25
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 2021-05-26
+* Discussion at: https://groups.google.com/g/grpc-io/c/o0Kkwc2JDa4
 
 ## Abstract
 
@@ -98,7 +98,7 @@ grpc_service_account_jwt_access_credentials_create(
    mechanism.
 
    user_provided_audience is an optional field for user to override the
-   auidence in the JWT token if used. If user_provided_audience is empty,
+   audience in the JWT token if used. If user_provided_audience is empty,
    the service URL will be used as the audience.
 */
 GRPCAPI grpc_channel_credentials* grpc_google_default_credentials_create(
