@@ -81,8 +81,11 @@ The [RBAC policy][] has many fields. All current (Envoy-implemented) fields will
 be considered in gRPC. However, some fields may have pre-determined values or
 behavior. At this time, if the `RBAC.action` is `Action.LOG` then the policy
 will be completely ignored, as if RBAC was not configurated. CEL fields are not
-supported, so if `Policy.condition` or `Policy.checked_condition` is present the
-XdsClient must NACK the configuration.
+supported, so `Policy.condition` and `Policy.checked_condition` must cause a
+validation failure if present. It is also a validation failure if Permission or
+Principal has a `header` matcher for a `grpc-`-prefixed header name. As
+described in A39, validation failures for filter configuration causes the
+listener to be NACKed.
 
 The following fields of `Permission` may not be obvious how they map to gRPC:
 
@@ -112,9 +115,8 @@ method types. It is unspecified whether hop-by-hop headers are matched.
 Multi-valued metadata is represented as the concatenation of the values along
 with a `,` (comma, no added spaces) separator, as permitted by HTTP and gRPC.
 The Content-Type provided by the client must be used; not a hard-coded value.
-(TODO: support binary headers?) Binary headers are represented in their
-base64-encoded form, although we rarely expect binary header matchers.
-(TODO: what about 'grpc-'-prefixed headers?)
+Binary headers are represented in their base64-encoded form, although we rarely
+expect binary header matchers other than presence-checking.
 
 [hop-by-hop headers]: https://datatracker.ietf.org/doc/html/rfc7230#section-6.1
 [hop-by-hop header list]: https://datatracker.ietf.org/doc/html/rfc2616#section-13.5.1
