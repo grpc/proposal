@@ -2,9 +2,9 @@ L81: Custom Audience in JWT Access Credentials and Google Default Credentials
 ----
 * Author(s): [Jiangtao Li](https://github.com/jiangtaoli2016), [Yihua Zhang](https://github.com/yihuazhang)
 * Approver: markdroth
-* Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
+* Status: Implemented {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: Core, C++
-* Last updated: 2021-05-26
+* Last updated: 2021-06-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/MgSP5tNrM0Q
 
 ## Abstract
