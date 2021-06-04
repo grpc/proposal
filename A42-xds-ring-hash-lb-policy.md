@@ -2,9 +2,9 @@ A42: xDS Ring Hash LB Policy
 ----
 * Author(s): markdroth
 * Approver: ejona86
-* Status: {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in: <language, ...>
-* Last updated: 2021-05-13
+* Status: Implementation in Progress
+* Implemented in: Java (C-core and Go in progress)
+* Last updated: 2021-06-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/_Z_oiWVXf6k
 
 ## Abstract
@@ -149,7 +149,8 @@ additional policy, `RING_HASH`.
 The configuration for the Ring Hash LB policy is in the
 [`ring_hash_lb_config`
 field](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L907).
-gRPC will support the
+The field is optional; if not present, defaults will be assumed for all
+of its values.  gRPC will support the
 [`minimum_ring_size`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L397)
 and
 [`maximum_ring_size`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L406)
@@ -355,8 +356,8 @@ The `ring_hash_experimental` policy will have the following config:
 
 ```
 message RingHashLoadBalancingConfig {
-  uint64 min_ring_size = 1;
-  uint64 max_ring_size = 2;
+  uint64 min_ring_size = 1;  // Optional, defaults to 1024.
+  uint64 max_ring_size = 2;  // Optional, defaults to 8M.
 }
 ```
 
