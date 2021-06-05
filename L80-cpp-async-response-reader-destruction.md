@@ -19,8 +19,6 @@ This proposal provides a plan for guaranteed destructor invocation, such that
 subclasses can count on their destructor running and their backing memory being
 freed, as with any other C++ class.
 
-This proposal requires a bump of the major version.
-
 ## Background
 
 We currently [specialize](https://github.com/grpc/grpc/blob/7e14d23ab46e1b0924d6c3e40797ed1d587aee7a/include/grpcpp/impl/codegen/async_unary_call.h#L404-L408)
@@ -101,7 +99,9 @@ Other subclasses of `ClientAsyncResponseReaderInterface` will see a behavior
 change. Their maintainers need to either override `Destroy` in the same manner
 as `ClientAsyncResponseReader` to restore the former behavior, or remove the
 hacks like the one described above to gain the usual ownership semantics of
-`std::unique_ptr`. This change thus requires a major version change.
+`std::unique_ptr`. However the change is likely to only affect those mocking the
+async API, which was never officially supported, so the commit will only bump
+the minor version.
 
 ## Rationale
 
