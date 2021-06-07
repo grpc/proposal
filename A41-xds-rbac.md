@@ -154,8 +154,9 @@ The following fields of `Principal` may not be obvious how they map to gRPC:
 
 The `authenticated.principal_name` will use the same definition as its
 `rbac.proto` comment, although it checks multiple values which isn't clear from
-the comment. All values being checked are derived from the client's certificate.
-The process is:
+the comment. If `principal_name` is unset, then `Authenticated` is said to match
+if the connection uses TLS; a client certificate is not necessary. Other
+values being checked are derived from the client's certificate. The process is:
 
 1. Check if any SubjectAltName entry with URI type (type 6) matches. If any
    entry matches, the `principal_name` is said to match
@@ -164,6 +165,8 @@ The process is:
 3. If there are no SAN with URI or DNS types, check if the Subject's
    distinguished name formatted as an RFC 2253 Name matches. If it matches, the
    `principal_name` is said to match
+4. If there is no client certificate (thus no SAN nor Subject), check if `""`
+   (empty string) matches. If it matches, the `principal_name` is said to match
 
 `source_ip` is the same as `direct_remote_ip` only as long as
 [envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol][] is
