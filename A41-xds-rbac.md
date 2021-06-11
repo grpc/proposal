@@ -48,7 +48,7 @@ a major loss as RBAC is poorly suited for service-level resource authz.
 
 [A36]: https://github.com/grpc/proposal/blob/master/A36-xds-for-servers.md
 <!-- FIXME: replace with final link once merged -->
-[A29]: https://github.com/grpc/proposal/pull/184
+[A29]: https://github.com/grpc/proposal/pull/243
 [A39]: https://github.com/grpc/proposal/blob/master/A39-xds-http-filters.md
 
 ## Proposal
