@@ -1,12 +1,12 @@
 A41: xDS RBAC Support
 ----
 * Author(s): [Eric Anderson](https://github.com/ejona86), [Ashitha
-  Santhosh](https://github.com/ashithasantosh) (RBAC engine behavior)
+  Santhosh](https://github.com/ashithasantosh)
 * Approver: markdroth
-* Status: Draft {Draft, In Review, Ready for Implementation, Implemented}
+* Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2021-05-07
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 2021-06-11
+* Discussion at: https://groups.google.com/g/grpc-io/c/DQJfShLTrTQ/
 
 ## Abstract
 
