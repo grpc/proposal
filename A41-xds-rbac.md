@@ -32,13 +32,13 @@ Envoy defines the [RBAC HTTP filter][RBAC filter] that is well-suited for
 limiting which nodes can access which services within a mesh as encouraged by
 the principle of least privilege.
 
-Resources in REST are present in the HTTP path so it would seem RBAC could be
-used in non-gRPC environments as a precise service-level resource authz engine.
-However, this 1) requires another filter to perform end-user authentication (as
-TLS just provides service-level authn) and 2) does not scale as RBAC provides no
-mechanism for loading rules on-demand. Since gRPC encodes service-level
-resource identifiers in the request message, RBAC does not have access to the
-requested resource for gRPC traffic.
+The resource name in REST is present in the HTTP path so technically RBAC could
+be used as a precise service-level resource authz engine with REST. However,
+this 1) requires another filter to perform end-user authentication as TLS just
+provides service-level authn and 2) does not scale as RBAC provides no mechanism
+for loading rules on-demand. gRPC encodes service-level resource names (if they
+exist) in the request message which RBAC cannot access, but this is not seen as
+a major loss as RBAC is poorly suited for service-level resource authz.
 
 ### Related Proposals:
 
