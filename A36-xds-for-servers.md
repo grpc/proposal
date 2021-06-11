@@ -181,8 +181,6 @@ Envoy's behavior.
 
 HttpConnectionManager support is required. HttpConnectionManager must have valid
 `http_filters`, as defined by [A39: xDS HTTP Filter Support][A39].
-RouteConfiguration (via `route_config` or indirect fields like `rds`) is not
-used nor validated at this time, but may be in the future.
 
 If the `envoy.extensions.filters.http.router.v3.Router` is not present in
 `http_filters`, A39 calls for inserting a special filter that fails all RPCs. If
@@ -193,8 +191,43 @@ required. This is to allow implementations that only support L4 xDS features to
 avoid L7 plumbing and implementation. This has no impact on the resource
 validation and NACKing behavior called for in A39.
 
+If an XdsServer implementation uses RouteConfiguration or supports any HTTP
+filters other than the hard-coded Router, then
+`HttpConnectionManager.route_config` and `HttpConnectionManager.rds` must be
+supported and RouteConfigurations must be validated. RouteConfiguration
+validation logic inherits all previous validations made for client-side usage
+as RDS does not distinguish between client-side and server-side. That is
+predomenently defined in [gRFC A28][A28-validation], although note that
+configuration for all VirtualHosts have been validated on client-side since
+sharing the XdsClient was introduced, yet was not documented in a gRFC. The
+validation must be updated to allow [Route.non_forwarding_action][] as a valid
+`action`. The VirtualHost is selected on a per-RPC basis using the RPC's
+requested `:authority`. Routes are matched the same as on client-side.
+`Route.non_forwarding_action` is expected for all Routes used on server-side and
+`Route.route` continues to be expected for all Routes used on client-side; a
+Route with an inappropriate `action` causes RPCs matching that route to fail.
+
+[Like in Envoy][envoy lds], updates to a Listener cause all older connections on
+that Listener to be gracefully shut down with a grace period of 10 minutes for
+long-lived RPCs, such that clients will reconnect and have the updated
+configuration apply. This applies equally to an update in a RouteConfiguration
+provided inline via the `route_config` field as it is part of the Listener, but
+it does not apply to an updated RouteConfiguration provided by reference via
+`rds` field. Infrastructure for "not serving" mode may be used for the graceful
+shutdown, but only if it can be used without causing spurious RPC or connection
+failures. Applying updates to a Listener should be delayed until dependent
+resources have been attempted to be loaded (e.g., via RDS). The existing
+resource loading timeout in XdsClient prevents the update from being delayed
+indefinitely.
+
+TODO: drain time is a command line flag for Envoy, not provided via xds.
+https://www.envoyproxy.io/docs/envoy/latest/operations/cli#cmdoption-drain-time-s
+
 [Filter.typed_config]: https://github.com/envoyproxy/envoy/blob/928a62b7a12c4d87ce215a7c4ebd376f69c2e080/api/envoy/config/listener/v3/listener_components.proto#L40
 [TypedStruct.type_url]: https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38
+[A28-validation]: https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md#response-validation
+[Route.non_forwarding_action]: https://github.com/envoyproxy/envoy/blob/5963beae8842982803af1bef04fb5a2a0893c613/api/envoy/config/route/v3/route_components.proto#L242
+[envoy lds]: https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/lds
 
 ### FilterChainMatch
 

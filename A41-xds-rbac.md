@@ -73,8 +73,6 @@ between these fields, then `xff_num_trusted_hops` must be verified to be unset
 or zero. If it is any other value, the Listener must be NACKed. (TODO: Do this
 only on server-side, or both client and server? Or just implement the feature?)
 
-TODO: Support RDS
-
 The core policy matching logic should be split into an "RBAC engine" to allow
 reuse with non-xDS environments. However, there is no requirement that the RBAC
 engine have a specialized API; it could simply be an interceptor.
