@@ -74,8 +74,10 @@ or zero. If it is any other value, the Listener must be NACKed. (TODO: Do this
 only on server-side, or both client and server? Or just implement the feature?)
 
 The core policy matching logic should be split into an "RBAC engine" to allow
-reuse with non-xDS environments. However, there is no requirement that the RBAC
-engine have a specialized API; it could simply be an interceptor.
+internal reuse with a non-xDS API. Any non-xDS API will not be RBAC, so this
+reuse is merely an implementation detail. The API is not part of this gRFC.
+There is no requirement that the RBAC engine have a specialized API; it could
+simply be an interceptor.
 
 The [RBAC policy][] has many fields. All current (Envoy-implemented) fields will
 be considered in gRPC. However, some fields may have pre-determined values or
