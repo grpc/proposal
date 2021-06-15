@@ -64,10 +64,15 @@ shutdown if it's destroyed by the platform.
 
 ### AndroidComponentAddress
 
-In Android, a [ComponentName] identifies a [bound service] to which a client can
-connect. We will create an `AndroidComponentAddress` that extends
-`SocketAddress` to wrap the ComponentName and allow it to be returned by a
-`NameResolver`.
+In Android, service bindings are identified by an explicit [Intent], i.e. one
+that specifies the target [bound service] by [ComponentName]. This so-called
+binding Intent can also use Intent fields like `action` to identify the target
+`IBinder` IPC endpoint when the target `Service` hosts more than one.
+
+We will create an `AndroidComponentAddress` that wraps a binding Intent and 
+extends `SocketAddress` to let BinderChannel's addressing scheme integrate with
+the existing transport-independent code such as `io.grpc.NameResolver` and
+`io.grpc.Server#getListenSockets()`.
 
 ### BinderTransport
 
@@ -301,6 +306,7 @@ productionized but some internal users.
 [Parcelable]: https://developer.android.com/reference/android/os/Parcelable
 [ComponentName]: https://developer.android.com/reference/android/content/ComponentName
 [InProcessTransport]: https://github.com/grpc/grpc-java/blob/master/core/src/main/java/io/grpc/inprocess/InProcessTransport.java
+[Intent]: https://developer.android.com/reference/android/content/Intent
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\)
 [InternalServer]: https://github.com/grpc/grpc-java/blob/v1.29.0/core/src/main/java/io/grpc/internal/InternalServer.java
