@@ -34,8 +34,8 @@ things, but otherwise shares the same rationale as the previous effort.
 
 ### Related Proposals:
 
-* This work supersedes https://github.com/grpc/proposal/pull/182
-* Supports the C++ Callback API, proposed in https://github.com/grpc/proposal/pull/180
+* This work supersedes [L69: EventManger API](https://github.com/grpc/proposal/pull/182)
+* Supports [L67: C++ callback-based asynchronous API](https://github.com/grpc/proposal/pull/180) as a more performant solution than provided by the [CallbackAlternativeCQ](https://github.com/grpc/grpc/pull/25169).
 
 ## Proposal
 
