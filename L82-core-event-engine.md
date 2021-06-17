@@ -426,12 +426,10 @@ provides a custom EventEngine, the fd-specific APIs will be no-ops.
 A sampling of APIs that will only be supported with the default EventEngine
 implementation:
 
-TODO: links
-
-* CreateInsecureChannelFromFd
-* AddInsecureChannelFromFd
-* SetSocketMutator
-* grpc\_insecure\_channel\_create\_from\_fd
+* [CreateInsecureChannelFromFd](https://github.com/grpc/grpc/blob/v1.38.0/include/grpcpp/create_channel_posix.h#L32-L46)
+* [AddInsecureChannelFromFd](https://github.com/grpc/grpc/blob/v1.38.0/include/grpcpp/server_posix.h#L31-L36)
+* [SetSocketMutator](https://github.com/grpc/grpc/blob/v1.38.0/include/grpcpp/support/channel_arguments.h#L73-L80)
+* [grpc\_insecure\_channel\_create\_from\_fd](https://github.com/grpc/grpc/blob/v1.38.0/include/grpc/grpc_posix.h#L38-L42)
 
 ## Rationale
 
