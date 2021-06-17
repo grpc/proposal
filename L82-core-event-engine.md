@@ -1,18 +1,18 @@
-gRPC core EventEngine API
+gRPC Core EventEngine API
 ----
 * Author: AJ Heller (@drfloob)
 * Approver: Mark Roth (@markdroth)
 * Status: Draft
-* Implemented in: gRPC-core
+* Implemented in: gRPC Core
 * Last updated: 2021.06.15
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
 
-This work replaces gRPC core's iomgr with a public interface for custom,
+This work replaces gRPC Core's iomgr with a public interface for custom,
 pluggable implementations which we're calling EventEngines. EventEngines are
 tasked with providing all cross-platform I/O, task execution, and DNS resolution
-functionality for gRPC-core and its wrapped languages.
+functionality for gRPC Core and its wrapped languages.
 
 Unlike the current polling model where threads are borrowed from the
 application, EventEngines will bring their own polling and callback execution
@@ -22,7 +22,7 @@ and it will provide another way to support the C++ Callback API.
 
 ## Background
 
-gRPC-core and its wrapped languages rely internally on an event management
+gRPC Core and its wrapped languages rely internally on an event management
 framework called iomgr. A small collection of homegrown, platform-specific
 implementations exist, allowing I/O functionality to be customized to the
 various platforms that gRPC supports (IOCP is used on Windows, epoll on Linux,
@@ -457,7 +457,7 @@ that gRPC supports.
 
 ## Implementation
 
-The core design team is lead by AJ Heller (@drfloob), and includes Mark Roth
+The design team is lead by AJ Heller (@drfloob), and includes Mark Roth
 (@markdroth) and Nicolas Noble (@nicolasnoble).
 
 The default implementation work is split between AJ and Nico: AJ will write an
@@ -475,4 +475,4 @@ EventEngine for python.
 Yet to be defined:
 
 * The specific changes required for all wrapped languages
-* Plans to deprecate the gRPC-core-internal completion queue model
+* Plans to deprecate the gRPC-Core-internal completion queue model
