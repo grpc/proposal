@@ -30,7 +30,7 @@ poll on Mac, etc).
 
 Over the past few years, there have been multiple projects aimed at improving or
 replacing iomgr. The EventEngine effort takes a slightly different approach to
-things, but otherwise shares the same rationale as previous work.
+things, but otherwise shares the same rationale as the previous effort.
 
 ### Related Proposals:
 
