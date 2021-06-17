@@ -1,4 +1,4 @@
-gRPC-core EventEngine API
+gRPC core EventEngine API
 ----
 * Author: AJ Heller (@drfloob)
 * Approver: Mark Roth (@markdroth)
@@ -41,7 +41,7 @@ things, but otherwise shares the same rationale as previous work.
 
 ### Concepts
 
-An EventEngine is is roughly composed of:
+An EventEngine is roughly composed of:
 
 * A task runner which asynchronously executes callables with optional
   scheduling.
@@ -314,7 +314,7 @@ class EventEngine {
 
 ### Cleanup and Shutdown
 
-```
+```cpp
   /// Immediately run all callbacks with status indicating the shutdown. Every
   /// EventEngine is expected to shut down exactly once. No new callbacks/tasks
   /// should be scheduled after shutdown has begun, no new connections should be
@@ -335,13 +335,13 @@ class EventEngine {
 
 *Caveat: This is not final, feedback is welcome!*
 
-There are three general ways in which EventEngines can be provided to gRPC.
+There are three ways in which EventEngines can be provided to gRPC.
 
 #### Setting an EventEngine instance for a Channel
 
-Custom EventEngines can be specified per channel, and allow configuration for
-both clients and servers. To set a custom EventEngine for a client channel, you
-can do something like the following:
+EventEngines can be configured per channel, which allows customization for both
+clients and servers. To set a custom EventEngine for a client channel, you can
+do something like the following:
 
 ```cpp
 ChannelArguments args;
@@ -366,22 +366,22 @@ server->Wait();
 
 #### Providing a default EventEngine factory
 
-TODO: this has not been discussed.
+TODO: this has not been thoroughly discussed.
 
 Before gRPC is initialized, an application can specify an EventEngine Factory
 method that will be used within gRPC when a channel- or server-specific
-EventEngine is unspecified. There are scenarios in which gRPC needs to perform
-I/O and run tasks, that are otherwise divorced from channels and servers.
-Providing a custom EventEngine factory will allow your application to avoid the
-creation of the default EventEngine provided by gRPC.
+EventEngine is unavailable. gRPC needs to perform I/O, run tasks, and use timers
+in scenarios that are not directly attached to channels and servers.  Providing
+a custom EventEngine factory will allow your application to avoid the creation
+of the default EventEngine provided by gRPC.
 
 ### Lifetime and Ownership
 
 gRPC will take shared ownership of application-provided EventEngines via
 std::shared\_ptrs to ensure that the engines remain available until they are no
-longer needed. Depending on the use case, engines may need to live until gRPC
-is shut down. Any EventEngine that is provided to gRPC is expected to remain
-valid for as long as gRPC holds a pointer to it. Application-provided
+longer needed. Depending on the use case, EventEngines may need to live until
+gRPC is shut down. Any EventEngine that is provided to gRPC is expected to
+remain valid for as long as gRPC holds a pointer to it. Application-provided
 EventEngines will not be shut down automatically when gRPC is shut down, it is
 the application's responsibility to shut down and clean up EventEngines when
 they are no longer needed.
@@ -393,14 +393,15 @@ The EventEngine can be enabled at compile time by defining the C/C++ macro
 platform to begin with.
 
 The EventEngine API will exist in the `grpc_event_engine::experimental`
-namespace until it has stabilized. Stabilization will likely be signaled
-by some number of platforms being supported sufficiently by the default
-EventEngine implementation, and all API use cases are being exercised without
-needing to make further API changes.
+namespace until it has stabilized. Stabilization will likely be signaled by
+having all platforms supported sufficiently by the default EventEngine, and
+having all other primary EventEngine use cases exercised without needing to make
+further API changes.
 
-The EventEngine API rollout is planned to be on a per-platform basis. Once we
+The EventEngine rollout is planned to be on a per-platform basis. Once we
 establish that the default EventEngine implementation is sufficient for a
-specific platform, we will change the build to replace iomgr with EventEngine.
+specific platform, we will change the build to replace iomgr with EventEngine on
+that platform.
 
 ## Limitations
 
@@ -409,13 +410,13 @@ specific platform, we will change the build to replace iomgr with EventEngine.
 The ability to provide custom EventEngines at runtime will be available
 exclusively in the C++ and C-core APIs.
 
-### Public file descriptor operations are only supported in the default EventEngine
+### Public file descriptor operations are not supported for custom EventEngines
 
-There are some public methods in the gRPC APIs that revolve around the concept
-of a system file descriptor (fd) for network operations. This is not a
-cross-platform concept, and many of the platforms that gRPC runs on do not
-natively support fds. For that reason, we did not want to include any mention of
-fds in the EventEngine API.
+gRPC public APIs contain methods that revolve around the concept of a system
+file descriptor (fd) for network operations. This is not a cross-platform
+concept, and many of the platforms that gRPC runs on do not natively support
+fds. For that reason, we did not want to include any mention of fds in the
+EventEngine API.
 
 Since we're committed to not making any breaking changes with this work, we have
 made a compromise to continue to support those fd-specific methods in the
@@ -453,7 +454,7 @@ was already well-stated:
 
 To address these problems, we would like to replace the iomgr APIs with the
 EventEngine API, and provide a default EventEngine implementation that utilizes
-third-party, cross-platform polling libraries that work on the various platforms
+third-party, cross-platform I/O libraries that work on the various platforms
 that gRPC supports.
 
 ## Implementation
