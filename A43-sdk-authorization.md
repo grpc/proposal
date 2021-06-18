@@ -87,7 +87,7 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
 					"properties": {
 						"paths": {
 							"description": "A list of paths to match for authorization. This is the fully qualified name"
-							  "in the form of \"/package.service/method\". The paths are""ORed together, i.e., it"
+							  "in the form of \"/package.service/method\". The paths are ORed together, i.e., it"
 							  "matches if one of the paths matches."
 							  "This field supports Exact, Prefix, Suffix, and Presence matches."
 								"- Exact match: \"abc\" will match on value \"abc\"."
@@ -109,8 +109,8 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
 								"properties": {
 									"key": {
 										"description": "The name of the HTTP header to match. The following "
-										  "headersare *not* supported: \"hop-by-hop\" headers (e.g.,"
-										  "those listed in\"Connection\" header), the \"Host\" header,"
+										  "headers are *not* supported: \"hop-by-hop\" headers (e.g.,"
+										  "those listed in \"Connection\" header), the \"Host\" header,"
 										  "HTTP/2 pseudo headers (\":\"-prefixed) and headers prefixed"
 										  "with \"grpc-\".",
 										"type": "string"
