@@ -2,10 +2,10 @@ gRPC Core EventEngine API
 ----
 * Author: AJ Heller (@drfloob)
 * Approver: Mark Roth (@markdroth)
-* Status: Draft
+* Status: In Review
 * Implemented in: gRPC Core
 * Last updated: 2021.06.15
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/EamJ_ae_db0
 
 ## Abstract
 
