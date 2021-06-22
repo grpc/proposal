@@ -15,14 +15,13 @@ available to non-xDS OSS gRPC users to perform per-RPC authorization checks.
 
 ## Background
 
-Authentication verifies the authority of the request. This is followed by
-authorization to ensure the authenticated authority has access to the requested
-resource.
+Authentication verifies the authority of the request. Authorization ensures the 
+authenticated authority has access to the requested resource.
 
 gRPC offers built-in authentication mechanisms like TLS, ALTS and even allow
-users to plug in their own authentication systems. However, gRPC didn't have any
+users to plug in their own authentication systems. However, gRPC doesn't have any
 standard authorization solution available. If a user wanted to perform per RPC
-authorization check, they had to implement their own solution in the application.
+authorization check, they have to implement their own solution in the application.
 With standard gRPC authorization solution (under implementation), users can simply
 provide a policy configuration for their service, then the server verifies
 whether the client is authorized to access the requested service, and for which
@@ -179,6 +178,8 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
 }
 ```
 
+#### Details
+
 gRPC SDK authorization policy has a list of allow rules and a list of deny rules. 
 The following sequence is followed to make an authorization decision -
 1. Check for a match in deny rules, if a match is found, the request will be denied. 
@@ -207,6 +208,8 @@ Each rule has the following semantics -
 3. Each request could contain a list of URL paths (i.e. fully qualified RPC methods)
    and list of http headers to match. Refer JSON schema above to understand matching
    semantics.
+
+#### Example
 
 In the following policy example
 - Peer identity from ["spiffe://foo.com/sa/admin1", "spiffe://foo.com/sa/admin2"] is 
@@ -271,7 +274,7 @@ different languages.
 
 #### C++
 
-Static Initialization
+1. Static Initialization
 
 ```C++
 std::shared_ptr<AuthorizationPolicyProviderInterface> provider = 
@@ -281,7 +284,7 @@ builder.SetAuthorizationPolicyProvider(provider);
 std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 ```
 
-Dynamic file reloading
+2. Dynamic file reloading
 
 ```C++
 std::shared_ptr<AuthorizationPolicyProviderInterface> provider = 
@@ -293,7 +296,7 @@ std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 
 #### Go
 
-Static initialization
+1. Static initialization
 
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
@@ -306,7 +309,7 @@ serverOpts := []grpc.ServerOption{
 s := grpc.NewServer(serverOpts...)
 ```
 
-Dynamic File Reloading
+2. Dynamic File Reloading
 
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
@@ -323,7 +326,7 @@ defer i.Close()
 
 #### Java
 
-Static initialization
+1. Static initialization
 
 ```Java
 AuthorizationServerInterceptor authzServerInterceptor;
@@ -341,7 +344,7 @@ Server server =
         .start();
 ```
 
-Dynamic file reloading
+2. Dynamic file reloading
 
 ```Java
 ScheduledExecutorService scheduledExecutor =
@@ -393,7 +396,7 @@ generated RBAC policies are used to create Envoy RBAC engine(s).
 
 For each incoming RPC request, we will invoke the Evaluate functionality in Engines
 (Deny engine followed by Allow engine), to get the authorization decision. We use a
-C-core filter in C++, and interceptors for Java and Go.
+C-core filter for C++, and interceptors for Java and Go.
 
 ## Rationale
 
@@ -403,6 +406,10 @@ consuming Envoy RBAC directly due to following reasons
   policy language
 - With our own language, we can provide a stable API, even when Envoy undergoes 
   versioning updates.
+
+Authorization APIs take policy in JSON format, instead of protobuf. gRPC wants to
+avoid the dependency on protobuf when possible. We have users in OSS that use gRPC
+without protobuf. Another reason is to have a consistent API across languages.
 
 ## Implementation
 
