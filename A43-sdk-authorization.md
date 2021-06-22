@@ -199,12 +199,12 @@ Each rule has the following semantics -
      against the source fields and apply that to any action.
 2. Each source could contain a list of principals. The principals are ORed together,
    i.e. it matches if one of them matches.
-   Sequence of steps to evaluate each principal from config
-   - If TLS is not used, matching fails.
-   - A match is found if principal matches URI SANs or DNS SANs or Subject field from
-     x509 client certificate.
-   - We also get a match if there is no client certificate, and principal is an empty
-     string.
+   Sequence of steps to evaluate each principal from config -
+   1. If TLS is not used, matching fails.
+   2. A match is found if principal matches any one of URI SANs or DNS SANs or Subject
+      field from x509 client certificate.
+   3. We also get a match if there is no client certificate, and principal is an empty
+      string.
 3. Each request could contain a list of URL paths (i.e. fully qualified RPC methods)
    and list of http headers to match. Refer JSON schema above to understand matching
    semantics.
