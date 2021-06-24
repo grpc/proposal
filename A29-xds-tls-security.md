@@ -12,41 +12,38 @@ A29: xDS-Based Security for gRPC Clients and Servers
 This proposal seeks to add transport security (i.e. TLS or mTLS) to xDS-managed
 gRPC connections. (m)TLS adds encryption and authentication capabilities to the
 connections. RBAC or client authorization is not part of this proposal but is covered in
-[A41:xDS RBAC Support](https://github.com/grpc/proposal/pull/237/files).
+[A41:xDS RBAC Support][A41].
 
-The proposal describes what is already implemented in the 3 core gRPC languages
-and seeks to formalize these implementations.
+[A41]: https://github.com/grpc/proposal/pull/237/files
 
 ## Background
 
 With the addition of server side xDS support
-[A36: xDS-Enabled Servers](https://github.com/grpc/proposal/blob/master/A36-xds-for-servers.md),
+[A36: xDS-Enabled Servers][A36],
 it is now possible to configure both client (for TLS origination) and server (for TLS termination)
 ends of a gRPC connection from the control plane when the infrastructure provides the required
 security or certificate capabilities.
 
-xDS [Listener](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/listener/v3/listener.proto)
-provides server side TLS configuration in something called
-[DownstreamTlsContext](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L57)
-and the xDS [Cluster](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/cluster/v3/cluster.proto)
-provides client side TLS configuration in something called
-[UpstreamTlsContext](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26).
-Through these configurations, the xDS-control plane can instruct xDS endpoints to use the infrastructure
-provided certificates and keys for their connections which replaces manual provisioning and management of
-these certificates. We provide a specification for interpreting and applying these configurations in gRPC.
+xDS [Listener][] provides server side TLS configuration in
+[DownstreamTlsContext][DTC] and the xDS [Cluster][] provides client side TLS configuration in
+[UpstreamTlsContext][UTC]. Through these configurations, the xDS-control plane can instruct
+xDS endpoints to use the infrastructure provided certificates and keys for their connections
+which replaces manual provisioning and management of these certificates. We provide a
+specification for interpreting and applying these configurations in gRPC.
 We also extend the gRPC programming API and the xDS support in gRPC so developers can programmatically
 enable (or disable) the use of these configurations.
 
+[Listener]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/listener/v3/listener.proto
+[Cluster]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/cluster/v3/cluster.proto
 
 ### Related Proposals
 
-[A27: xDS-Based Global Load Balancing](A27-xds-global-load-balancing.md)
+ * [A27: xDS-Based Global Load Balancing][A27]
+ * [A36: xDS-Enabled Servers][A36]
+ * [Java: Channel and Server Credentials][L74]
 
-[A36: xDS-Enabled Servers](A36-xds-for-servers.md)
-
-[Java: Channel and Server Credentials](L74-java-channel-creds.md)
-
-[L46: C-core: New TLS Credentials API](https://github.com/grpc/proposal/pull/205)
+[A27]: A27-xds-global-load-balancing.md
+[L74]: L74-java-channel-creds.md
 
 ## Proposal
 
@@ -54,7 +51,7 @@ enable (or disable) the use of these configurations.
 
 For each language, the channel and server credentials have been extended to allow a gRPC
 channel and server to use xDS provided security configurations. A Xds- Channel or Server credentials
-also needs to be provided with something called a fallback credentials. The fallback credentials
+also needs to be provided with a "fallback credentials". The fallback credentials
 is used in the following cases:
 
 - when xDS is not in use such as when the `xds:` scheme is not used on the client side
@@ -130,43 +127,48 @@ The required fields were added to xDS v3 hence xDS v3 is a pre-requisite for thi
 #### CDS for Client Side Security
 
 The CDS policy is the top level LB policy applied to all the connections under that policy.
-[A27:CDS](A27-xds-global-load-balancing.md#cds) describes the flow. The field
-[`transport_socket`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/cluster/v3/cluster.proto#L937)
-is used to extract the [`UpstreamTlsContext`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26)
-as described [here](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/cluster/v3/cluster.proto#L937).
-Note that we don't (currently) support
-[`transport_socket_matches`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/cluster/v3/cluster.proto#L680).
+[A27:CDS][] describes the flow. The field [`transport_socket`][CL-TS] is used to extract the
+[`UpstreamTlsContext`][UTC] as described [here][CL-TS-comment].
+Note that we don't (currently) support [`transport_socket_matches`][CL-TS-matches].
 The `UpstreamTlsContext` thus obtained is passed down to all the child policies and connections.
 How this is done is language dependent and is similar to how the implementations pass policy
 information down to child policies.
 
-[`common_tls_context`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L37)
-in the `UpstreamTlsContext` contains the required security configuration. All the other fields are ignored. See below for
-[`CommonTlsContext`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L129)
-processing.
+[`common_tls_context`][CTC] in the `UpstreamTlsContext` contains the required security configuration.
+All other fields are ignored. See below for [`CommonTlsContext`][CTC-type] processing.
+
+[A27:CDS]: A27-xds-global-load-balancing.md#cds
+[CL-TS]: https://github.com/envoyproxy/envoy/blob/9aca65c395f01020080166e4795455addde167fa/api/envoy/config/cluster/v3/cluster.proto#L937
+[CL-TS-comment]: https://github.com/envoyproxy/envoy/blob/9aca65c395f01020080166e4795455addde167fa/api/envoy/config/cluster/v3/cluster.proto#L932
+[CL-TS-matches]: https://github.com/envoyproxy/envoy/blob/9aca65c395f01020080166e4795455addde167fa/api/envoy/config/cluster/v3/cluster.proto#L680
+[CTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L37
 
 #### LDS for Server Side Security
 
-Server-side xDS processing is described in [A36: xDS-Enabled Servers](A36-xds-for-servers.md).
-An LDS may have one or more [`filter_chains`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/listener/v3/listener.proto#L120)
-and one of those `filter_chain`s is matched against an incoming connection in order to get and apply
+Server-side xDS processing is described in [A36: xDS-Enabled Servers][A36].
+An LDS may have one or more [`filter_chains`][filter-chains] and one of those
+`filter_chain`s is matched against an incoming connection in order to get and apply
 the security (and other) configuration for that connection as described in the
-[`FilterChainMatch`](A36-xds-for-servers.md#filterchainmatch). The
-[`transport_socket`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/listener/v3/listener_components.proto#L246)
+[`FilterChainMatch`][filter-chain-match]. The [`transport_socket`][transport-socket]
 of the matched (selected) `filter_chain` is used to extract the
-[`DownstreamTlsContext`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L57)
-as described
-[here](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/listener/v3/listener_components.proto#L246).
+[`DownstreamTlsContext`][DTC] as described [here][transport-socket-comment].
 The `DownstreamTlsContext` thus obtained is used for the incoming connection.
 
-[`common_tls_context`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L84)
-in the `DownstreamTlsContext` contains the required security configuration. The
-[`require_client_certificate`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L88) field
-determines whether the client certificate is required (mTLS mode if `true`, TLS if `false`).
-All the other fields are ignored. See below for
-[`CommonTlsContext`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L129)
+[`common_tls_context`][CTC1] in the `DownstreamTlsContext` contains the required
+security configuration. The [`require_client_certificate`][RCC] field determines
+whether the client certificate is required (mTLS mode if `true`, TLS if `false`).
+All the other fields are ignored. See below for [`CommonTlsContext`][CTC-type]
 processing.
 
+[A36]: A36-xds-for-servers.md
+[filter-chains]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener.proto#120
+[filter-chain-match]: A36-xds-for-servers.md#filterchainmatch
+[transport-socket]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener_components.proto#L246
+[DTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L57
+[transport-socket-comment]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener_components.proto#L241
+[CTC1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#84
+[RCC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#88
+[CTC-type]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L129
 
 #### CommonTlsContext Processing
 
@@ -174,35 +176,36 @@ processing.
 certificate and key configuration information needed on the client and server side respectively. The configuration
 tells gRPC how to obtain certificates and the keys for the TLS handshake. Although there are various ways to obtain
 certificates as per this proto (which are supported by Envoy), gRPC supports only one of them and that is defined by the
-[`CertificateProviderInstance`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L154)
-proto which is based on the notion of CertificateProvider plugin framework (described later).
-The field `instance_name` defines a CertificateProvider "instance" that gRPC looks up in the
-bootstrap file (described later) to obtain the CertificateProvider configuration. This
-configuration along with the CertificateProvider plugin framework enables gRPC to acquire
-the certificates necessary for the TLS handshake.
+[`CertificateProviderInstance`][CPI] proto which is based on the notion of CertificateProvider plugin framework
+(described later). The field `instance_name` defines a CertificateProvider "instance" that gRPC looks up in the
+bootstrap file (described later) to obtain the CertificateProvider configuration. This configuration along with
+the CertificateProvider plugin framework enables gRPC to acquire the certificates necessary for the TLS handshake.
 
-The field [`tls_certificate_certificate_provider_instance`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L234)
-is used for the local certificate and the private key. And either
-[`validation_context_certificate_provider_instance`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L259)
-or [`validation_context_certificate_provider_instance`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L200)
-inside [`combined_validation_context`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251)
+The field [`tls_certificate_certificate_provider_instance`][TCCPI] is used for the local certificate and the private
+key. And either [`validation_context_certificate_provider_instance`][VCCPI] or
+[`validation_context_certificate_provider_instance`][VCCPI1] inside [`combined_validation_context`][CVC]
 is used for the root certificate-chain for validating peer certificates. For mTLS both the local certificate
 and root certificate are needed at both client and server. For TLS the server needs only the local certificate
-(the [`tls_certificate_certificate_provider_instance`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L234))
-and the client needs only the root certificate
-(the [`validation_context_certificate_provider_instance`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L200)).
+(the [`tls_certificate_certificate_provider_instance`][TCCPI]) and the client needs only the root certificate
+(the [`validation_context_certificate_provider_instance`][VCCPI1]).
 
 gRPC silently ignores the other fields in `CommonTlsContext` pertaining to other ways of fetching
 TLS certificates and keys. Also the processing and parsing of `CommonTlsContext` for any particular
 CDS or LDS response does not take into account whether the Xds credentials are in effect for the
 respective channel or server.
 
+[CPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#154
+[TCCPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#234
+[VCCPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#259
+[VCCPI1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#200
 
 ### Use of SPIFFE IDs in Certificates
 
-To facilitate service mesh secure communication, we support [SPIFFE](https://github.com/spiffe/spiffe) based
-certificates and peer certificate verification following the [SPIFFE](https://github.com/spiffe/spiffe)
-specification and the [match_subject_alt_names](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto#envoy-v3-api-field-extensions-transport-sockets-tls-v3-certificatevalidationcontext-match-subject-alt-names) field in xDS.
+To facilitate service mesh secure communication, we support [SPIFFE][] based certificates and peer certificate
+verification following the [SPIFFE][] specification and the [match_subject_alt_names][] field in xDS.
+
+[SPIFFE]: https://github.com/spiffe/spiffe
+[match_subject_alt_names]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto#envoy-v3-api-field-extensions-transport-sockets-tls-v3-certificatevalidationcontext-match-subject-alt-names
 
 ### Certificate Provider Plugin Framework
 
@@ -229,7 +232,9 @@ later).
 
 * the xDS control plane only references the “plugin-instance-name”s: it uses one for the local
 certificates and another one for root certificates to validate the peer certificates (aka
-[`CertificateValidationContext`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L236)).
+[`CertificateValidationContext`][CVC-proto]).
+
+[CVC-proto]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L236
 
 #### Main Elements of the Framework
 
@@ -269,10 +274,9 @@ all its watchers.
 
 ### Bootstrap File Additions for Security
 
-The [bootstrap file](A27-xds-global-load-balancing.md#xdsclient-and-bootstrap-file) with
-[server side support](A36-xds-for-servers.md#xds-protocol) needs further changes as described
-here. The following snippet shows the additions for the `file_watcher` plugin that is
-already implemented in all gRPC languages.
+The [bootstrap file][bootstrap-file] with [server side support][A36-xds-protocol] needs further
+changes as described here. The following snippet shows the additions for the `file_watcher` plugin
+that is already implemented in all gRPC languages.
 ```
 {
   // "certificate_providers" contains configurations for all supported plugins 
@@ -303,6 +307,8 @@ fields are the file paths for the identity certificate, private key and the root
 certificate respectively. The last field is the certificate refresh interval i.e. the interval
 to be used by the plugin to monitor the file paths to refresh the certificates.
 
+[bootstrap-file]: A27-xds-global-load-balancing.md#xdsclient-and-bootstrap-file
+
 #### Use of Bootstrap File by the Certificate Provider Plugin Framework
 
 The xDS control plane specifies a certificate_provider_instance name as described above in
@@ -327,31 +333,30 @@ out of scope of this document.
 
 #### Client Side Flow
 
-The gRPC client xDS flow is described in
-[gRPC Client Architecture](./A27-xds-global-load-balancing.md#grpc-client-architecture).
+The gRPC client xDS flow is described in [gRPC Client Architecture][A27-client-arch].
 The resolver returns a `Cluster` resource for a channel and the CDS for that cluster has the
-[UpstreamTlsContext](https://github.com/envoyproxy/envoy/blob/35702fed462f63a0a237cfbfdf26184272207c11/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L27)
-containing the security configuration to be applied to all the child policies of that cluster.
-When a channel is using `XdsChannelCredentials`, gRPC processes the `UpstreamTlsContext`
-as described [above](#cds-for-client-side-security).
+[UpstreamTlsContext][UTC] containing the security configuration to be applied to all the
+child policies of that cluster. When a channel is using `XdsChannelCredentials`, gRPC
+processes the `UpstreamTlsContext` as described [above](#cds-for-client-side-security).
 
 At this stage the CDS policy uses the flow described above in
-[Use of Bootstrap File by the Certificate Provider Plugin Framework](#use-of-bootstrap-file-by-the-certificate-provider-plugin-framework)
+[Use of Bootstrap File by the Certificate Provider Plugin Framework][use-of-bootstrap]
 to fetch the requisite `CertificateProvider`s (one or two as the case may be). These `CertificateProvider`s,
 in one form or another, need to be made available to all the sub-channels of the cluster. How this is
 done is language dependent. For example, C-core uses the channel args to pass the individual
 `CertificateProvider`s whereas Java constructs a dynamic `SslContextProvider` that is directly
 usable by the sub-channel's TLS handshaker to build an `SslContext` for the impending handshake.
 
+[A27-client-arch]: ./A27-xds-global-load-balancing.md#grpc-client-architecture
+[UTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26
+[use-of-bootstrap]: #use-of-bootstrap-file-by-the-certificate-provider-plugin-framework
+
 ##### Server Authorization aka Subject-Alt-Name Checks
 
-If [match_subject_alt_names](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L373)
-is populated in the
-[combined_validation_context](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251)
+If [match_subject_alt_names][] is populated in the [combined_validation_context][CVC]
 of the received `UpstreamTlsContext` then gRPC validates the SAN entries in the server certificate
-by matching the `match_subject_alt_names` values using the
-[StringMatcher](https://github.com/envoyproxy/envoy/blob/main/api/envoy/type/matcher/string.proto#L20)
-semantics. This is called server authorization because this is how a client "authorizes" a server for
+by matching the `match_subject_alt_names` values using the [StringMatcher][] semantics.
+This is called server authorization because this is how a client "authorizes" a server for
 the connection.
 
 The implementation is language dependent. As an example, Java uses an implementation
@@ -359,17 +364,18 @@ of `X509TrustManager` through the `SslContext` provided to the client sub-channe
 languages use similar hooks provided by the underlying TLS framework to implement server
 authorization.
 
+[match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L373
+[CVC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#251
+[StringMatcher]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L20
+
 #### Server Side Flow
 
-The gRPC server xDS flow is described in
-[gRPC Server ](./A27-xds-global-load-balancing.md#grpc-client-architecture). The server
-configuration comes from the
-[`Listener`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/listener/v3/listener.proto#L39)
-resource which contains a list of
-[`FilterChain`](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/listener/v3/listener_components.proto#L193)s.
-The `FilterChain` contains the `DownstreamTlsContext` that is applied to an incoming connection
+The gRPC server xDS flow is described in [gRPC Server][A36-xds-protocol]. The server
+configuration comes from the [`Listener`][Listener] resource which contains a list of
+[`FilterChain`][Filter-chain]s. The `FilterChain` contains the `DownstreamTlsContext`
+that is applied to an incoming connection
 after selecting the best-matching `FilterChain` as described in
-[FilterChainMatch](A36-xds-for-servers.md#filterchainmatch). If the server is using `XdsServerCredentials`,
+[FilterChainMatch][A36-filter-chain-match]. If the server is using `XdsServerCredentials`,
 gRPC processes the `DownstreamTlsContext` as described [above](#lds-for-server-side-security) and then
 uses the flow described above in
 [Use of Bootstrap File by the Certificate Provider Plugin Framework](#use-of-bootstrap-file-by-the-certificate-provider-plugin-framework)
@@ -378,6 +384,11 @@ in one form or another, need to be made available to the incoming connection. Si
 client side, this part of the flow is language dependent. For example, Java constructs a dynamic
 `SslContextProvider` that is directly usable by the connection's TLS handshaker to build an
 `SslContext` for the impending handshake.
+
+[A36-xds-protocol]: A36-xds-for-servers.md#xds-protocol
+[Listener]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener.proto#L39
+[Filter-chain]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener_components.proto#L193
+[A36-filter-chain-match]: A36-xds-for-servers.md#filterchainmatch
 
 ## Rationale
 
