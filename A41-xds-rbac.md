@@ -86,9 +86,9 @@ behavior. At this time, if the `RBAC.action` is `Action.LOG` then the policy
 will be completely ignored, as if RBAC was not configurated. CEL fields are not
 supported, so `Policy.condition` and `Policy.checked_condition` must cause a
 validation failure if present. It is also a validation failure if Permission or
-Principal has a `header` matcher for a `grpc-`-prefixed header name. As
-described in A39, validation failures for filter configuration causes the
-listener to be NACKed.
+Principal has a `header` matcher for a `grpc-`-prefixed header name or
+`:scheme`. As described in A39, validation failures for filter configuration
+causes the listener to be NACKed.
 
 The following fields of `Permission` may not be obvious how they map to gRPC:
 
@@ -107,21 +107,19 @@ to "optimize out" the never-matching rules.
 
 The `header` field is not entirely 1:1 with gRPC Metadata, in part because which
 HTTP headers are present in Metadata is not 100% consistent cross-language.
-For this design, `headers` can include `:method`, `:scheme`, `:authority`,
-and`:path` matchers and they should match the values received on-the-wire
-independent of whether they are stored in Metadata or in separate APIs.
-`:scheme` is not universally available in gRPC APIs, so it may be hard-coded to
-`http` if unavailable. `:method` can be hard-coded to `POST` if unavailable and
-a code audit confirms the server denies requests for all other method types.
-Implementations must not match [hop-by-hop headers][]. Since hop-by-hop headers
-[are not used in HTTP/2 except for `te: trailers`][rfc7540 connection header],
-implementations must ensure they are disallowing the `Connection` header and not
-matching the `TE` header. Multi-valued metadata is represented as the
-concatenation of the values along with a `,` (comma, no added spaces) separator,
-as permitted by HTTP and gRPC. The `Content-Type` provided by the client must be
-used; not a hard-coded value. Binary headers are represented in their
-base64-encoded form, although we rarely expect binary header matchers other than
-presence-checking.
+For this design, `headers` can include `:method`, `:authority`, and`:path`
+matchers and they should match the values received on-the-wire independent of
+whether they are stored in Metadata or in separate APIs. `:method` can be
+hard-coded to `POST` if unavailable and a code audit confirms the server denies
+requests for all other method types. Implementations must not match [hop-by-hop
+headers][]. Since hop-by-hop headers [are not used in HTTP/2 except for `te:
+trailers`][rfc7540 connection header], implementations must ensure they are
+disallowing the `Connection` header and not matching the `TE` header.
+Multi-valued metadata is represented as the concatenation of the values along
+with a `,` (comma, no added spaces) separator, as permitted by HTTP and gRPC.
+The `Content-Type` provided by the client must be used; not a hard-coded value.
+Binary headers are represented in their base64-encoded form, although we rarely
+expect binary header matchers other than presence-checking.
 
 [hop-by-hop headers]: https://datatracker.ietf.org/doc/html/rfc7230#section-6.1
 [rfc7540 connection header]: https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2
