@@ -83,7 +83,12 @@ Use of XdsChannelCredentials:
 Use of XdsServerCredentials:
 
 ```C++
-   // TODO: yashykt to add
+   grpc::experimental::XdsServerBuilder builder;
+   builder.RegisterService(&service);
+   builder.AddListeningPort(listening_address,
+                                 grpc::experimental::XdsServerCredentials(
+                                     grpc::InsecureServerCredentials()));
+   builder.BuildAndStart()->Wait();
 ```
 
 #### Java
