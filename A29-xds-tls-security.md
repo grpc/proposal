@@ -40,7 +40,7 @@ enable (or disable) the use of these configurations.
 
  * [A27: xDS-Based Global Load Balancing][A27]
  * [A36: xDS-Enabled Servers][A36]
- * [Java: Channel and Server Credentials][L74]
+ * [L74: Java Channel and Server Credentials][L74]
 
 [A27]: A27-xds-global-load-balancing.md
 [L74]: L74-java-channel-creds.md
@@ -49,21 +49,25 @@ enable (or disable) the use of these configurations.
 
 ### Programming API
 
-For each language, the channel and server credentials have been extended to allow a gRPC
-channel and server to use xDS provided security configurations. A Xds- Channel or Server credentials
-also needs to be provided with a "fallback credentials". The fallback credentials
-is used in the following cases:
+We need a mechanism by which a programmer can "opt in" to allow the use of xDS provided security
+configuration for a gRPC channel or server. This is achieved by supplying an XdsChannelCredentials
+(to a channel) or an XdsServerCredentials (to a server). These two new credentials types are an extension
+of the existing channel or server credentials types in each language. Each Xds*Credentials needs to
+be provided with a "fallback credentials". The fallback credentials is used in the following cases:
 
 - when xDS is not in use such as when the `xds:` scheme is not used on the client side
 
-- xDS is in use but the control plane does not provide security configuration.
+- xDS is in use but the control plane does not provide security configuration. The gRPC behavior
+in this case is different from Envoy's due to fallback credentials. Envoy will just
+use plaintext (insecure) communication mode in this case. But with gRPC, the application
+needs to use InsecureCredentials as the fallback credentials to get the same result.
 
 The fallback credentials is *not* used in case of error situations e.g. when there is
 an error in using the xDS provided security configuration.
 
 Note that a user is not required to use Xds- Channel or Server Credentials even if they are
 using an xDS managed channel or server. Not using Xds Channel or Server Credentials results
-into not using xDS-provided TLS configuration.
+in not using xDS-provided TLS configuration.
 
 On the client side, an XdsChannelCredentials is used and on the server side an
 XdsServerCredentials is used as described in the example snippets below. In these examples,
@@ -115,13 +119,28 @@ Use of XdsServerCredentials:
 Use of XdsChannelCredentials:
 
 ```Go
-   // TODO: easwars to add
+   import (
+           xdscreds "google.golang.org/grpc/credentials/xds"
+   )
+
+   if creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()}); err != nil {
+           log.Fatalf("Failed to create xDS client credentials: %v", err)
+   }
+   conn, err := grpc.Dial(*target, grpc.WithTransportCredentials(creds))
 ```
 
 Use of XdsServerCredentials:
 
 ```Go
-   // TODO: easwars to add
+   import (
+           xdscreds "google.golang.org/grpc/credentials/xds"
+           "google.golang.org/grpc/xds"
+   )
+
+   if creds, err := xdscreds.NewServerCredentials(xdscreds.ServerOptions{FallbackCreds: insecure.NewCredentials()}); err != nil {
+           log.Fatalf("Failed to create xDS server credentials: %v", err)
+   }
+   server := xds.NewGRPCServer(grpc.Creds(creds))
 ```
 
 ### xDS Protocol
