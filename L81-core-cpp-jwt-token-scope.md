@@ -1,8 +1,8 @@
-L81: Custom Audience in JWT Access Credentials and Google Default Credentials
+L81: Custom Scope in JWT Access Credentials and Google Default Credentials
 ----
 * Author(s): [Jiangtao Li](https://github.com/jiangtaoli2016), [Yihua Zhang](https://github.com/yihuazhang)
 * Approver: markdroth
-* Status: Draft {Draft, In Review, Ready for Implementation, Implemented}
+* Status: Implemented {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: Core, C++
 * Last updated: 2021-06-29
 * Discussion at: https://groups.google.com/g/grpc-io/c/MgSP5tNrM0Q
@@ -62,7 +62,7 @@ std::shared_ptr<CallCredentials> ServiceAccountJWTAccessCredentials(
     const grpc::string& json_key,
     long token_lifetime_seconds = kMaxAuthTokenLifetimeSecs,
     const grpc::string& user_provided_scope = "",
-    bool clear_audience);
+    bool clear_audience = false);
 
 
 /// Builds credentials with reasonable defaults.
