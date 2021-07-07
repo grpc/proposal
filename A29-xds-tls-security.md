@@ -80,17 +80,17 @@ Use of XdsChannelCredentials:
 
 ```C++
     std::shared_ptr<grpc::ChannelCredentials> credentials =
-        grpc::experimental::XdsCredentials(grpc::InsecureChannelCredentials());
+        grpc::XdsCredentials(grpc::InsecureChannelCredentials());
     std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(target, credentials);
 ```
 
 Use of XdsServerCredentials:
 
 ```C++
-   grpc::experimental::XdsServerBuilder builder;
+   grpc::XdsServerBuilder builder;
    builder.RegisterService(&service);
    builder.AddListeningPort(listening_address,
-                                 grpc::experimental::XdsServerCredentials(
+                                 grpc::XdsServerCredentials(
                                      grpc::InsecureServerCredentials()));
    builder.BuildAndStart()->Wait();
 ```
@@ -154,9 +154,9 @@ The CDS policy is the top level LB policy applied to all the connections under t
 [A27:CDS][] describes the flow. The field [`transport_socket`][CL-TS] is used to extract the
 [`UpstreamTlsContext`][UTC] as described [here][CL-TS-comment].
 Note that we don't (currently) support [`transport_socket_matches`][CL-TS-matches].
-The `UpstreamTlsContext` thus obtained is passed down to all the child policies and connections.
-How this is done is language dependent and is similar to how the implementations pass policy
-information down to child policies.
+The security configuration extracted from the `UpstreamTlsContext` thus obtained
+is passed down to all the child policies and connections. How this is done is language dependent
+and is similar to how the implementations pass policy information down to child policies.
 
 [`common_tls_context`][CTC] in the `UpstreamTlsContext` contains the required security configuration.
 See below for [`CommonTlsContext`][CTC-type] processing.
@@ -193,7 +193,9 @@ the security (and other) configuration for that connection as described in the
 [`FilterChainMatch`][filter-chain-match]. The [`transport_socket`][transport-socket]
 of the matched (selected) `filter_chain` is used to extract the
 [`DownstreamTlsContext`][DTC] as described [here][transport-socket-comment].
-The `DownstreamTlsContext` thus obtained is used for the incoming connection.
+If the `transport_socket` name is not `envoy.transport_sockets.tls` i.e.
+something we don't recognize, gRPC will NACK the LDS update. Otherwise
+the `DownstreamTlsContext` thus obtained is used for the incoming connection.
 If it is not present (such as when [`transport_socket`][transport-socket] is
 not present or is not named `"envoy.transport_sockets.tls"`) then we use the
 fallback credentials for the incoming connection.
@@ -260,7 +262,7 @@ gRPC does not support the other certificate acquisition mechanisms specified by 
 * [validation_context_sds_secret_config][VAL-SDS]
 * [validation_context_certificate_provider][VAL-PROVIDER]
 
-When the supported fields of type [`CertificateProviderInstance`][CPI] are present gRPC ignores the respective
+When fields of type [`CertificateProviderInstance`][CPI] are present gRPC ignores the respective
 unsupported fields but if the unsupported fields are present by themselves gRPC will NACK the update.
 
 For example, in [`UpstreamTlsContext`][UTC] (on the client side), the identity certificate is not needed for the TLS mode,
@@ -334,22 +336,23 @@ certificates and another one for root certificates to validate the peer certific
 
 #### Main Elements of the Framework
 
-**`CertificateProvider`** represents an actual plugin that fetches or "mints" the required certificates
-and keys. One example of a (already implemented) plugin is a `FileWatcherCertificateProvider` which
-monitors certain files in the file system and reads those files on updates to get the latest
-certificates and keys and provide those to the consumers after converting them to the canonical
-format e.g. `java.security.PrivateKey` and `java.security.cert.X509Certificate` in Java.
-Another example is a plugin that periodically "mints" new certificates by creating
-CSRs at regular intervals and getting those signed by a Certification Authority (CA) that is
+**`CertificateProvider`** represents an actual plugin that fetches or "mints" the required
+certificates and keys. **`FileWatcherCertificateProvider`** (described below) is an
+implementation of the **`CertificateProvider`** that is part of this framework. Another example
+of a **`CertificateProvider`** is a plugin that periodically "mints" new certificates by creating
+CSRs at regular intervals and getting those signed by a Certification Authority (CA) which is
 configured into the plugin.
 
-A client registers itself as a **`Watcher`**  of the plugin to receive certificate updates.
-The plugin supports multiple **`Watchers`** to be registered and uses a **`DistributorWatcher`**
+A "consumer" registers itself as a **`Watcher`**  of the plugin to receive certificate updates.
+The plugin supports multiple **`Watcher`s** to be registered and uses a **`DistributorWatcher`**
 internally to propagate a single update to multiple **`Watchers`**. A plugin caches the latest
 certificate (and key) it has fetched (or minted) and delivers them to every newly registered
+watcher. Note that it is possible for an implementation to use a fetch-style API instead of a
+watch-style API. For example, in the Go implementation a consumer calls into the
+**`CertificateProvider`** whenever it needs certificates and keys instead of registering a
 watcher.
 
-The `CertificateProvider` plugin also has an associated factory or
+The **`CertificateProvider`** plugin also has an associated factory or
 provider implementation (**`CertificateProviderFactory`**) to instantiate the plugin and this
 factory is identified by a unique name e.g. `"file_watcher"` which is also the identity of the
 plugin. The factory is responsible for instantiating the plugin after validating the received
@@ -366,7 +369,12 @@ as a **`Watcher`**. If the plugin is not already present, the store uses the reg
 instantiate it. It then increments the reference-count and adds the new **`Watcher`** to the 
 **`DistributorWatcher`** of the plugin. The plugin typically creates a new thread and a
 timer to periodically fetch or mint a new certificate and send the certificate (and the key) to
-all its watchers. 
+all its watchers.
+
+**`FileWatcherCertificateProvider`** is an implementation of **`CertificateProvider`** which
+monitors configured file-paths in the file system and reads those files on updates to get the latest
+certificates and keys and provide those to the consumers after converting them to the canonical
+format e.g. `java.security.PrivateKey` and `java.security.cert.X509Certificate` in Java.
 
 ### Bootstrap File Additions for Security
 
@@ -375,7 +383,7 @@ changes as described here. The following snippet shows the additions for the `fi
 that is already implemented in all gRPC languages.
 ```
 {
-  // "certificate_providers" contains configurations for all supported plugins 
+  // "certificate_providers" lists the instances available for xDS to use.
   "certificate_providers": {
     "google_cloud_private_spiffe": { // certificate_provider_instance name
       "plugin_name": "file_watcher", // name of the plugin
@@ -396,12 +404,8 @@ having exactly 2 fields:
 
 * `"plugin_name"` which is the name of the plugin (a string value), and
 * `"config"` which is the configuration for the plugin. The value of `"config"` is a JSON object
-whose schema is defined by that plugin.
-
-In the above example, the config for the file_watcher plugin contains 4 fields: the first 3
-fields are the file paths for the identity certificate, private key and the root (or CA)
-certificate respectively. The last field is the certificate refresh interval i.e. the interval
-to be used by the plugin to monitor the file paths to refresh the certificates.
+whose schema is defined by that plugin. For the file_watcher plugin the `"config"` consists
+of the 3 file-paths to watch and the polling interval value.
 
 [bootstrap-file]: A27-xds-global-load-balancing.md#xdsclient-and-bootstrap-file
 
@@ -493,12 +497,13 @@ advanced traffic management. xDS-based security was next in the roadmap and this
 addresses that. gRPC makes a proxyless service mesh (PSM) possible. A secure proxyless
 service mesh requires the security features described in this proposal.
 
-The Certificate Provider Plugin Framework does not depend on an agent (SDS server). The
-SDS server/agent based solution compromised security (by sharing the private key with the
-agent). The combination of Envoy sidecar and the SDS server was also somewhat tied to the
-Kubernetes architecture where Envoy runs in a sidecar container and the SDS server runs
-as a Node agent in the cluster. The Certificate Provider Plugin Framework has eliminated that
-dependency. The framework has also made the certificate provider functionality extensible
+The Certificate Provider Plugin Framework provides a generic alternative to the SDS
+server/agent based solution and eliminates the dependency on the SDS protocol. An SDS
+protocol based client can still be added just as another plugin implementation in the
+framework. The plugin framework allows different environments to have different
+dependencies because the xDS client environment is abstracted out via the plugin
+framework and the control plane can be agnostic to the specific client environment.
+The framework has also made the certificate provider functionality extensible
 and pluggable which enables support for new certificate providers without requiring
 changes to the xDS protocol or the control plane. These advantages plus the extensions
 made to the xDS protocol are providing an impetus to the Envoy community so that Envoy
@@ -513,6 +518,6 @@ proxyless and interop or co-existence with Envoy.
 
 Java had an early prototype implementation of xDS-based security that used SDS similar to Envoy. It was
 then modified and refined to match this spec. Other languages followed soon after to complete
-the implementation. The implementations (in Java, C++ and Go) are currently "hidden" behing the
+the implementation. The implementations (in Java, C++ and Go) are currently "hidden" behind the
 environment variable `GRPC_XDS_EXPERIMENTAL_SECURITY_SUPPORT` which will be removed
 once this proposal is official.
