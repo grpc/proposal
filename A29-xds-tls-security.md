@@ -157,9 +157,13 @@ Note that we don't (currently) support [`transport_socket_matches`][CL-TS-matche
 The security configuration extracted from the `UpstreamTlsContext` thus obtained
 is passed down to all the child policies and connections. How this is done is language dependent
 and is similar to how the implementations pass policy information down to child policies.
+For example, C-core uses the channel args to pass security configuration down, whereas
+Java constructs a dynamic `SslContextProvider` that is directly usable by a sub-channel's
+TLS handshaker to build an SslContext for the upcoming TLS handshake.
 
-[`common_tls_context`][CTC] in the `UpstreamTlsContext` contains the required security configuration.
-See below for [`CommonTlsContext`][CTC-type] processing.
+Only when a channel is using `XdsChannelCredentials`, gRPC uses the security configuration
+in `UpstreamTlsContext`. [`common_tls_context`][CTC] in the `UpstreamTlsContext` contains
+the required security configuration. See below for [`CommonTlsContext`][CTC-type] processing.
 
 A secure client at a minimum requires [`validation_context_certificate_provider_instance`][VCCPI1]
 inside [`combined_validation_context`][CVC] to be able to validate the server certificate
@@ -184,21 +188,48 @@ If any of the following fields are present, gRPC will NACK the CDS update:
 [ALLOW-RENEG]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L47
 [MAX-SESS-KEYS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L53
 
+##### Server Authorization aka Subject-Alt-Name Checks
+
+"Server authorization" is performed by the client in which the client authorizes
+a server for the connection as described below. This check is in lieu of the
+canonical [hostname check in Web PKI][RFC6125-6].
+
+If [match_subject_alt_names][] is populated in the [combined_validation_context][CVC]
+of the received `UpstreamTlsContext` then gRPC validates the SAN entries in the server
+certificate by matching the `match_subject_alt_names` values using the [StringMatcher][]
+semantics. If the match does not succeed the connection attempt fails indicating a
+"certificate check failure".
+
+Individual Implementations will use hooks provided by the underlying TLS framework to
+implement server authorization. As an example, Java may use a custom `X509TrustManager`
+implementation through the `SslContext` provided to the client sub-channel.
+
+[match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L373
+[CVC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251
+[StringMatcher]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L20
+[RFC6125-6]: https://datatracker.ietf.org/doc/html/rfc6125#section-6
+
 #### LDS for Server Side Security
 
 Server-side xDS processing is described in [A36: xDS-Enabled Servers][A36].
-A Listener resource may have one or more [`filter_chains`][filter-chains] and one of those
-`filter_chain`s is matched against an incoming connection in order to get and apply
+A Listener resource has zero or more [`filter_chains`][filter-chains] and one of those
+`filter_chain`s is matched against an incoming connection (or
+[`default_filter_chain`][default-filter-chain] if none matches) in order to get and apply
 the security (and other) configuration for that connection as described in the
 [`FilterChainMatch`][filter-chain-match]. The [`transport_socket`][transport-socket]
 of the matched (selected) `filter_chain` is used to extract the
 [`DownstreamTlsContext`][DTC] as described [here][transport-socket-comment].
 If the `transport_socket` name is not `envoy.transport_sockets.tls` i.e.
 something we don't recognize, gRPC will NACK the LDS update. Otherwise
-the `DownstreamTlsContext` thus obtained is used for the incoming connection.
-If it is not present (such as when [`transport_socket`][transport-socket] is
-not present or is not named `"envoy.transport_sockets.tls"`) then we use the
-fallback credentials for the incoming connection.
+the `DownstreamTlsContext` thus obtained is used for the incoming connection
+if the server is using `XdsServerCredentials`. How the security configuration
+in `DownstreamTlsContext` is made available to the incoming connection is language
+dependent. For example, Java constructs a dynamic `SslContextProvider` that is
+directly usable by the connection's TLS handshaker to build an `SslContext` for
+the upcoming TLS handshake. If there is no `DownstreamTlsContext` (such as when
+[`transport_socket`][transport-socket] is not present or is not named
+`"envoy.transport_sockets.tls"`) then gRPC uses the fallback credentials
+for the incoming connection.
 
 [`common_tls_context`][CTC1] in the `DownstreamTlsContext` contains the required
 security configuration. See below for [`CommonTlsContext`][CTC-type] processing.
@@ -225,6 +256,7 @@ If any of the following fields are present, gRPC will NACK the LDS update:
 
 [A36]: A36-xds-for-servers.md
 [filter-chains]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener.proto#L120
+[default-filter-chain]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener.proto#L131
 [filter-chain-match]: A36-xds-for-servers.md#filterchainmatch
 [transport-socket]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener_components.proto#L246
 [DTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L57
@@ -296,6 +328,7 @@ not take into account whether Xds credentials are in effect for the respective c
 [TLS-PARAMS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L207
 [CUSTOM-HS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L276
 [ALPN-PROTOCOLS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L272
+[UTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26
 
 ### Use of SPIFFE IDs in Certificates
 
@@ -307,87 +340,70 @@ verification following the [SPIFFE][] specification and the [match_subject_alt_n
 
 ### Certificate Provider Plugin Framework
 
-The pluggable Certificate Provider framework in gRPC underlies the use of `CertificateProviderInstance`
-configuration. The framework supports "Certificate Providers" as pluggable and custom components (plugins)
-used for dynamically fetching certificates used during the TLS handshake of gRPC channel and server connections.
+xDS supports many different configurations for endpoints to obtain certificates but gRPC supports only
+`CertificateProviderInstance`. Through this object the control plane tells the xDS client the name of
+a certificate and the "instance" name of a provider to use to obtain a certificate. This provider
+instance name is translated into a provider implementation and a configuration for that implementation
+using the client's own configuration instead of being sent by the control plane. This enables flexibility
+in heterogeneous deployments where different clients can use different implementations for the same
+provider instance name. For example, an on-prem client may get its certificate using a local certificate
+provider whereas a client running in cloud may use a cloud-vendor provided implementation to obtain
+the certificate.
 
-This document discusses just enough of the framework to explain the use-case. Users who want to
-implement new plugins will need to understand the detailed design of the framework in the
-respective language.
+gRPC provides a `CertificateProvider` plugin API that can support multiple implementations. The plugin API
+is not currently public, so applications cannot currently add their own provider implementations although
+we might make this API public in the future. However gRPC currently includes a `file_watcher` provider
+implementation - descibed [below][FILE-WATCHER-LINK] - which reads certificates from the local file system.
 
-Envoy was the original and only consumer of the xDS protocol and its security features were tied to
-Envoy's security capabilities such as fetching certificates from the file-system or
-using a separate SDS protocol to fetch certificates from an agent (that's not defined in the xDS
-architecture). Instead of emulating Envoy's functionality and limitations in this area, we decided to
-have a generic Certificate Provider plugin architecture in gRPC with the following characteristics:
+[FILE-WATCHER-LINK]: #file_watcher-certificate-provider
 
-* the xDS control plane is not aware of the plugin specifics including its name, instantiation
-mechanism or configuration requirements.
+Certificate provider plugin instances are configured via the xDS bootstrap file.  There is a new
+top-level field called `"certificate_providers"` whose value is a map (a JSON object).  The key
+in this map is the certificate_provider_instance name and the value is a JSON object
+having exactly 2 fields:
 
-* all of these are abstracted out into a single “plugin-instance-name” which is resolved into an
-actual Certificate provider instance using the local bootstrap file and the framework (as explained
-later).
+* `"plugin_name"` which is the name of the plugin implementation (a string value), and
+* `"config"` which is the configuration for the plugin. The value of `"config"` is a JSON object
+whose schema is defined by that plugin.
 
-* the xDS control plane only references the “plugin-instance-name”s: it uses one for the local
-certificates and another one for root certificates to validate the peer certificates (aka
-[`CertificateValidationContext`][CVC-proto]).
+The structure in the bootstrap file is as follows:
 
-[CVC-proto]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L236
-
-#### Main Elements of the Framework
-
-**`CertificateProvider`** represents an actual plugin that fetches or "mints" the required
-certificates and keys. **`FileWatcherCertificateProvider`** (described below) is an
-implementation of the **`CertificateProvider`** that is part of this framework. Another example
-of a **`CertificateProvider`** is a plugin that periodically "mints" new certificates by creating
-CSRs at regular intervals and getting those signed by a Certification Authority (CA) which is
-configured into the plugin.
-
-A "consumer" registers itself as a **`Watcher`**  of the plugin to receive certificate updates.
-The plugin supports multiple **`Watcher`s** to be registered and uses a **`DistributorWatcher`**
-internally to propagate a single update to multiple **`Watchers`**. A plugin caches the latest
-certificate (and key) it has fetched (or minted) and delivers them to every newly registered
-watcher. Note that it is possible for an implementation to use a fetch-style API instead of a
-watch-style API. For example, in the Go implementation a consumer calls into the
-**`CertificateProvider`** whenever it needs certificates and keys instead of registering a
-watcher.
-
-The **`CertificateProvider`** plugin also has an associated factory or
-provider implementation (**`CertificateProviderFactory`**) to instantiate the plugin and this
-factory is identified by a unique name e.g. `"file_watcher"` which is also the identity of the
-plugin. The factory is responsible for instantiating the plugin after validating the received
-configuration.
-
-**`CertificateProviderRegistry`** is a registry of all registered plugins supported by the gRPC library.
-A **`CertificateProviderFactory`** registers itself in the registry.
-
-**`CertificateProviderStore`** is a store or global map of all instantiated plugins. In this map
-the key is the plugin-name plus its config and the value is a reference counted instantiated plugin.
-Reference counting ensures that a plugin with a given name and configuration combination is only
-instantiated once. A client of the framework looks up a plugin by name and config and adds itself
-as a **`Watcher`**. If the plugin is not already present, the store uses the registry to
-instantiate it. It then increments the reference-count and adds the new **`Watcher`** to the 
-**`DistributorWatcher`** of the plugin. The plugin typically creates a new thread and a
-timer to periodically fetch or mint a new certificate and send the certificate (and the key) to
-all its watchers.
-
-**`FileWatcherCertificateProvider`** is an implementation of **`CertificateProvider`** which
-monitors configured file-paths in the file system and reads those files on updates to get the latest
-certificates and keys and provide those to the consumers after converting them to the canonical
-format e.g. `java.security.PrivateKey` and `java.security.cert.X509Certificate` in Java.
-
-### Bootstrap File Additions for Security
-
-The [bootstrap file][bootstrap-file] with [server side support][A36-xds-protocol] needs further
-changes as described here. The following snippet shows the additions for the `file_watcher` plugin
-that is already implemented in all gRPC languages.
 ```
-{
-  // "certificate_providers" lists the instances available for xDS to use.
+"certificate_providers": {
+  "instance_name": {
+    "plugin_name": "implementation_name",
+    "config": {
+      // ...config for implementation_name plugin...
+    }
+  }
+}
+```
+
+This defines a plugin instance for the instance name `instance_name` which consists of a
+plugin implementation called `implementation_name` with the corresponding configuration
+defined as the value for the key `config`. When the xDS server tells the client to obtain
+a certificate from `instance_name`, the client will use this plugin instance.
+
+#### `file_watcher` Certificate Provider
+
+As mentioned before, we currently only have one plugin implementation called `file_watcher`.
+The configuration for this plugin has the following fields:
+- `certificate_file`: The path to the file containing the identity certificate. The file should contain
+a PEM-formatted X.509 conforming certificate.
+- `private_key_file`: The path to the file containing the private key. The file should contain a
+PEM-formatted PKCS encoded private key.
+- `ca_certificate_file`: The path to the file containing the root certificate. The file should contain
+a PEM-formatted X.509 conforming certificate chain.
+- `refresh_interval`: Specifies how frequently the plugin should read the files. The value must be
+in the [JSON format described for a `Duration`][DURATION-JSON] protobuf message.
+
+For example, the bootstrap file might contain the following:
+
+```
   "certificate_providers": {
     "google_cloud_private_spiffe": { // certificate_provider_instance name
-      "plugin_name": "file_watcher", // name of the plugin
-      "config": {                    // config to be supplied to the plugin
+      "plugin_name": "file_watcher", // name of the plugin instance
+      "config": {                    // config to be supplied to the plugin instance
         "certificate_file": "/var/run/gke-spiffe/certs/certificates.pem",
         "private_key_file": "/var/run/gke-spiffe/certs/private_key.pem",
         "ca_certificate_file": "/var/run/gke-spiffe/certs/ca_certificates.pem",
@@ -395,100 +411,44 @@ that is already implemented in all gRPC languages.
       }
     }
   }
-}
 ```
 
-`"certificate_providers"` is a new top level field whose value is a map (a JSON object).
-The key in this map is the certificate_provider_instance name and the value is a JSON object
-having exactly 2 fields:
+With this configuration, when the xDS server tells the client to get a certificate from
+plugin instance "google_cloud_private_spiffe", the client will load the certificate data
+from the specified files.
 
-* `"plugin_name"` which is the name of the plugin (a string value), and
-* `"config"` which is the configuration for the plugin. The value of `"config"` is a JSON object
-whose schema is defined by that plugin. For the file_watcher plugin the `"config"` consists
-of the 3 file-paths to watch and the polling interval value.
+[DURATION-JSON]: https://developers.google.com/protocol-buffers/docs/proto3#json.
 
-[bootstrap-file]: A27-xds-global-load-balancing.md#xdsclient-and-bootstrap-file
+## Implementation Details
 
-#### Use of Bootstrap File by the Certificate Provider Plugin Framework
+High level implementation details common to all the implementing gRPC languages
+are described here.
 
-The xDS control plane specifies a certificate_provider_instance name as described above in
-[CommonTlsContext Processing](#commontlscontext-processing). For this example, let's assume
-it uses `"google_cloud_private_spiffe"` as the `"instance_name"` in
-`tls_certificate_certificate_provider_instance`. gRPC looks up
-`"google_cloud_private_spiffe"` in the `"certificate_providers"` map loaded from the
-bootstrap file and use the JSON object value to extract the plugin name (value of
-`"plugin_name"` as a string) and configuration (value of `"config"` as a JSON object).
-It passes on these values to the `CertificateProviderStore` to retrieve
-(after instantiating if necessary) the associated `CertificateProvider` plugin.
-The caller of the framework registers a watcher with the plugin to receive
-certificate updates as described below.
+A **`CertificateProvider`** object represents a plugin that provides the required
+certificates and keys to the gRPC application. A component registers itself as a **`Watcher`**
+of the plugin to receive certificate updates. The plugin supports multiple
+**`Watcher`s** and uses a **`DistributorWatcher`** internally to propagate a
+single update to multiple **`Watchers`**. The plugin caches the last
+certificate (and key) and delivers them to every newly registered
+watcher. Note that it is possible for an implementation to use a fetch-style API instead of a
+watch-style API. For example, in the Go implementation a consumer calls into the
+**`CertificateProvider`** whenever it needs certificates and keys instead of registering a
+watcher.
 
-### Implementing Security in the xDS Flow
+The **`CertificateProvider`** plugin also has an associated factory
+(**`CertificateProviderFactory`**) that is used to instantiate the plugin. The
+factory is identified by a unique name e.g. `"file_watcher"` that is also the identity of the
+plugin. The factory is used to instantiate the plugin after validating the received
+configuration. The framework uses deduping and reference counting mechanism to
+ensure that a plugin of a given kind and configuration is instantiated only once.
 
-Let's see how gRPC enables security in xDS managed clients and servers by putting it all
-together. Note that gRPC uses the existing low level TLS handshaker code/libraries
-(aka security connector or handshaker) after making the certificates and keys available
-to that code. The TLS handshaker functionality (which is language dependent) is
-out of scope of this document.
-
-#### Client Side Flow
-
-The gRPC client xDS flow is described in [gRPC Client Architecture][A27-client-arch].
-The resolver returns a `Cluster` resource for a channel and the CDS for that cluster has the
-[UpstreamTlsContext][UTC] containing the security configuration to be applied to all the
-child policies of that cluster. When a channel is using `XdsChannelCredentials`, gRPC
-processes the `UpstreamTlsContext` as described [above](#cds-for-client-side-security).
-
-At this stage the CDS policy uses the flow described above in
-[Use of Bootstrap File by the Certificate Provider Plugin Framework][use-of-bootstrap]
-to fetch the requisite `CertificateProvider`s (one or two as the case may be). These `CertificateProvider`s,
-in one form or another, need to be made available to all the sub-channels of the cluster. How this is
-done is language dependent. For example, C-core uses the channel args to pass the individual
-`CertificateProvider`s whereas Java constructs a dynamic `SslContextProvider` that is directly
-usable by the sub-channel's TLS handshaker to build an `SslContext` for the impending handshake.
-
-[A27-client-arch]: ./A27-xds-global-load-balancing.md#grpc-client-architecture
-[UTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26
-[use-of-bootstrap]: #use-of-bootstrap-file-by-the-certificate-provider-plugin-framework
-
-##### Server Authorization aka Subject-Alt-Name Checks
-
-If [match_subject_alt_names][] is populated in the [combined_validation_context][CVC]
-of the received `UpstreamTlsContext` then gRPC validates the SAN entries in the server certificate
-by matching the `match_subject_alt_names` values using the [StringMatcher][] semantics.
-This is called server authorization because this is how a client "authorizes" a server for
-the connection.
-
-The implementation is language dependent. As an example, Java uses an implementation
-of `X509TrustManager` through the `SslContext` provided to the client sub-channel. The other
-languages use similar hooks provided by the underlying TLS framework to implement server
-authorization.
-
-[match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L373
-[CVC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251
-[StringMatcher]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L20
-
-#### Server Side Flow
-
-The gRPC server xDS flow is described in [gRPC Server][A36-xds-protocol]. The server
-configuration comes from the [`Listener`][Listener] resource which contains a list of
-[`FilterChain`][Filter-chain]s. The `FilterChain` contains the `DownstreamTlsContext`
-that is applied to an incoming connection
-after selecting the best-matching `FilterChain` as described in
-[FilterChainMatch][A36-filter-chain-match]. If the server is using `XdsServerCredentials`,
-gRPC processes the `DownstreamTlsContext` as described [above](#lds-for-server-side-security) and then
-uses the flow described above in
-[Use of Bootstrap File by the Certificate Provider Plugin Framework](#use-of-bootstrap-file-by-the-certificate-provider-plugin-framework)
-to fetch the requisite `CertificateProvider`s (one or two as the case may be). These `CertificateProvider`s,
-in one form or another, need to be made available to the incoming connection. Similar to the
-client side, this part of the flow is language dependent. For example, Java constructs a dynamic
-`SslContextProvider` that is directly usable by the connection's TLS handshaker to build an
-`SslContext` for the impending handshake.
-
-[A36-xds-protocol]: A36-xds-for-servers.md#xds-protocol
-[Listener]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener.proto#L39
-[Filter-chain]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener_components.proto#L193
-[A36-filter-chain-match]: A36-xds-for-servers.md#filterchainmatch
+A plugin typically creates a new thread and a timer to periodically query and 
+send a certificate (and the key) to all its watchers. **`FileWatcherCertificateProvider`**
+(aka `file_watcher` described [above][FILE-WATCHER-LINK]) is an implementation of
+the **`CertificateProvider`**. This plugin monitors configured file-paths in the file
+system and reads those files on updates to get the latest certificates and keys and
+provide those to the watchers after converting them to the canonical
+format e.g. `java.security.PrivateKey` and `java.security.cert.X509Certificate` in Java.
 
 ## Rationale
 
@@ -514,10 +474,10 @@ In any case the addition of xDS based security has brought gRPC xDS support clos
 Envoy in terms of capabilities. This enables various use-cases such as migration to
 proxyless and interop or co-existence with Envoy.
 
-## Implementation
+## Implementation Status
 
 Java had an early prototype implementation of xDS-based security that used SDS similar to Envoy. It was
 then modified and refined to match this spec. Other languages followed soon after to complete
 the implementation. The implementations (in Java, C++ and Go) are currently "hidden" behind the
 environment variable `GRPC_XDS_EXPERIMENTAL_SECURITY_SUPPORT` which will be removed
-once this proposal is official.
+once this proposal is approved.
