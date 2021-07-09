@@ -50,9 +50,9 @@ enable (or disable) the use of these configurations.
 ### Programming API
 
 We need a mechanism by which a programmer can "opt in" to allow the use of xDS provided security
-configuration for a gRPC channel or server. This is achieved by supplying an XdsChannelCredentials
-(to a channel) or an XdsServerCredentials (to a server). These two new credentials types are an extension
-of the existing channel or server credentials types in each language. Each Xds*Credentials needs to
+configuration for a gRPC channel or server. This is achieved by supplying an `XdsChannelCredentials`
+(to a channel) or an `XdsServerCredentials` (to a server). These two new credentials types are an extension
+of the existing channel or server credentials types in each language. Each `Xds*Credentials` needs to
 be provided with a "fallback credentials". The fallback credentials is used in the following cases:
 
 - when xDS is not in use such as when the `xds:` scheme is not used on the client side
@@ -62,17 +62,16 @@ in this case is different from Envoy's due to fallback credentials. Envoy will j
 use plaintext (insecure) communication mode in this case. But with gRPC, the application
 needs to use InsecureCredentials as the fallback credentials to get the same result.
 
-The fallback credentials is *not* used in case of error situations e.g. whenever there is
-an error in using the xDS provided security configuration.
+Note that the fallback credentials is *not* used in case of errors. For example, if there is
+an error encountered while using the xDS provided security configuration a connection will be
+terminated rather than using the fallback credentials.
 
-Note that a user is not required to use Xds- Channel or Server Credentials even if they are
-using an xDS managed channel or server. Not using Xds Channel or Server Credentials results
-in not using xDS-provided TLS configuration.
+A user is not required to use Xds- Channel or Server Credentials even if they are
+using an xDS managed channel or server. Not using Xds- Channel or Server Credentials results
+in not using the xDS provided TLS configuration.
 
-On the client side, an XdsChannelCredentials is used and on the server side an
-XdsServerCredentials is used as described in the example snippets below. In these examples,
-a plaintext or insecure credentials is used as the fallback credentials.
-
+The example snippets below show the use of `XdsChannelCredentials` and `XdsServerCredentials`.
+In these examples a plaintext or insecure credentials is used as the fallback credentials.
 
 #### C++ 
 
@@ -157,9 +156,9 @@ Note that we don't (currently) support [`transport_socket_matches`][CL-TS-matche
 The security configuration extracted from the `UpstreamTlsContext` thus obtained
 is passed down to all the child policies and connections. How this is done is language dependent
 and is similar to how the implementations pass policy information down to child policies.
-For example, C-core uses the channel args to pass security configuration down, whereas
+For example, C-core uses channel args to pass security configuration down, whereas
 Java constructs a dynamic `SslContextProvider` that is directly usable by a sub-channel's
-TLS handshaker to build an SslContext for the upcoming TLS handshake.
+TLS handshaker to build an `SslContext` for the pending TLS handshake.
 
 Only when a channel is using `XdsChannelCredentials`, gRPC uses the security configuration
 in `UpstreamTlsContext`. [`common_tls_context`][CTC] in the `UpstreamTlsContext` contains
@@ -190,7 +189,7 @@ If any of the following fields are present, gRPC will NACK the CDS update:
 
 ##### Server Authorization aka Subject-Alt-Name Checks
 
-"Server authorization" is performed by the client in which the client authorizes
+"Server authorization" is performed by the client where the client authorizes
 a server for the connection as described below. This check is in lieu of the
 canonical [hostname check in Web PKI][RFC6125-6].
 
@@ -201,7 +200,7 @@ semantics. If the match does not succeed the connection attempt fails indicating
 "certificate check failure".
 
 Individual Implementations will use hooks provided by the underlying TLS framework to
-implement server authorization. As an example, Java may use a custom `X509TrustManager`
+implement server authorization. As an example, Java uses a custom `X509TrustManager`
 implementation through the `SslContext` provided to the client sub-channel.
 
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L373
@@ -213,10 +212,10 @@ implementation through the `SslContext` provided to the client sub-channel.
 
 Server-side xDS processing is described in [A36: xDS-Enabled Servers][A36].
 A Listener resource has zero or more [`filter_chains`][filter-chains] and one of those
-`filter_chain`s is matched against an incoming connection (or
-[`default_filter_chain`][default-filter-chain] if none matches) in order to get and apply
+`filter_chain`s is matched against an incoming connection (or the
+[`default_filter_chain`][default-filter-chain] if there is no match) in order to get and apply
 the security (and other) configuration for that connection as described in the
-[`FilterChainMatch`][filter-chain-match]. The [`transport_socket`][transport-socket]
+[`FilterChainMatch`][filter-chain-match] section. The [`transport_socket`][transport-socket]
 of the matched (selected) `filter_chain` is used to extract the
 [`DownstreamTlsContext`][DTC] as described [here][transport-socket-comment].
 If the `transport_socket` name is not `envoy.transport_sockets.tls` i.e.
@@ -243,7 +242,7 @@ the client certificate. When [`require_client_certificate`][RCC] is `true`,
 gRPC requires the client certificate and will reject a connection without a valid
 client certificate. When [`require_client_certificate`][RCC] is `true`, the
 [`validation_context_certificate_provider_instance`][VCCPI1] value should be
-present otherwise gRPC should NACK the LDS update.
+present otherwise gRPC will NACK the LDS update.
 
 If any of the following fields are present, gRPC will NACK the LDS update:
 
@@ -414,7 +413,7 @@ For example, the bootstrap file might contain the following:
 ```
 
 With this configuration, when the xDS server tells the client to get a certificate from
-plugin instance "google_cloud_private_spiffe", the client will load the certificate data
+plugin instance `"google_cloud_private_spiffe"`, the client will load the certificate data
 from the specified files.
 
 [DURATION-JSON]: https://developers.google.com/protocol-buffers/docs/proto3#json.
@@ -439,23 +438,24 @@ The **`CertificateProvider`** plugin also has an associated factory
 (**`CertificateProviderFactory`**) that is used to instantiate the plugin. The
 factory is identified by a unique name e.g. `"file_watcher"` that is also the identity of the
 plugin. The factory is used to instantiate the plugin after validating the received
-configuration. The framework uses deduping and reference counting mechanism to
-ensure that a plugin of a given kind and configuration is instantiated only once.
+configuration. The framework uses deduping and reference counting to ensure that a plugin
+of a given kind and configuration is instantiated only once.
 
 A plugin typically creates a new thread and a timer to periodically query and 
-send a certificate (and the key) to all its watchers. **`FileWatcherCertificateProvider`**
+send the certificate (and the key) to all its watchers. **`FileWatcherCertificateProvider`**
 (aka `file_watcher` described [above][FILE-WATCHER-LINK]) is an implementation of
 the **`CertificateProvider`**. This plugin monitors configured file-paths in the file
 system and reads those files on updates to get the latest certificates and keys and
-provide those to the watchers after converting them to the canonical
-format e.g. `java.security.PrivateKey` and `java.security.cert.X509Certificate` in Java.
+provide those to the watchers after converting them to the canonical format. For example,
+Java uses `java.security.PrivateKey` and `java.security.cert.X509Certificate` for a
+private key and a certificate respectively.
 
 ## Rationale
 
-gRPC has been steadily adding support for various xDS features including load balancing and
+gRPC has been steadily adding support for various xDS features such as load balancing and
 advanced traffic management. xDS-based security was next in the roadmap and this proposal
-addresses that. gRPC makes a proxyless service mesh (PSM) possible. A secure proxyless
-service mesh requires the security features described in this proposal.
+addresses that requirement. gRPC makes a proxyless service mesh (PSM) possible. A secure
+proxyless service mesh requires the security features described in this proposal.
 
 The Certificate Provider Plugin Framework provides a generic alternative to the SDS
 server/agent based solution and eliminates the dependency on the SDS protocol. An SDS
