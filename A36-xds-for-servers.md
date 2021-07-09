@@ -217,28 +217,28 @@ its present fields, which avoids repeating fields and converts the matchers into
 disjunctive normal form. That is, the matcher:
 
 ```
-destination_ports: 80, 8080
-prefix_ranges: 192.168.0.0/16, 10.0.0.0/8
+prefix_ranges: 192.168.0.0/24, 10.1.0.0/16
+source_prefix_ranges: 192.168.1.0/24, 10.2.0.0/16
 source_type: EXTERNAL
 ```
 
 Should be treated as four matchers:
 
 ```
-destination_ports: 80
-prefix_ranges: 192.168.0.0/16
+prefix_ranges: 192.168.0.0/24
+source_prefix_ranges: 192.168.1.0/24
 source_type: EXTERNAL
 
-destination_ports: 80
-prefix_ranges: 10.0.0.0/8
+prefix_ranges: 192.168.0.0/24
+source_prefix_ranges: 10.2.0.0/16
 source_type: EXTERNAL
 
-destination_ports: 8080
-prefix_ranges: 192.168.0.0/16
+prefix_ranges: 10.1.0.0/16
+source_prefix_ranges: 192.168.1.0/24
 source_type: EXTERNAL
 
-destination_ports: 8080
-prefix_ranges: 10.0.0.0/8
+prefix_ranges: 10.1.0.0/16
+source_prefix_ranges: 10.2.0.0/16
 source_type: EXTERNAL
 ```
 
