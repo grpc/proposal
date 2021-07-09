@@ -193,10 +193,11 @@ If any of the following fields are present, gRPC will NACK the CDS update:
 a server for the connection as described below. This check is in lieu of the
 canonical [hostname check in Web PKI][RFC6125-6].
 
-If [match_subject_alt_names][] is populated in the [combined_validation_context][CVC]
-of the received `UpstreamTlsContext` then gRPC validates the SAN entries in the server
-certificate by matching the `match_subject_alt_names` values using the [StringMatcher][]
-semantics. If the match does not succeed the connection attempt fails indicating a
+If [match_subject_alt_names][] in [default_validation_context][]
+of [combined_validation_context][CVC] of the received `UpstreamTlsContext` is populated
+then gRPC validates the SAN entries in the server certificate by matching the
+`match_subject_alt_names` values using the [StringMatcher][] semantics.
+If the match does not succeed the connection attempt fails indicating a
 "certificate check failure".
 
 Individual Implementations will use hooks provided by the underlying TLS framework to
@@ -204,6 +205,7 @@ implement server authorization. As an example, Java uses a custom `X509TrustMana
 implementation through the `SslContext` provided to the client sub-channel.
 
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L373
+[default_validation_context]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L177
 [CVC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251
 [StringMatcher]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L20
 [RFC6125-6]: https://datatracker.ietf.org/doc/html/rfc6125#section-6
@@ -296,15 +298,16 @@ gRPC does not support the other certificate acquisition mechanisms specified by 
 When fields of type [`CertificateProviderInstance`][CPI] are present gRPC ignores the respective
 unsupported fields but if the unsupported fields are present by themselves gRPC will NACK the update.
 
-For example, in [`UpstreamTlsContext`][UTC] (on the client side), the identity certificate is not needed for the TLS mode,
-which is indicated by [`tls_certificate_certificate_provider_instance`][TCCPI] being absent. However in this case
-if any of the other unsupported identity certificate fields ([tls_certificates][TLS-CERT],
-[tls_certificate_sds_secret_configs][CERT-SDS], [tls_certificate_certificate_provider][CERT-PROVIDER]) are
-present then gRPC will NACK the update. But if [`tls_certificate_certificate_provider_instance`][TCCPI] is
-present, then the unsupported fields are ignored. This allows a control plane to formulate a single
-`CommonTlsContext` that works for both gRPC (which only supports [`CertificateProviderInstance`][CPI])
-and Envoy (which does not support [`CertificateProviderInstance`][CPI]) to achieve consistent
-security configuration between gRPC and Envoy.
+For example, in [`UpstreamTlsContext`][UTC] (on the client side), the identity certificate is not
+needed for the TLS mode, which is indicated by [`tls_certificate_certificate_provider_instance`][TCCPI]
+being absent. However in this case if any of the other unsupported identity certificate fields
+([tls_certificates][TLS-CERT], [tls_certificate_sds_secret_configs][CERT-SDS],
+[tls_certificate_certificate_provider][CERT-PROVIDER]) are present then gRPC will NACK the update.
+But if [`tls_certificate_certificate_provider_instance`][TCCPI] is present, then the unsupported
+fields are ignored. This allows a control plane to formulate a single `CommonTlsContext` that works
+for both gRPC (which only supports [`CertificateProviderInstance`][CPI]) and Envoy (which does not
+support [`CertificateProviderInstance`][CPI]) to achieve consistent security configuration between
+gRPC and Envoy.
 
 The following fields are unsupported and if present will cause a NACK from gRPC:
 
@@ -315,6 +318,26 @@ The following fields are unsupported and if present will cause a NACK from gRPC:
 be absent. On the client side (inside [`UpstreamTlsContext`][UTC]) it is ignored if present.
 The processing and parsing of `CommonTlsContext` inside any particular CDS or LDS response does
 not take into account whether Xds credentials are in effect for the respective channel or server.
+
+[`combined_validation_context`][CVC] is validated as follows: [default_validation_context][]
+is accepted only on the client side i.e. inside `UpstreamTlsContext`. And inside that field
+only [match_subject_alt_names][] is processed as described [above][server-authz]. If any of
+the other fields (listed below) are present, the update is NACKed.
+
+* `trusted_ca`
+* `watched_directory`
+* `verify_certificate_spki`
+* `verify_certificate_hash`
+* `require_signed_certificate_timestamp`
+* `crl`
+* `allow_expired_certificate`
+* `trust_chain_verification`
+* `custom_validator_config`
+
+Only [`validation_context_certificate_provider_instance`][VCCPI1] is accepted. When that value is present
+in the [`combined_validation_context`][CVC] the other fields
+[`validation_context_certificate_provider`][VCCP1] and [`validation_context_sds_secret_config`][VCSSC1]
+are ignored otherwise the presence of those fields will cause a NACK.
 
 [CPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L154
 [TCCPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L234
@@ -328,6 +351,9 @@ not take into account whether Xds credentials are in effect for the respective c
 [CUSTOM-HS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L276
 [ALPN-PROTOCOLS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L272
 [UTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26
+[server-authz]: #server-authorization-aka-subject-alt-name-checks
+[VCCP1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L193
+[VCSSC1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L184
 
 ### Use of SPIFFE IDs in Certificates
 
