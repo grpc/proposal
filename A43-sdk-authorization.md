@@ -197,6 +197,8 @@ Each rule has the following semantics -
    - If only source is empty, we evaluate against the request fields and apply that to
      any user (See example below). Similarly, if only request is empty, we evaluate
      against the source fields and apply that to any action.
+   - This also applies to sub fields, like if the principals in source is empty, the
+     behavior would be similar to an empty source.
 2. Each source could contain a list of principals. The principals are ORed together,
    i.e. it matches if one of them matches.
    Sequence of steps to evaluate each principal from config -
@@ -269,6 +271,13 @@ from filesystem. In static initialization, the policy will be provided as a JSON
 string. In dynamic file reloading, the application will specify the file path that
 contains the authorization policy in JSON format.
 
+We recommend the users to use a single SDK authorization policy per gRPC server.
+If there are multiple policies, then there is a possibility that all the policies
+may not be evaluated against. For ex. if we have two policies for two different
+services say service A and service B. RPC to service B may get rejected, without
+even evaluating against service B policy, because it is evaluated after service A
+policy. On getting no match, service A policy could deny by default.
+
 Following code snippets show how to enable authorization in gRPC servers in 
 different languages.
 
@@ -336,9 +345,8 @@ try {
   // ...
 }
 Server server =
-    ServerBuilder.forPort(port)
+    Grpc.newServerBuilderForPort(port, serverCreds)
         .addService(service)
-        .useTransportSecurity(certChainFile, privateKeyFile)
         .intercept(authzServerInterceptor);
         .build()
         .start();
@@ -364,9 +372,8 @@ try {
 Closeable closeable = authzServerInterceptor.scheduleRefreshes(
     1, TimeUnit.HOURS, scheduledExecutor);
 Server server =
-    ServerBuilder.forPort(port)
+    Grpc.newServerBuilderForPort(port, serverCreds)
         .addService(service)
-        .useTransportSecurity(certChainFile, privateKeyFile)
         .intercept(authzServerInterceptor)
         .build()
         .start();
