@@ -498,7 +498,7 @@ extensible certificate providers.
 
 In any case the addition of xDS based security has brought gRPC xDS support closer to
 Envoy in terms of capabilities. This enables various use-cases such as migration to
-proxyless and interop or co-existence with Envoy.
+proxyless and interop or coexistence with Envoy.
 
 ## Implementation Status
 
