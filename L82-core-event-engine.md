@@ -55,6 +55,92 @@ An EventEngine is roughly composed of:
 ```cpp
 namespace grpc_event_engine {
 namespace experimental {
+
+/// A set of parameters used to configure an endpoint, either when initiating a
+/// new connection on the client side or when listening for incoming connections
+/// on the server side. An EndpointConfig contains a set of zero or more
+/// Settings. Each setting has a unique name, which can be used to fetch that
+/// Setting via the Get() method. Each Setting has a value, which can be an
+/// integer, string, or void pointer. Each EE impl should define the set of
+/// Settings that it supports being passed into it, along with the corresponding
+/// type.
+class EndpointConfig {
+ public:
+  virtual ~EndpointConfig() = default;
+  using Setting = absl::variant<absl::monostate, int, absl::string_view, void*>;
+  /// Returns an EndpointConfig Setting. If there is no Setting associated with
+  /// \a key in the EndpointConfig, an \a absl::monostate type will be
+  /// returned. Caller does not take ownership of resulting value.
+  virtual Setting Get(absl::string_view key) const = 0;
+};
+```
+
+The `SliceAllocator` provides memory buffers for EventEngine read/write
+operations, allowing EventEngines to seamlessly participate in the
+C++ `ResourceQuota` system.
+
+```cpp
+class SliceAllocator {
+ public:
+  // gRPC-internal constructor
+  explicit SliceAllocator(grpc_resource_user* user);
+  // Not copyable
+  SliceAllocator(SliceAllocator& other) = delete;
+  SliceAllocator& operator=(const SliceAllocator& other) = delete;
+  // Moveable
+  SliceAllocator(SliceAllocator&& other) noexcept;
+  SliceAllocator& operator=(SliceAllocator&& other) noexcept;
+  ~SliceAllocator();
+
+  using AllocateCallback =
+      std::function<void(absl::Status, SliceBuffer* buffer)>;
+  /// Requests \a size bytes from gRPC, and populates \a dest with the allocated
+  /// slices. Ownership of the \a SliceBuffer is not transferred.
+  ///
+  /// gRPC provides a ResourceQuota system to cap the amount of memory used by
+  /// the library. When a memory limit has been reached, slice allocation is
+  /// interrupted to attempt to reclaim memory from participating gRPC
+  /// internals. When there is sufficient memory available, slice allocation
+  /// proceeds as normal.
+  absl::Status Allocate(size_t size, SliceBuffer* dest,
+                        SliceAllocator::AllocateCallback cb);
+
+ private:
+  grpc_resource_user* resource_user_;
+};
+```
+
+The `SliceAllocatorFactory` allows `EventEnigine::Listener`s to create and
+provide `SliceAllocator`s to `EventEngine::Endpoint`s as incoming connections
+are accepted.
+
+```cpp
+class SliceAllocatorFactory {
+ public:
+  // gRPC-internal constructor
+  explicit SliceAllocatorFactory(grpc_resource_quota* quota);
+  // Not copyable
+  SliceAllocatorFactory(SliceAllocatorFactory& other) = delete;
+  SliceAllocatorFactory& operator=(const SliceAllocatorFactory& other) = delete;
+  // Moveable
+  SliceAllocatorFactory(SliceAllocatorFactory&& other) noexcept;
+  SliceAllocatorFactory& operator=(SliceAllocatorFactory&& other) noexcept;
+  ~SliceAllocatorFactory();
+
+  /// On Endpoint creation, call \a CreateSliceAllocator with the name of the
+  /// endpoint peer (a URI string, most likely). Note: \a peer_name must outlive
+  /// the Endpoint.
+  SliceAllocator CreateSliceAllocator(absl::string_view peer_name);
+
+ private:
+  grpc_resource_quota* resource_quota_;
+};
+```
+
+Finally, many `EventEngine` pieces rely on `Callback`s, `TaskHandle`s, and
+`ResolvedAddress`es.
+
+```cpp
 class EventEngine {
  public:
   /// A basic callable function. The first argument to all callbacks is an
