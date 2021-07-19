@@ -305,7 +305,7 @@ class EventEngine {
    public:
     /// A task handle for DNS Resolution requests.
     struct LookupTaskHandle {
-      intptr_t key;
+      intptr_t key[2];
     };
     /// A DNS SRV record type.
     struct SRVRecord {
