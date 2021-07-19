@@ -150,7 +150,7 @@ class EventEngine {
   using Callback = std::function<void(absl::Status)>;
   /// A callback handle, used to cancel a callback.
   struct TaskHandle {
-    intptr_t key;
+    intptr_t keys[2];
   };
   /// A thin wrapper around a platform-specific sockaddr type. A sockaddr struct
   /// exists on all platforms that gRPC supports.
@@ -202,10 +202,8 @@ class EventEngine {
     ///
     /// For failed read operations, implementations should pass the appropriate
     /// statuses to \a on_read. For example, callbacks might expect to receive
-    /// DEADLINE_EXCEEDED when the deadline is exceeded, and CANCELLED on
-    /// endpoint shutdown.
-    virtual void Read(Callback on_read, SliceBuffer* buffer,
-                      absl::Time deadline) = 0;
+    /// CANCELLED on endpoint shutdown.
+    virtual void Read(Callback on_read, SliceBuffer* buffer) = 0;
     /// Write data out on the connection.
     ///
     /// \a on_writable is called when the connection is ready for more data. The
@@ -215,10 +213,8 @@ class EventEngine {
     ///
     /// For failed write operations, implementations should pass the appropriate
     /// statuses to \a on_writable. For example, callbacks might expect to
-    /// receive DEADLINE_EXCEEDED when the deadline is exceeded, and CANCELLED
-    /// on endpoint shutdown.
-    virtual void Write(Callback on_writable, SliceBuffer* data,
-                       absl::Time deadline) = 0;
+    /// receive CANCELLED on endpoint shutdown.
+    virtual void Write(Callback on_writable, SliceBuffer* data) = 0;
     /// These methods return an address in the format described in DNSResolver.
     /// The returned values are owned by the Endpoint and are expected to remain
     /// valid for the life of the Endpoint.
@@ -491,10 +487,13 @@ that platform.
 
 ## Limitations
 
-### Wrapped languages cannot provide a custom EventEngine at runtime
+### No immediate goal for wrapped languages to provide custom EventEngines
 
-The ability to provide custom EventEngines at runtime will be available
-exclusively in the C++ and C-core APIs.
+The ability to provide custom EventEngines at runtime will initially be
+available in the C++ and C-core APIs only. Adding support for custom
+EventEngines written in wrapped languages, or providing EventEngines at runtime
+from wrapped languages, is not a focus of this work.  Challenges may include the
+management of dll-barrier crossing issues, and potential performance losses.
 
 ### Public file descriptor operations are not supported for custom EventEngines
 
