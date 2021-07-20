@@ -1,10 +1,14 @@
 A43: SDK authorization
 
 * Author(s): [Ashitha Santhosh](https://github.com/ashithasantosh)
-* Approver: 
+* Approver: [Doug Fawley](https://github.com/dfawley)
+            [Eric Anderson](https://github.com/ejona86),
+            [Mark Roth](https://github.com/markdroth),
+            [Sanjay Pujare](https://github.com/sanjaypujare),
+            [Yihua Zhang](https://github.com/yihuazhang)
 * Status: Draft {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2021-06-17
+* Last updated: 2021-07-19
 * Discussion at: (filled after thread exists)
 
 ## Abstract
@@ -180,36 +184,42 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
 
 #### Details
 
-gRPC SDK authorization policy has a list of allow rules and a list of deny rules. 
+gRPC SDK authorization policy has a list of *allow rules* and a list of *deny rules*.
 The following sequence is followed to make an authorization decision -
-1. Check for a match in deny rules, if a match is found, the request will be denied. 
+1. Check for a match in *deny rules*, if a match is found, the request will be denied.
    If no match is found in deny rules, or there are no deny rules execute next step.
-2. Check for a match in allow rules, if a match is found, the request will be allowed. 
+2. Check for a match in *allow rules*, if a match is found, the request will be allowed.
    Note that allow rules is a required field here, if not present, policy is invalid.
 3. If no match is found in allow rules, we deny the request.
 
-Each rule has the following semantics -
-1. Each rule has a name, a source and a request to match against. For a rule to match,
-   both source and request must match.
-   - If both source and request are empty, and the policy is an allow list, we will
-     accept all RPC requests. On the other hand, if the policy were a denylist, we
-     would deny all RPC requests.
-   - If only source is empty, we evaluate against the request fields and apply that to
-     any user (See example below). Similarly, if only request is empty, we evaluate
-     against the source fields and apply that to any action.
-   - This also applies to sub fields, like if the principals in source is empty, the
-     behavior would be similar to an empty source.
-2. Each source could contain a list of principals. The principals are ORed together,
-   i.e. it matches if one of them matches.
+Each *rule* has the following semantics -
+1. Each *rule* has a *name*, a *source* and a *request* to match against. For a *rule*
+   to match, both *source* and *request* must match.
+   - If both *source* and *request* are empty, the *rule* always matches. It is a
+     wildcard that can be used in a deny list to deny all RPCs or in a allow list to
+     accept all RPCs except those matching in the deny list.
+   - If only *source* is empty, we evaluate against the *request* fields and apply
+     that to any user (See example below). Similarly, if only *request* is empty, we
+     evaluate against the *source* fields and apply that to any action.
+2. Each *source* could contain a list of *principals*. The *principals* are ORed
+   together, i.e. it matches if one of them matches.
    Sequence of steps to evaluate each principal from config -
    1. If TLS is not used, matching fails.
-   2. A match is found if principal matches any one of URI SANs or DNS SANs or Subject
-      field from x509 client certificate.
+   2. A match is found if principal matches URI SANs from the client certificate. If
+      there are no URI SANs in certificate, or no match was found, we check against
+      DNS SANs. Similarly, if certificate has no DNS SANs or match wasn't found, we
+      check against Subject field from certificate. We move to next step, if subject
+      does not match principal.
    3. We also get a match if there is no client certificate, and principal is an empty
       string.
-3. Each request could contain a list of URL paths (i.e. fully qualified RPC methods)
-   and list of http headers to match. Refer JSON schema above to understand matching
-   semantics.
+   If the *principals* list is empty, we only check for step 1 above, i.e. applies to
+   any user that is authenticated.
+3. Each *request* could contain a list of URL *paths* (i.e. fully qualified RPC
+   methods) and list of http *headers* to match. Refer JSON schema above to
+   understand matching semantics.
+   - If the sub-fields are empty, like if the *paths* is empty (assuming *headers*
+     is unset), the behavior would be similar to an empty *request* since no other
+     *request* fields are set.
 
 #### Example
 
@@ -286,8 +296,9 @@ different languages.
 1. Static Initialization
 
 ```C++
+grpc::Status status;
 std::shared_ptr<AuthorizationPolicyProviderInterface> provider = 
-	StaticDataAuthorizationPolicyProvider::Create(authz_policy);
+	StaticDataAuthorizationPolicyProvider::Create(authz_policy, &status);
 ServerBuilder builder;
 builder.SetAuthorizationPolicyProvider(provider);
 std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
@@ -296,8 +307,9 @@ std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 2. Dynamic file reloading
 
 ```C++
+grpc::Status status;
 std::shared_ptr<AuthorizationPolicyProviderInterface> provider = 
-	FileWatcherAuthorizationPolicyProvider::Create(authz_policy_path, /*refresh_interval_sec=*/3600);
+	FileWatcherAuthorizationPolicyProvider::Create(authz_policy_path, /*refresh_interval_sec=*/3600, &status);
 ServerBuilder builder;
 builder.SetAuthorizationPolicyProvider(provider);
 std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
