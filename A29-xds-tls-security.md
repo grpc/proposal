@@ -51,14 +51,14 @@ enable (or disable) the use of these configurations.
 
 We need a mechanism by which a programmer can "opt in" to allow the use of xDS provided security
 configuration for a gRPC channel or server. This is achieved by supplying an `XdsChannelCredentials`
-(to a channel) or an `XdsServerCredentials` (to a server). These two new credentials types are an extension
-of the existing channel or server credentials types in each language. Each `Xds*Credentials` needs to
-be provided with a "fallback credentials". The fallback credentials is used in the following cases:
+(to a channel) or an `XdsServerCredentials` (to a server). These two new credentials types extend
+the existing channel or server credentials types in each language. Each `Xds*Credentials` needs to
+be provided with _fallback credentials_. The fallback credentials are used in the following cases:
 
-- when xDS is not in use such as when the `xds:` scheme is not used on the client side
+- when xDS is not in use (such as when the `xds:` scheme is not used on the client side)
 
-- xDS is in use but the control plane does not provide security configuration. The gRPC behavior
-in this case is different from Envoy's due to fallback credentials. Envoy will just
+- xDS is in use, but the control plane does not provide security configuration. The gRPC behavior
+in this case is different from Envoy's due to fallback credentials. Envoy will
 use plaintext (insecure) communication mode in this case. But with gRPC, the application
 needs to use InsecureCredentials as the fallback credentials to get the same result.
 
@@ -393,7 +393,7 @@ whose schema is defined by that plugin.
 
 The structure in the bootstrap file is as follows:
 
-```
+```jsonc
 "certificate_providers": {
   "instance_name": {
     "plugin_name": "implementation_name",
@@ -424,7 +424,7 @@ in the [JSON format described for a `Duration`][DURATION-JSON] protobuf message.
 
 For example, the bootstrap file might contain the following:
 
-```
+```jsonc
   "certificate_providers": {
     "google_cloud_private_spiffe": { // certificate_provider_instance name
       "plugin_name": "file_watcher", // name of the plugin instance
