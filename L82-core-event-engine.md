@@ -83,8 +83,7 @@ C++ `ResourceQuota` system.
 class SliceAllocator {
  public:
   virtual ~SliceAllocator() = default;
-  using AllocateCallback =
-      std::function<void(absl::Status, SliceBuffer* buffer)>;
+  using AllocateCallback = std::function<void(absl::Status)>;
   /// Requests \a size bytes from gRPC, and populates \a dest with the allocated
   /// slices. Ownership of the \a SliceBuffer is not transferred.
   ///
@@ -252,7 +251,7 @@ class EventEngine {
   virtual absl::StatusOr<std::unique_ptr<Listener>> CreateListener(
       Listener::AcceptCallback on_accept, Callback on_shutdown,
       const EndpointConfig& args,
-      SliceAllocatorFactory slice_allocator_factory) = 0;
+      std::unique_ptr<SliceAllocatorFactory> slice_allocator_factory) = 0;
   /// Creates a client network connection to a remote network listener.
   ///
   /// \a Connect may return an error status immediately if there was a failure
@@ -264,12 +263,12 @@ class EventEngine {
   /// Implementation Note: it is important that the \a slice_allocator be used
   /// for all read/write buffer allocations in the EventEngine implementation.
   /// This allows gRPC's \a ResourceQuota system to monitor and control memory
-  /// usage with graceful degradation mechanisms. Please see the \a
-  /// SliceAllocator API for more information.
+  /// usage with graceful degradation mechanisms. Please see the
+  /// \a SliceAllocator API for more information.
   virtual absl::Status Connect(OnConnectCallback on_connect,
                                const ResolvedAddress& addr,
                                const EndpointConfig& args,
-                               SliceAllocator slice_allocator,
+                               std::unique_ptr<SliceAllocator> slice_allocator,
                                absl::Time deadline) = 0;
 ```
 
