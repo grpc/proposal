@@ -144,8 +144,13 @@ Use of XdsServerCredentials:
 
 ### xDS Protocol
 
-gRPC uses CDS to configure client side security and LDS for server side security as described below.
-The required fields were added to xDS v3 hence xDS v3 is a pre-requisite for this proposal.
+xDS v3 is a pre-requisite for this proposal because the required fields were added to xDS v3. 
+gRPC uses CDS to configure client side security and LDS for server side security as described in the
+sections below. The sections describe how the CDS or LDS updates are processed by gRPC. Note that gRPC
+always validates all security configurations in CDS or LDS regardless of whether an XdsChannelCredentials
+or XdsServerCredentials is in force. If validation fails, the update is NACKed. When an update is
+accepted the correponding security configuration in CDS or LDS is used if the corresponding
+Xds*Credentials is in force.
 
 #### CDS for Client Side Security
 
@@ -160,19 +165,21 @@ For example, C-core uses channel args to pass security configuration down, where
 Java constructs a dynamic `SslContextProvider` that is directly usable by a sub-channel's
 TLS handshaker to build an `SslContext` for the pending TLS handshake.
 
-Only when a channel is using `XdsChannelCredentials`, gRPC uses the security configuration
-in `UpstreamTlsContext`. [`common_tls_context`][CTC] in the `UpstreamTlsContext` contains
-the required security configuration. See below for [`CommonTlsContext`][CTC-type] processing.
+[`common_tls_context`][CTC] in the `UpstreamTlsContext` contains the required security
+configuration. See below for [`CommonTlsContext`][CTC-type] processing.
 
 A secure client at a minimum requires [`validation_context_certificate_provider_instance`][VCCPI1]
 inside [`combined_validation_context`][CVC] to be able to validate the server certificate
-in the TLS mode. If this field is not set, gRPC will NACK the CDS update. The client identity
-certificate is configured via the [`tls_certificate_certificate_provider_instance`][TCCPI]
-field which is optional. The client certificate is sent to the server if the server requests
-or requires it in the TLS handshake. If the server requires the client certificate but is not
-present then the TLS handshake fails.
+in the TLS mode. As part of validating all CDS updates, if this field is not set in a CDS,
+gRPC will NACK the CDS update. The client identity certificate is configured via the
+[`tls_certificate_certificate_provider_instance`][TCCPI] field which is optional. The
+client certificate is sent to the server if the server requests or requires it in the
+TLS handshake. If the server requires the client certificate but is not
+configured on the client side then the TLS handshake will fail because of the client's inability
+to send the certificate.
 
-If any of the following fields are present, gRPC will NACK the CDS update:
+As part of validating all CDS updates, if any of the following fields are present, gRPC
+will NACK a CDS update:
 
 * [sni][SNI]
 * [allow_renegotiation][ALLOW-RENEG]
@@ -193,14 +200,34 @@ If any of the following fields are present, gRPC will NACK the CDS update:
 a server for the connection as described below. This check is in lieu of the
 canonical [hostname check in Web PKI][RFC6125-6].
 
-If [match_subject_alt_names][] in [default_validation_context][]
-of [combined_validation_context][CVC] of the received `UpstreamTlsContext` is populated
-then gRPC validates the SAN entries in the server certificate by matching the
-`match_subject_alt_names` values using the [StringMatcher][] semantics.
-If the match does not succeed the connection attempt fails indicating a
-"certificate check failure".
+If [`match_subject_alt_names`][match_subject_alt_names] in
+[`default_validation_context`][default_validation_context] of
+[combined_validation_context][CVC] of the received `UpstreamTlsContext` is populated
+then gRPC checks the SAN entries in the leaf server certificate against the
+`match_subject_alt_names` values as follows:
 
-Individual Implementations will use hooks provided by the underlying TLS framework to
+* if the `match_subject_alt_names` list is empty then there is nothing to match and the
+check succeeds.
+
+* if there is no leaf server certificate, or there are no SAN entries in the certificate
+the check fails.
+
+* each SAN entry of type DNS, URI and IP address is considered for the below match
+logic. If an entry matches as per the logic, the check succeeds and it exits the check
+logic.
+
+  * if the SAN entry is empty then the match fails for that entry.
+
+  * the SAN entry is matched against each value of
+[`match_subject_alt_names`][match_subject_alt_names] as follows.
+    * A `match_subject_alt_names` is a [`StringMatcher`][StringMatcher] and
+    the match is performed as per the semantics described for each `match_pattern`
+    in the [`StringMatcher`][StringMatcher] type. If there is a match, then the
+    check succeeds and it exits the check logic.
+
+If the check fails, the connection attempt fails with a "certificate check failure".
+
+Individual implementations will use hooks provided by the underlying TLS framework to
 implement server authorization. As an example, Java uses a custom `X509TrustManager`
 implementation through the `SslContext` provided to the client sub-channel.
 
@@ -220,33 +247,34 @@ the security (and other) configuration for that connection as described in the
 [`FilterChainMatch`][filter-chain-match] section. The [`transport_socket`][transport-socket]
 of the matched (selected) `filter_chain` is used to extract the
 [`DownstreamTlsContext`][DTC] as described [here][transport-socket-comment].
-If the `transport_socket` name is not `envoy.transport_sockets.tls` i.e.
-something we don't recognize, gRPC will NACK the LDS update. Otherwise
-the `DownstreamTlsContext` thus obtained is used for the incoming connection
-if the server is using `XdsServerCredentials`. How the security configuration
-in `DownstreamTlsContext` is made available to the incoming connection is language
-dependent. For example, Java constructs a dynamic `SslContextProvider` that is
-directly usable by the connection's TLS handshaker to build an `SslContext` for
-the upcoming TLS handshake. If there is no `DownstreamTlsContext` (such as when
-[`transport_socket`][transport-socket] is not present or is not named
-`"envoy.transport_sockets.tls"`) then gRPC uses the fallback credentials
-for the incoming connection.
+As part of validating all LDS updates, if a `transport_socket` name is not
+`envoy.transport_sockets.tls` i.e. something we don't recognize, gRPC will
+NACK an LDS update. Otherwise the `DownstreamTlsContext` thus obtained is used
+for the incoming connection if the server is using `XdsServerCredentials`.
+How the security configuration in `DownstreamTlsContext` is made available to
+the incoming connection is language dependent. For example, Java constructs a
+dynamic `SslContextProvider` that is directly usable by the connection's TLS
+handshaker to build an `SslContext` for the upcoming TLS handshake. If there
+is no `DownstreamTlsContext` (such as when [`transport_socket`][transport-socket]
+is not present) then gRPC uses the fallback credentials for the incoming connection.
 
 [`common_tls_context`][CTC1] in the `DownstreamTlsContext` contains the required
 security configuration. See below for [`CommonTlsContext`][CTC-type] processing.
 
 A secure server at a minimum requires an identity certificate which is provided
 by [`tls_certificate_certificate_provider_instance`][TCCPI]. If that field is
-empty, gRPC will NACK the update. If
+empty, gRPC will NACK an update as part of validating all LDS updates. If
 [`validation_context_certificate_provider_instance`][VCCPI1] inside
 [`combined_validation_context`][CVC] is provided then the server will request
 the client certificate. When [`require_client_certificate`][RCC] is `true`,
 gRPC requires the client certificate and will reject a connection without a valid
 client certificate. When [`require_client_certificate`][RCC] is `true`, the
 [`validation_context_certificate_provider_instance`][VCCPI1] value should be
-present otherwise gRPC will NACK the LDS update.
+present otherwise gRPC will NACK an LDS update as part of validating all LDS
+updates.
 
-If any of the following fields are present, gRPC will NACK the LDS update:
+If any of the following fields are present, gRPC will NACK an LDS update as
+part of validating all LDS updates:
 
 * [require_sni][REQ-SNI]
 * [session_ticket_keys][SESSION-TICKET-KEYS]
@@ -296,33 +324,34 @@ gRPC does not support the other certificate acquisition mechanisms specified by 
 * [validation_context_certificate_provider][VAL-PROVIDER]
 
 When fields of type [`CertificateProviderInstance`][CPI] are present gRPC ignores the respective
-unsupported fields but if the unsupported fields are present by themselves gRPC will NACK the update.
+unsupported fields but if the unsupported fields are present by themselves gRPC will NACK an update
+as part of validating all CDS/LDS updates.
 
 For example, in [`UpstreamTlsContext`][UTC] (on the client side), the identity certificate is not
 needed for the TLS mode, which is indicated by [`tls_certificate_certificate_provider_instance`][TCCPI]
 being absent. However in this case if any of the other unsupported identity certificate fields
 ([tls_certificates][TLS-CERT], [tls_certificate_sds_secret_configs][CERT-SDS],
-[tls_certificate_certificate_provider][CERT-PROVIDER]) are present then gRPC will NACK the update.
+[tls_certificate_certificate_provider][CERT-PROVIDER]) are present then gRPC will NACK a CDS update.
 But if [`tls_certificate_certificate_provider_instance`][TCCPI] is present, then the unsupported
 fields are ignored. This allows a control plane to formulate a single `CommonTlsContext` that works
 for both gRPC (which only supports [`CertificateProviderInstance`][CPI]) and Envoy (which does not
 support [`CertificateProviderInstance`][CPI]) to achieve consistent security configuration between
 gRPC and Envoy.
 
-The following fields are unsupported and if present will cause a NACK from gRPC:
+The following fields are unsupported and if present will cause a NACK from gRPC for any update:
 
 * [tls_params][TLS-PARAMS]
 * [custom_handshaker][CUSTOM-HS]
 
-[alpn_protocols][ALPN-PROTOCOLS] on server side (inside [`DownstreamTlsContext`][DTC]) should
-be absent. On the client side (inside [`UpstreamTlsContext`][UTC]) it is ignored if present.
+[alpn_protocols][ALPN-PROTOCOLS] on server side (inside [`DownstreamTlsContext`][DTC]) and
+on the client side (inside [`UpstreamTlsContext`][UTC]) is ignored if present.
 The processing and parsing of `CommonTlsContext` inside any particular CDS or LDS response does
 not take into account whether Xds credentials are in effect for the respective channel or server.
 
-[`combined_validation_context`][CVC] is validated as follows: [default_validation_context][]
-is accepted only on the client side i.e. inside `UpstreamTlsContext`. And inside that field
-only [match_subject_alt_names][] is processed as described [above][server-authz]. If any of
-the other fields (listed below) are present, the update is NACKed.
+[`combined_validation_context`][CVC] is validated in any CDS/LDS update as follows:
+[default_validation_context][] is accepted only on the client side i.e. inside `UpstreamTlsContext`.
+And inside that field only [match_subject_alt_names][] is processed as described [above][server-authz].
+If any of the other fields (listed below) are present, the update is NACKed.
 
 * `trusted_ca`
 * `watched_directory`
@@ -375,7 +404,7 @@ provider instance name. For example, an on-prem client may get its certificate u
 provider whereas a client running in cloud may use a cloud-vendor provided implementation to obtain
 the certificate.
 
-gRPC provides a `CertificateProvider` plugin API that can support multiple implementations. The plugin API
+gRPC offers a `CertificateProvider` plugin API that can support multiple implementations. The plugin API
 is not currently public, so applications cannot currently add their own provider implementations although
 we might make this API public in the future. However gRPC currently includes a `file_watcher` provider
 implementation - descibed [below][FILE-WATCHER-LINK] - which reads certificates from the local file system.
