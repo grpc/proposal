@@ -85,7 +85,12 @@ Each filter implementation will provide the following:
 - An indication of whether it is supported on the gRPC client and/or gRPC
   server.
 - An indication of whether the filter is a terminal filter (i.e., it
-  must be the last filter in the filter chain).
+  must be the last filter in the filter chain).  (Note that the
+  [router filter](#the-router-filter) is currently the only terminal
+  filter supported by gRPC, so implementations may choose to hard-code
+  the requirement that that filter is the last filter in the chain
+  instead of supporting a general-purpose mechanism to determine whether
+  a given filter is a terminal filter.)
 - Methods to generate and configure the appropriate filters or
   interceptors in gRPC to perform the necessary functionality on the
   data plane.
@@ -155,7 +160,9 @@ response, it will validate the list of filters as follows:
   for its top-level config and its override config).  In addition,
   validation will fail if a terminal filter is not the last filter in
   the chain or if a non-terminal filter is the last filter in the chain.
-  Any validation error will cause the Listener resource to be NACKed.
+  (Note that the only currently supported terminal filter is the [router
+  filter](#the-router-filter).)  Any validation error will cause the
+  Listener resource to be NACKed.
 
 #### Filter Config Overrides
 
@@ -236,9 +243,9 @@ gRPC will support the [router
 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter),
 which is used for the proto message type
 [`envoy.extensions.filters.http.router.v3.Router`](https://github.com/envoyproxy/envoy/blob/18db4c90e3295fb2c39bfc7b2ce641cfd6c3fbed/api/envoy/extensions/filters/http/router/v3/router.proto#L23).
-This filter is a terminal filter, so it must be the last one in the
-filter chain, and that requirement will be enforced at config validation
-time.
+This filter is a terminal filter, and it is currently the only terminal
+filter supported by gRPC, so it must be the last one in the filter chain.
+This will be enforced at config validation time, as described above.
 
 Note that gRPC will not actually have a discrete filter implementation
 for the router filter; instead, this filter will simply trigger the
