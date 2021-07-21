@@ -317,7 +317,7 @@ different languages.
 
 #### C++
 
-1. Application enables SDK authorization in gRPC Servers.
+1. Application enables SDK authorization in gRPC Server.
 
 - Policy is statically initialized
 
@@ -348,20 +348,44 @@ std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 /** Channel args for grpc_authorization_policy_provider. If present, enables gRPC authorization check. */
 #define GRPC_ARG_AUTHORIZATION_POLICY_PROVIDER "grpc.authorization_policy_provider"
 
-/** Opaque type. */
+/**
+ * An opaque type that is responsible for providing authorization policies to
+ * gRPC.
+ */
 typedef struct grpc_authorization_policy_provider grpc_authorization_policy_provider;
 
-/** Create grpc_authorization_policy_provider using SDK authorization policy from static string.*/
+/**
+ * Creates a grpc_authorization_policy_provider using SDK authorization policy
+ * from static string.
+ * - authz_policy is the input SDK authorization policy.
+ * - code is the error status code on failure. On success, it equals
+ *   GRPC_STATUS_OK.
+ * - error_details contains details about the error if any. If the
+ *   initialization is successful, it will be null. Caller must use gpr_free to
+ *   destroy this string.
+ */
 GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_static_data_create(
-    const char* authz_policy, grpc_error* error);
+    const char* authz_policy, grpc_status_code* code, const char** error_details);
 
-/** Create grpc_authorization_policy_provider using SDK authorization policy from filesystem.
- *  This provider will watch for changes in policy file. */
+/**
+ * Creates a grpc_authorization_policy_provider using SDK authorization policy
+ * from filesystem.
+ * - authz_policy_path is the file path of SDK authorization policy.
+ * - refresh_interval_sec is the refreshing interval that we will check the
+ *   policy file for updates.
+ * - code is the error status code on failure. On success, it equals
+ *   GRPC_STATUS_OK.
+ * - error_details contains details about the error if any. If the
+ *   initialization is successful, it will be null. Caller must use gpr_free to
+ *   destroy this string.
+ */
 GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_file_watcher_create(
-	const char* authz_policy_path, unsigned int refresh_interval_sec, grpc_error* error);
+	const char* authz_policy_path, unsigned int refresh_interval_sec, grpc_status_code* code, const char** error_details);
 
-/** Releases grpc_authorization_policy_provider object. The creator of
- *  grpc_authorization_policy_provider is responsible for its release. */
+/**
+ * Releases grpc_authorization_policy_provider object. The creator of
+ * grpc_authorization_policy_provider is responsible for its release.
+ */
 GRPCAPI void grpc_authorization_policy_provider_release(grpc_authorization_policy_provider* provider);
 
 ```
@@ -511,7 +535,7 @@ class GrpcAuthorizationEngine : public AuthorizationEngine {
 
 #### Go
 
-1. Application enables SDK authorization in gRPC Servers.
+1. Application enables SDK authorization in gRPC Server.
 
 - Policy is statically initialized
 
@@ -653,12 +677,12 @@ type RPCData struct {
 }
 
 type engine struct {
-	policies map[string]*policyMatcher
-	action action
+  policies map[string]*policyMatcher
+  action action
 }
 
 type ChainEngine struct {
-	chainedEngines []*engine
+  chainedEngines []*engine
 }
 
 // NewChainEngine returns a chain of RBAC Engines, used to make authorization decisions on
@@ -671,7 +695,7 @@ func (cre *ChainEngine) IsAuthorized(ctx context.Context) error {}
 
 #### Java
 
-1. Application enables SDK authorization in gRPC Servers.
+1. Application enables SDK authorization in gRPC Server.
 
 - Policy is statically initialized
 
@@ -849,7 +873,6 @@ public class AuthorizationDecision {
 }
 
 public class RbacEngine {
-  // Constructor.
   public RbacEngine(RBAC policy);
   // Given a RPC call and headers, evaluate the policy.
   public AuthorizationDecision evaluate(
