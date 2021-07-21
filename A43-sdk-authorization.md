@@ -1,7 +1,7 @@
 A43: SDK authorization
 
 * Author(s): [Ashitha Santhosh](https://github.com/ashithasantosh)
-* Approver: [Doug Fawley](https://github.com/dfawley)
+* Approver: [Doug Fawley](https://github.com/dfawley),
             [Eric Anderson](https://github.com/ejona86),
             [Mark Roth](https://github.com/markdroth),
             [Sanjay Pujare](https://github.com/sanjaypujare),
@@ -274,6 +274,30 @@ In the following policy example
 }
 ```
 
+### High level Implementation
+
+gRPC Authorization internally implements RBAC Engines based on Envoy RBAC policies.
+RBAC policy provides service-level and method-level access control for a service.
+Engines process incoming RPC request attributes against policy configs and make a
+decision on whether to allow or deny the request. The decision depends on the type
+of policy (if the policy is an allowlist or denylist) and whether a matching policy
+was found. Engine implementation is shared by xDS and SDK authorization.
+
+[RBAC filter]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/http/rbac/v3/rbac.proto
+
+In SDK authorization, user supplies gRPC SDK authorization policy to policy provider
+interface. In the case of file watcher, the provider is responsible for initializing
+the thread(C++)/ goroutine(Go)/ scheduled service(Java) which will be used to read
+the policy file periodically. The provider then forwards the JSON policy to Policy
+translator. The translator converts JSON policy to Envoy RBAC protos (Allow and/or
+Deny policy). Note that SDK authorization policy is a subset of Envoy RBAC, and it
+does not support all the fields that are present in Envoy RBAC. Ultimately the
+generated RBAC policies are used to create Envoy RBAC engine(s).
+
+For each incoming RPC request, we will invoke the Evaluate functionality in Engines
+(Deny engine followed by Allow engine), to get the authorization decision. We use a
+C-core filter for C++, and interceptors for Java and Go.
+
 ### API
 
 gRPC will support both static initialization and dynamically reloading the policy
@@ -281,19 +305,21 @@ from filesystem. In static initialization, the policy will be provided as a JSON
 string. In dynamic file reloading, the application will specify the file path that
 contains the authorization policy in JSON format.
 
-We recommend the users to use a single SDK authorization policy per gRPC server.
-If there are multiple policies, then there is a possibility that all the policies
+We recommend users to use a single SDK authorization policy per gRPC server. If
+there are multiple policies, then there is a possibility that all the policies
 may not be evaluated against. For ex. if we have two policies for two different
 services say service A and service B. RPC to service B may get rejected, without
 even evaluating against service B policy, because it is evaluated after service A
 policy. On getting no match, service A policy could deny by default.
 
-Following code snippets show how to enable authorization in gRPC servers in 
+Following code snippets show how to enable authorization in gRPC servers in
 different languages.
 
 #### C++
 
-1. Static Initialization
+1. Application enables SDK authorization in gRPC Servers.
+
+- Policy is statically initialized
 
 ```C++
 grpc::Status status;
@@ -304,20 +330,190 @@ builder.SetAuthorizationPolicyProvider(provider);
 std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 ```
 
-2. Dynamic file reloading
+- Policy is reloaded dynamically from file path
 
 ```C++
 grpc::Status status;
 std::shared_ptr<AuthorizationPolicyProviderInterface> provider = 
-	FileWatcherAuthorizationPolicyProvider::Create(authz_policy_path, /*refresh_interval_sec=*/3600, &status);
+	FileWatcherAuthorizationPolicyProvider::Create(
+		authz_policy_path, /*refresh_interval_sec=*/3600, &status);
 ServerBuilder builder;
 builder.SetAuthorizationPolicyProvider(provider);
 std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 ```
 
+2. C-core APIs
+
+```C++
+/** Channel args for grpc_authorization_policy_provider. If present, enables gRPC authorization check. */
+#define GRPC_ARG_AUTHORIZATION_POLICY_PROVIDER "grpc.authorization_policy_provider"
+
+/** Opaque type. */
+typedef struct grpc_authorization_policy_provider grpc_authorization_policy_provider;
+
+/** Create grpc_authorization_policy_provider using SDK authorization policy from static string.*/
+GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_static_data_create(
+    const char* authz_policy, grpc_error* error);
+
+/** Create grpc_authorization_policy_provider using SDK authorization policy from filesystem.
+ *  This provider will watch for changes in policy file. */
+GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_file_watcher_create(
+	const char* authz_policy_path, unsigned int refresh_interval_sec, grpc_error* error);
+
+/** Releases grpc_authorization_policy_provider object. The creator of
+ *  grpc_authorization_policy_provider is responsible for its release. */
+GRPCAPI void grpc_authorization_policy_provider_release(grpc_authorization_policy_provider* provider);
+
+```
+
+3. C-core Authorization Providers
+
+```C++
+struct grpc_authorization_policy_provider
+    : public DualRefCounted<grpc_authorization_policy_provider> {
+  virtual AuthorizationEngines engines() const= 0;
+};
+
+// Provider class will get SDK Authorization policy from string during
+// initialization. This policy will be translated to Envoy RBAC policies and
+// used to initialize allow and deny AuthorizationEngine objects. This provider
+// will return the same authorization engines everytime.
+class StaticDataAuthorizationPolicyProvider
+    : public grpc_authorization_policy_provider {
+ public:
+  static absl::StatusOr<RefCountedPtr<grpc_authorization_policy_provider>>
+  	Create(absl::string_view authz_policy);
+
+ private:
+  RefCountedPtr<AuthorizationEngine> allow_engine_;
+  RefCountedPtr<AuthorizationEngine> deny_engine_;
+};
+
+// Provider class that will get SDK Authorization Policy by watching for changes in
+// filesystem. When we read the file contents for the first time, we will translate
+// the SDK Authorization policy from file to Envoy RBAC policy and use the
+// the Envoy RBAC policy to initialize allow and deny grpc_authorization_engine
+// objects. This class contains a refresh thread, which will periodically (every
+// refresh_interval_sec) load file contents in specified path, and upon
+// modification invoke translator code, and replace existing engines with new
+// engines initialized with new policy.
+class FileWatcherAuthorizationPolicyProvider final
+        : public grpc_authorization_policy_provider {
+  public:
+    static absl::StatusOr<RefCountedPtr<grpc_authorization_policy_provider>>
+        Create(const std::string& authz_policy_path,
+            unsigned int refresh_interval_sec){
+    // We will perform an initial read, upon failure return error back to
+    // application. This is required to ensure that the file watcher provider
+    // always has a valid policy to make authorization decisions against. Once we
+    // have a valid policy, and if the reload fails (due to invalid policy or I/O
+    // error), we will continue using the latest valid policy to make authorization
+    // decisions.
+    }
+
+  private:
+    RefCountedPtr<AuthorizationEngine>> allow_engine_;
+    RefCountedPtr<AuthorizationEngine>> deny_engine_;
+};
+
+```
+
+4. C++ authorization providers
+
+```C++
+// C++ wrapper around C-core grpc_authorization_policy_provider type.
+class AuthorizationPolicyProviderInterface {
+ public:
+  virtual ~AuthorizationPolicyProviderInterface() = default;
+  virtual grpc_authorization_policy_provider* c_provider() = 0;
+};
+
+class StaticDataAuthorizationPolicyProvider
+      : public AuthorizationPolicyProviderInterface {
+ public:
+  static std::unique_ptr<StaticDataAuthorizationPolicyProvider>
+     Create(const std::string& authz_policy, grpc::Status* status);
+
+  ~StaticDataAuthorizationPolicyProvider override() {
+    grpc_autz_provider_release(provider_);
+  }
+ private:
+  grpc_authorization_policy_provider* provider_;
+};
+
+// Similarly for FileWatcherAuthorizationPolicyProvider.
+class FileWatcherAuthorizationPolicyProvider final
+    : public AuthorizationPolicyProviderInterface {
+ public:
+  static std::unique_ptr<FileWatcherAuthorizationPolicyProvider>
+    Create(const std::string& authz_policy_path,
+           unsigned int refresh_interval_sec,
+           grpc::Status* status);
+};
+
+
+```
+
+5. SDK policy translator
+
+```C++
+struct RbacPolicies {
+  Rbac deny_policy;
+  Rbac allow_policy;
+};
+
+// Translates SDK authorization policy to Envoy RBAC policies. Returns
+// error on failure.
+// authz_policy: Authorization Policy string in JSON format.
+absl::StatusOr<RbacPolicies> GenerateRbacPolicies(
+    absl::string_view authz_policy);
+```
+
+6. RBAC Engine
+
+```C++
+// Interface for gRPC authorization engines
+class AuthorizationEngine : public RefCounted<AuthorizationEngine> {
+ public:
+  struct Decision {
+    enum class Type {
+      kAllow,
+      kDeny,
+    };
+    Type type;
+    std::string matching_policy_name;
+  };
+
+  virtual Decision Evaluate(const EvaluateArgs& args) const = 0;
+};
+
+// GrpcAuthorizationEngine can be either an Allow engine or Deny engine. This
+// engine makes authorization decisions to Allow or Deny incoming RPC request
+// based on permission and principal configs in the provided RBAC policy and the
+// engine type. This engine ignores condition field in RBAC config. It is the
+// caller's responsibility to provide RBAC policies that are compatible with
+// this engine.
+class GrpcAuthorizationEngine : public AuthorizationEngine {
+ public:
+  // Builds GrpcAuthorizationEngine without any policies.
+  explicit GrpcAuthorizationEngine(Rbac::Action action) : action_(action) {}
+  // Builds GrpcAuthorizationEngine with allow/deny RBAC policy.
+  explicit GrpcAuthorizationEngine(Rbac policy);
+
+  // Evaluates incoming request against RBAC policy and makes a decision to
+  // whether allow/deny this request.
+  Decision Evaluate(const EvaluateArgs& args) const override;
+
+  //...
+};
+
+```
+
 #### Go
 
-1. Static initialization
+1. Application enables SDK authorization in gRPC Servers.
+
+- Policy is statically initialized
 
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
@@ -330,7 +526,7 @@ serverOpts := []grpc.ServerOption{
 s := grpc.NewServer(serverOpts...)
 ```
 
-2. Dynamic File Reloading
+- Policy is reloaded dynamically from file path
 
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
@@ -345,9 +541,139 @@ s := grpc.NewServer(serverOpts...)
 defer i.Close()
 ```
 
+2. Authorization Server Interceptors
+
+- Static initialization
+
+```Go
+package authz
+
+type StaticInterceptors struct {
+  denyEngine  Engine
+  allowEngine Engine
+}
+
+// NewStatic returns a new StaticInterceptors from a static authorization policy
+// JSON string.
+func NewStatic(authzPolicy string) (*StaticInterceptors, error) {
+  // ...
+}
+
+func (i *StaticInterceptors) UnaryInterceptor(
+	ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler)
+		(resp interface{}, err error) {
+  // First invoke denyEngine.Evaluate. If the evaluation result is DENY, close the
+  // call with UNAUTHENTICATED error, otherwise invoke allowEngine.Evaluate. If the
+  // evaluation result from is ALLOW, invoke handler to complete the RPC. If no matches
+  // are found, deny the request by default, close the call with UNAUTHENTICATED error.
+}
+
+func (i *StaticInterceptors) StreamInterceptor(
+	srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler)
+		(err error) {
+  // Similar to UnaryInterceptor implementation.
+}
+```
+
+- Dynamic file reloading
+
+```Go
+package authz
+
+type FileWatcherInterceptors struct {
+  internalInterceptors StaticInterceptors
+  policyFile           string
+  policyContents       string
+  refreshDuration      time.Duration
+  cancel               context.CancelFunc
+}
+
+// NewFileWatcher returns a new FileWatcherInterceptors from a policy file
+// that contains JSON string of authorization policy and a refresh duration to
+// specify the amount of time between policy refreshes.
+func NewFileWatcher(file string, duration time.Duration) (*FileWatcherInterceptors, error) {
+  // Read the policy file and create new internal Interceptors. Will return error on
+  // failure.
+  // Creates a background go routine for policy refresh.
+  // ...
+}
+
+// run is a long running goroutine which watches for changes in file path, and
+// updates the internalInterceptors upon modification.
+func (i *FileWatcherInterceptors) run(ctx context.Context) {
+  // ...
+}
+
+// updateInternalInterceptors checks if the policy file that is watching has changed,
+// and if so, updates the internalInterceptors with the policy. Unlike the
+// constructor, if there is an error in reading the file or parsing the policy, the
+// previous internalInterceptors will not be replaced.
+func (i *FileWatcherInterceptors) updateInternalInterceptors() {
+  // ...
+}
+
+func (i *FileWatcherInterceptors) UnaryInterceptor(
+	ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) 
+		(resp interface{}, err error) {
+  return i.internalInterceptors.UnaryInterceptor(ctx, req, info, handler)
+}
+
+func (i *FileWatcherInterceptors) StreamInterceptor(
+	srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) 
+		(err error) {
+  return i.internalInterceptors.StreamInterceptor(srv, ss, info, handler)
+}
+
+// Close cleans up resources allocated by the interceptors.
+func (i *FileWatcherInterceptors) Close() {
+  i.cancel()
+}
+```
+
+3. SDK policy translator
+
+```Go
+package authz
+
+// Translates a gRPC authorization policy in JSON string to two Envoy RBAC policies (deny and
+// allow policy). If the policy cannot be parsed or is invalid, an error will be returned.
+func translatePolicy(policyStr string) (*v3rbacpb.RBAC, *v3rbacpb.RBAC, error) {}
+```
+
+4. RBAC Engine
+
+```Go
+package authz
+
+type RPCData struct {
+  MD metadata.MD
+  PeerInfo *peer.Peer
+  FullMethod string
+  // ...
+}
+
+type engine struct {
+	policies map[string]*policyMatcher
+	action action
+}
+
+type ChainEngine struct {
+	chainedEngines []*engine
+}
+
+// NewChainEngine returns a chain of RBAC Engines, used to make authorization decisions on
+// incoming RPCs. Returns a non-nil error for invalid policies.
+func NewChainEngine(policy []*v3rbacpb.RBAC) (*ChainEngine, error) {}
+
+// IsAuthorized determines if an incoming RPC is authorized based on chain of RBAC engines.
+func (cre *ChainEngine) IsAuthorized(ctx context.Context) error {}
+```
+
 #### Java
 
-1. Static initialization
+1. Application enables SDK authorization in gRPC Servers.
+
+- Policy is statically initialized
 
 ```Java
 AuthorizationServerInterceptor authzServerInterceptor;
@@ -359,12 +685,12 @@ try {
 Server server =
     Grpc.newServerBuilderForPort(port, serverCreds)
         .addService(service)
-        .intercept(authzServerInterceptor);
+        .intercept(authzServerInterceptor)
         .build()
         .start();
 ```
 
-2. Dynamic file reloading
+- Policy is reloaded dynamically from file path
 
 ```Java
 ScheduledExecutorService scheduledExecutor =
@@ -393,29 +719,144 @@ Server server =
 closeable.close();
 ```
 
-### High level Implementation
+3. Authorization Server Interceptors
 
-gRPC Authorization internally implements RBAC Engines based on Envoy RBAC policies.
-RBAC policy provides service-level and method-level access control for a service.
-Engines process incoming RPC request attributes against policy configs and make a
-decision on whether to allow or deny the request. The decision depends on the type
-of policy (if the policy is an allowlist or denylist) and whether a matching policy
-was found. Engine implementation is shared by xDS and SDK authorization.
+```Java
+package io.grpc.authz;
 
-[RBAC filter]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/http/rbac/v3/rbac.proto
+// Class of authorization server interceptor for static policy.
+public final class AuthorizationServerInterceptor implements ServerInterceptor {
+  private final RbacEngine denyRbacEngine;
+  private final RbacEngine allowRbacEngine;
 
-In SDK authorization, user supplies gRPC SDK authorization policy to policy provider
-interface. In the case of file watcher, the provider is responsible for initializing
-the thread(C++)/ goroutine(Go)/ scheduled service(Java) which will be used to read
-the policy file periodically. The provider then forwards the JSON policy to Policy
-translator. The translator converts JSON policy to Envoy RBAC protos (Allow and/or
-Deny policy). Note that SDK authorization policy is a subset of Envoy RBAC, and it
-does not support all the fields that are present in Envoy RBAC. Ultimately the
-generated RBAC policies are used to create Envoy RBAC engine(s).
+  // Constructor
+  private AuthorizationServerInterceptor(String authorizationPolicy) {
+    // Translate authorization policy into RBAC policies and then create engines.
+  }
 
-For each incoming RPC request, we will invoke the Evaluate functionality in Engines
-(Deny engine followed by Allow engine), to get the authorization decision. We use a
-C-core filter for C++, and interceptors for Java and Go.
+  @Override
+  public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
+      ServerCall<ReqT, RespT> call, Metadata headers,
+      ServerCallHandler<ReqT, RespT> next) {
+    // First invoke denyRbacEngine.evaluate(call, headers). If the evaluation result
+    // is DENY, close the call with UNAUTHENTICATED error, otherwise invoke
+    // allowRbacEngine.evaluate(call, headers). If the evaluation result from the
+    // allow engine is ALLOW, invoke the next call handler. If no matches are found,
+    // deny the request by default, close the call with UNAUTHENTICATED error.
+  }
+
+  // Static method that creates an AuthorizationServerInterceptor.
+  public static AuthorizationServerInterceptor create(String authorizationPolicy)
+      throws IllegalArgumentException {
+    return new AuthorizationServerInterceptor(authorizationPolicy);
+  }
+}
+
+// Class of authorization server interceptor for policy from file with refresh
+// capability.
+public final class FileAuthorizationServerInterceptor implements ServerInterceptor {
+  private volatile AuthorizationServerInterceptor internalAuthzServerInterceptor;
+  private final String policyFile;
+  private FileTime lastModifiedTime;
+
+  // Constructor
+  private FileAuthorizationServerInterceptor(File policyFile) {
+    // Read policy from policyFile and create an internalAuthzServerInterceptor. An
+    // IOException or IllegalArgumentException will be thrown if the policy file
+    // cannot be read initially or parsed correctly, respectively.
+  }
+
+  @Override
+  public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
+      ServerCall<ReqT, RespT> call, Metadata headers,
+      ServerCallHandler<ReqT, RespT> next) {
+    return internalAuthzServerInterceptor.interceptCall(call, headers, next);
+  }
+
+  // Check if the policy file has been modified, if so, read authorization policy
+  // from the policy file and create a new internalAuthzServerInterceptor.
+  // Unlike the constructor, IOException or IllegalArgumentException here will be
+  // caught and logged and the previous internalAuthzServerInterceptor will be
+  // continuously used.
+  void checkAndReloadPolicy();
+
+  // Closeable for scheduling policy refreshes.
+  public Closeable scheduleRefreshes(
+      long delay, TimeUnit unit, ScheduledExecutorService executor) {
+
+    final ScheduledFuture<Void> future =
+        executor.scheduleWithFixedDelay(delay, unit, new Runnable() {
+          @Override public void run() {
+            checkAndReloadPolicy();
+          }
+        });
+
+    return new Closeable() {
+      @Override public void close() {
+        future.cancel(false);
+      }
+    };
+  }
+
+  // Static method that creates a FileAuthorizationServerInterceptor.
+  public static FileAuthorizationServerInterceptor create(File policyFile)
+      throws IllegalArgumentException, IOException {
+    return new FileAuthorizationServerInterceptor(policyFile);
+  }
+}
+```
+
+4. SDK policy translator
+
+```Java
+package io.grpc.authz;
+
+class RbacPolicies {
+  private final RBAC denyRbacPolicy;
+  private final RBAC allowRbacPolicy;
+
+  private RbacPolicies(Builder builder);
+  RBAC getDenyRbacPolicy();
+  RBAC getAllowRbacPolicy();
+
+  static final class Builder {
+    // ...
+  }
+}
+
+class AuthorizationPolicyTranslator {
+  // Translate a gRPC authorization policy in JSON string to two RBAC policies, a
+  // deny RBAC policy followed by an allow RBAC policy. If the policy cannot be
+  // parsed or is invalid, an IllegalArgumentException will be thrown.
+  public static RbacPolicies translate(String authorizationPolicy)
+      throws IllegalArgumentException {
+  }
+}
+```
+
+5. RBAC Engine
+
+```Java
+package io.grpc.xds.internal.rbac;
+
+public class AuthorizationDecision {
+  public enum Decision {
+    ALLOW,
+    DENY,
+  }
+  private Decision decision;
+  private String matchingPolicyName;
+}
+
+public class RbacEngine {
+  // Constructor.
+  public RbacEngine(RBAC policy);
+  // Given a RPC call and headers, evaluate the policy.
+  public AuthorizationDecision evaluate(
+      ServerCall<ReqT, RespT> call, Metadata headers) {
+  }
+}
+```
 
 ## Rationale
 
