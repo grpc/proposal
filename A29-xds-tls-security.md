@@ -213,17 +213,19 @@ check succeeds.
 the check fails.
 
 * each SAN entry of type DNS, URI and IP address is considered for the below match
-logic. If an entry matches as per the logic, the check succeeds and it exits the check
-logic.
+logic. An IP address is converted to its canonical string representation. For
+IPv6 this includes [maximum zero compression][zero-compr], [no leading zeros][no-leading-0]
+and [lower case][lower-case] e.g. `2001:db8::1` but *not* `2001:DB8:0::01`.
+If an entry matches as per this logic, the check completes successfully.
 
-  * if the SAN entry is empty then the match fails for that entry.
+  * if a SAN entry is empty then the match fails for that entry.
 
-  * the SAN entry is matched against each value of
+  * a SAN entry is matched against each value of
 [`match_subject_alt_names`][match_subject_alt_names] as follows.
-    * A `match_subject_alt_names` is a [`StringMatcher`][StringMatcher] and
+    * A `match_subject_alt_names` value is a [`StringMatcher`][StringMatcher] and
     the match is performed as per the semantics described for each `match_pattern`
     in the [`StringMatcher`][StringMatcher] type. If there is a match, then the
-    check succeeds and it exits the check logic.
+    check completes successfully.
 
 If the check fails, the connection attempt fails with a "certificate check failure".
 
@@ -236,6 +238,9 @@ implementation through the `SslContext` provided to the client sub-channel.
 [CVC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251
 [StringMatcher]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L20
 [RFC6125-6]: https://datatracker.ietf.org/doc/html/rfc6125#section-6
+[zero-compr]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.2
+[no-leading-0]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.1
+[lower-case]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.3
 
 #### LDS for Server Side Security
 
