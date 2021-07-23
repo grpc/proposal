@@ -53,11 +53,13 @@ will be convered in a different proposal.
 gRPC SDK authorization policy is the user facing policy language that allows
 service owners and/or security admins to enable per-RPC authorization checks.
 
-SDK authorization policy guarantees stability and backward compatibility. So if
-a user writes a config, it will always be supported by gRPC unless the policy
-undergoes major versioning change like adding required fields. The policy is 
-extendable, we may add new fields in the future as new requirements are introduced, 
-we won’t be removing fields or updating semantics of existing fields.
+SDK authorization policy is extendable, we may add new fields in the future as
+new requirements are introduced, we won’t be removing fields or updating
+semantics of existing fields. However, this means if user wants to use policy
+with new fields, they need to use the right gRPC version. Using policy with new
+fields, with an older version of gRPC, will result in policy being marked invalid.
+This is essential, because otherwise we may end up allowing an RPC request without
+even evaluating the new field values in policy, which poses a security risk.
 
 Following is the JSON schema of SDK Authorization Policy Version 1.0
 
@@ -290,9 +292,12 @@ interface. In the case of file watcher, the provider is responsible for initiali
 the thread(C++)/ goroutine(Go)/ scheduled service(Java) which will be used to read
 the policy file periodically. The provider then forwards the JSON policy to Policy
 translator. The translator converts JSON policy to Envoy RBAC protos (Allow and/or
-Deny policy). Note that SDK authorization policy is a subset of Envoy RBAC, and it
-does not support all the fields that are present in Envoy RBAC. Ultimately the
-generated RBAC policies are used to create Envoy RBAC engine(s).
+Deny policy). Translator errors out on I/O errors or if the policy does not
+represent JSON schema it currently supports.
+
+Note that SDK authorization policy is a subset of Envoy RBAC, and it does not
+support all the fields that are present in Envoy RBAC. Ultimately the generated
+RBAC policies are used to create Envoy RBAC engine(s).
 
 For each incoming RPC request, we will invoke the Evaluate functionality in Engines
 (Deny engine followed by Allow engine), to get the authorization decision. We use a
