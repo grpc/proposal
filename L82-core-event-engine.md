@@ -56,21 +56,16 @@ An EventEngine is roughly composed of:
 namespace grpc_event_engine {
 namespace experimental {
 
-/// A set of parameters used to configure an endpoint, either when initiating a
-/// new connection on the client side or when listening for incoming connections
-/// on the server side. An EndpointConfig contains a set of zero or more
-/// Settings. Each setting has a unique name, which can be used to fetch that
-/// Setting via the Get() method. Each Setting has a value, which can be an
-/// integer, string, or void pointer. Each EE impl should define the set of
-/// Settings that it supports being passed into it, along with the corresponding
-/// type.
+/// Collection of parameters used to configure client and server endpoints. The
+/// \a EndpointConfig maps string-valued keys to values of type int,
+/// string_view, or void pointer. Each EventEngine implementation should
+/// document its set of supported configuration options.
 class EndpointConfig {
  public:
   virtual ~EndpointConfig() = default;
   using Setting = absl::variant<absl::monostate, int, absl::string_view, void*>;
-  /// Returns an EndpointConfig Setting. If there is no Setting associated with
-  /// \a key in the EndpointConfig, an \a absl::monostate type will be
-  /// returned. Caller does not take ownership of resulting value.
+  /// Returns the Setting for a specified key, or \a absl::monostate if there is
+  /// no such entry. Caller does not take ownership of the resulting value.
   virtual Setting Get(absl::string_view key) const = 0;
 };
 ```
@@ -106,9 +101,9 @@ class SliceAllocatorFactory {
  public:
   virtual ~SliceAllocatorFactory() = default;
   /// On Endpoint creation, call \a CreateSliceAllocator with the name of the
-  /// endpoint peer (a URI string, most likely). The caller takes ownership of
-  /// the SliceAllocator.
-  virtual SliceAllocator* CreateSliceAllocator(absl::string_view peer_name) = 0;
+  /// endpoint peer (a URI string, most likely).
+  virtual std::unique_ptr<SliceAllocator> CreateSliceAllocator(
+      absl::string_view peer_name) = 0;
 };
 ```
 
@@ -118,16 +113,16 @@ Finally, many `EventEngine` pieces rely on `Callback`s, `TaskHandle`s, and
 ```cpp
 class EventEngine {
  public:
-  /// A basic callable function. The first argument to all callbacks is an
+  /// Basic callable function. The first argument to all callbacks is an
   /// absl::Status indicating the status of the operation associated with this
   /// callback. Each EventEngine method that takes a callback parameter, defines
   /// the expected sets and meanings of statuses for that use case.
   using Callback = std::function<void(absl::Status)>;
-  /// A callback handle, used to cancel a callback.
+  /// Callback handle, used to cancel a callback.
   struct TaskHandle {
     intptr_t keys[2];
   };
-  /// A thin wrapper around a platform-specific sockaddr type. A sockaddr struct
+  /// Thin wrapper around a platform-specific sockaddr type. A sockaddr struct
   /// exists on all platforms that gRPC supports.
   ///
   /// Platforms are expected to provide definitions for:
@@ -154,9 +149,9 @@ class EventEngine {
 ### Endpoints
 
 ```cpp
-  /// An Endpoint represents one end of a connection between a gRPC client and
-  /// server. Endpoints are created when connections are established, and
-  /// Endpoint operations are gRPC's primary means of communication.
+  /// One end of a connection between a gRPC client and server. Endpoints are
+  /// created when connections are established, and Endpoint operations are
+  /// gRPC's primary means of communication.
   ///
   /// Endpoints must use the provided SliceAllocator for all data buffer memory
   /// allocations. gRPC allows applications to set memory constraints per
@@ -164,10 +159,10 @@ class EventEngine {
   /// allocation being handled by the quota system.
   class Endpoint {
    public:
-    /// The Endpoint destructor is responsible for shutting down all connections
-    /// and invoking all pending read or write callbacks with an error status.
+    /// Shuts down all connections and invokes all pending read or write
+    /// callbacks with an error status.
     virtual ~Endpoint() = default;
-    /// Read data from the Endpoint.
+    /// Reads data from the Endpoint.
     ///
     /// When data is available on the connection, that data is moved into the
     /// \a buffer, and the \a on_read callback is called. The caller must ensure
@@ -179,7 +174,7 @@ class EventEngine {
     /// statuses to \a on_read. For example, callbacks might expect to receive
     /// CANCELLED on endpoint shutdown.
     virtual void Read(Callback on_read, SliceBuffer* buffer) = 0;
-    /// Write data out on the connection.
+    /// Writes data out on the connection.
     ///
     /// \a on_writable is called when the connection is ready for more data. The
     /// Slices within the \a data buffer may be mutated at will by the Endpoint
@@ -190,9 +185,8 @@ class EventEngine {
     /// statuses to \a on_writable. For example, callbacks might expect to
     /// receive CANCELLED on endpoint shutdown.
     virtual void Write(Callback on_writable, SliceBuffer* data) = 0;
-    /// These methods return an address in the format described in DNSResolver.
-    /// The returned values are owned by the Endpoint and are expected to remain
-    /// valid for the life of the Endpoint.
+    /// Returns an address in the format described in DNSResolver. The returned
+    /// values are expected to remain valid for the life of the Endpoint.
     virtual const ResolvedAddress& GetPeerAddress() const = 0;
     virtual const ResolvedAddress& GetLocalAddress() const = 0;
   };
@@ -210,8 +204,8 @@ class EventEngine {
   using OnConnectCallback =
       std::function<void(absl::StatusOr<std::unique_ptr<Endpoint>>)>;
 
-  /// An EventEngine Listener listens for incoming connection requests from gRPC
-  /// clients and initiates request processing once connections are established.
+  /// Listens for incoming connection requests from gRPC clients and initiates
+  /// request processing once connections are established.
   class Listener {
    public:
     /// Called when the listener has accepted a new client connection.
@@ -233,14 +227,10 @@ class EventEngine {
   /// Factory method to create a network listener / server.
   ///
   /// Once a \a Listener is created and started, the \a on_accept callback will
-  /// be called once asynchronously for each established connection. Note that
-  /// unlike other callbacks, there is no status code parameter since the
-  /// callback will only be called in healthy scenarios where connections can be
-  /// accepted.
-  ///
-  /// This method may return a non-OK status immediately if an error was
-  /// encountered in any synchronous steps required to create the Listener. In
-  /// this case, \a on_shutdown will never be called.
+  /// be called once asynchronously for each established connection. This method
+  /// may return a non-OK status immediately if an error was encountered in any
+  /// synchronous steps required to create the Listener. In this case,
+  /// \a on_shutdown will never be called.
   ///
   /// If this method returns a Listener, then \a on_shutdown will be invoked
   /// exactly once, when the Listener is shut down. The status passed to it will
@@ -250,13 +240,13 @@ class EventEngine {
   /// for Endpoint construction.
   virtual absl::StatusOr<std::unique_ptr<Listener>> CreateListener(
       Listener::AcceptCallback on_accept, Callback on_shutdown,
-      const EndpointConfig& args,
+      const EndpointConfig& config,
       std::unique_ptr<SliceAllocatorFactory> slice_allocator_factory) = 0;
   /// Creates a client network connection to a remote network listener.
   ///
-  /// \a Connect may return an error status immediately if there was a failure
-  /// in the synchronous part of establishing a connection. In that event, the
-  /// \a on_connect callback *will not* have been executed. Otherwise, it is
+  /// May return an error status immediately if there was a failure in the
+  /// synchronous part of establishing a connection. In that event, the \a
+  /// on_connect callback *will not* have been executed. Otherwise, it is
   /// expected that the \a on_connect callback will be asynchronously executed
   /// exactly once by the EventEngine.
   ///
@@ -275,14 +265,14 @@ class EventEngine {
 ### DNS Resolution
 
 ```cpp
-  /// The DNSResolver that provides asynchronous resolution.
+  /// Provides asynchronous resolution.
   class DNSResolver {
    public:
-    /// A task handle for DNS Resolution requests.
+    /// Task handle for DNS Resolution requests.
     struct LookupTaskHandle {
       intptr_t key[2];
     };
-    /// A DNS SRV record type.
+    /// DNS SRV record type.
     struct SRVRecord {
       std::string host;
       int port = 0;
@@ -337,12 +327,12 @@ class EventEngine {
 ### Task Execution
 
 ```cpp
-  /// Retrieves an instance of a DNSResolver.
-  virtual absl::StatusOr<std::unique_ptr<DNSResolver>> GetDNSResolver() = 0;
+  /// Creates and returns an instance of a DNSResolver.
+  virtual std::unique_ptr<DNSResolver> GetDNSResolver() = 0;
 
   /// Intended for future expansion of Task run functionality.
   struct RunOptions {};
-  /// Run a callback as soon as possible.
+  /// Executes a callback as soon as possible.
   ///
   /// The \a fn callback's \a status argument is used to indicate whether it was
   /// executed normally. For example, the status may be CANCELLED if
@@ -351,14 +341,14 @@ class EventEngine {
   /// Synonymous with scheduling an alarm to run at time \a when.
   ///
   /// The callback \a fn will execute when either when time \a when arrives
-  /// (receiving status OK), or when the \a fn is cancelled (reveiving status
+  /// (receiving status OK), or when the \a fn is cancelled (receiving status
   /// CANCELLED). The callback is guaranteed to be called exactly once.
   virtual TaskHandle RunAt(absl::Time when, Callback fn, RunOptions opts) = 0;
-  /// Immediately tries to cancel a callback.
+  /// Attempts to cancel a callback.
   /// Note that this is a "best effort" cancellation. No guarantee is made that
   /// the callback will be cancelled, the call could be in any stage.
   ///
-  /// There are three scenarios in which we may cancel a scheduled function:
+  /// There are three scenarios in which we may cancel a scheduled task:
   ///   1. We cancel the execution before it has run.
   ///   2. The callback has already run.
   ///   3. We can't cancel it because it is "in flight".
@@ -373,9 +363,9 @@ class EventEngine {
 
 ```cpp
   /// Immediately run all callbacks with status indicating the shutdown. Every
-  /// EventEngine is expected to shut down exactly once. No new callbacks/tasks
-  /// should be scheduled after shutdown has begun, no new connections should be
-  /// created.
+  /// EventEngine is expected to shut down exactly once. After shutdown has
+  /// begun, newly scheduled callbacks will be cancelled synchronously, and no
+  /// new connections should be created.
   ///
   /// If the \a on_shutdown_complete callback is given a non-OK status, errors
   /// are expected to be unrecoverable. For example, an implementation could
