@@ -10,15 +10,15 @@ gRPC Core EventEngine API
 ## Abstract
 
 This work replaces gRPC Core's iomgr with a public interface for custom,
-pluggable implementations which we're calling EventEngines. EventEngines are
-tasked with providing all cross-platform I/O, task execution, and DNS resolution
-functionality for gRPC Core and its wrapped languages.
+pluggable implementations that we're calling EventEngines. EventEngines are
+tasked with providing all I/O, task execution, and DNS resolution functionality
+in a platform-agnostic way for gRPC Core and its wrapped languages.
 
 Unlike the current polling model where threads are borrowed from the
 application, EventEngines will bring their own polling and callback execution
 threads. This public API will make it easier to integrate gRPC into external
 event loops, it will support siloing events between gRPC channels and servers,
-and it will provide another way to support the C++ Callback API.
+and it will provide better performance for the C++ Callback API.
 
 ## Background
 
@@ -209,7 +209,8 @@ class EventEngine {
   class Listener {
    public:
     /// Called when the listener has accepted a new client connection.
-    using AcceptCallback = std::function<void(std::unique_ptr<Endpoint>)>;
+    using AcceptCallback = std::function<void(
+        std::unique_ptr<Endpoint>, const SliceAllocator& slice_allocator)>;
     virtual ~Listener() = default;
     /// Bind an address/port to this Listener.
     ///
@@ -471,7 +472,7 @@ EventEngine API.
 Since we're committed to not making any breaking changes with this work, we have
 made a compromise to continue to support those fd-specific methods in the
 default EventEngine implementation alone. In other words, if your application
-provides a custom EventEngine, the fd-specific APIs will be no-ops.
+provides a custom EventEngine, the fd-specific APIs will fail.
 
 A sampling of APIs that will only be supported with the default EventEngine
 implementation:
