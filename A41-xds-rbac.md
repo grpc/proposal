@@ -130,11 +130,13 @@ matchers; there must be no behavior change depending on which of the two header
 names is used in the _RBAC policy_.
 
 The core gRPC implementation (not just xDS or RBAC) must observe both :authority
-and Host headers. If either header contains a comma, the request must be failed
-(TODO: any other characters to disallow; what status code?). If :authority is
-missing, Host must be renamed to :authority. If :authority is present, Host must
-be discarded. This produces a singular, unambiguous authority for every request
-to be used by RBAC and the application itself.
+and Host headers. If :authority is missing, Host must be renamed to :authority.
+If :authority is present, Host must be discarded. If multiple Host headers or
+multiple :authority headers are present, the request must be rejected with an
+HTTP status code 400 as required by Host validation in RFC 7230 §5.4, gRPC
+status code INTERNAL, or RST_STREAM with HTTP/2 error code PROTOCOL_ERROR. These
+restrictions and behavior produce a singular, unambiguous authority for every
+request to be used by RBAC and the application itself.
 
 `metadata` will never match as `ValueMatcher` can only match if the value is
 present (even `NullMatch`). Be strongly aware that Envoy Metadata has no
