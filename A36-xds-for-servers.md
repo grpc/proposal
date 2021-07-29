@@ -5,7 +5,7 @@ A36: xDS-Enabled Servers
 * Approver: markdroth
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
-* Last updated: 2021-02-25
+* Last updated: 2021-07-21
 * Discussion at: https://groups.google.com/g/grpc-io/c/CDjGypQi1J0
 
 ## Abstract
@@ -165,11 +165,10 @@ The xDS client must NACK the Listener resource if any entry in
 [`filter_chains`][Listener.filter_chains] or `default_filter_chain` is invalid.
 `FilterChain`s are valid if all of their network `filters` are supported by the
 implementation, the network filters' configuration is valid, and the filter
-names are unique within the `filters` list. Additionally, the
+names are unique within the `filters` list. Additionally, the `FilterChain` is
+only valid if `filters` contains exactly one entry for the
 `envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager`
-filter, HttpConnectionManager hereafter, must be present. Any filters after
-HttpConnectionManager should be ignored during connection processing but must
-still be considered for validity.
+filter, HttpConnectionManager hereafter, as the last entry in the list.
 
 `Filter` types are the type contained in the
 [`typed_config`][Filter.typed_config] Any. If the type is
@@ -217,28 +216,28 @@ its present fields, which avoids repeating fields and converts the matchers into
 disjunctive normal form. That is, the matcher:
 
 ```
-destination_ports: 80, 8080
-prefix_ranges: 192.168.0.0/16, 10.0.0.0/8
+prefix_ranges: 192.168.0.0/24, 10.1.0.0/16
+source_prefix_ranges: 192.168.1.0/24, 10.2.0.0/16
 source_type: EXTERNAL
 ```
 
 Should be treated as four matchers:
 
 ```
-destination_ports: 80
-prefix_ranges: 192.168.0.0/16
+prefix_ranges: 192.168.0.0/24
+source_prefix_ranges: 192.168.1.0/24
 source_type: EXTERNAL
 
-destination_ports: 80
-prefix_ranges: 10.0.0.0/8
+prefix_ranges: 192.168.0.0/24
+source_prefix_ranges: 10.2.0.0/16
 source_type: EXTERNAL
 
-destination_ports: 8080
-prefix_ranges: 192.168.0.0/16
+prefix_ranges: 10.1.0.0/16
+source_prefix_ranges: 192.168.1.0/24
 source_type: EXTERNAL
 
-destination_ports: 8080
-prefix_ranges: 10.0.0.0/8
+prefix_ranges: 10.1.0.0/16
+source_prefix_ranges: 10.2.0.0/16
 source_type: EXTERNAL
 ```
 
