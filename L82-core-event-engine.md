@@ -434,6 +434,12 @@ EventEngines will not be shut down automatically when gRPC is shut down, it is
 the application's responsibility to shut down and clean up EventEngines when
 they are no longer needed.
 
+### Synchronous Server Implementation
+
+Instead of the separate thread pool that gRPC creates for C++ synchronous
+servers, the synchronous server implementation will use the same threads
+provided by the EventEngine as will be used for the asynchronous API.
+
 ### Temporary protections
 
 The EventEngine can be enabled at compile time by defining the C/C++ macro
@@ -506,7 +512,7 @@ EventEngine API, and provide a default EventEngine implementation that utilizes
 third-party, cross-platform I/O libraries that work on the various platforms
 that gRPC supports.
 
-## Implementation
+## The Team
 
 The design team is lead by AJ Heller (@drfloob), and includes Mark Roth
 (@markdroth) and Nicolas Noble (@nicolasnoble).
@@ -519,9 +525,10 @@ When it comes time to do so, Mark will remove the pollset\_set code, and AJ will
 likely remove unneeded iomgr implementations.
 
 Richard Belleville (@gnossen) has volunteered to write a custom gevent-based
-EventEngine for python.
+EventEngine for python. Lidi Zheng (@lidizheng) will work on the asyncio-based
+implementation.
 
-## Open issues
+## TODO
 
 Yet to be defined:
 
