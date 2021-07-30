@@ -4,7 +4,7 @@ gRPC Core EventEngine API
 * Approver: Mark Roth (@markdroth)
 * Status: In Review
 * Implemented in: gRPC Core
-* Last updated: 2021.06.15
+* Last updated: 2021.07.30
 * Discussion at: https://groups.google.com/g/grpc-io/c/EamJ_ae_db0
 
 ## Abstract
