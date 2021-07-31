@@ -345,20 +345,18 @@ class EventEngine {
   /// Creates and returns an instance of a DNSResolver.
   virtual std::unique_ptr<DNSResolver> GetDNSResolver() = 0;
 
-  /// Intended for future expansion of Task run functionality.
-  struct RunOptions {};
   /// Executes a callback as soon as possible.
   ///
   /// The \a fn callback's \a status argument is used to indicate whether it was
   /// executed normally. For example, the status may be CANCELLED if
   /// \a TryCancel was called, or if the EventEngine is being shut down.
-  virtual TaskHandle Run(Callback fn, RunOptions opts) = 0;
+  virtual TaskHandle Run(Callback fn) = 0;
   /// Synonymous with scheduling an alarm to run at time \a when.
   ///
   /// The callback \a fn will execute when either when time \a when arrives
   /// (receiving status OK), or when the \a fn is cancelled (receiving status
   /// CANCELLED). The callback is guaranteed to be called exactly once.
-  virtual TaskHandle RunAt(absl::Time when, Callback fn, RunOptions opts) = 0;
+  virtual TaskHandle RunAt(absl::Time when, Callback fn) = 0;
   /// Attempts to cancel a callback.
   /// Note that this is a "best effort" cancellation. No guarantee is made that
   /// the callback will be cancelled, the call could be in any stage.
