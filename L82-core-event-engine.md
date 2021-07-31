@@ -170,6 +170,12 @@ class EventEngine {
     /// Ownership of the buffer is not transferred. Valid slices *may* be placed
     /// into the buffer even if the callback is invoked with a non-OK Status.
     ///
+    /// There can be at most one outstanding read per Endpoint at any given
+    /// time. An outstanding read is one in which the \a on_read callback has
+    /// not yet been executed for some previous call to \a Read.  If an attempt
+    /// is made to call \a Read while a previous read is still outstanding, the
+    /// \a EventEngine must abort.
+    ///
     /// For failed read operations, implementations should pass the appropriate
     /// statuses to \a on_read. For example, callbacks might expect to receive
     /// CANCELLED on endpoint shutdown.
@@ -182,7 +188,12 @@ class EventEngine {
     /// valid after calling \a Write, but its state is otherwise undefined.  All
     /// bytes in \a data must have been written before calling \a on_writable
     /// unless an error has occurred.
-
+    ///
+    /// There can be at most one outstanding write per Endpoint at any given
+    /// time. An outstanding write is one in which the \a on_writable callback
+    /// has not yet been executed for some previous call to \a Write.  If an
+    /// attempt is made to call \a Write while a previous write is still
+    /// outstanding, the \a EventEngine must abort.
     ///
     /// For failed write operations, implementations should pass the appropriate
     /// statuses to \a on_writable. For example, callbacks might expect to
