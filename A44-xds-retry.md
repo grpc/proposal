@@ -1,11 +1,11 @@
 A44: gRPC xDS Retry Support
 ----
 * Author(s): dapengzhang0
-* Approver:
-* Status: Draft
+* Approver: markdroth
+* Status: In Review
 * Implemented in: C-core, Java
 * Last updated: 2021-08-02
-* Discussion at:
+* Discussion at: https://groups.google.com/g/grpc-io/c/rTUvJ14gjDs
 
 ## Abstract
 Retry is an important feature that helps users improve service availability if instances or endpoints (that host your server application(s)) are slow or flaky. This doc aims to design a retry mechanism for proxyless gRPC clients using xDS based traffic routing.
