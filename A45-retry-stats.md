@@ -13,7 +13,7 @@ This document proposes a family of metrics that gRPC retry should expose to Open
 
 ## Background
 
-There are a collection of OpenCensus [metrics](https://github.com/census-instrumentation/opencensus-specs/blob/master/stats/gRPC.md#measures) for gRPC. When adding retry support to gRPC, we need to clearly define the measurement points for those metrics and add some retry specific metrics to OpenCensus library to present a clearer picture of retry attempts. The retry gRFC discussed exposing [three additional per-method metrics]((https://github.com/grpc/proposal/blob/master/A6-client-retries.md#retry-and-hedging-statistics)) for retry. However, no detail on how to record and expose these metrics was discussed. Aslo, these metrics still provide very limited information and the histogram view (the third metric) is not very useful because `maxAttempts` is always less than or equal 5. Besides the number of retry attempts, users may also be interested in the total number of transparent retries and the total amount of delay time caused by retry backoff.
+There are a collection of OpenCensus [metrics](https://github.com/census-instrumentation/opencensus-specs/blob/master/stats/gRPC.md#measures) for gRPC. When adding retry support to gRPC, we need to clearly define the measurement points for those metrics and add some retry specific metrics to OpenCensus library to present a clearer picture of retry attempts. The retry gRFC discussed exposing [three additional per-method metrics]((https://github.com/grpc/proposal/blob/master/A6-client-retries.md#retry-and-hedging-statistics)) for retry. However, no detail on how to record and expose these metrics was discussed. Also, these metrics still provide very limited information and the histogram view (the third metric) is not very useful because `maxAttempts` is always less than or equal 5. Besides the number of retry attempts, users may also be interested in the total number of transparent retries and the total amount of delay time caused by retry backoff.
 
 ### Related Proposals: 
 * [gRPC Retry Design](https://github.com/grpc/proposal/blob/master/A6-client-retries.md)
@@ -60,7 +60,7 @@ We add the following per-overall-client-call metrics to OpenCensus:
 
 ## Rationale
 
-Transparent retry should also be treated as a distinct RPC with regards to the per-attmept metrics, becasue for OpenCensus tracing, it's nature to create a child span for transparent retry as with ordinary retry attempt, so for OpenCensus stats, we should be consistent. Also, there is no effective way to distinguish the two types of transparent retry, and one of them actually sends data to the wire, so the outbound bytes should be recorded.
+Transparent retry should also be treated as a distinct RPC with regards to the per-attempt metrics, because for OpenCensus tracing, it's natural to create a child span for transparent retry as with ordinary retry attempt, so for OpenCensus stats, we should be consistent. Also, there is no effective way to distinguish the two types of transparent retry, and one of them actually sends data to the wire, so the outbound bytes should be recorded.
 
 ## Implementation
 
