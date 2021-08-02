@@ -22,6 +22,11 @@ There are some key differences between gRPC’s and Envoy’s retry policy:
   - Throttler config is a subconfig of service config, whereas retry circuit breaker is part of CDS update or cluster_impl lb config.
   - Throttler is shared per client channel, whereas retry circuit breaker is shared per upstream cluster.
 
+### Related Proposals
+
+- [A6: gRPC Retry Design](https://github.com/grpc/proposal/blob/master/A6-client-retries.md)
+- [A31: gRPC xDS Timeout Support and Config Selector Design](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md)
+
 ## Proposal
 
 ### Features to support
