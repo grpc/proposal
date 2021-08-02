@@ -1,11 +1,11 @@
 A55: Exposing OpenCensus Metrics for gRPC retry
 ----
 * Author(s): dapengzhang0, dfawley, ejona86, markdroth
-* Approver:
-* Status: Draft
+* Approver: markdroth
+* Status: In Review
 * Implemented in: C-core, Java
 * Last updated: 2021-08-02
-* Discussion at:
+* Discussion at: https://groups.google.com/g/grpc-io/c/EAbFqaJWp5w
 
 ## Abstract
 
