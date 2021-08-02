@@ -110,7 +110,7 @@ For creating a real stream, we create the same tracers array as above and set th
 
 ### C-core
 
-TBD
+See the [`CallTracer` class](https://github.com/grpc/grpc/blob/master/src/core/lib/channel/call_tracer.h).
 
 ### Go
 
