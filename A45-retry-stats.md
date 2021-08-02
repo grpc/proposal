@@ -9,7 +9,7 @@ A55: Exposing OpenCensus Metrics for gRPC retry
 
 ## Abstract
 
-This document proposes a family of metrics that gRPC retry should expose to OpenCensus and a high-level requirement for the APIs that record the measurements. It can be considered as an augment of the [retry gRFC](https://github.com/grpc/proposal/blob/master/A6-client-retries).
+This document proposes a family of metrics that gRPC retry should expose to OpenCensus and a high-level requirement for the APIs that record the measurements. It can be considered as an augment of the [retry gRFC](https://github.com/grpc/proposal/blob/master/A6-client-retries.md).
 
 ## Background
 
