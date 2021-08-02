@@ -322,6 +322,8 @@ Eventually, retry logic should be taken out of the wrapping libraries, and only 
 
 #### Retry and Hedging Statistics
 
+__Notice__: Retry statistics has been updated in the new design [gRFC-A45](https://github.com/grpc/proposal/pull/254). The original design below is obsolete.
+
 gRPC will treat each retry attempt or hedged RPC as a distinct RPC with regards to the current per-RPC metrics. For example, when an RPC fails with a retryable status code and a retry attempt is made, the original request and the retry attempt will be recorded as two separate RPCs.
 
 Additionally, to present a clearer picture of retry attempts, we add three additional per-method metrics:
