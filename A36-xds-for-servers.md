@@ -225,7 +225,7 @@ https://www.envoyproxy.io/docs/envoy/latest/operations/cli#cmdoption-drain-time-
 
 [Filter.typed_config]: https://github.com/envoyproxy/envoy/blob/928a62b7a12c4d87ce215a7c4ebd376f69c2e080/api/envoy/config/listener/v3/listener_components.proto#L40
 [TypedStruct.type_url]: https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38
-[A28-validation]: https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md#response-validation
+[A28-validation]: A28-xds-traffic-splitting-and-routing.md#response-validation
 [Route.non_forwarding_action]: https://github.com/envoyproxy/envoy/blob/5963beae8842982803af1bef04fb5a2a0893c613/api/envoy/config/route/v3/route_components.proto#L242
 [envoy lds]: https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/lds
 

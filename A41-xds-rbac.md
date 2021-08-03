@@ -46,10 +46,10 @@ a major loss as RBAC is poorly suited for service-level resource authz.
 * [A29: xDS-Based Security for gRPC Clients and Servers][A29]
 * [A39: xDS HTTP Filter Support][A39]
 
-[A36]: https://github.com/grpc/proposal/blob/master/A36-xds-for-servers.md
+[A36]: A36-xds-for-servers.md
 <!-- FIXME: replace with final link once merged -->
 [A29]: https://github.com/grpc/proposal/pull/243
-[A39]: https://github.com/grpc/proposal/blob/master/A39-xds-http-filters.md
+[A39]: A39-xds-http-filters.md
 
 ## Proposal
 
