@@ -9,14 +9,14 @@ A55: Exposing OpenCensus Metrics and Tracing for gRPC retry
 
 ## Abstract
 
-This document is a proposal on how gRPC client would expose OpenCensus metrics and tracing when retry is enabled. It can be considered as an augment of the [retry gRFC](https://github.com/grpc/proposal/blob/master/A6-client-retries.md).
+This document is a proposal on how gRPC client would expose OpenCensus metrics and tracing when retry is enabled. It can be considered as an augment of the [retry gRFC](A6-client-retries.md).
 
 ## Background
 
-There are a collection of OpenCensus [metrics](https://github.com/census-instrumentation/opencensus-specs/blob/master/stats/gRPC.md#measures) for gRPC. When adding retry support to gRPC, we need to clearly define the measurement points for those metrics and add some retry specific metrics to OpenCensus library to present a clearer picture of retry attempts. The retry gRFC discussed exposing [three additional per-method metrics](https://github.com/grpc/proposal/blob/master/A6-client-retries.md#retry-and-hedging-statistics) for retry. However, no detail on how to record and expose these metrics was discussed. Also, these metrics still provide very limited information and the histogram view (the third metric) is not very useful because `maxAttempts` is always less than or equal 5. Besides the number of retry attempts, users may also be interested in the total number of transparent retries and the total amount of delay time caused by retry backoff.
+There are a collection of OpenCensus [metrics](https://github.com/census-instrumentation/opencensus-specs/blob/master/stats/gRPC.md#measures) for gRPC. When adding retry support to gRPC, we need to clearly define the measurement points for those metrics and add some retry specific metrics to OpenCensus library to present a clearer picture of retry attempts. The retry gRFC discussed exposing [three additional per-method metrics](A6-client-retries.md#retry-and-hedging-statistics) for retry. However, no detail on how to record and expose these metrics was discussed. Also, these metrics still provide very limited information and the histogram view (the third metric) is not very useful because `maxAttempts` is always less than or equal 5. Besides the number of retry attempts, users may also be interested in the total number of transparent retries and the total amount of delay time caused by retry backoff.
 
 ### Related Proposals: 
-* [gRPC Retry Design](https://github.com/grpc/proposal/blob/master/A6-client-retries.md)
+* [gRPC Retry Design](A6-client-retries.md)
 
 ## Proposal
 
@@ -119,7 +119,7 @@ For creating a real stream, we create the same tracers array as above and set th
 
 ### C-core
 
-See the [`CallTracer` class](https://github.com/grpc/grpc/blob/master/src/core/lib/channel/call_tracer.h).
+See the [`CallTracer` class](https://github.com/grpc/grpc/blob/ae3e2c92143c22245a27dbd9b5354863261fa83a/src/core/lib/channel/call_tracer.h).
 
 ### Go
 
