@@ -1,4 +1,4 @@
-A55: Exposing OpenCensus Metrics for gRPC retry
+A55: Exposing OpenCensus Metrics and Tracing for gRPC retry
 ----
 * Author(s): dapengzhang0, dfawley, ejona86, markdroth
 * Approver: markdroth
@@ -9,7 +9,7 @@ A55: Exposing OpenCensus Metrics for gRPC retry
 
 ## Abstract
 
-This document proposes a family of metrics that gRPC retry should expose to OpenCensus and a high-level requirement for the APIs that record the measurements. It can be considered as an augment of the [retry gRFC](https://github.com/grpc/proposal/blob/master/A6-client-retries.md).
+This document is a proposal on how gRPC client would expose OpenCensus metrics and tracing when retry is enbaled. It can be considered as an augment of the [retry gRFC](https://github.com/grpc/proposal/blob/master/A6-client-retries.md).
 
 ## Background
 
@@ -20,7 +20,7 @@ There are a collection of OpenCensus [metrics](https://github.com/census-instrum
 
 ## Proposal
 
-### High-level Requirement
+### High-level Requirement for Exposing Metrics
 
 Per-call stats from the perspective of the application should continue to be gathered from the interceptor/filter level, just as they are today.
 
@@ -57,6 +57,15 @@ We add the following per-overall-client-call metrics to OpenCensus:
 | grpc.io/client/transparent\_retries            | transparent\_retries\_per\_call | sum          | grpc\_client\_method |
 | grpc.io/client/retry\_delay\_per\_call         | retry\_delay\_per\_call         | distribution | grpc\_client\_method |
 
+
+### Tracing
+
+If retry is not enabled on the client channel, the gRPC tracing module should behave the same as it does today. If retry is enabled, the gRPC tracing module should create a tracing span for each call from the perspective of the application, and create a child span for each individual call attempt, including transparent retry attempts. The parent span is named in the form of `Sent.<service name>.<method name>`, which is the same as the case when retry is not enabled. The span for each individual call attempt is named in the form of `Attempt.<service name>.<method name>`, and is with the following additional span attributes:
+
+      `previous-rpc-attempts` : number of preceding attempts,
+      `transparent-retry`     : whether the attempt is a transparent retry.
+
+The child span should record the message events of the attempt as the call span would do in the case when retry is not enabled.
 
 ## Rationale
 
