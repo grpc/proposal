@@ -148,9 +148,14 @@ xDS v3 is a pre-requisite for this proposal because the required fields were add
 gRPC uses CDS to configure client side security and LDS for server side security as described in the
 sections below. The sections describe how the CDS or LDS updates are processed by gRPC. Note that gRPC
 always validates all security configurations in CDS or LDS regardless of whether an XdsChannelCredentials
-or XdsServerCredentials is in force. If validation fails, the update is NACKed. When an update is
-accepted the correponding security configuration in CDS or LDS is used if the corresponding
-Xds*Credentials is in force.
+or XdsServerCredentials is in force. If validation fails on an update, the update is NACKed.
+
+An unsupported field is normally ignored. However if ignoring a field compromises security, or
+if the unsupported field affects how we interpret other fields, we NACK the update when the
+field is present.
+
+When an update is accepted, the security configuration contained in that update is used if the
+application used Xds*Credentials.
 
 #### CDS for Client Side Security
 
@@ -159,27 +164,23 @@ The CDS policy is the top level LB policy applied to all the connections under t
 [`UpstreamTlsContext`][UTC] as described [here][CL-TS-comment].
 Note that we don't (currently) support [`transport_socket_matches`][CL-TS-matches].
 The security configuration extracted from the `UpstreamTlsContext` thus obtained
-is passed down to all the child policies and connections. How this is done is language dependent
-and is similar to how the implementations pass policy information down to child policies.
-For example, C-core uses channel args to pass security configuration down, whereas
-Java constructs a dynamic `SslContextProvider` that is directly usable by a sub-channel's
-TLS handshaker to build an `SslContext` for the pending TLS handshake.
+is passed down to all the child policies and connections similar to how gRPC passes
+load balancer policy information down to child policies.
 
 [`common_tls_context`][CTC] in the `UpstreamTlsContext` contains the required security
 configuration. See below for [`CommonTlsContext`][CTC-type] processing.
 
 A secure client at a minimum requires [`validation_context_certificate_provider_instance`][VCCPI1]
 inside [`combined_validation_context`][CVC] to be able to validate the server certificate
-in the TLS mode. As part of validating all CDS updates, if this field is not set in a CDS,
-gRPC will NACK the CDS update. The client identity certificate is configured via the
-[`tls_certificate_certificate_provider_instance`][TCCPI] field which is optional. The
+in the TLS mode. As part of validating all CDS updates, if this field is not set in a CDS
+resource, gRPC will NACK the CDS update. The client identity certificate is configured via
+the [`tls_certificate_certificate_provider_instance`][TCCPI] field which is optional. The
 client certificate is sent to the server if the server requests or requires it in the
-TLS handshake. If the server requires the client certificate but is not
-configured on the client side then the TLS handshake will fail because of the client's inability
-to send the certificate.
+TLS handshake. If the server requires the client certificate but is not configured on the
+client side then the TLS handshake will fail because of the client's inability to send the
+certificate.
 
-As part of validating all CDS updates, if any of the following fields are present, gRPC
-will NACK a CDS update:
+The following fields in a CDS update are ignored:
 
 * [sni][SNI]
 * [allow_renegotiation][ALLOW-RENEG]
@@ -212,7 +213,7 @@ check succeeds.
 * if there is no leaf server certificate, or there are no SAN entries in the certificate
 the check fails.
 
-* each SAN entry of type DNS, URI and IP address is considered for the below match
+* each SAN entry of type DNS, URI, email and IP address is considered for the below match
 logic. An IP address is converted to its canonical string representation. For
 IPv6 this includes [maximum zero compression][zero-compr], [no leading zeros][no-leading-0]
 and [lower case][lower-case] e.g. `2001:db8::1` but *not* `2001:DB8:0::01`.
@@ -224,10 +225,11 @@ If an entry matches as per this logic, the check completes successfully.
 [`match_subject_alt_names`][match_subject_alt_names] as follows.
     * A `match_subject_alt_names` value is a [`StringMatcher`][StringMatcher] and
     the match is performed as per the semantics described for each `match_pattern`
-    in the [`StringMatcher`][StringMatcher] type. If there is a match, then the
-    check completes successfully.
+    in the [`StringMatcher`][StringMatcher] type. Note that [exact match][ExactMatch]
+    supports subdomain matching for wildcard DNS SAN entries as described
+    [here][DNS-wildcard]. If there is a match, then the check completes successfully.
 
-If the check fails, the connection attempt fails with a "certificate check failure".
+If the check fails, the connection attempt fails with "certificate check failure".
 
 Individual implementations will use hooks provided by the underlying TLS framework to
 implement server authorization. As an example, Java uses a custom `X509TrustManager`
@@ -237,10 +239,12 @@ implementation through the `SslContext` provided to the client sub-channel.
 [default_validation_context]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L177
 [CVC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251
 [StringMatcher]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L20
+[ExactMatch]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L29
 [RFC6125-6]: https://datatracker.ietf.org/doc/html/rfc6125#section-6
 [zero-compr]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.2
 [no-leading-0]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.1
 [lower-case]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.3
+[DNS-wildcard]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L358-L360
 
 #### LDS for Server Side Security
 
@@ -256,11 +260,7 @@ As part of validating all LDS updates, if a `transport_socket` name is not
 `envoy.transport_sockets.tls` i.e. something we don't recognize, gRPC will
 NACK an LDS update. Otherwise the `DownstreamTlsContext` thus obtained is used
 for the incoming connection if the server is using `XdsServerCredentials`.
-How the security configuration in `DownstreamTlsContext` is made available to
-the incoming connection is language dependent. For example, Java constructs a
-dynamic `SslContextProvider` that is directly usable by the connection's TLS
-handshaker to build an `SslContext` for the upcoming TLS handshake. If there
-is no `DownstreamTlsContext` (such as when [`transport_socket`][transport-socket]
+If there is no `DownstreamTlsContext` (such as when [`transport_socket`][transport-socket]
 is not present) then gRPC uses the fallback credentials for the incoming connection.
 
 [`common_tls_context`][CTC1] in the `DownstreamTlsContext` contains the required
@@ -278,15 +278,18 @@ client certificate. When [`require_client_certificate`][RCC] is `true`, the
 present otherwise gRPC will NACK an LDS update as part of validating all LDS
 updates.
 
+The following fields in an LDS update are ignored:
+
+* [disable_stateless_session_resumption][DIS-STATELESS-SESS-RES]
+* [session_timeout][SESSION-TIMEOUT]
+
 If any of the following fields are present, gRPC will NACK an LDS update as
 part of validating all LDS updates:
 
 * [require_sni][REQ-SNI]
 * [session_ticket_keys][SESSION-TICKET-KEYS]
 * [session_ticket_keys_sds_secret_config][SESSION-TICKET-KEYS-SDS]
-* [disable_stateless_session_resumption][DIS-STATELESS-SESS-RES]
-* [session_timeout][SESSION-TIMEOUT]
-* [ocsp_staple_policy][OCSP-STAPLE-POLICY]
+* [ocsp_staple_policy][OCSP-STAPLE-POLICY]: any value other than `LENIENT_STAPLING` causes NACK.
 
 [A36]: A36-xds-for-servers.md
 [filter-chains]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener.proto#L120
@@ -343,35 +346,40 @@ for both gRPC (which only supports [`CertificateProviderInstance`][CPI]) and Env
 support [`CertificateProviderInstance`][CPI]) to achieve consistent security configuration between
 gRPC and Envoy.
 
-The following fields are unsupported and if present will cause a NACK from gRPC for any update:
+The following fields are unsupported and if present will cause a NACK from gRPC for any update
+since ignoring these fields will compromise security:
 
 * [tls_params][TLS-PARAMS]
 * [custom_handshaker][CUSTOM-HS]
 
-[alpn_protocols][ALPN-PROTOCOLS] on server side (inside [`DownstreamTlsContext`][DTC]) and
+[alpn_protocols][ALPN-PROTOCOLS] on the server side (inside [`DownstreamTlsContext`][DTC]) and
 on the client side (inside [`UpstreamTlsContext`][UTC]) is ignored if present.
 The processing and parsing of `CommonTlsContext` inside any particular CDS or LDS response does
 not take into account whether Xds credentials are in effect for the respective channel or server.
 
 [`combined_validation_context`][CVC] is validated in any CDS/LDS update as follows:
-[default_validation_context][] is accepted only on the client side i.e. inside `UpstreamTlsContext`.
-And inside that field only [match_subject_alt_names][] is processed as described [above][server-authz].
-If any of the other fields (listed below) are present, the update is NACKed.
+The field [match_subject_alt_names][] inside [default_validation_context][] is accepted only on
+the client side i.e. inside `UpstreamTlsContext` and is processed as described [above][server-authz].
+If any of the other fields (listed below) are present in [default_validation_context][], the update
+is NACKed since ignoring these fields will compromise security:
 
-* `trusted_ca`
-* `watched_directory`
 * `verify_certificate_spki`
 * `verify_certificate_hash`
 * `require_signed_certificate_timestamp`
 * `crl`
-* `allow_expired_certificate`
-* `trust_chain_verification`
+* `trust_chain_verification`: any value other than `VERIFY_TRUST_CHAIN` causes NACK.
 * `custom_validator_config`
 
-Only [`validation_context_certificate_provider_instance`][VCCPI1] is accepted. When that value is present
-in the [`combined_validation_context`][CVC] the other fields
-[`validation_context_certificate_provider`][VCCP1] and [`validation_context_sds_secret_config`][VCSSC1]
-are ignored otherwise the presence of those fields will cause a NACK.
+The following fields from [default_validation_context][] are ignored:
+
+* `trusted_ca`
+* `watched_directory`
+* `allow_expired_certificate`
+
+In [`combined_validation_context`][CVC], only [`validation_context_certificate_provider_instance`][VCCPI1]
+is accepted. When that field is present, the other fields [`validation_context_certificate_provider`][VCCP1]
+and [`validation_context_sds_secret_config`][VCSSC1] are ignored otherwise the presence of those fields will
+cause a NACK.
 
 [CPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L154
 [TCCPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L234
@@ -389,25 +397,17 @@ are ignored otherwise the presence of those fields will cause a NACK.
 [VCCP1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L193
 [VCSSC1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L184
 
-### Use of SPIFFE IDs in Certificates
-
-To facilitate service mesh secure communication, we support [SPIFFE][] based certificates and peer certificate
-verification following the [SPIFFE][] specification and the [match_subject_alt_names][] field in xDS.
-
-[SPIFFE]: https://github.com/spiffe/spiffe
-[match_subject_alt_names]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto#envoy-v3-api-field-extensions-transport-sockets-tls-v3-certificatevalidationcontext-match-subject-alt-names
-
 ### Certificate Provider Plugin Framework
 
 xDS supports many different configurations for endpoints to obtain certificates but gRPC supports only
-`CertificateProviderInstance`. Through this object the control plane tells the xDS client the name of
-a certificate and the "instance" name of a provider to use to obtain a certificate. This provider
-instance name is translated into a provider implementation and a configuration for that implementation
-using the client's own configuration instead of being sent by the control plane. This enables flexibility
-in heterogeneous deployments where different clients can use different implementations for the same
-provider instance name. For example, an on-prem client may get its certificate using a local certificate
-provider whereas a client running in cloud may use a cloud-vendor provided implementation to obtain
-the certificate.
+[`CertificateProviderInstance`][CPI]. In this approach, the control plane tells the xDS client the
+[name of a certificate][CERT-NAME] (which is currently ignored) and the ["instance" name][INST-NAME]
+of a provider to use to obtain a certificate. This provider [instance name][INST-NAME] is translated
+into a provider implementation and a configuration for that implementation using the client's own
+configuration instead of being sent by the control plane. This enables flexibility in heterogeneous
+deployments where different clients can use different implementations for the same provider instance
+name. For example, an on-prem client may get its certificate using a local certificate provider whereas
+a client running in cloud may use a cloud-vendor provided implementation to obtain the certificate.
 
 gRPC offers a `CertificateProvider` plugin API that can support multiple implementations. The plugin API
 is not currently public, so applications cannot currently add their own provider implementations although
@@ -415,6 +415,8 @@ we might make this API public in the future. However gRPC currently includes a `
 implementation - descibed [below][FILE-WATCHER-LINK] - which reads certificates from the local file system.
 
 [FILE-WATCHER-LINK]: #file_watcher-certificate-provider
+[CERT-NAME]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L169
+[INST-NAME]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L163
 
 Certificate provider plugin instances are configured via the xDS bootstrap file.  There is a new
 top-level field called `"certificate_providers"` whose value is a map (a JSON object).  The key
@@ -447,12 +449,12 @@ a certificate from `instance_name`, the client will use this plugin instance.
 
 As mentioned before, we currently only have one plugin implementation called `file_watcher`.
 The configuration for this plugin has the following fields:
-- `certificate_file`: The path to the file containing the identity certificate. The file should contain
-a PEM-formatted X.509 conforming certificate.
+- `certificate_file`: The path to the file containing the identity certificate or certificate chain.
+The file should contain a PEM-formatted X.509 conforming certificate or certificate chain.
 - `private_key_file`: The path to the file containing the private key. The file should contain a
 PEM-formatted PKCS encoded private key.
-- `ca_certificate_file`: The path to the file containing the root certificate. The file should contain
-a PEM-formatted X.509 conforming certificate chain.
+- `ca_certificate_file`: The path to the file containing the root certificates aka trust bundle.
+The file should contain PEM-formatted X.509 conforming certificates.
 - `refresh_interval`: Specifies how frequently the plugin should read the files. The value must be
 in the [JSON format described for a `Duration`][DURATION-JSON] protobuf message.
 
@@ -461,7 +463,7 @@ For example, the bootstrap file might contain the following:
 ```jsonc
   "certificate_providers": {
     "google_cloud_private_spiffe": { // certificate_provider_instance name
-      "plugin_name": "file_watcher", // name of the plugin instance
+      "plugin_name": "file_watcher", // name of the plugin implementation
       "config": {                    // config to be supplied to the plugin instance
         "certificate_file": "/var/run/gke-spiffe/certs/certificates.pem",
         "private_key_file": "/var/run/gke-spiffe/certs/private_key.pem",
@@ -473,15 +475,30 @@ For example, the bootstrap file might contain the following:
 ```
 
 With this configuration, when the xDS server tells the client to get a certificate from
-plugin instance `"google_cloud_private_spiffe"`, the client will load the certificate data
-from the specified files.
+plugin instance `"google_cloud_private_spiffe"` (the value of [`instance_name`][INST-NAME]),
+the client will load the certificate data from the specified files.
 
 [DURATION-JSON]: https://developers.google.com/protocol-buffers/docs/proto3#json.
 
 ## Implementation Details
 
-High level implementation details common to all the implementing gRPC languages
-are described here.
+The gRPC client xDS flow is described in [gRPC Client Architecture][A27:CDS]. After
+obtaining the cluster load balancing policy configuration and optional security
+configuration (in [`UpstreamTlsContext`][UTC]), gRPC passes it down to child policies
+via channel arguments or a similar mechanism depending on the language. For example,
+C-core uses channel arguments to pass down the configuration, whereas Java constructs
+a dynamic `SslContextProvider` that is made available to sub-channels via channel
+attributes. The `SslContextProvider` is used by a sub-channel's TLS handshaker to
+build an `SslContext` for the pending TLS handshake.
+
+Server-side xDS processing is described in [A36: xDS-Enabled Servers][A36]. After
+obtaining the routing and optional security configuration (in
+[`DownstreamTlsContext`][DTC]), gRPC makes it available to each incoming connection.
+How this is done is language dependent. For example, Java uses a `ProtocolNegotiator`
+to pick a [`DownstreamTlsContext`][DTC] for each incoming connection and construct a
+dynamic `SslContextProvider` that is passed to the channel handler for that
+connection. The channel handler uses the `SslContextProvider` to build an `SslContext`
+for the pending TLS handshake.
 
 A **`CertificateProvider`** object represents a plugin that provides the required
 certificates and keys to the gRPC application. A component registers itself as a **`Watcher`**
