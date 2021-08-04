@@ -172,8 +172,10 @@ configuration. See below for [`CommonTlsContext`][CTC-type] processing.
 
 A secure client at a minimum requires [`validation_context_certificate_provider_instance`][VCCPI1]
 inside [`combined_validation_context`][CVC] to be able to validate the server certificate
-in the TLS mode. As part of validating all CDS updates, if this field is not set in a CDS
-resource, gRPC will NACK the CDS update. The client identity certificate is configured via
+in the TLS mode. If [`UpstreamTlsContext`][UTC] is present but
+[`combined_validation_context`][CVC] is not present or
+[`validation_context_certificate_provider_instance`][VCCPI1] is not set, then
+gRPC will NACK the CDS update. The client identity certificate is configured via
 the [`tls_certificate_certificate_provider_instance`][TCCPI] field which is optional. The
 client certificate is sent to the server if the server requests or requires it in the
 TLS handshake. If the server requires the client certificate but is not configured on the
