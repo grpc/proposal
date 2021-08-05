@@ -283,14 +283,14 @@ updates.
 The following fields in an LDS update are ignored:
 
 * [disable_stateless_session_resumption][DIS-STATELESS-SESS-RES]
+* [session_ticket_keys][SESSION-TICKET-KEYS]
+* [session_ticket_keys_sds_secret_config][SESSION-TICKET-KEYS-SDS]
 * [session_timeout][SESSION-TIMEOUT]
 
 If any of the following fields are present, gRPC will NACK an LDS update as
 part of validating all LDS updates:
 
 * [require_sni][REQ-SNI]
-* [session_ticket_keys][SESSION-TICKET-KEYS]
-* [session_ticket_keys_sds_secret_config][SESSION-TICKET-KEYS-SDS]
 * [ocsp_staple_policy][OCSP-STAPLE-POLICY]: any value other than `LENIENT_STAPLING` causes NACK.
 
 [A36]: A36-xds-for-servers.md
@@ -369,7 +369,6 @@ is NACKed since ignoring these fields will compromise security:
 * `verify_certificate_hash`
 * `require_signed_certificate_timestamp`
 * `crl`
-* `trust_chain_verification`: any value other than `VERIFY_TRUST_CHAIN` causes NACK.
 * `custom_validator_config`
 
 The following fields from [default_validation_context][] are ignored:
@@ -377,6 +376,7 @@ The following fields from [default_validation_context][] are ignored:
 * `trusted_ca`
 * `watched_directory`
 * `allow_expired_certificate`
+* `trust_chain_verification`
 
 In [`combined_validation_context`][CVC], only [`validation_context_certificate_provider_instance`][VCCPI1]
 is accepted. When that field is present, the other fields [`validation_context_certificate_provider`][VCCP1]
