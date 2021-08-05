@@ -4,7 +4,7 @@ A44: gRPC xDS Retry Support
 * Approver: markdroth
 * Status: In Review
 * Implemented in: C-core, Java
-* Last updated: 2021-08-02
+* Last updated: 2021-08-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/rTUvJ14gjDs
 
 ## Abstract
@@ -12,7 +12,7 @@ Retry is an important feature that helps users improve service availability if i
 
 ## Background
 
-gRPC library provides a [built-in retry](https://github.com/grpc/proposal/blob/master/A6-client-retries.md) mechanism based on gRPC retry policy in service config. Envoy also provides a [proxy-level retry](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/http_routing.html?highlight=hedge#retry-semantics) based on either route configuration or request headers for either REST or gRPC requests. The Envoy retry for gRPC requests is triggered either based on the failure indicated by the initial metadata in the response, in the same way as gRPC built-in retry, or based on a per-try-timeout. For proxyless gRPC (aka gRPC-xDS), it is proposed to support various features and configurations in route action such as timeout and retry using a per-RPC ConfigSelector (see [gRPC xDS Config Selector Design](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md)). It is natural to fit Envoy retry config into gRPC retry policy with proper extension.
+gRPC library provides a [built-in retry](A6-client-retries.md) mechanism based on gRPC retry policy in service config. Envoy also provides a [proxy-level retry](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/http_routing.html#retry-semantics) based on either route configuration or request headers for either REST or gRPC requests. The Envoy retry for gRPC requests is triggered either based on the failure indicated by the initial metadata in the response, in the same way as gRPC built-in retry, or based on a per-try-timeout. For proxyless gRPC (aka gRPC-xDS), it is proposed to support various features and configurations in route action such as timeout and retry using a per-RPC ConfigSelector (see [gRPC xDS Config Selector Design](A31-xds-timeout-support-and-config-selector.md)). It is natural to fit Envoy retry config into gRPC retry policy with proper extension.
 
 There are some key differences between gRPC’s and Envoy’s retry policy:
 
@@ -24,18 +24,18 @@ There are some key differences between gRPC’s and Envoy’s retry policy:
 
 ### Related Proposals
 
-- [A6: gRPC Retry Design](https://github.com/grpc/proposal/blob/master/A6-client-retries.md)
-- [A31: gRPC xDS Timeout Support and Config Selector Design](https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md)
+- [A6: gRPC Retry Design](A6-client-retries.md)
+- [A31: gRPC xDS Timeout Support and Config Selector Design](A31-xds-timeout-support-and-config-selector.md)
 
 ## Proposal
 
 ### Features to support
 
-Due to the differences between gRPC and Envoy, incomplete implementation status of the original [retry gRFC](https://github.com/grpc/proposal/blob/master/A6-client-retries.md) and unresolved [compatibility issues](https://github.com/envoyproxy/envoy/issues/17412) with dynamic cluster selection, we propose initially to support only some of the retry features in Envoy.
+Due to the differences between gRPC and Envoy, incomplete implementation status of the original [retry gRFC](A6-client-retries.md) and unresolved [compatibility issues](https://github.com/envoyproxy/envoy/issues/17412) with dynamic cluster selection, we propose initially to support only some of the retry features in Envoy.
 
 #### Supported Retry Features
 
-1. Retry on a given set of gRPC status codes (x-envoy-retry-grpc-on values) specified by the retry_on config.
+1. Retry on a given set of gRPC status codes ([x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on) values) specified by the retry_on config.
 1. Backoff retry on retriable error status by a time given by the retry_back_off config.
 1. Limit the number of attempts that can be retried for a given RPC by the num_retries config.
 
@@ -55,7 +55,7 @@ Due to the differences between gRPC and Envoy, incomplete implementation status 
 
 ### Converting Envoy RetryPolicy to gRPC RetryPolicy
 
-We convert the following (supported) attributes in [Envoy RetryPolicy](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-retrypolicy) to [gRPC RetryPolicy](https://github.com/grpc/proposal/blob/master/A6-client-retries.md#retry-policy):
+We convert the following (supported) attributes in [Envoy RetryPolicy](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-retrypolicy) to [gRPC RetryPolicy](A6-client-retries.md#retry-policy):
 
 | Attributes in Envoy RetryPolicy | Attributes in gRPC RetryPolicy |
 | ------------------------------- | ------------------------------ |
@@ -63,7 +63,7 @@ We convert the following (supported) attributes in [Envoy RetryPolicy](https://w
 | num\_retries                    | maxAttempts = num\_retries + 1 | 
 | retry\_back\_off                | initialBackoff = retry\_back\_off.base\_interval <br> maxBackoff = retry\_back\_off.max\_interval <br> backoffMultiplier = 2 |
 
-When converting `retry_on` value to `retryableStatusCodes`, the gRPC xDS client will only convert conditions that are documented in [x-envoy-retry-grpc-on], that is, "cancelled", "deadline-exceeded", "internal", "resource-exhausted" and "unavailable", and will ignore any other conditions. If the resulting retryableStatusCodes is empty, gRPC xDS client will not include a retry policy in the corresponding route action.
+When converting `retry_on` value to `retryableStatusCodes`, the gRPC xDS client will only convert conditions that are documented in [x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on), that is, "cancelled", "deadline-exceeded", "internal", "resource-exhausted" and "unavailable", and will ignore any other conditions. If the resulting retryableStatusCodes is empty, gRPC xDS client will not include a retry policy in the corresponding route action.
 
 The num_retries attribute defaults to 1 as specified in Envoy API doc. As specified in the original retry gRFC any maxAttempts value greater than 5 will be treated as 5, so any value greater than 4, will effectively be converted to maxAttempts=5. If num_retries is less than 1, gRPC xDS client will reject the config by NACKing the xDS update.
 
