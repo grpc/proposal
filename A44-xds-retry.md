@@ -33,9 +33,9 @@ There are some key differences between gRPC’s and Envoy’s retry policy:
 
 gRPC will support the following xDS retry features:
 
-- Retry on a given set of gRPC status codes ([x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on) values) specified by the retry_on config.
-- Backoff retry on retriable error status by a time given by the retry_back_off config.
-- Limit the number of attempts that can be retried for a given RPC by the num_retries config.
+- Retry on a given set of gRPC status codes ([x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on) values) specified by the `retry_on` config.
+- Backoff retry on retriable error status by a time given by the `retry_back_off` config.
+- Limit the number of attempts that can be retried for a given RPC by the `num_retries` config.
 
 Features that we will not support right now but may add in the future:
 
@@ -46,7 +46,7 @@ Features that we will not support right now but may add in the future:
 
 Features that we do not plan to support in gRPC:
 
-- Any `retry_on` conditions from values of [`x-envoy-retry-on`](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on). Most of these values are about HTTP-level conditions that are not exposed to the gRPC retry code.
+- Any `retry_on` conditions from values of [x-envoy-retry-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on). Most of these values are about HTTP-level conditions that are not exposed to the gRPC retry code.
 - Configuring retries via the [x-envoy-retry-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on), [x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on), [x-envoy-max-retries](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-max-retries), [x-envoy-upstream-rq-per-try-timeout-ms](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-upstream-rq-per-try-timeout-ms), and [x-envoy-hedge-on-per-try-timeout](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-hedge-on-per-try-timeout) request headers, and the `retriable_headers` field.  Configuring retries via request headers may make sense for a proxy like Envoy but does not really make sense for gRPC.
 - The `retriable_request_headers` attribute, because it does not make sense to allow configuring retries via headers.  (Note that gRPC does support the `grpc-retry-pushback-ms` header, as described in [gRFC A6](A6-client-retries.md#pushback), which allows servers to inhibit retries configured in the client.)
 - Retry circuit breaker, because there is a [design conflict](https://github.com/envoyproxy/envoy/issues/17412) in xDS between this and dynamic cluster selection. If/when we have a use-case for this in the future, we will evaluate alternative ways of providing this kind of safety valve.
@@ -61,11 +61,11 @@ We convert the following (supported) attributes in [Envoy RetryPolicy](https://w
 | num\_retries                    | maxAttempts = num\_retries + 1 | 
 | retry\_back\_off                | initialBackoff = retry\_back\_off.base\_interval <br> maxBackoff = retry\_back\_off.max\_interval <br> backoffMultiplier = 2 |
 
-When converting `retry_on` value to `retryableStatusCodes`, the gRPC xDS client will only convert conditions that are documented in [x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on), that is, "cancelled", "deadline-exceeded", "internal", "resource-exhausted" and "unavailable", and will ignore any other conditions. If the resulting retryableStatusCodes is empty, gRPC xDS client will not include a retry policy in the corresponding route action.
+When converting `retry_on` value to `retryableStatusCodes`, the gRPC xDS client will only convert conditions that are documented in [x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on), that is, "cancelled", "deadline-exceeded", "internal", "resource-exhausted" and "unavailable", and will ignore any other conditions. If the resulting `retryableStatusCodes` is empty, gRPC xDS client will not include a retry policy in the corresponding route action.
 
-The num_retries attribute defaults to 1 as specified in Envoy API doc. As specified in the original retry gRFC any maxAttempts value greater than 5 will be treated as 5, so any value greater than 4, will effectively be converted to maxAttempts=5. The num_retries attribute must not be less than 1.
+The `num_retries` attribute defaults to 1 as specified in Envoy API doc. As specified in the original retry gRFC any `maxAttempts` value greater than 5 will be treated as 5, so any value greater than 4, will effectively be converted to `maxAttempts=5`. The `num_retries` attribute must not be less than 1.
 
-As specified in Envoy API doc, retry_back_off is optional and defaults to base_interval=25ms and max_interval=250ms. In retry_back_off, base_interval is required. The max_interval is optional and defaults to 10 times base_interval. The value of base_interval and max_interval must be greater than zero. Values of base_interval or max_interval less than 1ms will be treated as 1ms. The value of max_interval must be no less than the value of base_interval.
+As specified in Envoy API doc, `retry_back_off` is optional and defaults to `base_interval=25ms` and `max_interval=250ms`. In `retry_back_off`, `base_interval` is required. The `max_interval` is optional and defaults to 10 times `base_interval`. The value of `base_interval` and `max_interval` must be greater than zero. Values of `base_interval` or `max_interval` less than 1ms will be treated as 1ms. The value of `max_interval` must be no less than the value of `base_interval`.
 
 When validating xDS update from the control plane, gRPC xDS client will reject the config if any of the above requirements is not met.
 
