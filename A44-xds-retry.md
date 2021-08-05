@@ -31,27 +31,25 @@ There are some key differences between gRPC’s and Envoy’s retry policy:
 
 ### Features to support
 
-Due to the differences between gRPC and Envoy, incomplete implementation status of the original [retry gRFC](A6-client-retries.md) and unresolved [compatibility issues](https://github.com/envoyproxy/envoy/issues/17412) with dynamic cluster selection, we propose initially to support only some of the retry features in Envoy.
+gRPC will support the following xDS retry features:
 
-#### Supported Retry Features
+- Retry on a given set of gRPC status codes ([x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on) values) specified by the retry_on config.
+- Backoff retry on retriable error status by a time given by the retry_back_off config.
+- Limit the number of attempts that can be retried for a given RPC by the num_retries config.
 
-1. Retry on a given set of gRPC status codes ([x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on) values) specified by the retry_on config.
-1. Backoff retry on retriable error status by a time given by the retry_back_off config.
-1. Limit the number of attempts that can be retried for a given RPC by the num_retries config.
+Features that we will not support right now but may add in the future:
 
+- Hedging support, because not all gRPC languages have implemented hedging yet, and we didn't want to wait for that before making retries configurable via xDS.
+- The `per_try_timeout` field, because we can't safely support this now without hedging support, lest we break users when we add hedging support. We will add this later, at the same time as we add hedging support. See the ["Rationale" section](#Supporting-per_try_timeout) below for more details.
+- Any `retry_on` conditions from values of [x-envoy-retry-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on).
+- The `retry_host_predicate`, `host_selection_retry_max_attempts` and `retry_priority` fields, because this mechanism is different than the one described for hedging in [gRFC A6](A6-client-retries.md#hedging-policy), so we will evaluate this later, possibly as part of implementing hedging.
 
-#### Deferred or Unsupported Retry Features
+Features that we do not plan to support in gRPC:
 
-1. The HedgePolicy.
-1. The `per_try_timeout` config.
-1. Any `retry_on` conditions from values of [x-envoy-retry-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on).
-1. The `retriable_headers` attribute in RetryPolicy.
-1. The `retriable_request_headers` attribute in RetryPolicy.
-1. Any retry related request headers such as: x-envoy-retry-on, x-envoy-retry-grpc-on, x-envoy-max-retries, and x-envoy-upstream-rq-per-try-timeout-ms.
-1. Retry circuit breaker.
-1. The `retry_priority` config.
-1. The `retry_host_predicate` config.
-1. The `host_selection_retry_max_attempts` config.
+- Any `retry_on` conditions from values of [`x-envoy-retry-on`](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on). Most of these values are about HTTP-level conditions that are not exposed to the gRPC retry code.
+- Configuring retries via the [x-envoy-retry-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on), [x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on), [x-envoy-max-retries](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-max-retries), [x-envoy-upstream-rq-per-try-timeout-ms](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-upstream-rq-per-try-timeout-ms), and [x-envoy-hedge-on-per-try-timeout](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-hedge-on-per-try-timeout) request headers, and the `retriable_headers` field.  Configuring retries via request headers may make sense for a proxy like Envoy but does not really make sense for gRPC.
+- The `retriable_request_headers` attribute, because it does not make sense to allow configuring retries via headers.  (Note that gRPC does support the `grpc-retry-pushback-ms` header, as described in [gRFC A6](A6-client-retries.md#pushback), which allows servers to inhibit retries configured in the client.)
+- Retry circuit breaker, because there is a [design conflict](https://github.com/envoyproxy/envoy/issues/17412) in xDS between this and dynamic cluster selection. If/when we have a use-case for this in the future, we will evaluate alternative ways of providing this kind of safety valve.
 
 ### Converting Envoy RetryPolicy to gRPC RetryPolicy
 
@@ -95,9 +93,9 @@ If we were to support per_try_timeout in non-hedging case before hedging support
 
 1. NACK the config
    - Pros
-     - Won’t do anything unintended for old clients
+     - Won’t do anything unintended for old clients.
    - Cons
-     - Could not update the config without outage until all old clients get updated first
+     - Could not update the config without outage until all old clients get updated first.
 1. Ignore only hedging policy
    - Cons
      - If the new config with hedging policy sets the per_try_timeout field extremely small, old clients will have unintended wrong behavior: retry extremely frequently and fail immediately.
@@ -108,8 +106,8 @@ If we were to support per_try_timeout in non-hedging case before hedging support
      - Upon change of policy, old clients will have different behavior which might result in different availability and error rates. The availability drop is unintended. 
 1. Ignore only hedging policy as well as the per_try_timeout field in retry policy (We’re not doing hedging for old clients)
    - Pros
-     - Could update the config without outage for old clients
-     - Old client won’t disable retry completely
+     - Could update the config without outage for old clients.
+     - Old client won’t disable retry completely.
    - Cons
      - In the case of the new config with per_try_timeout unchanged and with hedging enabled, old clients will have different behavior which might result in different availability and error rates upon the change of policy. The availability drop is unintended. 
 1. Ignore the entire route
