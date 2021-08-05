@@ -478,7 +478,8 @@ For example, the bootstrap file might contain the following:
 
 With this configuration, when the xDS server tells the client to get a certificate from
 plugin instance `"google_cloud_private_spiffe"` (the value of [`instance_name`][INST-NAME]),
-the client will load the certificate data from the specified files.
+the client will load the certificate data from the specified files. Note the
+[certificate_name][CERT-NAME] value is currently ignored by this plugin.
 
 [DURATION-JSON]: https://developers.google.com/protocol-buffers/docs/proto3#json.
 
