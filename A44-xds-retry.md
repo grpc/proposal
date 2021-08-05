@@ -65,9 +65,11 @@ We convert the following (supported) attributes in [Envoy RetryPolicy](https://w
 
 When converting `retry_on` value to `retryableStatusCodes`, the gRPC xDS client will only convert conditions that are documented in [x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on), that is, "cancelled", "deadline-exceeded", "internal", "resource-exhausted" and "unavailable", and will ignore any other conditions. If the resulting retryableStatusCodes is empty, gRPC xDS client will not include a retry policy in the corresponding route action.
 
-The num_retries attribute defaults to 1 as specified in Envoy API doc. As specified in the original retry gRFC any maxAttempts value greater than 5 will be treated as 5, so any value greater than 4, will effectively be converted to maxAttempts=5. If num_retries is less than 1, gRPC xDS client will reject the config by NACKing the xDS update.
+The num_retries attribute defaults to 1 as specified in Envoy API doc. As specified in the original retry gRFC any maxAttempts value greater than 5 will be treated as 5, so any value greater than 4, will effectively be converted to maxAttempts=5. The num_retries attribute must not be less than 1.
 
-As specified in Envoy API doc, the retry_back_off attribute defaults to base_interval=25ms and max_interval=250ms. The value of base_interval and max_interval must be greater than zero, otherwise the config will be rejected. Values of base_interval or max_interval less than 1ms will be treated as 1ms. The value of max_interval must be no less than the value of base_interval, otherwise the config will be rejected.
+As specified in Envoy API doc, retry_back_off is optional and defaults to base_interval=25ms and max_interval=250ms. In retry_back_off, base_interval is required. The max_interval is optional and defaults to 10 times base_interval. The value of base_interval and max_interval must be greater than zero. Values of base_interval or max_interval less than 1ms will be treated as 1ms. The value of max_interval must be no less than the value of base_interval.
+
+When validating xDS update from the control plane, gRPC xDS client will reject the config if any of the above requirements is not met.
 
 We ignore all other attributes in Envoy RetryPolicy.
 
