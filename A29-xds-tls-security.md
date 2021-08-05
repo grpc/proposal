@@ -192,10 +192,10 @@ The following fields in a CDS update are ignored:
 [CL-TS]: https://github.com/envoyproxy/envoy/blob/9aca65c395f01020080166e4795455addde167fa/api/envoy/config/cluster/v3/cluster.proto#L937
 [CL-TS-comment]: https://github.com/envoyproxy/envoy/blob/9aca65c395f01020080166e4795455addde167fa/api/envoy/config/cluster/v3/cluster.proto#L932
 [CL-TS-matches]: https://github.com/envoyproxy/envoy/blob/9aca65c395f01020080166e4795455addde167fa/api/envoy/config/cluster/v3/cluster.proto#L680
-[CTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L37
-[SNI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L40
-[ALLOW-RENEG]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L47
-[MAX-SESS-KEYS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L53
+[CTC]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L37
+[SNI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L40
+[ALLOW-RENEG]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L47
+[MAX-SESS-KEYS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L53
 
 ##### Server Authorization aka Subject-Alt-Name Checks
 
@@ -237,16 +237,16 @@ Individual implementations will use hooks provided by the underlying TLS framewo
 implement server authorization. As an example, Java uses a custom `X509TrustManager`
 implementation through the `SslContext` provided to the client sub-channel.
 
-[match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L373
-[default_validation_context]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L177
-[CVC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251
+[match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
+[default_validation_context]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L188
+[CVC]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L274
 [StringMatcher]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L20
 [ExactMatch]: https://github.com/envoyproxy/envoy/blob/6321e5d95f7e435625d762ea82316b7a9f7071a4/api/envoy/type/matcher/string.proto#L29
 [RFC6125-6]: https://datatracker.ietf.org/doc/html/rfc6125#section-6
 [zero-compr]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.2
 [no-leading-0]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.1
 [lower-case]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.3
-[DNS-wildcard]: https://github.com/envoyproxy/envoy/blob/c94e646e0280e4c521f8e613f1ae2a02b274dbbf/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L358-L360
+[DNS-wildcard]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L392-L394
 
 #### LDS for Server Side Security
 
@@ -298,17 +298,17 @@ part of validating all LDS updates:
 [default-filter-chain]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener.proto#L131
 [filter-chain-match]: A36-xds-for-servers.md#filterchainmatch
 [transport-socket]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener_components.proto#L246
-[DTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L57
+[DTC]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L57
 [transport-socket-comment]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener_components.proto#L241
-[CTC1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L84
-[RCC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L88
-[CTC-type]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L129
-[REQ-SNI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L92
-[SESSION-TICKET-KEYS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L96
-[SESSION-TICKET-KEYS-SDS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L99
-[DIS-STATELESS-SESS-RES]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L109
-[SESSION-TIMEOUT]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L116
-[OCSP-STAPLE-POLICY]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L124
+[CTC1]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L84
+[RCC]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L88
+[CTC-type]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L129
+[REQ-SNI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L92
+[SESSION-TICKET-KEYS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L96
+[SESSION-TICKET-KEYS-SDS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L99
+[DIS-STATELESS-SESS-RES]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L109
+[SESSION-TIMEOUT]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L116
+[OCSP-STAPLE-POLICY]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L124
 
 #### CommonTlsContext Processing
 
@@ -383,21 +383,21 @@ is accepted. When that field is present, the other fields [`validation_context_c
 and [`validation_context_sds_secret_config`][VCSSC1] are ignored otherwise the presence of those fields will
 cause a NACK.
 
-[CPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L154
-[TCCPI]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L234
-[VCCPI1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L200
-[TLS-CERT]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L215
-[CERT-SDS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L225
-[CERT-PROVIDER]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L230
-[VAL-SDS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L242
-[VAL-PROVIDER]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L255
-[TLS-PARAMS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L207
-[CUSTOM-HS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L276
-[ALPN-PROTOCOLS]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L272
-[UTC]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26
+[CPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L165
+[TCCPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L256
+[VCCPI1]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L205
+[TLS-CERT]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L226
+[CERT-SDS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L239
+[CERT-PROVIDER]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251
+[VAL-SDS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L265
+[VAL-PROVIDER]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L278
+[TLS-PARAMS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L212
+[CUSTOM-HS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L301
+[ALPN-PROTOCOLS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L297
+[UTC]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26
 [server-authz]: #server-authorization-aka-subject-alt-name-checks
-[VCCP1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L193
-[VCSSC1]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L184
+[VCCP1]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L199
+[VCSSC1]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L193
 
 ### Certificate Provider Plugin Framework
 
@@ -417,8 +417,8 @@ we might make this API public in the future. However gRPC currently includes a `
 implementation - descibed [below][FILE-WATCHER-LINK] - which reads certificates from the local file system.
 
 [FILE-WATCHER-LINK]: #file_watcher-certificate-provider
-[CERT-NAME]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L169
-[INST-NAME]: https://github.com/envoyproxy/envoy/blob/7d4b2cae486b66b62ba0d3e1e348504699bea1bf/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L163
+[CERT-NAME]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L180
+[INST-NAME]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L174
 
 Certificate provider plugin instances are configured via the xDS bootstrap file.  There is a new
 top-level field called `"certificate_providers"` whose value is a map (a JSON object).  The key
