@@ -41,8 +41,7 @@ Features that we will not support right now but may add in the future:
 
 - Hedging support, because not all gRPC languages have implemented hedging yet, and we didn't want to wait for that before making retries configurable via xDS.
 - The `per_try_timeout` field, because we can't safely support this now without hedging support, lest we break users when we add hedging support. We will add this later, at the same time as we add hedging support. See the ["Rationale" section](#Supporting-per_try_timeout) below for more details.
-- Any `retry_on` conditions from values of [x-envoy-retry-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on).
-- The `retry_host_predicate`, `host_selection_retry_max_attempts` and `retry_priority` fields, because this mechanism is different than the one described for hedging in [gRFC A6](A6-client-retries.md#hedging-policy), so we will evaluate this later, possibly as part of implementing hedging.
+- The `retry_host_predicate`, and `host_selection_retry_max_attempts` fields, because this mechanism is different than the one described for hedging in [gRFC A6](A6-client-retries.md#hedging-policy), so we will evaluate this later, possibly as part of implementing hedging.
 
 Features that we do not plan to support in gRPC:
 
@@ -50,6 +49,7 @@ Features that we do not plan to support in gRPC:
 - Configuring retries via the [x-envoy-retry-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on), [x-envoy-retry-grpc-on](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-grpc-on), [x-envoy-max-retries](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-max-retries), [x-envoy-upstream-rq-per-try-timeout-ms](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-upstream-rq-per-try-timeout-ms), and [x-envoy-hedge-on-per-try-timeout](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-hedge-on-per-try-timeout) request headers, and the `retriable_headers` field.  Configuring retries via request headers may make sense for a proxy like Envoy but does not really make sense for gRPC.
 - The `retriable_request_headers` attribute, because it does not make sense to allow configuring retries via headers.  (Note that gRPC does support the `grpc-retry-pushback-ms` header, as described in [gRFC A6](A6-client-retries.md#pushback), which allows servers to inhibit retries configured in the client.)
 - Retry circuit breaker, because there is a [design conflict](https://github.com/envoyproxy/envoy/issues/17412) in xDS between this and dynamic cluster selection. If/when we have a use-case for this in the future, we will evaluate alternative ways of providing this kind of safety valve.
+- The `retry_priority` field, because gRPC does not support HTTP/2 priority.
 
 ### Converting Envoy RetryPolicy to gRPC RetryPolicy
 
