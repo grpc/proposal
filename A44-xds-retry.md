@@ -77,6 +77,8 @@ As shown in the chart below, the client RPC obtains from ConfigSelector (i) the 
 
 For client versions in which the xDS retry feature is experimental, if the environment variable `GRPC_XDS_EXPERIMENTAL_ENABLE_RETRY` is not set as true, the client will ignore RetryPolicy updates from the control plane.
 
+If the application disables retries for the channel via the gRPC API, then the retry config from xDS will be validated as described above but will not actually be used as [specified by the retry gRFC](A6-client-retries.md#disabling-retries).
+
 The gRPC RetryPolicy is converted from Envoy RetryPolicy, where the Envoy RetryPolicy is obtained in either the LDS or RDS update from the control plane. If a RetryPolicy is given in the RouteAction config for the selected route, that will be used; otherwise if a RetryPolicy is given in the VirtualHost config for the selected VirtualHost, that will be used.
 
 If retry is allowed by the RetryPolicy, after the backoff period, each retry attempt will re-pick a subchannel that routes to the upstream cluster from the most up-to-date picker provided by the load balancer.
