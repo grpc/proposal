@@ -208,20 +208,20 @@ requested `:authority`. Routes are matched the same as on client-side.
 Route with an inappropriate `action` causes RPCs matching that route to fail.
 
 [Like in Envoy][envoy lds], updates to a Listener cause all older connections on
-that Listener to be gracefully shut down with a grace period of 10 minutes for
-long-lived RPCs, such that clients will reconnect and have the updated
-configuration apply. This applies equally to an update in a RouteConfiguration
-provided inline via the `route_config` field as it is part of the Listener, but
-it does not apply to an updated RouteConfiguration provided by reference via
-`rds` field. Infrastructure for "not serving" mode may be used for the graceful
-shutdown, but only if it can be used without causing spurious RPC or connection
-failures. Applying updates to a Listener should be delayed until dependent
-resources have been attempted to be loaded (e.g., via RDS). The existing
-resource loading timeout in XdsClient prevents the update from being delayed
-indefinitely.
-
-TODO: drain time is a command line flag for Envoy, not provided via xds.
-https://www.envoyproxy.io/docs/envoy/latest/operations/cli#cmdoption-drain-time-s
+that Listener to be gracefully shut down (i.e., "drained") with a default grace
+period of 10 minutes for long-lived RPCs, such that clients will reconnect and
+have the updated configuration apply. This applies equally to an update in a
+RouteConfiguration provided inline via the `route_config` field as it is part of
+the Listener, but it does not apply to an updated RouteConfiguration provided by
+reference via `rds` field. Infrastructure for "not serving" mode may be used for
+the graceful shutdown, but only if it can be used without causing spurious RPC
+or connection failures. Applying updates to a Listener should be delayed until
+dependent resources have been attempted to be loaded (e.g., via RDS). The
+existing resource loading timeout in XdsClient prevents the update from being
+delayed indefinitely and the duplicate resource update detection in XdsClient
+prevents replacing the Listener when nothing changes. The grace period should be
+adjustable when building the XdsServer and should be described as the "drain
+grace time."
 
 [Filter.typed_config]: https://github.com/envoyproxy/envoy/blob/928a62b7a12c4d87ce215a7c4ebd376f69c2e080/api/envoy/config/listener/v3/listener_components.proto#L40
 [TypedStruct.type_url]: https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38
