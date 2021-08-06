@@ -205,7 +205,12 @@ validation must be updated to allow [Route.non_forwarding_action][] as a valid
 requested `:authority`. Routes are matched the same as on client-side.
 `Route.non_forwarding_action` is expected for all Routes used on server-side and
 `Route.route` continues to be expected for all Routes used on client-side; a
-Route with an inappropriate `action` causes RPCs matching that route to fail.
+Route with an inappropriate `action` causes RPCs matching that route to fail
+with UNAVAILABLE. If `HttpConnectionManager.rds` references a NACKed resource
+without a previous good version, an unavailable resource because of
+communication failures with control plane or a triggered loading timeout, or
+a non-existent resource, then all RPCs processed by that HttpConnectionManager
+will fail with UNAVAILABLE.
 
 [Like in Envoy][envoy lds], updates to a Listener cause all older connections on
 that Listener to be gracefully shut down (i.e., "drained") with a default grace
