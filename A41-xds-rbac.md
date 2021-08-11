@@ -67,11 +67,13 @@ should be provided to each filter. A39 should be consulted for the expected
 behavior.
 
 New validation should occur for `HttpConnectionManager` to allow equating
-`direct_remote_ip` and `remote_ip`. If the implementation does not distinguish
-between these fields, then `xff_num_trusted_hops` must be unset or zero and
-`original_ip_detection_extensions` must be empty. If either field has an
-incorrect value, the Listener must be NACKed. For simplicity, this behavior
-applies independent of the Listener type (both client-side and server-side).
+RBAC's `direct_remote_ip` and `remote_ip`. If the RBAC implementation does not
+distinguish between these fields, then
+`HttpConnectionManager.xff_num_trusted_hops` must be unset or zero and
+`HttpConnectionManager.original_ip_detection_extensions` must be empty. If
+either field has an incorrect value, the Listener must be NACKed. For
+simplicity, this behavior applies independent of the Listener type (both
+client-side and server-side).
 
 The core policy matching logic should be split into an "RBAC engine" to allow
 internal reuse with a non-xDS API. Any non-xDS API will not be RBAC, so this
