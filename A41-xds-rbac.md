@@ -219,8 +219,5 @@ support one day, but would most likely be a more advanced feature.
 
 ## Implementation
 
-[A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
-
-## Open issues (if applicable)
-
-[A discussion of issues relating to this proposal for which the author does not know the solution. This section may be omitted if there are none.]
+This will be implemented simultaneously in Java by @YifeiZhuang and @voidzcy, in
+Go by @zasweq, and C++ by @yashykt.
