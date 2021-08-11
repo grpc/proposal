@@ -107,14 +107,16 @@ to "optimize out" the never-matching rules.
 
 The `header` field is not entirely 1:1 with gRPC Metadata, in part because which
 HTTP headers are present in Metadata is not 100% consistent cross-language.
-For this design, `headers` can include `:method`, `:authority`, and`:path`
+For this design, `headers` can include `:method`, `:authority`, and `:path`
 matchers and they should match the values received on-the-wire independent of
 whether they are stored in Metadata or in separate APIs. `:method` can be
 hard-coded to `POST` if unavailable and a code audit confirms the server denies
 requests for all other method types. Implementations must not match [hop-by-hop
 headers][]. Since hop-by-hop headers [are not used in HTTP/2 except for `te:
-trailers`][rfc7540 connection header], implementations must ensure they are
-disallowing the `Connection` header and not matching the `TE` header.
+trailers`][rfc7540 connection header], transports must consider requests
+containing the `Connection` header as malformed, independent of xDS or RBAC, and
+only the `TE` header may need special handling. If the transport exposes `TE` in
+Metadata, then RBAC must special-case the header to prevent it from matching.
 Multi-valued metadata is represented as the concatenation of the values along
 with a `,` (comma, no added spaces) separator, as permitted by HTTP and gRPC.
 The `Content-Type` provided by the client must be used; not a hard-coded value.
