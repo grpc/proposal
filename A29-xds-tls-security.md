@@ -4,7 +4,7 @@ A29: xDS-Based Security for gRPC Clients and Servers
 * Approver: markdroth
 * Status: Draft
 * Implemented in: C-core, Java, and Go
-* Last updated: 2021-06-08
+* Last updated: 2021-08-12
 * Discussion at: 
 
 ## Abstract
@@ -173,7 +173,7 @@ configuration. See below for [`CommonTlsContext`][CTC-type] processing.
 A secure client at a minimum requires a CA root certificate to be able to validate the server
 certificate in the TLS mode and this is provided by [ca_certificate_provider_instance][CCPI]
 inside the [`default_validation_context`][default_validation_context] of
-[combined_validation_context][CVC]. For backward compatibility gRPC will use the deprecated
+[combined_validation_context][CVC]. For backward compatibility, gRPC will use the deprecated
 field [`validation_context_certificate_provider_instance`][VCCPI1] inside
 [`combined_validation_context`][CVC] if [ca_certificate_provider_instance][CCPI] is not
 present. If [`UpstreamTlsContext`][UTC] is present but
@@ -224,8 +224,9 @@ the check fails.
 * each SAN entry of type DNS, URI, email and IP address is considered for the below match
 logic. An IP address is converted to its canonical string representation. For
 IPv6 this includes [maximum zero compression][zero-compr], [no leading zeros][no-leading-0]
-and [lower case][lower-case] e.g. `2001:db8::1` but *not* `2001:DB8:0::01`.
-If an entry matches as per this logic, the check completes successfully.
+and [lower case][lower-case] e.g. an address like `"2001:DB8:0::01"` will be converted to
+`"2001:db8::1"` for matching. If an entry matches as per this logic, the check completes
+successfully.
 
   * if a SAN entry is empty then the match fails for that entry.
 
