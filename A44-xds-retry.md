@@ -2,7 +2,7 @@ A44: gRPC xDS Retry Support
 ----
 * Author(s): dapengzhang0
 * Approver: markdroth
-* Status: In Review
+* Status: Implemented
 * Implemented in: C-core, Java
 * Last updated: 2021-08-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/rTUvJ14gjDs
