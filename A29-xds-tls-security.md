@@ -147,8 +147,9 @@ Use of XdsServerCredentials:
 xDS v3 is a pre-requisite for this proposal because the required fields were added to xDS v3. 
 gRPC uses CDS to configure client side security and LDS for server side security as described in the
 sections below. The sections describe how the CDS or LDS updates are processed by gRPC. Note that gRPC
-always validates all security configurations in CDS or LDS regardless of whether an XdsChannelCredentials
-or XdsServerCredentials is in force. If validation fails on an update, the update is NACKed.
+always validates all security configurations in CDS or LDS regardless of whether the application used
+`XdsChannelCredentials` or `XdsServerCredentials`. If validation fails on an update, the update is
+NACKed.
 
 An unsupported field is normally ignored. However if ignoring a field compromises security, or
 if the unsupported field affects how we interpret other fields, we NACK the update when the
@@ -170,23 +171,29 @@ load balancer policy information down to child policies.
 [`common_tls_context`][CTC] in the `UpstreamTlsContext` contains the required security
 configuration. See below for [`CommonTlsContext`][CTC-type] processing.
 
-A secure client at a minimum requires a CA root certificate to be able to validate the server
-certificate in the TLS mode and this is provided by [ca_certificate_provider_instance][CCPI]
-inside the [`default_validation_context`][default_validation_context] of
-[combined_validation_context][CVC]. For backward compatibility, gRPC will use the deprecated
-field [`validation_context_certificate_provider_instance`][VCCPI1] inside
-[`combined_validation_context`][CVC] if [ca_certificate_provider_instance][CCPI] is not
-present. If [`UpstreamTlsContext`][UTC] is present but
-[`combined_validation_context`][CVC] is not present or neither of
-[ca_certificate_provider_instance][CCPI] and [`validation_context_certificate_provider_instance`][VCCPI1]
-is set, then gRPC will NACK the CDS update. The client identity certificate is configured via
-[`tls_certificate_provider_instance`][TCPI] (or the deprecated
-[`tls_certificate_certificate_provider_instance`][TCCPI] if [`tls_certificate_provider_instance`][TCPI]
-is not set). Note that the identity certificate on the client side is optional. The
-client certificate is sent to the server if the server requests or requires it in the
-TLS handshake. If the server requires the client certificate but is not configured on the
-client side then the TLS handshake will fail because of the client's inability to send the
-certificate.
+A secure client performs validation of the server's certificate. This validation is configured
+via the `CertificateValidationContext` message, which is present in either the
+[`validation_context`][validation_context] field or in the
+[`default_validation_context`][default_validation_context] field inside of the
+[`combined_validation_context`][CVC] field. If neither of those fields are set, gRPC will NACK
+the CDS update.
+
+At minimum, a secure client requires a CA root certificate to be able to validate the server
+certificate. The CA root certificate is obtained using the certificate provider instance configured
+via the [`ca_certificate_provider_instance`][CCPI] field of the `CertificateValidationContext`
+message. If this field is not present, or if it specifies a certificate provider instance that
+is not configured in the bootstrap file, gRPC will NACK the CDS update.
+
+The client's identity certificate, if configured, is obtained using the certificate provider instance
+configured via the [`tls_certificate_provider_instance`][TCPI] field of the `CommonTlsContext` message.
+If this field is set, the client certificate is sent to the server if the server requests or requires
+it in the TLS handshake. If the server requires the client certificate but is not configured on the
+client side then the TLS handshake will fail because of the client's inability to send the certificate.
+If this field specifies a certificate provider instance that is not configured in the bootstrap file,
+gRPC will NACK the CDS update. Note that gRPC does not support any of the other mechanisms in xDS for
+configuring the client's identity certificate. If the [`tls_certificate_provider_instance`][TCPI] field
+is unset but either of the [`tls_certificates`][TLS-CERT] or [`tls_certificate_sds_secret_configs`][CERT-SDS]
+fields are set, gRPC will NACK the CDS update.
 
 The following fields in a CDS update are ignored:
 
@@ -210,10 +217,9 @@ a server for the connection as described below. This check is in lieu of the
 canonical [hostname check in Web PKI][RFC6125-6].
 
 If [`match_subject_alt_names`][match_subject_alt_names] in
-[`default_validation_context`][default_validation_context] of
-[combined_validation_context][CVC] of the received `UpstreamTlsContext` is populated
-then gRPC checks the SAN entries in the leaf server certificate against the
-`match_subject_alt_names` values as follows:
+the `CertificateValidationContext` is populated then gRPC checks the SAN entries
+in the leaf server certificate against the
+[`match_subject_alt_names`][match_subject_alt_names] values as follows:
 
 * if the `match_subject_alt_names` list is empty then there is nothing to match and the
 check succeeds.
@@ -254,6 +260,7 @@ implementation through the `SslContext` provided to the client sub-channel.
 [no-leading-0]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.1
 [lower-case]: https://datatracker.ietf.org/doc/html/rfc5952#section-2.3
 [DNS-wildcard]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L392-L394
+[validation_context]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L261
 
 #### LDS for Server Side Security
 
@@ -275,22 +282,31 @@ is not present) then gRPC uses the fallback credentials for the incoming connect
 [`common_tls_context`][CTC1] in the `DownstreamTlsContext` contains the required
 security configuration. See below for [`CommonTlsContext`][CTC-type] processing.
 
-A secure server at a minimum requires an identity certificate which is provided
-by [`tls_certificate_provider_instance`][TCPI] (or in its absence the deprecated
-field [`tls_certificate_certificate_provider_instance`][TCCPI]). If both fields are
-empty, gRPC will NACK an update as part of validating all LDS updates. If
-[ca_certificate_provider_instance][CCPI] inside the
-[`default_validation_context`][default_validation_context] of [combined_validation_context][CVC]
-(or in its absence the deprecated field
-[`validation_context_certificate_provider_instance`][VCCPI1] inside
-[`combined_validation_context`][CVC]) is provided then the server will request
-the client certificate. When [`require_client_certificate`][RCC] is `true`,
-gRPC requires the client certificate and will reject a connection without a valid
-client certificate. When [`require_client_certificate`][RCC] is `true`, the
-[ca_certificate_provider_instance][CCPI] field (or in its absence
-[`validation_context_certificate_provider_instance`][VCCPI1]) should be
-present otherwise gRPC will NACK an LDS update as part of validating all LDS
-updates.
+The server's identity certificate is obtained using the certificate provider instance
+configured via the [`tls_certificate_provider_instance`][TCPI] field of the
+`CommonTlsContext` message. If this field is not present, or if it specifies a certificate
+provider instance that is not configured in the bootstrap file, gRPC will NACK the LDS
+update.
+
+If a secure server is configured for mTLS, it will need configuration for how to validate
+the client's certificate. This validation is configured via the `CertificateValidationContext`
+message, which is present in either the [`validation_context`][validation_context] field or
+in the [`default_validation_context`][default_validation_context] field inside of the
+[`combined_validation_context`][CVC] field. If neither of those fields are set, the server
+will not request the client's certificate during the TLS handshake (i.e., it will use TLS
+instead of mTLS).
+
+If a `CertificateValidationContext` is provided, then the server requires a CA root certificate
+to be able to validate the client certificate. The CA root certificate is obtained using the
+certificate provider instance configured via the [`ca_certificate_provider_instance`][CCPI]
+field. If this field is not present, or if it specifies a certificate provider instance that
+is not configured in the bootstrap file, gRPC will NACK the LDS update.
+
+If the [`require_client_certificate`][RCC] field in the `DownstreamTlsContext` message is set
+to true, gRPC requires the client certificate and will reject a connection without a client
+certificate that is successfully validated as per the `CertificateValidationContext`. Note
+that if [`require_client_certificate`][RCC] is true, and if no `CertificateValidationContext`
+is provided, gRPC will NACK the LDS resource.
 
 The following fields in an LDS update are ignored:
 
@@ -302,8 +318,18 @@ The following fields in an LDS update are ignored:
 If any of the following fields are present, gRPC will NACK an LDS update as
 part of validating all LDS updates:
 
-* [require_sni][REQ-SNI]
-* [ocsp_staple_policy][OCSP-STAPLE-POLICY]: any value other than `LENIENT_STAPLING` causes NACK.
+* [require_sni][REQ-SNI]: when this is set to `true`, it requires the server to
+["reject connections without a valid and matching SNI"][sni-comment]. However SNI is
+almost always used for "name-based virtual hosting" web-servers and is not applicable
+to gRPC. Silently ignoring the `true` value will result into gRPC not rejecting connections
+without a valid and matching SNI thereby making the implementation less secure than
+what the control plane intended, hence gRPC will NACK such an LDS update.
+
+* [ocsp_staple_policy][OCSP-STAPLE-POLICY]: Instead of mandating the implementation of
+[`STRICT_STAPLING`][STRICT_STAPLING] and [`MUST_STAPLE`][MUST_STAPLE] in gRPC,
+we NACK any value other than [`LENIENT_STAPLING`][LENIENT_STAPLING] because ignoring
+the unsupported values would make the implementation less secure than what the control
+plane intended.
 
 [A36]: A36-xds-for-servers.md
 [filter-chains]: https://github.com/envoyproxy/envoy/blob/45ec050f91407147ed53a999434b09ef77590177/api/envoy/config/listener/v3/listener.proto#L120
@@ -321,54 +347,38 @@ part of validating all LDS updates:
 [DIS-STATELESS-SESS-RES]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L109
 [SESSION-TIMEOUT]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L116
 [OCSP-STAPLE-POLICY]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L124
+[sni-comment]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L90
+[STRICT_STAPLING]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L73
+[MUST_STAPLE]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L80
+[LENIENT_STAPLING]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L65
 
 #### CommonTlsContext Processing
 
 `CommonTlsContext` is present in both the `UpstreamTlsContext` and `DownstreamTlsContext` protos and contains the
 certificate and key configuration information needed on the client and server side respectively. The configuration
 tells gRPC how to obtain certificates and the keys for the TLS handshake. Although there are various ways to obtain
-certificates as per this proto (which are supported by Envoy), gRPC supports only two of them. The preferred mechanism
-is the [`CertificateProviderPluginInstance`][CPPI] proto and the less preferred mechanism is
-[`CertificateProviderInstance`][CPI] which is a deprecated proto but looks identical to
-[`CertificateProviderPluginInstance`][CPPI]. They are both based on the notion of CertificateProvider plugin framework
-(described later). The field `instance_name` defines a CertificateProvider "instance" that gRPC looks up in the bootstrap
-file (described later) to obtain the CertificateProvider configuration. This configuration along with the CertificateProvider
-plugin framework enables gRPC to acquire the certificates necessary for the TLS handshake.
+certificates as per this proto (which are supported by Envoy), gRPC supports only one of them and that is
+the [`CertificateProviderPluginInstance`][CPPI] proto. This proto is based on the notion of the CertificateProvider
+plugin framework (described later). The field `instance_name` defines a CertificateProvider "instance" that gRPC looks
+up in the bootstrap file (described later) to obtain the CertificateProvider configuration. This configuration along
+with the CertificateProvider plugin framework enables gRPC to acquire the certificates necessary for the TLS handshake.
 
-The field [`tls_certificate_provider_instance`][TCPI] (or in its absence the deprecated
-field [`tls_certificate_certificate_provider_instance`][TCCPI]) is used for the identity certificate and the
-private key. And [`ca_certificate_provider_instance`][CCPI] inside the
-[`default_validation_context`][default_validation_context] of [`combined_validation_context`][CVC]
-(or in its absence the deprecated field [`validation_context_certificate_provider_instance`][VCCPI1] inside
-[`combined_validation_context`][CVC]) is used for the root certificates for validating peer certificates.
+The field [`tls_certificate_provider_instance`][TCPI] is used for the identity certificate and the
+private key. And [`ca_certificate_provider_instance`][CCPI] inside a `CertificateValidationContext`
+is used for the root certificates for validating peer certificates.
 
 gRPC does not support the other certificate acquisition mechanisms specified by the following fields:
 
-* [tls_certificates][TLS-CERT]
-* [tls_certificate_sds_secret_configs][CERT-SDS]
-* [tls_certificate_certificate_provider][CERT-PROVIDER]
-* [validation_context_sds_secret_config][VAL-SDS]
-* [validation_context_certificate_provider][VAL-PROVIDER]
+* [tls_certificates][TLS-CERT]: if this is present but [`tls_certificate_provider_instance`][TCPI] is
+not present, then gRPC will NACK the update.
+* [tls_certificate_sds_secret_configs][CERT-SDS]: similar to above, if this is present but
+[`tls_certificate_provider_instance`][TCPI] is not present, then gRPC will NACK the update.
+* [validation_context_sds_secret_config][VAL-SDS]: if this is present but a
+`CertificateValidationContext` (either the [`validation_context`][validation_context] field or
+the [`default_validation_context`][default_validation_context] field inside of the
+[`combined_validation_context`][CVC]) is not present, then gRPC will NACK the update.
 
-When fields of type [`CertificateProviderPluginInstance`][CPPI] (or the deprecated
-[`CertificateProviderInstance`][CPI]) are present gRPC ignores the respective
-unsupported fields but if the unsupported fields are present by themselves gRPC will NACK an update
-as part of validating all CDS/LDS updates.
-
-For example, in [`UpstreamTlsContext`][UTC] (on the client side), the identity certificate is not
-needed for the TLS mode, which is indicated by the absence of both [`tls_certificate_provider_instance`][TCPI]
-and [`tls_certificate_certificate_provider_instance`][TCCPI]. However in this case if any of the other
-unsupported identity certificate fields ([tls_certificates][TLS-CERT], [tls_certificate_sds_secret_configs][CERT-SDS],
-[tls_certificate_certificate_provider][CERT-PROVIDER]) are present then gRPC will NACK a CDS update.
-But if [`tls_certificate_provider_instance`][TCPI] (or in its absence the deprecated
-[`tls_certificate_certificate_provider_instance`][TCCPI]) is present, then the unsupported
-fields are ignored. This allows a control plane to formulate a single `CommonTlsContext` that works
-for both gRPC (which only supports [`CertificateProviderPluginInstance`][CPPI] or the deprecated
-[`CertificateProviderInstance`][CPI]) and Envoy (which supports neither [`CertificateProviderPluginInstance`][CPPI]
-nor [`CertificateProviderInstance`][CPI]) to achieve consistent security configuration between
-gRPC and Envoy.
-
-The following fields are unsupported and if present will cause a NACK from gRPC for any update
+The following fields are unsupported and if present will cause a NACK from gRPC
 because ignoring these fields compromises security:
 
 * [tls_params][TLS-PARAMS]
@@ -379,11 +389,13 @@ on the client side (inside [`UpstreamTlsContext`][UTC]) is ignored if present.
 The processing and parsing of `CommonTlsContext` inside any particular CDS or LDS response does
 not take into account whether Xds credentials are in effect for the respective channel or server.
 
-[`combined_validation_context`][CVC] is validated in any CDS/LDS update as follows:
-The field [match_subject_alt_names][] inside [default_validation_context][] is accepted only on
-the client side i.e. inside `UpstreamTlsContext` and is processed as described [above][server-authz].
-If any of the other fields (listed below) are present in [default_validation_context][], the update
-is NACKed because ignoring these fields compromises security:
+A `CertificateValidationContext` (either the [`validation_context`][validation_context] field or
+the [`default_validation_context`][default_validation_context] field inside of the
+[`combined_validation_context`][CVC]) is validated in any CDS/LDS update as follows:
+The field [match_subject_alt_names][] is accepted only on the client side i.e. inside
+`UpstreamTlsContext` and is processed as described [above][server-authz]. If any of the other
+fields (listed below) are present, the update is NACKed because ignoring these fields compromises
+security:
 
 * `verify_certificate_spki`
 * `verify_certificate_hash`
@@ -391,19 +403,12 @@ is NACKed because ignoring these fields compromises security:
 * `crl`
 * `custom_validator_config`
 
-The following fields from [default_validation_context][] are ignored:
+The following fields from `CertificateValidationContext` are ignored:
 
 * `trusted_ca`
 * `watched_directory`
 * `allow_expired_certificate`
 * `trust_chain_verification`
-
-In [`combined_validation_context`][CVC], (other than [default_validation_context][]) only
-[`validation_context_certificate_provider_instance`][VCCPI1] is accepted as a deprecated alternative to
-[ca_certificate_provider_instance][CCPI]. When one of those fields ([ca_certificate_provider_instance][CCPI]
-or [`validation_context_certificate_provider_instance`][VCCPI1]) is present, the other fields
-[`validation_context_certificate_provider`][VCCP1] and [`validation_context_sds_secret_config`][VCSSC1]
-are ignored otherwise the presence of any of those fields will cause a NACK.
 
 [CPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L165
 [TCCPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L256
@@ -428,9 +433,9 @@ are ignored otherwise the presence of any of those fields will cause a NACK.
 
 xDS supports many different configurations for endpoints to obtain certificates but gRPC supports only
 [`CertificateProviderPluginInstance`][CPPI] (or its deprecated version [`CertificateProviderInstance`][CPI]).
-In this approach, the control plane tells the xDS client the [name of a certificate][CERT-NAME] (which
-is currently ignored) and the ["instance" name][INST-NAME] of a provider to use to obtain a certificate.
-This provider [instance name][INST-NAME] is translated into a provider implementation and a configuration
+In this approach, the control plane tells the xDS client the [name of a certificate][CERT-NAME] and the
+["instance" name][INST-NAME] of a provider to use to obtain a certificate. This provider
+[instance name][INST-NAME] is translated into a provider implementation and a configuration
 for that implementation using the client's own configuration instead of being sent by the control plane.
 This enables flexibility in heterogeneous deployments where different clients can use different
 implementations for the same provider instance name. For example, an on-prem client may get its certificate
