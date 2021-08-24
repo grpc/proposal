@@ -69,7 +69,7 @@ The child span should record the message events of the attempt.
 
 ## Rationale
 
-Transparent retry should also be treated as a distinct RPC with regards to the per-attempt metrics, because for OpenCensus tracing, it's natural to create a child span for transparent retry as with ordinary retry attempt, so for OpenCensus stats, we should be consistent. Also, there is no effective way to distinguish the two types of transparent retry, and one of them actually sends data to the wire, so the outbound bytes should be recorded.
+Transparent retry should also be treated as a distinct RPC with regards to the pre-existing OpenCensus [metrics](https://github.com/census-instrumentation/opencensus-specs/blob/master/stats/gRPC.md#measures), because for OpenCensus tracing it's natural to create a child span for transparent retry as with ordinary retry attempt, so for OpenCensus metrics we should be consistent. Also, there is no effective way to distinguish the two types of transparent retry, and one of them actually sends data to the wire, so the outbound bytes should be recorded.
 
 ## Implementation
 
