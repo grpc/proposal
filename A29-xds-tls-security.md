@@ -410,29 +410,22 @@ The following fields from `CertificateValidationContext` are ignored:
 * `allow_expired_certificate`
 * `trust_chain_verification`
 
-[CPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L165
-[TCCPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L256
 [TCPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L247
-[VCCPI1]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L205
 [TLS-CERT]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L226
 [CERT-SDS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L239
-[CERT-PROVIDER]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L251
 [VAL-SDS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L265
-[VAL-PROVIDER]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L278
 [TLS-PARAMS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L212
 [CUSTOM-HS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L301
 [ALPN-PROTOCOLS]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L297
 [UTC]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L26
 [server-authz]: #server-authorization-aka-subject-alt-name-checks
-[VCCP1]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L199
-[VCSSC1]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L193
 [CCPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L315
 [CPPI]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L241
 
 ### Certificate Provider Plugin Framework
 
 xDS supports many different configurations for endpoints to obtain certificates but gRPC supports only
-[`CertificateProviderPluginInstance`][CPPI] (or its deprecated version [`CertificateProviderInstance`][CPI]).
+[`CertificateProviderPluginInstance`][CPPI].
 In this approach, the control plane tells the xDS client the [name of a certificate][CERT-NAME] and the
 ["instance" name][INST-NAME] of a provider to use to obtain a certificate. This provider
 [instance name][INST-NAME] is translated into a provider implementation and a configuration
