@@ -290,11 +290,13 @@ update.
 
 If a secure server is configured for mTLS, it will need configuration for how to validate
 the client's certificate. This validation is configured via the `CertificateValidationContext`
-message, which is present in either the [`validation_context`][validation_context] field or
-in the [`default_validation_context`][default_validation_context] field inside of the
-[`combined_validation_context`][CVC] field. If neither of those fields are set, the server
-will not request the client's certificate during the TLS handshake (i.e., it will use TLS
-instead of mTLS).
+message, which comes from one of the options in the [`validation_context_type`][validation_context_type] oneof.
+If the [`validation_context_sds_secret_config`][VAL-SDS] field is set, gRPC will NACK the CDS update,
+since we do not support SDS. If the [`validation_context`][validation_context] field is set, we get
+the `CertificateValidationContext` from there. If the [`combined_validation_context`][CVC] field is
+set, we get the `CertificateValidationContext` from its [`default_validation_context`][default_validation_context]
+field. If there is no `CertificateValidationContext`, then the server will not request the client's
+certificate during the TLS handshake (i.e., it will use TLS instead of mTLS).
 
 If a `CertificateValidationContext` is provided, then the server requires a CA root certificate
 to be able to validate the client certificate. The CA root certificate is obtained using the
@@ -351,6 +353,7 @@ plane intended.
 [STRICT_STAPLING]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L73
 [MUST_STAPLE]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L80
 [LENIENT_STAPLING]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L65
+[validation_context_type]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L259
 
 #### CommonTlsContext Processing
 
@@ -367,17 +370,6 @@ The field [`tls_certificate_provider_instance`][TCPI] is used for the identity c
 private key. And [`ca_certificate_provider_instance`][CCPI] inside a `CertificateValidationContext`
 is used for the root certificates for validating peer certificates.
 
-gRPC does not support the other certificate acquisition mechanisms specified by the following fields:
-
-* [tls_certificates][TLS-CERT]: if this is present but [`tls_certificate_provider_instance`][TCPI] is
-not present, then gRPC will NACK the update.
-* [tls_certificate_sds_secret_configs][CERT-SDS]: similar to above, if this is present but
-[`tls_certificate_provider_instance`][TCPI] is not present, then gRPC will NACK the update.
-* [validation_context_sds_secret_config][VAL-SDS]: if this is present but a
-`CertificateValidationContext` (either the [`validation_context`][validation_context] field or
-the [`default_validation_context`][default_validation_context] field inside of the
-[`combined_validation_context`][CVC]) is not present, then gRPC will NACK the update.
-
 The following fields are unsupported and if present will cause a NACK from gRPC
 because ignoring these fields compromises security:
 
@@ -392,10 +384,10 @@ not take into account whether Xds credentials are in effect for the respective c
 A `CertificateValidationContext` (either the [`validation_context`][validation_context] field or
 the [`default_validation_context`][default_validation_context] field inside of the
 [`combined_validation_context`][CVC]) is validated in any CDS/LDS update as follows:
-The field [match_subject_alt_names][] is accepted only on the client side i.e. inside
-`UpstreamTlsContext` and is processed as described [above][server-authz]. If any of the other
-fields (listed below) are present, the update is NACKed because ignoring these fields compromises
-security:
+The field [match_subject_alt_names][] is used only on the client side i.e. inside
+`UpstreamTlsContext` and is processed as described [above][server-authz]; it is ignored on the
+server side. If any of the other fields (listed below) are present, the update is NACKed because
+ignoring these fields compromises security:
 
 * `verify_certificate_spki`
 * `verify_certificate_hash`
