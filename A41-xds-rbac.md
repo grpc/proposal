@@ -17,7 +17,7 @@ client authorization (authz) on xDS-enabled gRPC servers.
 
 ## Background
 
-[A29 xDS-Based Security][A29] introduced the ability to manage xDS-managed mTLS
+[A29 xDS-Based Security][A29] introduced the ability to have xDS-managed mTLS
 meshes. As standard for TLS clients, the client verifies the server's identity
 is permitted to run the service. This is normally known as "hostname
 verification", but in a mesh scenario may be known as "server authorization" as
