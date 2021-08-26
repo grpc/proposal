@@ -32,12 +32,11 @@ Envoy defines the [RBAC HTTP filter][RBAC filter] that is well-suited for
 limiting which nodes can access which services within a mesh as encouraged by
 the principle of least privilege.
 
-RBAC is not well-suited for precise service-level resource authorization, even
-if the resource name is exposed to the engine. Service-level resource authz 1)
-requires another filter to perform end-user authentication as TLS just provides
-service-level authn and 2) does not scale as RBAC provides no mechanism for
-loading rules on-demand. Thus RBAC is only intended for service-to-service
-authz.
+RBAC is not well-suited for precise resource authorization, even if the resource
+name is exposed to the engine. Resource authz 1) requires another filter to
+perform end-user authentication as TLS just provides client service authn and 2)
+does not scale as RBAC provides no mechanism for loading rules on-demand. Thus
+RBAC is only intended for service-to-service authz.
 
 ### Related Proposals:
 
@@ -112,17 +111,18 @@ For this design, `headers` can include `:method`, `:authority`, and `:path`
 matchers and they should match the values received on-the-wire independent of
 whether they are stored in Metadata or in separate APIs. `:method` can be
 hard-coded to `POST` if unavailable and a code audit confirms the server denies
-requests for all other method types. Implementations must not match [hop-by-hop
-headers][]. Since hop-by-hop headers [are not used in HTTP/2 except for `te:
-trailers`][rfc7540 connection header], transports must consider requests
-containing the `Connection` header as malformed, independent of xDS or RBAC, and
-only the `TE` header may need special handling. If the transport exposes `TE` in
-Metadata, then RBAC must special-case the header to prevent it from matching.
-Multi-valued metadata is represented as the concatenation of the values along
-with a `,` (comma, no added spaces) separator, as permitted by HTTP and gRPC.
-The `Content-Type` provided by the client must be used; not a hard-coded value.
-Binary headers are represented in their base64-encoded form, although we rarely
-expect binary header matchers other than presence-checking.
+requests for all other method types. Implementations must consider the
+request's [hop-by-hop headers][] to not be present. Since hop-by-hop headers
+[are not used in HTTP/2 except for `te: trailers`][rfc7540 connection header],
+transports must consider requests containing the `Connection` header as
+malformed, independent of xDS or RBAC, and only the `TE` header may need special
+handling. If the transport exposes `TE` in Metadata, then RBAC must special-case
+the header to treat it as not present. Multi-valued metadata is represented as
+the concatenation of the values along with a `,` (comma, no added spaces)
+separator, as permitted by HTTP and gRPC. The `Content-Type` provided by the
+client must be used; not a hard-coded value. Binary headers are represented in
+their base64-encoded form, although we rarely expect binary header matchers
+other than presence-checking.
 
 [hop-by-hop headers]: https://datatracker.ietf.org/doc/html/rfc7230#section-6.1
 [rfc7540 connection header]: https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2
@@ -141,10 +141,11 @@ status code INTERNAL, or RST_STREAM with HTTP/2 error code PROTOCOL_ERROR. These
 restrictions and behavior produce a singular, unambiguous authority for every
 request to be used by RBAC and the application itself.
 
-`metadata` will never match as `ValueMatcher` can only match if the value is
-present (even `NullMatch`). Be strongly aware that Envoy Metadata has no
-relation to gRPC Metadata. Envoy Metadata is generic state shared between
-filters which has no gRPC equivalent.
+In RBAC `metadata` refers to the Envoy metadata which has no relation to gRPC
+metadata. Envoy metadata is generic state shared between filters, which has no
+gRPC equivalent. RBAC implementations in gRPC will treat Envoy metadata as
+empty. Since `ValueMatcher` can only match if a value is present (even
+`NullMatch`), the `metadata` matcher is guaranteed not to match.
 
 `requested_server_name` can match if the matcher accepts empty string.
 
