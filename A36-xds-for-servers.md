@@ -217,9 +217,9 @@ period of 10 minutes for long-lived RPCs, such that clients will reconnect and
 have the updated configuration apply. This applies equally to an update in a
 RouteConfiguration provided inline via the `route_config` field as it is part of
 the Listener, but it does not apply to an updated RouteConfiguration provided by
-reference via `rds` field. Infrastructure for "not serving" mode may be used for
-the graceful shutdown, but only if it can be used without causing spurious RPC
-or connection failures. Applying updates to a Listener should be delayed until
+reference via `rds` field. Draining must not cause the server to spuriously fail
+RPCs or connections, so the listening port must not be closed as part of the
+process. Applying updates to a Listener should be delayed until
 dependent resources have been attempted to be loaded (e.g., via RDS). The
 existing resource loading timeout in XdsClient prevents the update from being
 delayed indefinitely and the duplicate resource update detection in XdsClient
