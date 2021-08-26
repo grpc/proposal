@@ -384,10 +384,10 @@ not take into account whether Xds credentials are in effect for the respective c
 A `CertificateValidationContext` (either the [`validation_context`][validation_context] field or
 the [`default_validation_context`][default_validation_context] field inside of the
 [`combined_validation_context`][CVC]) is validated in any CDS/LDS update as follows:
-The field [match_subject_alt_names][] is used only on the client side i.e. inside
-`UpstreamTlsContext` and is processed as described [above][server-authz]; it is ignored on the
-server side. If any of the other fields (listed below) are present, the update is NACKed because
-ignoring these fields compromises security:
+The field [match_subject_alt_names][] is used on the client side i.e. inside `UpstreamTlsContext`
+as described [above][server-authz]. On the server side an implementation may support this field
+and its semantics, or NACK the update it if it doesn't. If any of the other fields (listed below)
+are present, the update is NACKed because ignoring these fields compromises security:
 
 * `verify_certificate_spki`
 * `verify_certificate_hash`
