@@ -5,7 +5,7 @@ Title
 * Status: Draft
 * Implemented in: C++
 * Last updated: 2021-08-27
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/UNBHGr6feeY
 
 ## Abstract
 
