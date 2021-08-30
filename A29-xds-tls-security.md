@@ -2,10 +2,10 @@ A29: xDS-Based Security for gRPC Clients and Servers
 ----
 * Author(s): [Sanjay M. Pujare](https://github.com/sanjaypujare), [Easwar Swaminathan](https://github.com/easwars), [Yash Tibrewal](https://github.com/yashykt)
 * Approver: markdroth
-* Status: Draft
+* Status: Final
 * Implemented in: C-core, Java, and Go
-* Last updated: 2021-08-12
-* Discussion at: 
+* Last updated: 2021-08-30
+* Discussion at: https://groups.google.com/g/grpc-io/c/4IwVLPeTAe4/m/ng9w3D0XBgAJ
 
 ## Abstract
 
