@@ -428,7 +428,7 @@ type StaticInterceptors struct {
 // NewStatic returns a new StaticInterceptors from a static authorization policy
 // JSON string.
 func NewStatic(authzPolicy string) (*StaticInterceptors, error) {
-	// ...
+  // ...
 }
 
 // UnaryInterceptor intercepts incoming Unary RPC requests.
@@ -437,7 +437,7 @@ func NewStatic(authzPolicy string) (*StaticInterceptors, error) {
 func (i *StaticInterceptors) UnaryInterceptor(
 	ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler)
 		(resp interface{}, err error) {
-	// ...
+  // ...
 }
 
 // StreamInterceptor intercepts incoming Stream RPC requests.
@@ -446,7 +446,7 @@ func (i *StaticInterceptors) UnaryInterceptor(
 func (i *StaticInterceptors) StreamInterceptor(
 	srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler)
 		(err error) {
-	// ...
+  // ...
 }
 
 type FileWatcherInterceptors struct {
@@ -655,7 +655,7 @@ closeable.close();
 
 ## Rationale
 
-gRPC Authorization internally implements RBAC Engines based on Envoy RBAC policies.
+gRPC Authorization internally implements RBAC Engine(s) based on Envoy [RBAC policy](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/http/rbac/v3/rbac.proto).
 We decided to create a new policy language "SDK authorization policy" instead of 
 consuming Envoy RBAC directly due to following reasons:
 - Envoy RBAC is a complex language, and we preferred using a simple human readable 
@@ -672,14 +672,10 @@ decision on whether to allow or deny the request. The decision depends on the ty
 of policy (if the policy is an allowlist or denylist) and whether a matching policy
 was found.
 
-[RBAC filter]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/http/rbac/v3/rbac.proto
-
 This engine implementation is shared by SDK-based authorization and xDS-based
-authorization. In gRPC Proxyless Service Mesh (or xDS authorization) Istio or
+authorization. In gRPC Proxyless Service Mesh (or xDS authorization), Istio or
 Traffic Director control plane sends Envoy RBAC policy configs to xDS enabled gRPC
-servers for authorization. 
-
-[A41](https://github.com/grpc/proposal/pull/237): xds RBAC Support
+servers for authorization. ([A41](https://github.com/grpc/proposal/pull/237): xDS RBAC Support)
 
 Overall SDK authorization flow is as follows. User supplies gRPC SDK authorization
 policy to provider/interceptor. The provider then forwards the JSON policy to Policy
