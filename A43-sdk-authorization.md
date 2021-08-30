@@ -655,7 +655,7 @@ closeable.close();
 
 ## Rationale
 
-gRPC Authorization internally implements RBAC Engine(s) based on Envoy [RBAC policy](https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/http/rbac/v3/rbac.proto).
+gRPC Authorization internally implements RBAC Engine(s) based on Envoy [RBAC policy](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/rbac/v3/rbac.proto).
 We decided to create a new policy language "SDK authorization policy" instead of 
 consuming Envoy RBAC directly due to following reasons:
 - Envoy RBAC is a complex language, and we preferred using a simple human readable 
