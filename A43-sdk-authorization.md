@@ -15,7 +15,7 @@ A43: SDK authorization
 
 gRPC is currently implementing an open-source standard authorization solution.
 This proposal discusses how this framework would be made available to OSS gRPC
-users to perform per-RPC authorization checks.
+users (like network switches) to perform per-RPC authorization checks.
 
 ## Background
 
@@ -29,20 +29,6 @@ authorization check, they have to implement their own solution in the applicatio
 The standard gRPC authorization mechanism described in this proposal allows users
 to simply provide an authorization policy for their server. Then, for each RPC,
 the server verifies whether the client is authorized to issue the RPC.
-
-We have two different use-cases for authorization-
-1. gRPC Proxyless Service Mesh (or xDS authz) - Here Istio or Traffic Director
-   control plane sends Envoy RBAC policy configs to xDS enabled gRPC servers for
-   authorization
-2. SDK authorization (or non-xDS authz) - Authorization is made available to
-   OSS gRPC users like network switches.
-
-This document discusses details of SDK authorization use-case. xDS authorization
-will be convered in a different proposal.
-
-## Related Proposals:
-
-* [A41](https://github.com/grpc/proposal/pull/237): xds RBAC Support
 
 ## Proposal
 
@@ -200,13 +186,13 @@ The following sequence is followed to make an authorization decision -
    If no match is found in deny rules, or there are no deny rules execute next step.
 2. Check for a match in *allow rules*, if a match is found, the request will be allowed.
    Note that allow rules is a required field here, if not present, policy is invalid.
-3. If no match is found in allow rules, we deny the request.
+3. If no match is found in *allow rules*, we deny the request.
 
 Each *rule* has the following semantics -
 1. Each *rule* has a *name*, a *source* and a *request* to match against. For a *rule*
    to match, both *source* and *request* must match.
    - If both *source* and *request* are empty, the *rule* always matches. It is a
-     wildcard that can be used in a deny list to deny all RPCs or in a allow list to
+     wildcard that can be used in a deny list to deny all RPCs or in an allow list to
      accept all RPCs except those matching in the deny list.
    - If only *source* is empty, we evaluate against the *request* fields and apply
      that to any user (See example below). Similarly, if only *request* is empty, we
@@ -222,8 +208,9 @@ Each *rule* has the following semantics -
       does not match principal.
    3. We also get a match if there is no client certificate, and principal is an empty
       string.
-   If the *principals* list is empty, we only check for step 1 above, i.e. applies to
-   any user that is authenticated.
+   
+   Consider the case where the *principals* list is empty, then we only check for
+   step 1 above, i.e. rule matches for any authenticated user.
 3. Each *request* could contain a list of URL *paths* (i.e. fully qualified RPC
    methods) and list of http *headers* to match. Refer JSON schema above to
    understand matching semantics.
@@ -284,39 +271,19 @@ In the following policy example
 }
 ```
 
-### High level Implementation
-
-gRPC Authorization internally implements RBAC Engines based on Envoy RBAC policies.
-RBAC policy provides service-level and method-level access control for a service.
-Engines process incoming RPC request attributes against policy configs and make a
-decision on whether to allow or deny the request. The decision depends on the type
-of policy (if the policy is an allowlist or denylist) and whether a matching policy
-was found. Engine implementation is shared by xDS and SDK authorization.
-
-[RBAC filter]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/http/rbac/v3/rbac.proto
-
-In SDK authorization, user supplies gRPC SDK authorization policy to policy provider
-interface. In the case of file watcher, the provider is responsible for initializing
-the thread(C++)/ goroutine(Go)/ scheduled service(Java) which will be used to read
-the policy file periodically. The provider then forwards the JSON policy to Policy
-translator. The translator converts JSON policy to Envoy RBAC protos (Allow and/or
-Deny policy). Translator errors out on I/O errors or if the policy does not
-represent JSON schema it currently supports.
-
-Note that SDK authorization policy is a subset of Envoy RBAC, and it does not
-support all the fields that are present in Envoy RBAC. Ultimately the generated
-RBAC policies are used to create Envoy RBAC engine(s).
-
-For each incoming RPC request, we will invoke the Evaluate functionality in Engines
-(Deny engine followed by Allow engine), to get the authorization decision. We use a
-C-core filter for C++, and interceptors for Java and Go.
-
 ### API
 
 gRPC will support both static initialization and dynamically reloading the policy
 from filesystem. In static initialization, the policy will be provided as a JSON
 string. In dynamic file reloading, the application will specify the file path that
 contains the authorization policy in JSON format.
+
+Valid user provided SDK authorization policy creates authorization engine(s).
+In the case of file watcher, we internally create thread(C-core)/ goroutine(Go)/
+scheduled service(Java) which will be used to read the policy file periodically,
+and update the authorization engines. For each incoming RPC request, we will invoke
+the Engines (Deny engine followed by Allow engine), to get the authorization
+decision. We use a C-core filter for C++, and interceptors for Java and Go.
 
 We recommend users to use a single SDK authorization policy per gRPC server. If
 there are multiple policies, then there is a possibility that all the policies
@@ -410,7 +377,8 @@ GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_s
  *   destroy this string.
  */
 GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_file_watcher_create(
-	const char* authz_policy_path, unsigned int refresh_interval_sec, grpc_status_code* code, const char** error_details);
+	const char* authz_policy_path, unsigned int refresh_interval_sec, 
+	grpc_status_code* code, const char** error_details);
 
 /**
  * Releases grpc_authorization_policy_provider object. The creator of
@@ -420,7 +388,7 @@ GRPCAPI void grpc_authorization_policy_provider_release(grpc_authorization_polic
 
 ```
 
-3. Application enables SDK authorization in gRPC Server.
+3. Application enables SDK authorization in gRPC Server
 
 - Policy is statically initialized
 
@@ -449,14 +417,12 @@ std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 
 1. Authorization Server Interceptors
 
-- Static initialization
-
 ```Go
 package authz
 
+// StaticInterceptor contains engines used to make authorization decisions.
 type StaticInterceptors struct {
-  denyEngine  Engine
-  allowEngine Engine
+  engines ChainEngine
 }
 
 // NewStatic returns a new StaticInterceptors from a static authorization policy
@@ -482,12 +448,6 @@ func (i *StaticInterceptors) StreamInterceptor(
 		(err error) {
 	// ...
 }
-```
-
-- Dynamic file reloading
-
-```Go
-package authz
 
 type FileWatcherInterceptors struct {
   internalInterceptors StaticInterceptors
@@ -499,8 +459,7 @@ type FileWatcherInterceptors struct {
 
 // NewFileWatcher returns a new FileWatcherInterceptors from a policy file
 // that contains JSON string of authorization policy and a refresh duration to
-// specify the amount of time between policy refreshes. Creates a background go
-// routine for policy refresh.
+// specify the amount of time between policy refreshes.
 func NewFileWatcher(file string, duration time.Duration) (*FileWatcherInterceptors, error);
 
 // run is a long running goroutine which watches for changes in file path, and
@@ -535,7 +494,7 @@ func (i *FileWatcherInterceptors) Close() {
 }
 ```
 
-2. Application enables SDK authorization in gRPC Server.
+2. Application enables SDK authorization in gRPC Server
 
 - Policy is statically initialized
 
@@ -574,12 +533,10 @@ package io.grpc.authz;
 
 // Class of authorization server interceptor for static policy.
 public final class AuthorizationServerInterceptor implements ServerInterceptor {
-  private final RbacEngine denyRbacEngine;
-  private final RbacEngine allowRbacEngine;
-
   // Constructor
   private AuthorizationServerInterceptor(String authorizationPolicy) {
-    // Translate authorization policy into RBAC policies and then create engines.
+    // Creates authorization engines. An IllegalArgumentException will be thrown
+    // if the policy file is invalid.
   }
 
   @Override
@@ -589,7 +546,6 @@ public final class AuthorizationServerInterceptor implements ServerInterceptor {
     // ...
   }
 
-  // Static method that creates an AuthorizationServerInterceptor.
   public static AuthorizationServerInterceptor create(String authorizationPolicy)
       throws IllegalArgumentException {
     return new AuthorizationServerInterceptor(authorizationPolicy);
@@ -642,7 +598,6 @@ public final class FileAuthorizationServerInterceptor implements ServerIntercept
     };
   }
 
-  // Static method that creates a FileAuthorizationServerInterceptor.
   public static FileAuthorizationServerInterceptor create(File policyFile)
       throws IllegalArgumentException, IOException {
     return new FileAuthorizationServerInterceptor(policyFile);
@@ -650,7 +605,7 @@ public final class FileAuthorizationServerInterceptor implements ServerIntercept
 }
 ```
 
-2. Application enables SDK authorization in gRPC Server.
+2. Application enables SDK authorization in gRPC Server
 
 - Policy is statically initialized
 
@@ -700,16 +655,43 @@ closeable.close();
 
 ## Rationale
 
+gRPC Authorization internally implements RBAC Engines based on Envoy RBAC policies.
 We decided to create a new policy language "SDK authorization policy" instead of 
-consuming Envoy RBAC directly due to following reasons
+consuming Envoy RBAC directly due to following reasons:
 - Envoy RBAC is a complex language, and we preferred using a simple human readable 
   policy language
 - With our own language, we can provide a stable API, even when Envoy undergoes 
   versioning updates.
 
-Authorization APIs take policy in JSON format, instead of protobuf. gRPC wants to
-avoid the dependency on protobuf when possible. We have users in OSS that use gRPC
-without protobuf. Another reason is to have a consistent API across languages.
+Note that SDK authorization policy is a subset of Envoy RBAC, and it does not
+support all the fields that are present in Envoy RBAC. 
+
+RBAC policy provides service-level and method-level access control for a service.
+Engines process incoming RPC request attributes against policy configs and make a
+decision on whether to allow or deny the request. The decision depends on the type
+of policy (if the policy is an allowlist or denylist) and whether a matching policy
+was found.
+
+[RBAC filter]: https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/filters/http/rbac/v3/rbac.proto
+
+This engine implementation is shared by SDK-based authorization and xDS-based
+authorization. In gRPC Proxyless Service Mesh (or xDS authorization) Istio or
+Traffic Director control plane sends Envoy RBAC policy configs to xDS enabled gRPC
+servers for authorization. 
+
+[A41](https://github.com/grpc/proposal/pull/237): xds RBAC Support
+
+Overall SDK authorization flow is as follows. User supplies gRPC SDK authorization
+policy to provider/interceptor. The provider then forwards the JSON policy to Policy
+translator. The translator converts JSON policy to Envoy RBAC protos (Allow and/or
+Deny policy). Translator errors out on I/O errors or if the policy does not
+represent JSON schema it currently supports. Ultimately the generated RBAC policies
+are used to create Envoy RBAC engine(s).
+
+As mentioned previously, authorization APIs take policy in JSON format, instead of
+protobuf. This is done to avoid the dependency on protobuf. We have users in OSS
+that use gRPC without protobuf. Another reason is to have a consistent API across
+languages.
 
 ## Implementation
 
