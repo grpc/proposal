@@ -242,20 +242,18 @@ class EventEngine {
   /// Factory method to create a network listener / server.
   ///
   /// Once a \a Listener is created and started, the \a on_accept callback will
-  /// be called once asynchronously for each established connection. This method
-  /// may return a non-OK status immediately if an error was encountered in any
-  /// synchronous steps required to create the Listener. In this case,
-  /// \a on_shutdown will never be called.
+  /// be called once asynchronously for each established connection. Note that
+  /// unlike other callbacks, there is no status code parameter since the
+  /// callback will only be called in healthy scenarios where connections can be
+  /// accepted.
   ///
-  /// If this method returns a Listener, then \a on_shutdown will be invoked
-  /// exactly once, when the Listener is shut down. The status passed to it will
-  /// indicate if there was a problem during shutdown.
+  /// This method may return a non-OK status immediately if an error was
+  /// encountered in any synchronous steps required to create the Listener.
   ///
   /// The provided \a SliceAllocatorFactory is used to create \a SliceAllocators
   /// for Endpoint construction.
   virtual absl::StatusOr<std::unique_ptr<Listener>> CreateListener(
-      Listener::AcceptCallback on_accept, Callback on_shutdown,
-      const EndpointConfig& config,
+      Listener::AcceptCallback on_accept, const EndpointConfig& args,
       std::unique_ptr<SliceAllocatorFactory> slice_allocator_factory) = 0;
   /// Creates a client network connection to a remote network listener.
   ///
@@ -378,21 +376,6 @@ class EventEngine {
   /// callback will be run exactly once from either cancellation or from its
   /// activation.
   virtual void TryCancel(TaskHandle handle) = 0;
-```
-
-### Cleanup and Shutdown
-
-```cpp
-  /// Immediately run all callbacks with status indicating the shutdown. Every
-  /// EventEngine is expected to shut down exactly once. After shutdown has
-  /// begun, newly scheduled callbacks will be cancelled synchronously, and no
-  /// new connections should be created.
-  ///
-  /// If the \a on_shutdown_complete callback is given a non-OK status, errors
-  /// are expected to be unrecoverable. For example, an implementation could
-  /// warn callers about leaks if memory cannot be freed within a certain
-  /// timeframe.
-  virtual void Shutdown(Callback on_shutdown_complete) = 0;
 };
 
 }  // namespace experimental
