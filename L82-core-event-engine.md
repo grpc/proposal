@@ -248,12 +248,18 @@ class EventEngine {
   /// accepted.
   ///
   /// This method may return a non-OK status immediately if an error was
-  /// encountered in any synchronous steps required to create the Listener.
+  /// encountered in any synchronous steps required to create the Listener. In
+  /// this case, \a on_shutdown will never be called.
+  ///
+  /// If this method returns a Listener, then \a on_shutdown will be invoked
+  /// exactly once, when the Listener is shut down. The status passed to it will
+  /// indicate if there was a problem during shutdown.
   ///
   /// The provided \a SliceAllocatorFactory is used to create \a SliceAllocators
   /// for Endpoint construction.
   virtual absl::StatusOr<std::unique_ptr<Listener>> CreateListener(
-      Listener::AcceptCallback on_accept, const EndpointConfig& args,
+      Listener::AcceptCallback on_accept, Callback on_shutdown,
+      const EndpointConfig& args,
       std::unique_ptr<SliceAllocatorFactory> slice_allocator_factory) = 0;
   /// Creates a client network connection to a remote network listener.
   ///
