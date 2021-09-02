@@ -682,7 +682,12 @@ policy to provider/interceptor. The provider then forwards the JSON policy to Po
 translator. The translator converts JSON policy to Envoy RBAC protos (Allow and/or
 Deny policy). Translator errors out on I/O errors or if the policy does not
 represent JSON schema it currently supports. Ultimately the generated RBAC policies
-are used to create Envoy RBAC engine(s).
+are used to create Envoy RBAC authorization engine(s). Then, for each incoming RPC
+request, we will invoke the Engines to get the authorization decision.
+
+SDK authorization can be enabled in xDS enabled servers, which means both
+authorization paths (SDK and xDS authorization) can co-exist. For a request to
+be allowed, both paths must allow the request.
 
 As mentioned previously, authorization APIs take policy in JSON format, instead of
 protobuf. This is done to avoid the dependency on protobuf. We have users in OSS
