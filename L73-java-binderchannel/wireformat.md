@@ -52,7 +52,7 @@ it will shutdown the transport gracefully.
 ```
 version = int;
 protocol extension flags = int;
-num bytes = int;
+num bytes = long;
 ping id = int;
 
 setup transport transaction = version, binder, [protocol extension flags];
@@ -147,6 +147,7 @@ rpc transaction = flags, sequence no, rpc data;
     included.
 *   FLAG_MESSAGE_DATA_IS_PARCELABLE (0x40) - Indicates the message is a parcelable
     object.
+*   FLAG_MESSAGE_DATA_IS_PARTIAL (0x80) - Indicates the message is partial and the receiver should continue reading.
 *   status - If a status is included in the data, the status code will be
     present in the top 16 bits of the flags value.
 
@@ -201,7 +202,13 @@ ungraceful shutdown will occur, with the status code CANCELLED. The remote
 transport will be notified, cancelling all ongoing remote calls on the server
 side.
 
+## Flow Control
+
+BinderTransport now supports flow control, aiming to keep use of the process transaction buffer to at most 128k. Each transaction we send adds to an internal count of unacknowledged outbound data. If that exceeds 128k, we’ll stop sending transactions until we receive an acknowledgement message from the transport peer. Each transport sends an acknowledgement for each 16k received, which should avoid blocking the transport most of the time.
+
+For message larger than the flow control window size, the transport can choose to split it into multiple chunks using the FLAG_MESSAGE_DATA_IS_PARTIAL option.
+
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel
-[onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\))
+[onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\)
 
