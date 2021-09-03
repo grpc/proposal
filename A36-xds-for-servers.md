@@ -204,12 +204,12 @@ validation must be updated to allow [Route.non_forwarding_action][] as a valid
 requested `:authority`. Routes are matched the same as on client-side.
 `Route.non_forwarding_action` is expected for all Routes used on server-side and
 `Route.route` continues to be expected for all Routes used on client-side; a
-Route with an inappropriate `action` causes RPCs matching that route to fail
-with UNAVAILABLE. If `HttpConnectionManager.rds` references a NACKed resource
-without a previous good version, an unavailable resource because of
-communication failures with control plane or a triggered loading timeout, or
-a non-existent resource, then all RPCs processed by that HttpConnectionManager
-will fail with UNAVAILABLE.
+Route with an inappropriate `action` causes RPCs matching that route and
+reaching the end of the filter chain to fail with UNAVAILABLE. If
+`HttpConnectionManager.rds` references a NACKed resource without a previous good
+version, an unavailable resource because of communication failures with control
+plane or a triggered loading timeout, or a non-existent resource, then all RPCs
+processed by that HttpConnectionManager will fail with UNAVAILABLE.
 
 [Like in Envoy][envoy lds], updates to a Listener cause all older connections on
 that Listener to be gracefully shut down (i.e., "drained") with a default grace
@@ -577,6 +577,13 @@ waiting on the C core implementation.
   appropriate structure. So the gRFC just tries to show that the API design
   would work for C++/wrapped languages but there is currently no associated
   implementation work.
+
+  * This design changes the client-side behavior for an inappropriate `action`
+    and requires the RPC be processed by the filters before being failed. C will
+    initially fail the client-side RPCs without filter processing. Implementing
+    the full behavior will be follow-up work because the behavior difference
+    isn't important for the currently-supported filters and the change is more
+    invasive in C than other languages.
 
 * Java. Implementation work primarily by @sanjaypujare, along with gRFC A29.
   Added classes are in the `grpc-xds` artifact and `io.grpc.xds` package.
