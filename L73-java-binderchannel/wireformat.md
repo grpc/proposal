@@ -204,9 +204,9 @@ side.
 
 ## Flow Control
 
-BinderTransport now supports flow control, aiming to keep use of the process transaction buffer to at most 128k. Each transaction we send adds to an internal count of unacknowledged outbound data. If that exceeds 128k, we’ll stop sending transactions until we receive an acknowledgement message from the transport peer. Each transport sends an acknowledgement for each 16k received, which should avoid blocking the transport most of the time.
+Due to the limited binder buffer size of 1MB, BinderTransport now supports flow control, aiming to keep use of the process transaction buffer to at most 128k. Each transaction we send adds to an internal count of unacknowledged outbound data. If that exceeds 128k, we’ll stop sending transactions until we receive an acknowledgement message from the transport peer. Each transport sends an acknowledgement for each 16k received, which should avoid blocking the transport most of the time.
 
-For message larger than the flow control window size, the transport can choose to split it into multiple chunks using the FLAG_MESSAGE_DATA_IS_PARTIAL option.
+For message larger than the flow control window size, the transport can choose to split it into multiple chunks using the FLAG_MESSAGE_DATA_IS_PARTIAL flag.
 
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel
