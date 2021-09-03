@@ -92,7 +92,10 @@ means that the control plane *already* did not have that kind of clear
 picture.  To ensure that the control plane will have that kind of clear
 picture, there will be subsequent work to extend the xDS protocol to
 allow per-resource NACKing instead of per-response NACKing, although
-that will be a broader project.
+that will be a broader project.  Note that the CSDS service in the gRPC
+xDS client (see [gRFC A40](A40-csds-support.md)) can be used to get the
+current state of the resources in the client, which is likely to be more
+accurate than the view fromthe xDS server.
 
 We considered the following alternatives:
 
