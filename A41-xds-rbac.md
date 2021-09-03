@@ -45,8 +45,7 @@ RBAC is only intended for service-to-service authz.
 * [A39: xDS HTTP Filter Support][A39]
 
 [A36]: A36-xds-for-servers.md
-<!-- FIXME: replace with final link once merged -->
-[A29]: https://github.com/grpc/proposal/pull/243
+[A29]: A29-xds-tls-security.md
 [A39]: A39-xds-http-filters.md
 
 ## Proposal
