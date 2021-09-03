@@ -32,11 +32,15 @@ Envoy defines the [RBAC HTTP filter][RBAC filter] that is well-suited for
 limiting which nodes can access which services within a mesh as encouraged by
 the principle of least privilege.
 
-RBAC is not well-suited for precise resource authorization, even if the resource
-name is exposed to the engine. Resource authz 1) requires another filter to
-perform end-user authentication as TLS just provides client service authn and 2)
-does not scale as RBAC provides no mechanism for loading rules on-demand. Thus
-RBAC is only intended for service-to-service authz.
+Services that have state managed by their clients tend to need precise
+authorization to that state, commonly driven by per-resource ACLs. RBAC is not
+well suited for this precise authorization, even if the resource name
+is exposed to the engine. Per-resource authorization 1) commonly uses end-user
+identity so requires another filter to perform end-user authentication and
+2) is too great of scale to enumerate all resource's ACLs in a single policy and
+to absorb the rate of change to that policy. Thus RBAC is only intended for
+service-to-service authorization and resource authorization is outside the scope
+of this gRFC.
 
 ### Related Proposals:
 
