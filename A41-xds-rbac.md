@@ -143,8 +143,8 @@ request to be used by RBAC and the application itself.
 
 In RBAC `metadata` refers to the Envoy metadata which has no relation to gRPC
 metadata. Envoy metadata is generic state shared between filters, which has no
-gRPC equivalent. RBAC implementations in gRPC will treat Envoy metadata as
-empty. Since `ValueMatcher` can only match if a value is present (even
+gRPC equivalent. RBAC implementations in gRPC will treat Envoy metadata as an
+empty map. Since `ValueMatcher` can only match if a value is present (even
 `NullMatch`), the `metadata` matcher is guaranteed not to match.
 
 `requested_server_name` can match if the matcher accepts empty string.
