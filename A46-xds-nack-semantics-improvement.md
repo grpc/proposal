@@ -5,7 +5,7 @@ A46: xDS NACK Semantics Improvement
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2021-09-03
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/gFYDcWIu9B8
 
 ## Abstract
 
