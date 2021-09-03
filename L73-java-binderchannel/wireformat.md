@@ -35,7 +35,8 @@ For general transport lifecycle, using one of 1000 reserved transaction codes.
 *   Acknowledge bytes.
     *   Transaction code: BinderTransport.ACKNOWLEDGE_BYTES (3)
     *   From either transport to its peer's binder. Reports reception of
-        transaction data for flow control.
+        transaction data for flow control. The "num bytes" field should contain
+        the sum of "data size" of the parcels received until now.
 *   Ping
     *   Transaction code: BinderTransport.PING (4)
     *   Currently only sent from ClientTransport to server binder.
@@ -204,7 +205,7 @@ side.
 
 ## Flow Control
 
-Due to the limited binder buffer size of 1MB, BinderTransport now supports flow control, aiming to keep use of the process transaction buffer to at most 128k. Each transaction we send adds to an internal count of unacknowledged outbound data. If that exceeds 128k, we’ll stop sending transactions until we receive an acknowledgement message from the transport peer. Each transport sends an acknowledgement for each 16k received, which should avoid blocking the transport most of the time.
+Due to the limited binder buffer size of 1MB, BinderTransport now supports flow control, aiming to keep use of the process transaction buffer to at most 128k. Each transaction we send adds to an internal count of unacknowledged outbound data (here the count refers to the "data size" of the parcels). If that exceeds 128k, we’ll stop sending transactions until we receive an acknowledgement message from the transport peer. Each transport sends an acknowledgement for each 16k received, which should avoid blocking the transport most of the time.
 
 For message larger than the flow control window size, the transport can choose to split it into multiple chunks using the FLAG_MESSAGE_DATA_IS_PARTIAL flag.
 
