@@ -211,6 +211,16 @@ version, an unavailable resource because of communication failures with control
 plane or a triggered loading timeout, or a non-existent resource, then all RPCs
 processed by that HttpConnectionManager will fail with UNAVAILABLE.
 
+There are situations when an XdsServer can clearly tell the configuration will
+cause errors, yet it still applies the configuration. In these situations the
+XdsServer should log a warning each time it receives updates for configuration
+in this state. This is known as "configuration error logging." If an XdsServer
+logs such a warning, then it should also log a single warning once there are no
+longer any such errors. Configuration error logging is currently limited to
+broken RDS resources and an unsupported Route `action` (i.e., is not
+`non_forwarding_action`), both of which cause RPCs to fail with UNAVAILABLE as
+described above.
+
 [Like in Envoy][envoy lds], updates to a Listener cause all older connections on
 that Listener to be gracefully shut down (i.e., "drained") with a default grace
 period of 10 minutes for long-lived RPCs, such that clients will reconnect and
