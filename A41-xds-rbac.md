@@ -57,7 +57,9 @@ of this gRFC.
 Support the [xDS RBAC HTTP filter][RBAC filter] as a registered filter type on
 xDS-enabled gRPC Servers, and support its `RBACPerRoute` configuration override.
 This does _not_ include [RBAC network filter][] support nor running the filter
-on gRPC clients. xDS v2 support is not necessary.
+on gRPC clients. xDS v2 support is not necessary. Shadow rules will not be
+supported and is left as a potential future enhancement; only `RBAC.rules` will
+be supported as they can function without stats.
 
 Supporting the RBAC HTTP filter on server-side leverages [A36: xDS-Enabled
 Servers][A36] and [A39: xDS HTTP Filter Support][A39]. Server-side HTTP filters
