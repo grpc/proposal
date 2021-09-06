@@ -208,7 +208,7 @@ side.
 
 ## Large Messages
 
-We limit the amount of message data sent in a single transaction to 16k.
+We limit the amount of message data sent in a single transaction to 16KB.
 Messages larger than that will be sent in multiple sequential transactions, with
 all but the last transaction having FLAG_MESSAGE_DATA_IS_PARTIAL set.
 
@@ -216,11 +216,11 @@ all but the last transaction having FLAG_MESSAGE_DATA_IS_PARTIAL set.
 
 Due to the limited binder buffer size of 1MB, BinderTransport supports
 transport-level flow control, aiming to keep use of the process transaction
-buffer to at most 128k. Each transaction we send adds to an internal count of
+buffer to at most 128KB. Each transaction we send adds to an internal count of
 unacknowledged outbound data (here the count refers to the "data size" of the
-parcels). If that exceeds 128k, we’ll stop sending transactions until we receive
+parcels). If that exceeds 128KB, we’ll stop sending transactions until we receive
 an acknowledgement message from the transport peer. Each transport sends an
-acknowledgement for each 16k received, which should avoid blocking the transport
+acknowledgement for each 16KB received, which should avoid blocking the transport
 most of the time.
 
 [Binder]: https://developer.android.com/reference/android/os/Binder
