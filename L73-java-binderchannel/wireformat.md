@@ -36,7 +36,7 @@ For general transport lifecycle, using one of 1000 reserved transaction codes.
     *   Transaction code: BinderTransport.ACKNOWLEDGE_BYTES (3)
     *   From either transport to its peer's binder. Reports reception of
         transaction data for flow control. The "num bytes" field should contain
-        the sum of "data size" of the parcels received until now.
+        the sum of "[data size]" of the parcels received until now.
 *   Ping
     *   Transaction code: BinderTransport.PING (4)
     *   Currently only sent from ClientTransport to server binder.
@@ -226,4 +226,4 @@ most of the time.
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel
 [onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\)
-
+[data size]: https://developer.android.com/reference/android/os/Parcel#dataSize()
