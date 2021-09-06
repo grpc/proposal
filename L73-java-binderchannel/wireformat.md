@@ -148,7 +148,7 @@ rpc transaction = flags, sequence no, rpc data;
     included.
 *   FLAG_MESSAGE_DATA_IS_PARCELABLE (0x40) - Indicates the message is a parcelable
     object.
-*   FLAG_MESSAGE_DATA_IS_PARTIAL (0x80) - Indicates the message is partial and the receiver should continue reading.
+*   FLAG_MESSAGE_DATA_IS_PARTIAL (0x80) - Indicates the message is partial and the receiver should continue reading. When a message doesn't fit into a single transaction, the message will be sent in multiple transactions with this bit set on all but the final transaction of the message.
 *   status - If a status is included in the data, the status code will be
     present in the top 16 bits of the flags value.
 
@@ -203,11 +203,13 @@ ungraceful shutdown will occur, with the status code CANCELLED. The remote
 transport will be notified, cancelling all ongoing remote calls on the server
 side.
 
+## Large Messages
+
+We limit the amount of message data sent in a single transaction to 16k. Messages larger than that will be sent in multiple sequential transactions, with all but the last transaction having FLAG_MESSAGE_DATA_IS_PARTIAL set.
+
 ## Flow Control
 
-Due to the limited binder buffer size of 1MB, BinderTransport now supports flow control, aiming to keep use of the process transaction buffer to at most 128k. Each transaction we send adds to an internal count of unacknowledged outbound data (here the count refers to the "data size" of the parcels). If that exceeds 128k, we’ll stop sending transactions until we receive an acknowledgement message from the transport peer. Each transport sends an acknowledgement for each 16k received, which should avoid blocking the transport most of the time.
-
-For message larger than the flow control window size, the transport can choose to split it into multiple chunks using the FLAG_MESSAGE_DATA_IS_PARTIAL flag.
+Due to the limited binder buffer size of 1MB, BinderTransport supports transport-level flow control, aiming to keep use of the process transaction buffer to at most 128k. Each transaction we send adds to an internal count of unacknowledged outbound data (here the count refers to the "data size" of the parcels). If that exceeds 128k, we’ll stop sending transactions until we receive an acknowledgement message from the transport peer. Each transport sends an acknowledgement for each 16k received, which should avoid blocking the transport most of the time.
 
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel
