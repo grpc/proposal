@@ -95,7 +95,7 @@ allow per-resource NACKing instead of per-response NACKing, although
 that will be a broader project.  Note that the CSDS service in the gRPC
 xDS client (see [gRFC A40](A40-csds-support.md)) can be used to get the
 current state of the resources in the client, which is likely to be more
-accurate than the view fromthe xDS server.
+accurate than the view from the xDS server.
 
 We considered the following alternatives:
 
