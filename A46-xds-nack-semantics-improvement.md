@@ -2,9 +2,9 @@ A46: xDS NACK Semantics Improvement
 ----
 * Author(s): Mark D. Roth (markdroth)
 * Approver: ejona86, dfawley
-* Status: {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in: <language, ...>
-* Last updated: 2021-09-03
+* Status: Implemented
+* Implemented in: C-core
+* Last updated: 2021-09-07
 * Discussion at: https://groups.google.com/g/grpc-io/c/gFYDcWIu9B8
 
 ## Abstract
@@ -115,7 +115,9 @@ We considered the following alternatives:
 
 ## Implementation
 
-[A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
+C-core implementation: https://github.com/grpc/grpc/pull/27276
+
+TODO: Add info for other languages.
 
 ## Open issues (if applicable)
 
