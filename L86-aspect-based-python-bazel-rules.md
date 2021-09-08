@@ -1,10 +1,10 @@
 Aspect-based Python Bazel Rules
 ----
 * Author(s): Michael Beardsworth
-* Approver: a11r
+* Approver: gnossen
 * Status: Draft
 * Implemented in: Bazel and Starlark
-* Last updated: [Date]
+* Last updated: Sept. 8, 2021
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
