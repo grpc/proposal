@@ -27,10 +27,10 @@ dependency tracking.
 
 * We propose rebuilding the `py_proto_library` and `py_grpc_library` rules to use [aspects](https://docs.bazel.build/versions/main/skylark/aspects.html) to perform code generation steps.
   This approach corresponds to the Google-internal design for these rules.
-* Aspects `_gen_py_proto_aspect` and `_gen_py_grpc_aspect` visit `proto_library` rules to generate Python code for Protobuf and gRPC, respectively.
-* They produce custom [providers](https://docs.bazel.build/versions/main/skylark/rules.html#providers) `PyProtoInfo` and `PyGrpcInfo` that wrap a `PyInfo` provider to avoid creating spurious dependencies for Python users that interface with the `proto_library` rules through some other means.
+* The `_gen_py_proto_aspect` aspect visits `proto_library` rules to generate Python code for Protobuf.
+* The aspect produces a custom [providers](https://docs.bazel.build/versions/main/skylark/rules.html#providers) `PyProtoInfo` that wraps a `PyInfo` provider to avoid creating spurious dependencies for Python users that interface with the `proto_library` rules through some other means.
 * The `py_proto_library` and `py_grpc_library` rules will only be responsible for collecting the `PyInfo` providers from their dependencies.
-* The `plugin` attribute must be removed from `py_proto_library` and `py_grpc_library`. Aspects require the declaration of all possible parameter values up front, so it would not be possible for the new aspects to continue supporting arbitrary plugins. (Note that the plugin feature is not used in gRPC. It was introduced to support [GAPIC](https://github.com/googleapis/gapic-generator-python), which no longer uses the feature.)
+* The `plugin` attribute must be removed from `py_proto_library`. Aspects require the declaration of all possible parameter values up front, so it would not be possible for the new aspects to continue supporting arbitrary plugins. (Note that the plugin feature is not used in gRPC. It was introduced to support [GAPIC](https://github.com/googleapis/gapic-generator-python), which no longer uses the feature.)
 * No behavior change should be observed by the user of `py_proto_library` or `py_grpc_library` unless they rely on the (removed) `plugin` attribute.
 
 ## Rationale
