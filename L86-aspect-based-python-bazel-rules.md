@@ -5,7 +5,7 @@ Aspect-based Python Bazel Rules
 * Status: Draft
 * Implemented in: Bazel and Starlark
 * Last updated: Sept. 8, 2021
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/NXdtW5xe9Js
 
 ## Abstract
 
