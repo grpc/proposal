@@ -355,9 +355,13 @@ object needed to communicate with the control plane.
 
 ```C
 typedef struct {
+  grpc_status_code code;
+  const char* error_message;
+} grpc_serving_status_update;
+
+typedef struct {
   void (*on_serving_status_update)(void* user_data, const char* uri,
-                                   grpc_status_code code,
-                                   const char* error_message);
+                                   grpc_serving_status_update update);
   void* user_data;
 } grpc_server_xds_status_notifier;
 
@@ -371,7 +375,7 @@ GRPCAPI grpc_server_config_fetcher* grpc_server_config_fetcher_xds_create(
 GRPCAPI void grpc_server_config_fetcher_destroy(
     grpc_server_config_fetcher* config_fetcher);
 
-/** Sets the server's config fetcher.  Takes ownership. Must be called before 
+/** Sets the server's config fetcher.  Takes ownership. Must be called before
     adding ports. */
 GRPCAPI void grpc_server_set_config_fetcher(
     grpc_server* server, grpc_server_config_fetcher* config_fetcher);
@@ -409,6 +413,10 @@ the server with the xDS server config fetcher. The server created after
 ```C++
 class XdsServerServingStatusNotifierInterface {
  public:
+  struct ServingStatusUpdate {
+    ::grpc::Status status;
+  };
+
   virtual ~XdsServerServingStatusNotifierInterface() = default;
 
   // \a uri contains the listening target associated with the notification. Note
@@ -418,7 +426,8 @@ class XdsServerServingStatusNotifierInterface {
   // The API does not provide any guarantees around duplicate updates.
   // Status::OK signifies that the server is serving, while a non-OK status
   // signifies that the server is not serving.
-  virtual void OnServingStatusUpdate(std::string uri, grpc::Status status) = 0;
+  virtual void OnServingStatusUpdate(std::string uri,
+                                     ServingStatusUpdate update) = 0;
 };
 
 class XdsServerBuilder : public ::grpc::ServerBuilder {
@@ -511,7 +520,7 @@ Create an `xds.GRPCServer` struct that would internally contain an unexported
 `grpc.Server`. It would inject its own `StreamServerInterceptor` and
 `UnaryServerInterceptor`s into the `grpc.Server`. The interceptors would be
 controlled by an `atomic.Value` or mutex-protected field that would update with
-the configuration. 
+the configuration.
 
 `GRPCServer.Serve()` takes a `net.Listener` instead of a `host:port` string to
 listen on, so as to be consistent with the `Serve()` method on the
@@ -525,7 +534,7 @@ interceptors, so the interceptors will need to look up the per-address
 configuration for each RPC.
 
 Service registration is done on a method in the generated code which
-accepts a `grpc.ServiceRegistrar` interface. Both `grpc.Server` and 
+accepts a `grpc.ServiceRegistrar` interface. Both `grpc.Server` and
 `xds.GRPCServer` implement this interface and therefore the latter can be passed to
 service registration methods just like the former.
 
