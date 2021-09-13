@@ -66,7 +66,7 @@ void CreateCustomBinderChannel(
 class SecurityPolicy {
  public:
   // return true if the uid is authorized to connect
-  virtual bool IsAuthorized(void* jni_env, int uid) = 0;
+  virtual bool IsAuthorized(int uid) = 0;
 };
 ```
 
@@ -125,9 +125,11 @@ transactions, and only allows clients that signed by the same key to connect:
 
 ```cpp
 grpc::ServerBuilder server_builder;
+
+// `jvm` is passed into SameSignatureSecurityPolicy so it can call Java
 server_builder.AddListeningPort(
-    "binder://example",
-    grpc::BinderServerCredentials(grpc::binder::SameSignatureSecurityPolicy()));
+    "binder://example", grpc::BinderServerCredentials(
+                            grpc::binder::SameSignatureSecurityPolicy(jvm)));
 ```
 
 The first argument specifies a "binder port". A binder port is not a real port,
