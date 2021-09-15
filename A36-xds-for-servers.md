@@ -5,7 +5,7 @@ A36: xDS-Enabled Servers
 * Approver: markdroth
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
-* Last updated: 2021-07-21
+* Last updated: 2021-08-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/CDjGypQi1J0
 
 ## Abstract
@@ -180,8 +180,6 @@ Envoy's behavior.
 
 HttpConnectionManager support is required. HttpConnectionManager must have valid
 `http_filters`, as defined by [A39: xDS HTTP Filter Support][A39].
-RouteConfiguration (via `route_config` or indirect fields like `rds`) is not
-used nor validated at this time, but may be in the future.
 
 If the `envoy.extensions.filters.http.router.v3.Router` is not present in
 `http_filters`, A39 calls for inserting a special filter that fails all RPCs. If
@@ -192,8 +190,58 @@ required. This is to allow implementations that only support L4 xDS features to
 avoid L7 plumbing and implementation. This has no impact on the resource
 validation and NACKing behavior called for in A39.
 
+If an XdsServer implementation uses RouteConfiguration or supports any HTTP
+filters other than the hard-coded Router, then
+`HttpConnectionManager.route_config` and `HttpConnectionManager.rds` must be
+supported and RouteConfigurations must be validated. RouteConfiguration
+validation logic inherits all previous validations made for client-side usage
+as RDS does not distinguish between client-side and server-side. That is
+predomenently defined in [gRFC A28][A28-validation], although note that
+configuration for all VirtualHosts have been validated on client-side since
+sharing the XdsClient was introduced, yet was not documented in a gRFC. The
+validation must be updated to allow [Route.non_forwarding_action][] as a valid
+`action`. The VirtualHost is selected on a per-RPC basis using the RPC's
+requested `:authority`. Routes are matched the same as on client-side.
+`Route.non_forwarding_action` is expected for all Routes used on server-side and
+`Route.route` continues to be expected for all Routes used on client-side; a
+Route with an inappropriate `action` causes RPCs matching that route and
+reaching the end of the filter chain to fail with UNAVAILABLE. If
+`HttpConnectionManager.rds` references a NACKed resource without a previous good
+version, an unavailable resource because of communication failures with control
+plane or a triggered loading timeout, or a non-existent resource, then all RPCs
+processed by that HttpConnectionManager will fail with UNAVAILABLE.
+
+There are situations when an XdsServer can clearly tell the configuration will
+cause errors, yet it still applies the configuration. In these situations the
+XdsServer should log a warning each time it receives updates for configuration
+in this state. This is known as "configuration error logging." If an XdsServer
+logs such a warning, then it should also log a single warning once there are no
+longer any such errors. Configuration error logging is currently limited to
+broken RDS resources and an unsupported Route `action` (i.e., is not
+`non_forwarding_action`), both of which cause RPCs to fail with UNAVAILABLE as
+described above.
+
+[Like in Envoy][envoy lds], updates to a Listener cause all older connections on
+that Listener to be gracefully shut down (i.e., "drained") with a default grace
+period of 10 minutes for long-lived RPCs, such that clients will reconnect and
+have the updated configuration apply. This applies equally to an update in a
+RouteConfiguration provided inline via the `route_config` field as it is part of
+the Listener, but it does not apply to an updated RouteConfiguration provided by
+reference via `rds` field. Draining must not cause the server to spuriously fail
+RPCs or connections, so the listening port must not be closed as part of the
+process. Applying updates to a Listener should be delayed until
+dependent resources have been attempted to be loaded (e.g., via RDS). The
+existing resource loading timeout in XdsClient prevents the update from being
+delayed indefinitely and the duplicate resource update detection in XdsClient
+prevents replacing the Listener when nothing changes. The grace period should be
+adjustable when building the XdsServer and should be described as the "drain
+grace time."
+
 [Filter.typed_config]: https://github.com/envoyproxy/envoy/blob/928a62b7a12c4d87ce215a7c4ebd376f69c2e080/api/envoy/config/listener/v3/listener_components.proto#L40
 [TypedStruct.type_url]: https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38
+[A28-validation]: A28-xds-traffic-splitting-and-routing.md#response-validation
+[Route.non_forwarding_action]: https://github.com/envoyproxy/envoy/blob/5963beae8842982803af1bef04fb5a2a0893c613/api/envoy/config/route/v3/route_components.proto#L242
+[envoy lds]: https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/lds
 
 ### FilterChainMatch
 
@@ -539,6 +587,13 @@ waiting on the C core implementation.
   appropriate structure. So the gRFC just tries to show that the API design
   would work for C++/wrapped languages but there is currently no associated
   implementation work.
+
+  * This design changes the client-side behavior for an inappropriate `action`
+    and requires the RPC be processed by the filters before being failed. C will
+    initially fail the client-side RPCs without filter processing. Implementing
+    the full behavior will be follow-up work because the behavior difference
+    isn't important for the currently-supported filters and the change is more
+    invasive in C than other languages.
 
 * Java. Implementation work primarily by @sanjaypujare, along with gRFC A29.
   Added classes are in the `grpc-xds` artifact and `io.grpc.xds` package.

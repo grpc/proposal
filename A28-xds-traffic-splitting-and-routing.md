@@ -6,6 +6,7 @@
 * Implemented in: C-core, Java, and Go
 * Last updated: 2020-05-20
 * Discussion at: https://groups.google.com/g/grpc-io/c/2Ot9HA3Rjeg
+* Updated by: [A36: xDS-Enabled Servers](A36-xds-for-servers.md)
 
 
 
