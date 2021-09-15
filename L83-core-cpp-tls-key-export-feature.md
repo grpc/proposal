@@ -148,13 +148,6 @@ GRPCAPI void grpc_tls_key_logger_destroy(grpc_tls_key_logger* key_logger);
  * created after the registry is initialized.
  */
 GRPCAPI void grpc_tls_key_logger_registry_init();
-
-/**
- * Destroys the Tls Key logger registry. No Tls Key logger objects can be
- * created after the registry is destroyed.
- */
-GRPCAPI void grpc_tls_key_logger_registry_destroy();
-
 ```
 
 # Example Usage
