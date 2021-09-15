@@ -9,11 +9,11 @@
 
 # Abstract
 
-This proposal discusses additions to the core/cpp public headers to support exporing of TLS SKeys on the client and server side to aid in decryption of packet captures using tools such as Wireshark.
+This proposal discusses additions to the core/cpp public headers to support exporing of TLS session keys on the client and server side to aid in decryption of packet captures using tools such as Wireshark.
 
 # Background
 
-Currently unlike the GRPC Go implementation, GRPC C++ does not allow export of TLS keys at run time. This is needed to decrypt and analyse packet captures for debugging purposes. The keys when exported in files in a specific format, can be read by debugging tools like wireshark and they can automatically decrypt packet captures.
+Currently unlike the GRPC Go implementation, GRPC C++ does not allow export of TLS session keys at run time. This is needed to decrypt and analyse packet captures for debugging purposes. The session keys when exported in files in a specific format, can be read by debugging tools like wireshark and they can automatically decrypt packet captures.
 
 # Related Proposals:
 
