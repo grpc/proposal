@@ -152,6 +152,8 @@ GRPCAPI void grpc_tls_key_logger_registry_init();
 
 # Example Usage
 
+The `GRPC_TLS_KEY_LOGGING_ENABLED` must be set to true to enable TLS session key logging. The TLS session key export config change examples described below only take effect if this is the case.
+
 ## Client Side (per-channel) C++ API usage
 
 ```
