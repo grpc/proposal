@@ -52,7 +52,7 @@ it will shutdown the transport gracefully.
 ```
 version = int;
 protocol extension flags = int;
-num bytes = int;
+num bytes = long;
 ping id = int;
 
 setup transport transaction = version, binder, [protocol extension flags];
