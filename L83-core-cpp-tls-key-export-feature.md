@@ -35,11 +35,9 @@ The proposal extends the existing `grpc::experimental::TlsCredentialsOptions` cl
   } grpc_tls_session_key_log_format;
   ```
 
-* A `grpc::experimental::TlsSessionKeyLoggerConfig` class is defined in `include/grpcpp/security/tls_credentials_options.h` to support configuration for session key export. It currently has two members:
-  * `std::string tls_session_key_log_file_path`: Full path where the TLS keys should be exported to.
-  * `grpc_tls_session_key_log_format  tls_session_key_log_format`: Format of the exported keys.
+* A `grpc::experimental::TlsSessionKeyLoggerConfig` class is defined in `include/grpcpp/security/tls_credentials_options.h` to support configuration for session key export.
 
-  The `grpc::experimental::TlsSessionKeyLoggerConfig` class has the following signature:
+  It has the following signature:
   ```
   class TlsSessionKeyLoggerConfig {
     public:
