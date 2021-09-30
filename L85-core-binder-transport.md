@@ -178,8 +178,8 @@ object in `Parcel`, we will print an error message and fail the RPC call.
 
 When the process hosting the service has crashed, been killed, been updated, or
 recovered, we will receive a notification in our [ServiceConnection] class. We
-will update [connectivety state] of the channel correspondingly. User don't need
-to handle connection recovery.
+will update [connectivity state] of the channel correspondingly. User will not
+need to handle connection recovery.
 
 Note that the API will be experimental for now and we need to experiment it in
 real world use cases.
