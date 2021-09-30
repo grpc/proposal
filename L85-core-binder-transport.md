@@ -6,13 +6,13 @@
 *   Approver: TBD
 *   Status: Draft
 *   Implemented in: gRPC-core, C++
-*   Last updated: August 31, 2021
+*   Last updated: September 30, 2021
 *   Discussion at: https://groups.google.com/g/grpc-io/c/n8Qhlfwd8tE
 
 ## Abstract
 
-Implements [BinderChannel protocol](proposal L73) in gRPC-core transport layer,
-and provide C++ interface for Android native code.
+Implements [BinderChannel protocol](proposal L73) in gRPC-core, and provide C++
+interface for Android native code.
 
 ## Background
 
@@ -44,28 +44,24 @@ After the connection is established, the rest can be done in pure C++.
 
 ### Client side API
 
-Since the channel creation process requires interactions with Android runtime,
-we will have a special API for creating binder transport channels.
+Since we need more than a simple URI string to create the channel, we will have
+separate APIs for creating binder transport channels.
 
 ```cpp
-void CreateBinderChannel(
+std::shared_ptr<grpc::Channel> CreateBinderChannel(
     void* jni_env, jobject context, const std::string& package_name,
     const std::string& class_name,
-    std::shared_ptr<grpc::binder::SecurityPolicy> security_policy,
-    std::function<void(void*, std::shared_ptr<grpc::Channel>)>
-        on_channel_created);
+    std::shared_ptr<grpc::binder::SecurityPolicy> security_policy);
 
-void CreateCustomBinderChannel(
+std::shared_ptr<grpc::Channel> CreateCustomBinderChannel(
     void* jni_env, jobject context, const std::string& package_name,
     const std::string& class_name,
     std::shared_ptr<grpc::binder::SecurityPolicy> security_policy,
-    const grpc::ChannelArguments& args,
-    std::function<void(void*, std::shared_ptr<grpc::Channel>)>
-        on_channel_created);
+    const grpc::ChannelArguments& args);
 
 class SecurityPolicy {
  public:
-  // return true if the uid is authorized to connect
+  // returns true if the UID is authorized to connect
   virtual bool IsAuthorized(int uid) = 0;
 };
 ```
@@ -74,7 +70,8 @@ class SecurityPolicy {
 Java code to establish the connection.
 
 `context`: The service will only be considered required by this client for as
-long as the `context` exists (See [bindService] for details).
+long as the `context` exists (See [bindService] for details). This object should
+be a `android.content.Context`.
 
 `package_name` and `class_name`: These 2 arguments will be used to create a
 [ComponentName], which identifies a specific service to connect to.
@@ -88,20 +85,8 @@ Google.
 `args`: `CreateCustomBinderChannel` accepts an extra argument `args`, used as
 additional options for channel creation.
 
-`on_channel_created`: A callback function that will be invoked when the
-`grpc::Channel` became available. We need to use asynchronous callback to notify
-user because the "bind to the server" operation is asynchronous in its nature.
-User should not block the thread to wait for this callback function to be
-called. See notes at the end of this RFC for details.
-
-Arguments of the callback function:
-
-*   `JNIEnv` is provided so user can call their Java code if they would like.
-*   `std::shared_ptr<grpc::Channel>` is the gRPC channel. It will be nullptr if
-    the bind is not successful.
-
 The API is implemented using [bindService] in Java. Upon [onServiceConnected]
-called by Android, the channel will be created and the callback will be invoked.
+called by Android, the channel's [connectivity state] will become `READY`.
 
 Because the API's signature contains [JNI] specific type `jobject`, the API will
 only be declared if the header is compiled with Android tool chain. (that is,
@@ -120,7 +105,7 @@ std::shared_ptr<ServerCredentials> BinderServerCredentials(
     std::shared_ptr<grpc::binder::SecurityPolicy> security_policy);
 ```
 
-The following snippet sets up gRPC server listening for incoming binder
+The following snippet sets up a gRPC server listening for incoming binder
 transactions, and only allows clients that signed by the same key to connect:
 
 ```cpp
@@ -132,45 +117,56 @@ server_builder.AddListeningPort(
                             grpc::binder::SameSignatureSecurityPolicy(jvm)));
 ```
 
-The first argument specifies a "binder port". A binder port is not a real port,
-and is identified with a custom binder URI scheme `binder://`.
+The first argument specifies a URI with a customized URI scheme "binder". The
+string will later be used in Java to locate the endpoint binder object created
+by gRPC server.
 
 After `server_builder.BuildAndStart()` is called, an endpoint binder will be
 created internally in the transport.
 
 To let the client connect to the server, the service needs to return the
 endpoint binder. To let the bound service implementation get the endpoint binder
-easily, we provide a Java class `GrpcCppServerBuilder` and a static Java method
-that can be used like the following:
+easily, we provide a Java class `GrpcCppServerBuilder` will be provided.
 
 ```java
-GrpcCppServerBuilder::GetEndpointBinder("example")
+GrpcCppServerBuilder::GetEndpointBinder("binder://example")
+public class GrpcCppServerBuilder {
+  public static IBinder GetEndpointBinder(String uri) {
+    // Call C++ to get the endpoint binder and return
+    // ...
+  }
+}
 ```
 
-The string parameter corresponds to the first argument passed in
+The static Java method that can be used like the following to get the IBinder
+
+```java
+GrpcCppServerBuilder::GetEndpointBinder("binder://example");
+```
+
+Note that the string parameter corresponds to the first argument passed in
 `grpc::ServerBuilder::AddListeningPort`.
 
-Note that the native library containing our transport implementation must have
-been loaded by user before using this helper class.
+The native library containing our transport implementation must have been loaded
+by user before using this helper class. This typically will not be an issue
+because loading the single native library after the application starts is
+generally considered as best practice.
 
 Under the hood we will use a shared static variable to store the mapping between
 service name and endpoint binder.
 
 ## Notes
 
-### Why asynchronous callback is used in client side API
+### Caveat: Connection might not be established if the thread is blocked
 
-Due to Android API's design, Android service might not call `onServiceConnected`
-before current activity ends.
+Due to Android's design, we will need to wait for Android to notify us when the
+connection become ready. However, Android will never be able to call us if the
+thread is blocked. This means the gRPC channel will never become `READY` state
+if the main thread is blocked.
 
-User should not block the (android) Activity to wait for the callback to be
-called. Instead, user should unblock the thread and wait Android to notify that
-the bind is successful, in an asynchronous manner.
-
-We made the design decision to not return a (pending) channel object immediately
-because typically user will want to be notified when the channel become usable,
-and we want to prevent user from using the (not yet connected) channel
-immediately and waiting for RPC call to success, which will cause deadlock.
+For example, making a synchronous RPC call on main thread while channel is in
+disconnected states will cause deadlock: the RPC call will block until success,
+and the connection cannot be established because the RPC call blocks the thread.
 
 ### Parcelable objects
 
