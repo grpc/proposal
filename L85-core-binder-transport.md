@@ -6,7 +6,7 @@
 *   Approver: TBD
 *   Status: Draft
 *   Implemented in: gRPC-core, C++
-*   Last updated: September 30, 2021
+*   Last updated: October 5, 2021
 *   Discussion at: https://groups.google.com/g/grpc-io/c/n8Qhlfwd8tE
 
 ## Abstract
@@ -61,7 +61,8 @@ std::shared_ptr<grpc::Channel> CreateCustomBinderChannel(
 
 class SecurityPolicy {
  public:
-  // returns true if the UID is authorized to connect
+  virtual ~SecurityPolicy() = default;
+  // Returns true if the UID is authorized to connect.
   virtual bool IsAuthorized(int uid) = 0;
 };
 ```
