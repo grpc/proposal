@@ -141,7 +141,7 @@ public class GrpcCppServerBuilder {
 The static Java method that can be used like the following to get the IBinder
 
 ```java
-GrpcCppServerBuilder::GetEndpointBinder("binder:example");
+GrpcCppServerBuilder.GetEndpointBinder("binder:example");
 ```
 
 Note that the string parameter corresponds to the first argument passed in
