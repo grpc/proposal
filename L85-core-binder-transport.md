@@ -130,7 +130,6 @@ endpoint binder. To let the bound service implementation get the endpoint binder
 easily, we provide a Java class `GrpcCppServerBuilder` will be provided.
 
 ```java
-GrpcCppServerBuilder::GetEndpointBinder("binder:example")
 public class GrpcCppServerBuilder {
   public static IBinder GetEndpointBinder(String uri) {
     // Call C++ to get the endpoint binder and return
