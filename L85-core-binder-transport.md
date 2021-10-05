@@ -114,7 +114,7 @@ grpc::ServerBuilder server_builder;
 
 // `jvm` is passed into SameSignatureSecurityPolicy so it can call Java
 server_builder.AddListeningPort(
-    "binder://example", grpc::BinderServerCredentials(
+    "binder:example", grpc::BinderServerCredentials(
                             grpc::binder::SameSignatureSecurityPolicy(jvm)));
 ```
 
@@ -130,7 +130,7 @@ endpoint binder. To let the bound service implementation get the endpoint binder
 easily, we provide a Java class `GrpcCppServerBuilder` will be provided.
 
 ```java
-GrpcCppServerBuilder::GetEndpointBinder("binder://example")
+GrpcCppServerBuilder::GetEndpointBinder("binder:example")
 public class GrpcCppServerBuilder {
   public static IBinder GetEndpointBinder(String uri) {
     // Call C++ to get the endpoint binder and return
@@ -142,7 +142,7 @@ public class GrpcCppServerBuilder {
 The static Java method that can be used like the following to get the IBinder
 
 ```java
-GrpcCppServerBuilder::GetEndpointBinder("binder://example");
+GrpcCppServerBuilder::GetEndpointBinder("binder:example");
 ```
 
 Note that the string parameter corresponds to the first argument passed in
