@@ -141,6 +141,8 @@ filters.  In each entry, gRPC will look at the following fields:
 
 When gRPC receives the `HttpConnectionManager` proto in the LDS
 response, it will validate the list of filters as follows:
+- There must be at least one filter in the list, or the Listener
+  resource will be NACKed.
 - Every filter in the list must have a unique instance name.  Any
   duplicate instance names will cause the Listener resource to be NACKed.
 - Every filter config in the list must be of a type (as identified by the
