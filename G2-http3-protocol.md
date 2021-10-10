@@ -98,7 +98,7 @@ that the last successfully processed stream ID.
 
 ### Exceeding deadlines
 
-When an RPC has exceeded its deadline, the server will reset the stream. In HTTP/2 a stream
+When an RPC has exceeded its deadline, the server will reset the stream. In HTTP/2, a stream
 is reset using the `RST_STREAM` frame. The `RST_STREAM` frame doesn't exist in HTTP/3. 
 Instead, this action is performed using a QUIC frame, called `RESET_STREAM`.
 
@@ -108,14 +108,15 @@ Deadline exceeded HTTP/2    | RST_STREAM   | CANCEL(8)                    | HTTP
 Deadline exceeded HTTP/3    | RESET_STREAM | H3_REQUEST_CANCELLED(0x010c) | QUIC     
 
 [RESET_STREAM](https://www.rfc-editor.org/rfc/rfc9000.html#name-reset_stream-frames) abruptly
-terminates both directions of a request stream. An important difference between HTTP/2 and
-HTTP/3 is frames are received out-of-order. Because of this, it is possible that a
-`RESET_STREAM` sent after a completed response results in an aborted request by the client.
+terminates sending on a stream. An important difference between HTTP/2 and
+HTTP/3 is frames are received out-of-order. Because of this, a `RESET_STREAM` sent after a
+completed response could still result in the response being aborted.
 
 HTTP/3 also has the QUIC `STOP_SENDING` frame. This frame is sent by the server when a
-stream's response side completes before the request side. `STOP_SENDING` isn't
-appropriate for a request that has exceeded its deadline because both stream dictions should
-be aborted.
+stream's response side completes before the request side. Using `STOP_SENDING` alone isn't
+appropriate for a deadline exceeded, because both stream dictions should be aborted.
+However, `STOP_SENDING` should be sent along with `RESET_STREAM` if the deadline is exceeded
+while the request side is in-progress.
 
 ## Rationale
 
