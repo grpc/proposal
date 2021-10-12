@@ -5,7 +5,7 @@ G2: gRPC over HTTP/3
 * Status: In review
 * Implemented in: grpc-dotnet
 * Last updated: 2021-08-25
-* Discussion at: 
+* Discussion at: https://groups.google.com/g/grpc-io/c/b1dWReBGyX4
 
 ## Abstract
 
