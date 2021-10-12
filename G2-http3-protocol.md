@@ -1,8 +1,8 @@
 G2: gRPC over HTTP/3
 ----
 * Author(s): [James Newton-King](https://github.com/jamesnk)
-* Approver: 
-* Status: Draft
+* Approver: ejona86
+* Status: In review
 * Implemented in: grpc-dotnet
 * Last updated: 2021-08-25
 * Discussion at: 
@@ -24,10 +24,10 @@ offered by HTTP/3:
 * Improved experience when there is connection packet loss.
 * Client supports transitioning between networks.
 
-[PROTOCOL-HTTP2.md](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md) covers gRPC's HTTP semantics, along with some content
-that is specific to HTTP/2. Either this document should be generalized to include
-HTTP/2 and HTTP/3 information, or a new gRPC over HTTP/3 protocol document should
-be created.
+[PROTOCOL-HTTP2.md](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)
+covers gRPC's HTTP semantics, along with some content that is specific to HTTP/2.
+Either this document should be generalized to include HTTP/2 and HTTP/3 information,
+or a new gRPC over HTTP/3 protocol document should be created.
 
 ### Related Proposals:
 
@@ -38,14 +38,16 @@ n/a
 ### HTTP semantics
 
 The shape of a gRPC HTTP requests and responses are unchanged in HTTP/3. The
-content in [PROTOCOL-HTTP2.md](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md) that covers requests and responses can be referred
-to directly, without any duplication.
+content in [PROTOCOL-HTTP2.md](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)
+that covers requests and responses can be referred to directly, without any
+duplication.
 
 Notably, unlike gRPC-Web, the content-type of `application/grpc` is unchanged.
 
 ### Transport mapping
 
-The gRPC over HTTP/2 specification [discusses HTTP2 transport mapping](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#http2-transport-mapping). The content discussed is mostly applicable to HTTP/3.
+The gRPC over HTTP/2 specification [discusses HTTP2 transport mapping](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#http2-transport-mapping).
+The content discussed is mostly applicable to HTTP/3.
 
 #### Stream Identification
 
@@ -57,7 +59,8 @@ The relationship between `DATA` frames and length prefixed messages are unchange
 
 #### Errors
 
-HTTP/3 [has different error codes](https://quicwg.org/base-drafts/draft-ietf-quic-http.html#section-8.1) from HTTP/2. HTTP/3 errors are sent via QUIC frames instead of an `RST_STREAM` HTTP frame.
+HTTP/3 [has different error codes](https://quicwg.org/base-drafts/draft-ietf-quic-http.html#section-8.1)
+from HTTP/2. HTTP/3 errors are sent via QUIC frames instead of an `RST_STREAM` HTTP frame.
 
 HTTP/3 errors are used in three situations:
 
