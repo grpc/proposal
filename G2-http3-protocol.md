@@ -118,7 +118,7 @@ completed response could still result in the response being aborted.
 
 HTTP/3 also has the QUIC `STOP_SENDING` frame. This frame is sent by the server when a
 stream's response side completes before the request side. Using `STOP_SENDING` alone isn't
-appropriate for a deadline exceeded, because both stream dictions should be aborted.
+appropriate for a deadline exceeded, because both stream directions should be aborted.
 However, `STOP_SENDING` should be sent along with `RESET_STREAM` if the deadline is exceeded
 while the request side is in-progress.
 
