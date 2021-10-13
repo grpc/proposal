@@ -37,12 +37,13 @@ n/a
 
 ### HTTP semantics
 
-The shape of a gRPC HTTP requests and responses are unchanged in HTTP/3. The
+The shape of gRPC HTTP requests and responses are unchanged in HTTP/3. The
 content in [PROTOCOL-HTTP2.md](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md)
 that covers requests and responses can be referred to directly, without any
 duplication.
 
-Notably, unlike gRPC-Web, the content-type of `application/grpc` is unchanged.
+Notably, unlike gRPC-Web, the content-type of `application/grpc` is unchanged. Apps
+are still communicating with gRPC, but over HTTP/3 instead of HTTP/2.
 
 ### Transport mapping
 
