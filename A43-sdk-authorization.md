@@ -52,127 +52,134 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
   "title": "AuthorizationPolicy",
   "definitions": {
   	"rule": {
-  	  "description": "Specification of rules. An empty rule is always matched"
-  	    "(i.e., both source and request are empty)",
-  	  "type" : "object",
-  	  "properties": {
-  	  	"name": {
-  	  	  "description": "The name of an authorization rule. It is mainly for"
-  	  	    "monitoring and error message generation.",
-		  "type": "string"
-		},
-		"source": {
-		  "description": "Specifies attributes of a peer. Fields in the source are"
-		    "ANDed together, once we support multiple fields in the future. If not"
-		    "set, no checks will be performed against the source.",
-			"type": "object",
-		  "properties": {
-			"principals": {
-			  "description": "A list of peer identities to match for authorization."
-			   "The principals are one of, i.e., it matches if one of the principals"
-			   "matches."
-			   "The field supports Exact, Prefix, Suffix, and Presence matches."
-				  "- Exact match: \"abc\" will match on value \"abc\"."
-				  "- Prefix match: \"abc*\" will match on value \"abc\" and \"abcd\"."
-				  "- Suffix match: \"*abc\" will match on value \"abc\" and \"xabc\"."
-				  "- Presence match: \"*\" will match when the value is not empty.",
-			  "type": "array",
-			  "items": {
-				"type": "string"
-			  }
-			}
-		  }
-		},
-	    "request": {
-	      "description": "Specifies attributes of a request. Fields in the request"
-	       "are ANDed together. If not set, no checks will be performed against"
-	       "the request.",
-		  "type": "object",
-		  "properties": {
-		    "paths": {
-			  "description": "A list of paths to match for authorization. This is the"
-			   "fully qualified name in the form of \"/package.service/method\". The"
-			   "paths are ORed together, i.e., it matches if one of the paths"
-			   "matches."
-			   "This field supports Exact, Prefix, Suffix, and Presence matches."
-				  "- Exact match: \"abc\" will match on value \"abc\"."
-				  "- Prefix match: \"abc*\" will match on value \"abc\" and \"abcd\"."
-				  "- Suffix match: \"*abc\" will match on value \"abc\" and \"xabc\"."
-				  "- Presence match: \"*\" will match when the value is not empty.",
-		      "type": "array",
-		   	  "items": {
-			    "type": "string"
-			  }
-			},
-			"headers": {
-			  "description": "A list of HTTP header key/value pairs to match against,"
-			   "for potentially advanced use cases. The headers are ANDed together,"
-			   "i.e., it matches only if *all* the headers match.",
-			  "type": "array",
-			  "items": {
-				"type": "object",
-				"properties": {
-				  "key": {
-					"description": "The name of the HTTP header to match. The following"
-					  "headers are *not* supported: \"hop-by-hop\" headers (e.g.,"
-					  "those listed in \"Connection\" header), the \"Host\" header,"
-					  "HTTP/2 pseudo headers (\":\"-prefixed) and headers prefixed"
-					  "with \"grpc-\".",
-					"type": "string"
-				  },
-				  "values": {
-				    "description": "A list of header values to match. The header"
-				     "values are ORed together, i.e., it matches if one of the values"
-				     "matches. Multi-valued headers are considered a single value with"
-				     "commas added between values."
-					  "This field supports Exact, Prefix, Suffix, and Presence match."
-						"- Exact match: \"abc\" will match on value \"abc\"."
-						"- Prefix match: \"abc*\" will match on value \"abc\" and \"abcd\"."
-						"- Suffix match: \"*abc\" will match on value \"abc\" and \"xabc\"."
-						"- Presence match: \"*\" will match when the value is not empty.",
-					"type": "array",
-					"items": {
-					  "type": "string"
-					}
-				  }
-				},
-				"required": ["key", "values"],
-		      }
-			}
-		  }
-		}
-	  },
-	  "required": ["name"]
-	}
+  		"description": "Specification of rules. An empty rule is always matched"
+  		  "(i.e., both source and request are empty)",
+  		"type" : "object",
+  		"properties": {
+  			"name": {
+  				"description": "The name of an authorization rule. It is mainly for"
+  				  "monitoring and error message generation.",
+  				"type": "string"
+  			},
+  			"source": {
+  				"description": "Specifies attributes of a peer. Fields in the source"
+  				  "are ANDed together, once we support multiple fields in the future."
+  				  "If not set, no checks will be performed against the source.",
+  				"type": "object",
+  				"properties": {
+  					"principals": {
+  						"description": "A list of peer identities to match for"
+  						  "authorization. The principals are one of, i.e., it matches"
+  						  "if one of the principals matches."
+  						  "The field supports Exact, Prefix, Suffix and Presence matches."
+  						  "- Exact match: \"abc\" will match on value \"abc\"."
+  						  "- Prefix match: \"abc*\" will match on value \"abc\" and \"abcd\"."
+  						  "- Suffix match: \"*abc\" will match on value \"abc\" and \"xabc\"."
+  						  "- Presence match: \"*\" will match when the value is not empty.",
+  						"type": "array",
+  						"items": {
+  							"type": "string"
+  						}
+  					}
+  				}
+  			},
+  			"request": {
+  				"description": "Specifies attributes of a request. Fields in the"
+  				  "request are ANDed together. If not set, no checks will be performed"
+  				  "against the request.",
+  				"type": "object",
+  				"properties": {
+  					"paths": {
+  						"description": "A list of paths to match for authorization. This"
+  						  "is the fully qualified name in the form of \"/package.service/method\"."
+  						  "The paths are ORed together, i.e., it matches if one of the"
+  						  "paths matches."
+  						  "This field supports Exact, Prefix, Suffix and Presence matches."
+  						  "- Exact match: \"abc\" will match on value \"abc\"."
+  						  "- Prefix match: \"abc*\" will match on value \"abc\" and \"abcd\"."
+  						  "- Suffix match: \"*abc\" will match on value \"abc\" and \"xabc\"."
+  						  "- Presence match: \"*\" will match when the value is not empty.",
+  						"type": "array",
+  						"items": {
+  							"type": "string"
+  						}
+  					},
+  					"headers": {
+  						"description": "A list of HTTP header key/value pairs to match"
+  						  "against, for potentially advanced use cases. The headers are"
+  						  "ANDed together, i.e., it matches only if *all* the headers"
+  						  "match.",
+  						"type": "array",
+  						"items": {
+  							"type": "object",
+  							"properties": {
+  								"key": {
+  									"description": "The name of the HTTP header to match."
+  									  "The following headers are *not* supported: the"
+  									  "\"Host\" header, \"hop-by-hop\" headers (e.g. those"
+  									  "listed in \"Connection\" header), HTTP/2 pseudo"
+  									  "headers (\":\"-prefixed) and headers prefixed with"
+  									  "\"grpc-\".",
+  									"type": "string"
+  								},
+  								"values": {
+  									"description": "A list of header values to match. The"
+  									  "header values are ORed together, i.e., it matches if"
+  									  "one of the values matches. Multi-valued headers are"
+  									  "considered a single value with commas added between"
+  									  "values."
+  									  "This field supports Exact, Prefix, Suffix and"
+  									  "Presence match."
+  									  "- Exact match: \"abc\" will match on value \"abc\"."
+  									  "- Prefix match: \"abc*\" will match on value \"abc\""
+  									  "  and \"abcd\"."
+  									  "- Suffix match: \"*abc\" will match on value \"abc\""
+  									  "  and \"xabc\"."
+  									  "- Presence match: \"*\" will match when the value is"
+  									  "  not empty.",
+  									"type": "array",
+  									"items": {
+  										"type": "string"
+  									}
+  								}
+  							},
+  							"required": ["key", "values"]
+  						}
+  					}
+  				}
+  			}
+  		},
+  		"required": ["name"]
+  	}
   },
   "description": "AuthorizationPolicy defines which principals are permitted to"
-   "access which resource. Resources are RPC methods scoped by services.",
+    "access which resource. Resources are RPC methods scoped by services.",
   "type": "object",
   "properties": {
-	"name": {
-	  "description": "The name of an authorization policy. It is mainly for"
-	   "monitoring and error message generation.",
-	  "type": "string",
-	},
-	"deny_rules": {
-      "description": "List of deny rules to match. If a request matches any of the"
-       "deny rules, then it will be denied. If none of the deny rules matches or"
-       "there are no deny rules, the allow rules will be evaluated.",
-	  "type": "array",
-      "items": {
-	    "$ref": "#/definitions/rule",
-	  },
-	},
-	"allow_rules": {
-      "description": "List of allow rules to match. The allow rules will only be"
-       "evaluated after the deny rules. If a request matches any of the allow"
-       "rules, then it will allowed. If none of the allow rules matches, it will"
-       "be denied.",
-	  "type": "array",
-	  "items": {
-		"$ref": "#/definitions/rule",
-	  },
-	}
+  	"name": {
+  		"description": "The name of an authorization policy. It is mainly for"
+  		  "monitoring and error message generation.",
+  		"type": "string"
+  	},
+  	"deny_rules": {
+  		"description": "List of deny rules to match. If a request matches any of the"
+  		  "deny rules, then it will be denied. If none of the deny rules matches or"
+  		  "there are no deny rules, the allow rules will be evaluated.",
+  		"type": "array",
+  		"items": {
+  			"$ref": "#/definitions/rule"
+  		}
+  	},
+  	"allow_rules": {
+  		"description": "List of allow rules to match. The allow rules will only be"
+  		  "evaluated after the deny rules. If a request matches any of the allow"
+  		  "rules, then it will allowed. If none of the allow rules matches, it will"
+  		  "be denied.",
+  		"type": "array",
+  		"items": {
+  			"$ref": "#/definitions/rule"
+  		}
+  	}
   },
   "required": ["name", "allow_rules"]
 }
@@ -246,9 +253,7 @@ In the following policy example
 		{
 			"name": "dev-access",
 			"source": {
-				"principals": [
-					"*"
-				]
+				"principals": []
 			},
 			"request": {
 				"paths": [
@@ -281,9 +286,15 @@ contains the authorization policy in JSON format.
 Valid user provided SDK authorization policy creates authorization engine(s).
 In the case of file watcher, we internally create thread(C-core)/ goroutine(Go)/
 scheduled service(Java) which will be used to read the policy file periodically,
-and update the authorization engines. For each incoming RPC request, we will invoke
-the Engines (Deny engine followed by Allow engine), to get the authorization
-decision. We use a C-core filter for C++, and interceptors for Java and Go.
+and update the authorization engines. During the first file read, if the policy
+is invalid or there are I/O errrors, we will return error back to application and
+SDK authorization won't be enabled. If the error occurs on a later reload, then
+that particular reload will be skipped, and we will continue to use the latest
+valid policy to make authorization decisions.
+
+For each incoming RPC request, we will invoke the Engines (Deny engine followed
+by Allow engine), to get the authorization decision. We use a C-core filter for
+C++, and interceptors for Java and Go.
 
 We recommend users to use a single SDK authorization policy per gRPC server. If
 there are multiple policies, then there is a possibility that all the policies
@@ -421,20 +432,20 @@ std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 package authz
 
 // StaticInterceptor contains engines used to make authorization decisions.
-type StaticInterceptors struct {
+type StaticInterceptor struct {
   engines ChainEngine
 }
 
-// NewStatic returns a new StaticInterceptors from a static authorization policy
+// NewStatic returns a new StaticInterceptor from a static authorization policy
 // JSON string.
-func NewStatic(authzPolicy string) (*StaticInterceptors, error) {
+func NewStatic(authzPolicy string) (*StaticInterceptor, error) {
   // ...
 }
 
 // UnaryInterceptor intercepts incoming Unary RPC requests.
 // Only authorized requests are allowed to pass. Otherwise, an unauthorized
 // error is returned to the client.
-func (i *StaticInterceptors) UnaryInterceptor(
+func (i *StaticInterceptor) UnaryInterceptor(
 	ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler)
 		(resp interface{}, err error) {
   // ...
@@ -443,13 +454,13 @@ func (i *StaticInterceptors) UnaryInterceptor(
 // StreamInterceptor intercepts incoming Stream RPC requests.
 // Only authorized requests are allowed to pass. Otherwise, an unauthorized
 // error is returned to the client.
-func (i *StaticInterceptors) StreamInterceptor(
+func (i *StaticInterceptor) StreamInterceptor(
 	srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler)
 		(err error) {
   // ...
 }
 
-type FileWatcherInterceptors struct {
+type FileWatcherInterceptor struct {
   internalInterceptors StaticInterceptors
   policyFile           string
   policyContents       string
@@ -457,14 +468,14 @@ type FileWatcherInterceptors struct {
   cancel               context.CancelFunc
 }
 
-// NewFileWatcher returns a new FileWatcherInterceptors from a policy file
+// NewFileWatcher returns a new FileWatcherInterceptor from a policy file
 // that contains JSON string of authorization policy and a refresh duration to
 // specify the amount of time between policy refreshes.
-func NewFileWatcher(file string, duration time.Duration) (*FileWatcherInterceptors, error);
+func NewFileWatcher(file string, duration time.Duration) (*FileWatcherInterceptor, error);
 
 // run is a long running goroutine which watches for changes in file path, and
 // updates the internalInterceptors upon modification.
-func (i *FileWatcherInterceptors) run(ctx context.Context) {
+func (i *FileWatcherInterceptor) run(ctx context.Context) {
   // ...
 }
 
@@ -472,24 +483,24 @@ func (i *FileWatcherInterceptors) run(ctx context.Context) {
 // and if so, updates the internalInterceptors with the policy. Unlike the
 // constructor, if there is an error in reading the file or parsing the policy, the
 // previous internalInterceptors will not be replaced.
-func (i *FileWatcherInterceptors) updateInternalInterceptors() {
+func (i *FileWatcherInterceptor) updateInternalInterceptors() {
   // ...
 }
 
-func (i *FileWatcherInterceptors) UnaryInterceptor(
+func (i *FileWatcherInterceptor) UnaryInterceptor(
 	ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) 
 		(resp interface{}, err error) {
-  return i.internalInterceptors.UnaryInterceptor(ctx, req, info, handler)
+  // ...
 }
 
-func (i *FileWatcherInterceptors) StreamInterceptor(
+func (i *FileWatcherInterceptor) StreamInterceptor(
 	srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) 
 		(err error) {
-  return i.internalInterceptors.StreamInterceptor(srv, ss, info, handler)
+  // ...
 }
 
 // Close cleans up resources allocated by the interceptors.
-func (i *FileWatcherInterceptors) Close() {
+func (i *FileWatcherInterceptor) Close() {
   i.cancel()
 }
 ```
