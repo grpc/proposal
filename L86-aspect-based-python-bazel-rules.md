@@ -21,7 +21,7 @@ dependency tracking.
 * This behavior is particularly surprising for Google-internal users. The internal versions of `py_proto_library` and `py_grpc_library` propagate Python dependencies.
 
 ### Related Proposals:
-`py_proto_library` and `py_grpc_library` are implemented in [python_rules.bzl](https://github.com/grpc/grpc/blob/bazel/python_rules.bzl). There doesn't seem to be a proposal for that, though.
+`py_proto_library` and `py_grpc_library` are implemented in [python_rules.bzl](https://github.com/grpc/grpc/blob/master/bazel/python_rules.bzl). There doesn't seem to be a proposal for that, though.
 
 ## Proposal
 
