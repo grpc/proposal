@@ -90,8 +90,8 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
   				"type": "object",
   				"properties": {
   					"paths": {
-  						"description": "A list of paths to match for authorization. This"
-  						  "is the fully qualified name in the form of \"/package.service/method\"."
+  						"description": "A list of paths to match for authorization. This is"
+  						  "the fully qualified name in the form of \"/package.service/method\"."
   						  "The paths are ORed together, i.e., it matches if one of the"
   						  "paths matches."
   						  "This field supports Exact, Prefix, Suffix and Presence matches."
@@ -114,29 +114,31 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
   							"type": "object",
   							"properties": {
   								"key": {
-  									"description": "The name of the HTTP header to match."
-  									  "The following headers are *not* supported: the"
-  									  "\"Host\" header, \"hop-by-hop\" headers (e.g. those"
-  									  "listed in \"Connection\" header), HTTP/2 pseudo"
-  									  "headers (\":\"-prefixed) and headers prefixed with"
-  									  "\"grpc-\".",
+  									"description": "The name of the HTTP header to"
+  									  "match. The following headers are *not*"
+  									  "supported: the \"Host\" header, \"hop-by-hop\""
+  									  "headers (e.g. those listed in \"Connection\""
+  									  "header), HTTP/2 pseudo headers (\":\"-prefixed)"
+  									  "and headers prefixed with \"grpc-\".",
   									"type": "string"
   								},
   								"values": {
-  									"description": "A list of header values to match. The"
-  									  "header values are ORed together, i.e., it matches if"
-  									  "one of the values matches. Multi-valued headers are"
-  									  "considered a single value with commas added between"
+  									"description": "A list of header values to"
+  									  "match. The header values are ORed together,"
+  									  "i.e., it matches if one of the values"
+  									  "matches. Multi-valued headers are considered"
+  									  "a single value with commas added between"
   									  "values."
-  									  "This field supports Exact, Prefix, Suffix and"
-  									  "Presence match."
-  									  "- Exact match: \"abc\" will match on value \"abc\"."
-  									  "- Prefix match: \"abc*\" will match on value \"abc\""
-  									  "  and \"abcd\"."
-  									  "- Suffix match: \"*abc\" will match on value \"abc\""
-  									  "  and \"xabc\"."
-  									  "- Presence match: \"*\" will match when the value is"
-  									  "  not empty.",
+  									  "This field supports Exact, Prefix, Suffix"
+  									  "and Presence match."
+  									  "- Exact match: \"abc\" will match on value"
+  									  "  \"abc\"."
+  									  "- Prefix match: \"abc*\" will match on value"
+  									  "  \"abc\" and \"abcd\"."
+  									  "- Suffix match: \"*abc\" will match on value"
+  									  "  \"abc\" and \"xabc\"."
+  									  "- Presence match: \"*\" will match when the"
+  									  "  value is not empty.",
   									"type": "array",
   									"items": {
   										"type": "string"
