@@ -28,10 +28,17 @@ dependency tracking.
 * We propose rebuilding the `py_proto_library` and `py_grpc_library` rules to use [aspects](https://docs.bazel.build/versions/main/skylark/aspects.html) to perform code generation steps.
   This approach corresponds to the Google-internal design for these rules.
 * The `_gen_py_proto_aspect` aspect visits `proto_library` rules to generate Python code for Protobuf.
+  gRPC-owned code is still responsible for generating the Python code.
 * The aspect produces a custom [providers](https://docs.bazel.build/versions/main/skylark/rules.html#providers) `PyProtoInfo` that wraps a `PyInfo` provider to avoid creating spurious dependencies for Python users that interface with the `proto_library` rules through some other means.
 * The `py_proto_library` and `py_grpc_library` rules will only be responsible for collecting the `PyInfo` providers from their dependencies.
 * The `plugin` attribute must be removed from `py_proto_library`. Aspects require the declaration of all possible parameter values up front, so it would not be possible for the new aspects to continue supporting arbitrary plugins. (Note that the plugin feature is not used in gRPC. It was introduced to support [GAPIC](https://github.com/googleapis/gapic-generator-python), which no longer uses the feature.)
-* No behavior change should be observed by the user of `py_proto_library` or `py_grpc_library` unless they rely on the (removed) `plugin` attribute.
+* In some use cases in gRPC [e.g. grpcio_channelz](https://github.com/grpc/grpc/blob/master/src/python/grpcio_channelz/grpc_channelz/v1/BUILD.bazel), the `py_proto_library` rule is located in a different package than the corresponding `proto_library` rule.
+  This rule layout is needed to generate Python code with import paths that match the Python package layout, rather than the directory structure containing the `.proto` files.
+  Since aspect-based code generation associates the generated code with the Bazel package (i.e. repository path) of the `proto_library` rule rather than the `py_proto_library` rule, we need special handling for this case.
+  When the `py_proto_library` is in a different Bazel package than the `proto_library` rule, we generate an additional set of Python files that import the generated Python files under the old convention.
+  Additionally, an `imports` attribute is added, to allow the caller to add import paths (similar to the behavior of `py_library`.
+  With these two changes, existing Python code can remain unmodified, with a minimal increase in BUILD file complexity.
+* No behavior change should be observed by the user of `py_proto_library` or `py_grpc_library` unless they rely on the (removed) `plugin` attribute, or if they use the new `imports` attribute.
 
 ## Rationale
 
@@ -44,6 +51,11 @@ The new build logic could be moved into a separate repository, or potentially up
 ## Implementation
 
 The implementation is mostly complete by beardsworth in [#27275](https://github.com/grpc/grpc/pull/27275).
+
+### Testing
+
+Existing unit tests cover the current API surface.
+An additional test case will be added to the Bazel [Python test repo](https://github.com/grpc/grpc/tree/master/bazel/test/python_test_repo) that covers transitive dependency resolution.
 
 ## Open issues (if applicable)
 
