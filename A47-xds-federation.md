@@ -1,11 +1,11 @@
 A47: xDS Federation
 ----
 * Author(s): Mark D. Roth (@markdroth)
-* Approver: ejona86, dfawley
+* Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2021-10-20
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/17pQyP31yL8
 
 ## Abstract
 
