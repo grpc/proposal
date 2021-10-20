@@ -187,7 +187,7 @@ There will be two changes to the existing
 `server_listener_resource_name_template` described in [gRFC A36][A36]:
 - If the template starts with `xdstp:`, it will be interpreted as a
   new-style name, in which case the authority of the URI will be used to
-  select the relevant configuration in the "authorities" map.
+  select the relevant configuration in the `authorities` map.
 - When replacing the `%s` token, if the template starts with `xdstp:`,
   the replacement string will be %-encoded in the resulting resource
   name.
