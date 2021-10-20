@@ -28,7 +28,7 @@ standard authorization solution available. If a user wanted to perform per RPC
 authorization check, they have to implement their own solution in the application.
 The standard gRPC authorization mechanism described in this proposal allows users
 to simply provide an authorization policy for their server. Then, for each RPC,
-the server verifies whether the client is authorized to issue the RPC.
+the server verifies whether the client is authorized to make the RPC request.
 
 ## Proposal
 
@@ -57,8 +57,9 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
   		"type" : "object",
   		"properties": {
   			"name": {
-  				"description": "The name of an authorization rule. It is mainly for"
-  				  "monitoring and error message generation.",
+  				"description": "The name of an authorization rule. This name should"
+  				  "be unique within the list of deny (or allow) rules. It is mainly"
+  				  "for monitoring and error message generation.",
   				"type": "string"
   			},
   			"source": {
@@ -209,7 +210,7 @@ Each *rule* has the following semantics -
 2. Each *source* could contain a list of *principals*. The *principals* are ORed
    together, i.e. it matches if one of them matches.
    Sequence of steps to evaluate each principal from config -
-   1. If TLS is not used, matching fails.
+   1. If TLS/mTLS is not used, matching fails.
    2. A match is found if principal matches URI SANs from the client certificate. If
       there are no URI SANs in certificate, or no match was found, we check against
       DNS SANs. Similarly, if certificate has no DNS SANs or match wasn't found, we
@@ -232,7 +233,8 @@ Each *rule* has the following semantics -
 In the following policy example
 - Peer identity from ["spiffe://foo.com/sa/admin1", "spiffe://foo.com/sa/admin2"] is 
   authorized to access any RPC methods in pkg.service
-- Any authenticated user is allowed to access "foo" and "bar" RPC methods.
+- Any authenticated user is allowed to access "foo" and "bar" RPC methods if the
+  HTTP header includes a name "dev-path" with prefix value "dev/path/".
 - Nobody can access "secret" RPC method, not even the admins as deny rules are evaluated 
   first.
 
@@ -261,6 +263,12 @@ In the following policy example
 				"paths": [
 					"/pkg.service/foo",
 					"/pkg.service/bar"
+				],
+				"headers": [
+					{
+						"key": "dev-path",
+						"values": ["/dev/path/*"]
+					}
 				]
 			}
 		}
