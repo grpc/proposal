@@ -115,7 +115,7 @@ field that was added in [gRFC A36][A36].
 
 The new `authorities` field will have the following format:
 
-```json
+```
 // A map of authority name to corresponding configuration.
 //
 // This is used in the following cases:
@@ -165,7 +165,7 @@ The new `authorities` field will have the following format:
 The new `client_default_listener_resource_name_template` field will have
 the following format:
 
-```json
+```
 // A template for the name of the Listener resource to subscribe to
 // for a gRPC client channel.  Used only when the channel is created
 // with an "xds:" URI with no authority.
@@ -194,7 +194,7 @@ There will be two changes to the existing
 
 The resulting field will have the following format:
 
-```json
+```
 // A template for the name of the Listener resource to subscribe to
 // for a gRPC server.
 //
@@ -246,7 +246,7 @@ If a gRPC server is created listening on `0.0.0.0:8080`:
 
 The following new fields are added to the bootstrap config:
 
-```json
+```
 "client_default_listener_resource_name_template": "xdstp://xds.example.com/envoy.config.listener.v3.Listener/%s",
 "authorities": {
   "xds.example.com": {
@@ -284,7 +284,7 @@ If a gRPC client channel is created for `xds://xds.example.com/server.example.co
 
 The following new fields are added to the bootstrap config:
 
-```json
+```
 // Use new-style Listener name on gRPC server.
 "server_listener_resource_name_template": "xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/server/%s",
 
@@ -309,7 +309,7 @@ If a gRPC server is created listening on `0.0.0.0:8080`:
 
 Consider the following bootstrap config:
 
-```json
+```
 // Top-level xDS server list.  Used for all resources with no authority, or
 // for any authority that does not specify a list of servers.
 "xds_servers": [
