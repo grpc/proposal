@@ -394,7 +394,14 @@ If a gRPC server is created listening on `0.0.0.0:8080`:
   we default to the top-level `xds_servers` list, which is the same one that
   we would have used prior to this design.
 
-### `xds` Resolver Changes
+### Implementation Changes
+
+This section describes the changes needed to implement this design.
+This information is relevant to those implementing this functionality in
+gRPC, but it is not useful to those simply wishing to know how to use
+the functionality in an application.
+
+#### `xds` Resolver Changes
 
 The xds resolver will be responsible for using the bootstrap information
 above to determine what Listener resource name to subscribe to for a
@@ -422,7 +429,7 @@ else:  # target_uri.authority not set
   xds_resource_name = ExpandPercentS(template, target_hostname)
 ```
 
-### xDS-Enabled gRPC Server Changes
+#### xDS-Enabled gRPC Server Changes
 
 Similarly to the xds resolver on the client side, the xDS-enabled gRPC
 server will need to be changed such that if the
@@ -430,11 +437,11 @@ server will need to be changed such that if the
 starts with `xdstp:`, then it will percent-encode the listening address
 before replacing the `%s` token in the template.
 
-### `XdsClient` Changes
+#### `XdsClient` Changes
 
 This design will require a number of changes in `XdsClient`.
 
-#### Server Channel Map
+##### Server Channel Map
 
 Currently, the `XdsClient` contains a single server channel.  This will be
 replaced with a map of server channels, keyed by the server definition
@@ -452,7 +459,7 @@ down the connections, or they can ref-count the channel and shut it down
 when it's no longer needed.  (The expected tear-down after being idle is
 O(5-15m).)
 
-#### Resource Cache
+##### Resource Cache
 
 The resource cache in the `XdsClient` is currently a two-level map, keyed
 first by resource type and then by resource name.  This will need to be
@@ -515,7 +522,7 @@ behavior is undefined.  The easiest thing is probably to just use the
 last value seen, since this allows the implementation to just populate
 the map by iterating over the query params.
 
-#### Watcher Changes
+##### Watcher Changes
 
 When a caller starts a watch on an old-style resource name (one that
 does not start with `xdstp:`), the `XdsClient` will behave essentially as
@@ -533,7 +540,7 @@ it will be returned immediately.  Otherwise, it will send a message
 subscribing to that resource, using the appropriate xDS server from the
 authority.
 
-### LRS Server Representation
+#### LRS Server Representation
 
 We currently represent the LRS server name in several places:
 - In the `CdsUpdate` struct returned by the `XdsClient` CDS watcher.
@@ -586,7 +593,7 @@ struct XdsServer {
 };
 ```
 
-#### `XdsClient` CDS Watcher
+##### `XdsClient` CDS Watcher
 
 For now, the `XdsClient` will continue to require the CDS resource's
 `lrs_server` field to contain a `SelfConfigSource` if it is set.  However,
@@ -609,7 +616,7 @@ resource did not change.
 The CDS LB policy will need to use this new field to populate the LB
 policy config for the `xds_cluster_resolver` LB policy.
 
-#### LB Policy Config Changes
+##### LB Policy Config Changes
 
 The configs for the `xds_cluster_resolver` and `xds_cluster_impl` LB
 policies will change to use type `XdsServer` instead of type
@@ -620,7 +627,7 @@ The same `XdsServer::Parse()` method will be used in both the bootstrap
 file parser and the LB policy config parser in the `xds_cluster_resolver`
 and `xds_cluster_impl LB policies`.
 
-#### `XdsClient` Load Reporting APIs
+##### `XdsClient` Load Reporting APIs
 
 The load reporting APIs will need to accept the LRS server as an
 `XdsServer` struct instead of as a simple string.
