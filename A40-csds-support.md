@@ -47,7 +47,7 @@ service ClientStatusDiscoveryService {
 }
 ```
 
-### Related Proposals: 
+### Related Proposals:
 * [A27 - xDS-Based Global Load
   Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
 * [A38 - Admin Interface API](https://github.com/grpc/proposal/pull/218)
@@ -96,7 +96,7 @@ CSDS -> [
 
 # The newer endpoint B contains parsing error
 EDS -> {A, B}, version 2
-gRPC -> NACK, Failed to parse endpoint B 
+gRPC -> NACK, Failed to parse endpoint B
 CSDS -> [
   {Endpoint A, NACK, version 1, rejected version 2, rejected reason: Failed to parse endpoint B},
   {Endpoint B, NACK, version 1, rejected version 2, rejected reason: Failed to parse endpoint B},
@@ -222,6 +222,26 @@ with the Node information of the gRPC application. This feature has lower
 priority. To preserve forward compatibility, this doc proposes to return an
 [INVALID_ARGUMENT](https://github.com/grpc/grpc/blob/master/doc/statuscodes.md)
 if the CSDS implementation observe an non-empty Node Matcher.
+
+
+### Config Dump Design: GenericXdsConfig vs. PerXdsConfig
+
+CSDS offers two ways to structure the xDS config dumps:
+
+1. [`PerXdsConfig`](https://github.com/envoyproxy/envoy/blob/3975bf5dadb43421907bbc52df57c0e8539c9a06/api/envoy/service/status/v3/csds.proto#L92):
+   group configs by their xDS type (e.g., all Cluster configs);
+2. [`GenericXdsConfig`](https://github.com/envoyproxy/envoy/blob/3975bf5dadb43421907bbc52df57c0e8539c9a06/api/envoy/service/status/v3/csds.proto#L133):
+   a flat list of xDS configs.
+
+gRPC implemented `PerXdsConfig` support in C++/Java/Go/Python since gRPC
+v1.37.x. However, after the `GenericXdsConfig` field is available, we found it
+allows easier programmatic access, and it removes the confusing per-xds-type
+version info. `PerXdsConfig` is now deprecated for xDS v3.
+
+The size of xDS configs may be significant. Supporting two CSDS standards is
+technically possible but at the cost of performance and verbose output. So, gRPC
+libraries should upgrade the existing `PerXdsConfig` config dump implementation
+to the latest CSDS standard `GenericXdsConfig`.
 
 
 ## Alternatives
