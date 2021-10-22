@@ -1,7 +1,7 @@
 A48: xDS Least Request LB Policy
 ----
 * Author(s): erikjoh & [fabric](https://github.com/orgs/spotify/teams/fabric)
-* Approver: a11r
+* Approver: markdroth
 * Status: Implementation in progress
 * Implemented in: Java in progress
 * Last updated: 2021-10-21
