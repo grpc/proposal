@@ -35,7 +35,8 @@ For general transport lifecycle, using one of 1000 reserved transaction codes.
 *   Acknowledge bytes.
     *   Transaction code: BinderTransport.ACKNOWLEDGE_BYTES (3)
     *   From either transport to its peer's binder. Reports reception of
-        transaction data for flow control.
+        transaction data for flow control. The "num bytes" field should contain
+        the sum of "[data size]" of the parcels received until now.
 *   Ping
     *   Transaction code: BinderTransport.PING (4)
     *   Currently only sent from ClientTransport to server binder.
@@ -52,7 +53,7 @@ it will shutdown the transport gracefully.
 ```
 version = int;
 protocol extension flags = int;
-num bytes = int;
+num bytes = long;
 ping id = int;
 
 setup transport transaction = version, binder, [protocol extension flags];
@@ -147,6 +148,10 @@ rpc transaction = flags, sequence no, rpc data;
     included.
 *   FLAG_MESSAGE_DATA_IS_PARCELABLE (0x40) - Indicates the message is a parcelable
     object.
+*   FLAG_MESSAGE_DATA_IS_PARTIAL (0x80) - Indicates the message is partial and
+    the receiver should continue reading. When a message doesn't fit into a
+    single transaction, the message will be sent in multiple transactions with
+    this bit set on all but the final transaction of the message.
 *   status - If a status is included in the data, the status code will be
     present in the top 16 bits of the flags value.
 
@@ -201,7 +206,24 @@ ungraceful shutdown will occur, with the status code CANCELLED. The remote
 transport will be notified, cancelling all ongoing remote calls on the server
 side.
 
+## Large Messages
+
+We limit the amount of message data sent in a single transaction to 16KB.
+Messages larger than that will be sent in multiple sequential transactions, with
+all but the last transaction having FLAG_MESSAGE_DATA_IS_PARTIAL set.
+
+## Flow Control
+
+Due to Android's limited per-process transaction buffer of 1MB, BinderTransport
+supports transport-level flow control, aiming to keep use of the process
+transaction buffer to at most 128KB. Each transaction we send adds to an
+internal count of unacknowledged outbound data (here the count refers to the
+"data size" of the parcels). If that exceeds 128KB, we’ll stop sending
+transactions until we receive an acknowledgement message from the transport
+peer. Each transport sends an acknowledgement for each 16KB received, which
+should avoid blocking the transport most of the time.
+
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel
-[onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\))
-
+[onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\)
+[data size]: https://developer.android.com/reference/android/os/Parcel#dataSize()
