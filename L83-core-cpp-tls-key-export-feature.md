@@ -13,7 +13,7 @@ This proposal discusses additions to the core/cpp public headers to support expo
 
 # Background
 
-Currently unlike the GRPC Go implementation, GRPC C++ does not allow export of TLS session keys at run time. This is needed to decrypt and analyse packet captures for debugging purposes. The session keys when exported in files in a specific format, can be read by debugging tools like wireshark and they can automatically decrypt packet captures.
+Currently unlike the GRPC Go implementation, GRPC C++ does not allow export of TLS session keys at run time. This is needed to decrypt and analyse packet captures for debugging purposes. The session keys when exported to files in the NSS format, and can be read by debugging tools like wireshark which can automatically decrypt packet captures.
 
 # Related Proposals:
 
@@ -25,41 +25,10 @@ N/A
 
 The proposal extends the existing `grpc::experimental::TlsCredentialsOptions` class with methods to set configuration for supporting TLS session key export at run-time. The proposed changes include:
 
-* A `grpc_tls_session_key_log_format` enum is added to `include/grpc/grpc_security_constants.h`
-  ```
-  /** Supported TLS session key logging formats **/
-  typedef enum {
-    // Default key logging formal is NSS compatible.
-    GRPC_TLS_KEY_LOG_FORMAT_NSS = 0,
-    // More formats can be added here for future extensions if desired.
-  } grpc_tls_session_key_log_format;
-  ```
 
-* A `grpc::experimental::TlsSessionKeyLoggerConfig` class is defined in `include/grpcpp/security/tls_credentials_options.h` to support configuration for session key export.
+* A `set_tls_session_key_log_file_path(std::string path)` method is added to the existing `grpc::experimental::TlsCredentialsOptions` class to set the desired TLS session key export file path on the client/server side.
 
-  It has the following signature:
-  ```
-  class TlsSessionKeyLoggerConfig {
-    public:
-      // Constructor
-      explicit TlsSessionKeyLoggerConfig();
-
-      // Copy ctor
-      TlsSessionKeyLoggerConfig(const TlsSessionKeyLoggerConfig& copy)
-
-      // Sets the tls key log file path.
-      void set_tls_session_key_log_file_path(std::string session_key_log_file_path);
-
-      // Sets the tls key logging format. Currently only NSS format is supported.
-      void set_tls_session_key_log_format(grpc_tls_session_key_log_format tls_session_key_log_format);
-    private:
-      ...
-  };
-  ```
-
-* A `set_tls_session_key_log_config(grpc::experimental::TlsSessionKeyLoggerConfig cfg)` method is added to the existing `grpc::experimental::TlsCredentialsOptions` class to set the desired TLS session key export configuration on the client/server side.
-
-These changes allow specifying TLS session key export configuration on a per-channel level on the client side and on a per-port level on the server side. If the configuration is not explicitly set, TLS session key logging is disabled. This config  struct can be extended in the future to support advanced features such as key logging based on source ip filtering etc.
+These changes allow specifying TLS session key export configuration on a per-channel level on the client side and on a per-port level on the server side. If the path is not explicitly set, TLS session key logging is disabled.
 
 
 ## C-Core API Additions
@@ -72,48 +41,8 @@ The following additions are made to the gRPC C-Core API to enable TLS session ke
  * is expected to be used only for debugging purposes and never in production.
  * Tls session key logging is only enabled when:
  *  At least one grpc_tls_credentials_options object is assigned a tls session
- *  key logging config using the API specified below.
+ *  key logging file path using the API specified below.
  */
-
-/**
- * EXPERIMENTAL API - Subject to change.
- * An opaque type pointing to a Tls session key logging configuration.
- */
-typedef struct grpc_tls_session_key_log_config grpc_tls_session_key_log_config;
-
-/**
- * EXPERIMENTAL API - Subject to change.
- * Creates and returns a grpc_tls_session_key_log_config. The caller becomes an
- * owner of the returned object and can free the allocated resources
- * appropriately using the grpc_tls_session_key_log_config_release API
- */
-
-GRPCAPI grpc_tls_session_key_log_config*
-  grpc_tls_session_key_log_config_create();
-
-/**
- * EXPERIMENTAL API - Subject to change.
- * Releases the ownership of a previously created
- * grpc_tls_session_key_log_config object.
- */
-GRPCAPI void grpc_tls_session_key_log_config_release(
-    grpc_tls_session_key_log_config* config);
-
-/**
- * EXPERIMENTAL API - Subject to change.
- * Sets the logging format for TLS session key logging.
- */
-GRPCAPI void grpc_tls_session_key_log_config_set_log_format(
-    grpc_tls_session_key_log_config* config,
-    grpc_tls_session_key_log_format format);
-
-/**
- * EXPERIMENTAL API - Subject to change.
- * Sets the file path for TLS session key logging.
- */
-
-GRPCAPI void grpc_tls_session_key_log_config_set_log_path(
-    grpc_tls_session_key_log_config* config, const char* path);
 
 
 /**
@@ -121,16 +50,11 @@ GRPCAPI void grpc_tls_session_key_log_config_set_log_path(
  * Associates a session key logging config with a
  * grpc_tls_credentials_options object.
  * - options is the grpc_tls_credentials_options object
- * - config is a grpc_tls_session_key_log_config object containing session key
- *   logging configuration.
- *
- * Each grpc_tls_credentials_options object can be associated with only
- * one grpc_tls_session_key_log_config. An existing config will not be
- * overwritten.
+ * - path is a string pointing to the location where TLS session keys would be
+ *   stored.
  */
-GRPCAPI void grpc_tls_credentials_options_set_tls_session_key_log_config(
-    grpc_tls_credentials_options* options,
-    grpc_tls_session_key_log_config* config);
+GRPCAPI void grpc_tls_credentials_options_set_tls_session_key_log_file_path(
+    grpc_tls_credentials_options* options, const char* path);
 ```
 
 # Example Usage
@@ -140,11 +64,7 @@ GRPCAPI void grpc_tls_credentials_options_set_tls_session_key_log_config(
 
 ```
 grpc::experimental::TlsChannelCredentialsOptions options;
-grpc::experimental::TlsSessionKeyLoggerConfig config;
-config.set_tls_session_key_log_file_path(
-  absl::StrCat(BASE_DIR, "/ssl-key-log-client.txt"));
-config.set_tls_session_key_log_format(GRPC_TLS_KEY_LOG_FORMAT_NSS);
-options.set_tls_session_key_log_config(config);
+options.set_tls_session_key_log_file_path(absl::StrCat(BASE_DIR, "/ssl-key-log-client.txt"));
 auto channel = grpc::CreateChannel(server_address,
   grpc::experimental::TlsCredentials(options)));
 ```
@@ -153,11 +73,7 @@ auto channel = grpc::CreateChannel(server_address,
 
 ```
 grpc::experimental::TlsServerCredentialsOptions options(certificate_provider);
-grpc::experimental::TlsSessionKeyLoggerConfig config;
-config.set_tls_session_key_log_file_path(
-  absl::StrCat(BASE_DIR, "/ssl-key-log-server.txt"));
-config.set_tls_session_key_log_format(GRPC_TLS_KEY_LOG_FORMAT_NSS);
-options.set_tls_session_key_log_config(config);
+options.set_tls_session_key_log_file_path(absl::StrCat(BASE_DIR, "/ssl-key-log-server.txt"));
 ...
 ServerBuilder builder;
 builder.AddListeningPort(server_address,
@@ -168,19 +84,10 @@ builder.AddListeningPort(server_address,
 
 ```
 grpc_tls_credentials_options * options = ...
-...
-// create a session key log config
-grpc_tls_session_key_log_config * config = grpc_tls_session_key_log_config_create();
 
-// set config parameters
-grpc_tls_session_key_log_config_set_log_path(config, "/tmp/test.txt");
-grpc_tls_session_key_log_config_set_log_format(config, GRPC_TLS_KEY_LOG_FORMAT_NSS);
+// associate a tls session key logging file path with a grpc_tls_credentials_options object
+grpc_tls_credentials_options_set_tls_session_key_log_file_path(options, "/tmp/test.txt");
 
-// associate with a grpc_tls_credentials_options object
-grpc_tls_credentials_options_set_tls_session_key_log_config(options, config);
-
-// release ownership of config
-grpc_tls_session_key_log_config_release(config);
 ```
 
 # Rationale
