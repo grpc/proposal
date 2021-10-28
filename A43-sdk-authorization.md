@@ -210,14 +210,14 @@ Each *rule* has the following semantics -
 2. Each *source* could contain a list of *principals*. The *principals* are ORed
    together, i.e. it matches if one of them matches.
    Sequence of steps to evaluate each principal from config -
-   1. If TLS/mTLS is not used, matching fails.
-   2. A match is found if principal matches URI SANs from the client certificate. If
-      there are no URI SANs in certificate, or no match was found, we check against
-      DNS SANs. Similarly, if certificate has no DNS SANs or match wasn't found, we
-      check against Subject field from certificate. We move to next step, if subject
-      does not match principal.
-   3. We also get a match if there is no client certificate, and principal is an empty
+   1. If TLS is not used, matching fails.
+   2. If there is no client certificate, we get a match if principal is an empty
       string.
+   3. If we have a client certificate, we check against certificate contents. A
+      match is found if principal matches URI SANs from the certificate. If
+      there are no URI SANs in certificate, or no match was found, we check
+      against DNS SANs. Similarly, if certificate has no DNS SANs or match wasn't
+      found, we check against Subject field from certificate.
    
    Consider the case where the *principals* list is empty, then we only check for
    step 1 above, i.e. rule matches for any authenticated user.
