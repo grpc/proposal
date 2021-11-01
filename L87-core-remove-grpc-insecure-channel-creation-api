@@ -5,7 +5,7 @@ Remove grpc_insecure_channel_create and grpc_server_add_insecure_http2_port from
 * Status: {In Review}
 * Implemented in: https://github.com/grpc/grpc/pull/25586
 * Last updated: 2021-11-01
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/9B4-AHCx_ZM 
 
 ## Abstract
 
