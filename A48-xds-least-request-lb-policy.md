@@ -115,7 +115,7 @@ With this list, the picker should pick a subchannel based on the following pseud
 ```
 candidate = null;
 for (int i = 0; i < choiceCount; ++i) {
-    sampled = subchannels[random_integer(0, subchannels.length)]
+    sampled = subchannels[random_integer(0, subchannels.length)];
     if (candidate == null) {
         candidate = sampled;
         continue;
