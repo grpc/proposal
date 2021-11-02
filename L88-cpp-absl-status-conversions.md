@@ -35,9 +35,7 @@ class Status {
  public:
   // ...
   explicit Status(absl::Status&&);
-
-  operator const absl::Status&();
-  operator absl::Status&&();  
+  operator const absl::Status&() const;
 };
 }
 ```
