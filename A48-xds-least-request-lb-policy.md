@@ -4,8 +4,8 @@ A48: xDS Least Request LB Policy
 * Approver: markdroth
 * Status: Implementation in progress
 * Implemented in: Java in progress
-* Last updated: 2021-10-21
-* Discussion at: TBD
+* Last updated: 2021-11-02
+* Discussion at: https://groups.google.com/g/grpc-io/c/4qycdcFfMUs
 
 ## Abstract
 
@@ -54,7 +54,8 @@ field](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473d
 The field is optional; if not present, defaults will be assumed for all
 of its values.  gRPC will support the
 [`choice_count`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L346)
-field the same way that Envoy does.
+field the same way that Envoy does with the exception of allowed values
+(More details further down in [LB Policy Config](#lb-policy-config)).
 The
 [`active_request_bias`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L371)
 field will be ignored as it is only used in the "*all weights not equal*" (weighted least request)
@@ -89,6 +90,10 @@ message LeastRequestLoadBalancingConfig {
 
 The `choice_count` determines the number of randomly sampled subchannels which should be compared
 for each pick by the picker.
+Envoy currently supports any `choice_count` value greater than two.
+In the `least_request_experimental` policy however, only an effective `choice_count` in the
+range `[2, 10]` will be supported. If a `LeastRequestLoadBalancingConfig` with a `choice_count > 10`
+is received, the `least_request_experimental` policy will set `choice_count = 10`.
 
 ##### Subchannel state handling
 
@@ -96,16 +101,22 @@ The subchannel state handling implemented in the `round_robin` policy will be re
 Implementations may break out this subchannel state handling and have `round_robin` and `least_request_experimental`
 inherit the logic instead. This would be similar to the "base balancer" already implemented in grpc-go
 [here](https://github.com/grpc/grpc-go/blob/03268c8ed29e801944a2265a82f240f7c0e1b1c3/balancer/base/balancer.go).
+The subchannel state handling used for the `round_robin` policy can be found in each language-specific implementation:
 
-TODO: Possibly flesh this out with more explicit logic pending proposal PR review.
+* [Java](https://github.com/grpc/grpc-java/blob/c1e19af86dea0b9a8725969a95e116029397ad4d/core/src/main/java/io/grpc/util/RoundRobinLoadBalancer.java)
+* [C++](https://github.com/grpc/grpc/blob/79d684529d9db60aa2c5e82deb43e297a6818cfb/src/core/ext/filters/client_channel/lb_policy/round_robin/round_robin.cc)
+* [Go](https://github.com/grpc/grpc-go/blob/03268c8ed29e801944a2265a82f240f7c0e1b1c3/balancer/base/balancer.go)
 
 ##### Aggregated Connectivity State
 
 The `least_request_experimental` policy will use the same heuristic for determining the aggregated
-connectivity state as `ring_hash_experimental` defined in
-[gRFC A42: xDS Ring Hash LB Policy](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md#aggregated-connectivity-state).
-As explained there, this heuristic ensures that the priority policy will fail over to the
-next priority quickly when there's an outage.
+connectivity state as the `round_robin` policy.
+The general rules in order of precedence are:
+
+1. If there is at least one subchannel with the state `READY`, the aggregated connectivity state is `READY`.
+2. If there is at least one subchannel with the state `CONNECTING` or `IDLE`,
+   the aggregated connectivity state is `CONNECTING`.
+3. If all subchannels have the state `TRANSIENT_FAILURE`, the aggregated connectivity state is `TRANSIENT_FAILURE`.
 
 ##### Picker Behavior
 
@@ -135,15 +146,22 @@ This pseudo-code is mirroring the
 
 The `least_request_experimental` policy will associate one outstanding request counter for each subchannel.
 These counters should additionally share the lifecycle with its corresponding subchannel.
-The counter for a subchannel should be atomically incremented by one once it has been picked by the picker.
+The counter for a subchannel should be atomically incremented by one after it has been successfully
+picked by the picker. Due to language-specifics, the increment may occur either before or during stream creation.
 In the `PickResult` for each language-specific implementation (
 [Java](https://github.com/grpc/grpc-java/blob/1f90e0e28d5628195cb1f861b73e45ed003f2973/api/src/main/java/io/grpc/LoadBalancer.java#L561-L571),
 [C++](https://github.com/grpc/grpc/blob/4567af504ed53cc8398e53bf1efd23f753d43bb8/src/core/ext/filters/client_channel/lb_policy.h#L178-L201),
 [Go](https://github.com/grpc/grpc-go/blob/01ed64857e3146000ec99cdea4f2932204f17cdd/balancer/balancer.go#L256-L269)
 ), the picker should add a
 callback for atomically decrementing the subchannel counter once the RPC finishes (regardless of `Status` code).
-In some cases, these callbacks may not be called.
-TODO: figure out how to avoid outstanding request counters that might not fully drain.
+This approach closely resembles the implementation for outstanding request counters already present in
+the `cluster_impl_experimental` policy (
+[Java](https://github.com/grpc/grpc-java/blob/0000cba665c69958355b639474c7387d98afcc79/xds/src/main/java/io/grpc/xds/ClusterImplLoadBalancer.java#L282-L379),
+[C++](https://github.com/grpc/grpc/blob/79d684529d9db60aa2c5e82deb43e297a6818cfb/src/core/ext/filters/client_channel/lb_policy/xds/xds_cluster_impl.cc#L285-L354),
+[Go](https://github.com/grpc/grpc-go/blob/03268c8ed29e801944a2265a82f240f7c0e1b1c3/xds/internal/balancer/clusterimpl/picker.go#L102-L191)
+).
+This approach entails some degree of raciness which will be discussed later
+(See [Outstanding request counter raciness](#outstanding-request-counter-raciness)).
 
 ### Temporary environment variable protection
 
@@ -176,6 +194,28 @@ There exists a
 [closed PR to Envoy](https://github.com/envoyproxy/envoy/pull/11006)
 that attempted to solve this.
 In that PR, there were some questions around whether there would be any significant improvement for >5 endpoints.
+
+### Outstanding request counter raciness
+
+While reading the outstanding request counters of samples in the picker, previously read values may become outdated.
+For cases where a high `choice_count` relative the number of endpoints is used, and/or cases with high/bursty traffic,
+there may be sub-optimal behaviors where certain endpoints may get an unfair amount of traffic.
+This raciness is currently accepted in the Envoy implementation.
+The fix for this raciness would most likely have to be a limitation on picker concurrency.
+Since such a limitation could have a serious negative impact on more normal load pattern situations,
+it may be argued that it's better to accept some degree of raciness in the picker instead.
+
+### Maximum limit for choice_count
+
+In gRPC, there are cases where LB config cannot be trusted. This means that config may contain an unreasonable
+(for example `UINT_MAX`) value for the `choice_count` setting.
+Thereby, it would be beneficial for gRPC to introduce a max value for the setting.
+The default value `choice_count = 2` comes from the P2C (power of two choices) paper
+([Mitzenmacher et al.](https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf)
+which shows that such a configuration nearly is as good as an O(n) full scan.
+With that in mind, picking a `choice_count > 2` would probably not add much benefit in many cases.
+By introducing a limit as `2 <= choice_count <= 10`, we disallow potentially dangerous LB configurations
+while still allowing some degree of freedom that could be beneficial in some edge-cases.
 
 ## Implementation
 
