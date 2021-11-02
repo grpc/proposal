@@ -117,6 +117,8 @@ Fifth, remove `grpc_insecure_channel_create` and `grpc_server_add_insecure_http2
 
 * Most importantly, since we introduce a different target for each credential type, for the binaries that do not rely on SSL-related functionalities, they do not need to bringin SSL dependency and thus will have a smaller binary size.
 
+* The proposed change only affects users who directly interact with Core surface APIs (e.g., by calling insecure channel creation API's). For the users who interact with wrapped language implementations, the change will be no-op.
+
 ## Implementation
 
 Core: https://github.com/grpc/grpc/pull/25586/files
