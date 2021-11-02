@@ -221,4 +221,5 @@ while still allowing some degree of freedom that could be beneficial in some edg
 
 [Spotify](https://github.com/orgs/spotify/teams/fabric) is able to contribute
 towards a Java implementation.
-Implementation of remaining gRPC languages is left for respective gRPC team.
+Implementation of remaining gRPC languages is left for respective gRPC team
+or any other contributors.
