@@ -50,7 +50,7 @@ This design does *not* include the following features:
 - xDS redirects.  We do not currently have a use-case for which this is
   required in gRPC.
 - Support for dynamic parameters.  This will be necessary in the
-  not-too-distance future, but it will be covered in a separate design.
+  not-too-distant future, but it will be covered in a separate design.
 
 ### Related Proposals: 
 * [gRFC A27: xDS-Based Global Load Balancing][A27]
@@ -139,8 +139,8 @@ The new `authorities` field will have the following format:
     // created using an "xds:" URI with this authority name.
     //
     // The token "%s", if present in this string, will be replaced
-    // with %-encoded service authority (i.e., the path part of the target
-    // URI used to create the gRPC channel).
+    // with percent-encoded service authority (i.e., the path part of the
+    // target URI used to create the gRPC channel).
     //
     // Must start with "xdstp://<authority_name>/".  If it does not,
     // that is considered a bootstrap file parsing error.
@@ -177,7 +177,7 @@ the following format:
 // The token "%s", if present in this string, will be replaced with
 // the service authority (i.e., the path part of the target URI
 // used to create the gRPC channel).  If the template starts with
-// "xdstp:", the replaced string will be %-encoded.
+// "xdstp:", the replaced string will be percent-encoded.
 //
 // Defaults to "%s".
 "client_default_listener_resource_name_template": <string>,
@@ -189,7 +189,7 @@ There will be two changes to the existing
   new-style name, in which case the authority of the URI will be used to
   select the relevant configuration in the `authorities` map.
 - When replacing the `%s` token, if the template starts with `xdstp:`,
-  the replacement string will be %-encoded in the resulting resource
+  the replacement string will be percent-encoded in the resulting resource
   name.
 
 The resulting field will have the following format:
@@ -204,7 +204,7 @@ The resulting field will have the following format:
 //
 // The token "%s", if present in this string, will be replaced with
 // the IP and port on which the server is listening.  If the template
-// starts with "xdstp:", the replaced string will be %-encoded.
+// starts with "xdstp:", the replaced string will be percent-encoded.
 //
 // There is no default; if unset, xDS-based server creation fails.
 //
@@ -660,7 +660,7 @@ config fields will be disabled unless the
 
 ## Rationale
 
-For security reasons, we are focusing on statically configuring a clien
+For security reasons, we are focusing on statically configuring a client
 to speak to a specific set of authorities in the bootstrap file rather
 than relying on one control plane dynamically telling the client to talk
 to a server that it has not before heard of.  This is to avoid leaking
