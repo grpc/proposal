@@ -466,11 +466,13 @@ first by resource type and then by resource name.  This will need to be
 changed to use a three-level map, keyed first by authority, then by
 resource type, and then by resource name.
 
-The top-level map in the cache is keyed by authority.  Resources without
-any authority will use the empty string as the key.  The value of this
-map will include a reference/pointer (details are implementation-dependent)
-to the entry in the server channel map for the associated server.  This
-indirection supports two things:
+The top-level map in the cache is keyed by authority.  There should be
+a separate entry for old-style resource names (either using some special
+map key, being careful to avoid collisions, or stored outside of the map).
+New-style resource names without any authority will use the empty string
+as the key.  The value of this map will include a reference/pointer
+(details are implementation-dependent) to the entry in the server channel
+map for the associated server.  This indirection supports two things:
 - It allows multiple authorities to use the same server channel, via the
   de-duplication described above.
 - It will pave the way for future work where each authority can specify
