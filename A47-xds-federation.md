@@ -209,7 +209,7 @@ The resulting field will have the following format:
 // There is no default; if unset, xDS-based server creation fails.
 //
 // Example:
-// "xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/server/%s"
+// "xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/server/%s"
 "server_listener_resource_name_template": <string>,
 ```
 
@@ -228,8 +228,8 @@ If a gRPC client channel is created for `xds:server.example.com`:
 - We use the top-level `xds_server` list, which is the same one that we
   would have used prior to this design.
 
-If a gRPC client channel is created for `xds://xds.example.com/server.example.com`:
-- The `authorities` map has no entry for `xds.example.com`, so we
+If a gRPC client channel is created for `xds://xds.authority.com/server.example.com`:
+- The `authorities` map has no entry for `xds.authority.com`, so we
   handle this as an invalid URI, which is exactly the same way it
   would have been handled prior to this design.
 
@@ -247,9 +247,9 @@ If a gRPC server is created listening on `0.0.0.0:8080`:
 The following new fields are added to the bootstrap config:
 
 ```
-"client_default_listener_resource_name_template": "xdstp://xds.example.com/envoy.config.listener.v3.Listener/%s",
+"client_default_listener_resource_name_template": "xdstp://xds.authority.com/envoy.config.listener.v3.Listener/%s",
 "authorities": {
-  "xds.example.com": {
+  "xds.authority.com": {
   }
 }
 ```
@@ -258,8 +258,8 @@ If a gRPC client channel is created for `xds:server.example.com`:
 - The target URI specifies no authority, so we use the
   `client_default_listener_resource_name_template` field.  The
   resulting resource name will be
-  `xdstp://xds.example.com/envoy.config.listener.v3.Listener/server.example.com`.
-- The resource name specifies the `xds.example.com` authority, so that's
+  `xdstp://xds.authority.com/envoy.config.listener.v3.Listener/server.example.com`.
+- The resource name specifies the `xds.authority.com` authority, so that's
   the entry we use from the `authorities` map.
 - Note: We do not use the `client_listener_resource_name_template`
   field in the `authorities` entry, since we've already used the
@@ -269,13 +269,13 @@ If a gRPC client channel is created for `xds:server.example.com`:
   so we default to the top-level `xds_server` list, which is the same one
   that we would have used prior to this design.
 
-If a gRPC client channel is created for `xds://xds.example.com/server.example.com`:
-- The target URI specifies the authority `xds.example.com`, so that's the
+If a gRPC client channel is created for `xds://xds.authority.com/server.example.com`:
+- The target URI specifies the authority `xds.authority.com`, so that's the
   entry we use from the `authorities` map.  That entry does not specify any
   `client_listener_resource_name_template` field, so we use the default of
   `xdstp://<authority_name>/envoy.config.listener.v3.Listener/%s`.
   Thus, the resource name will be
-  `xdstp://xds.example.com/envoy.config.listener.v3.Listener/server.example.com`.
+  `xdstp://xds.authority.com/envoy.config.listener.v3.Listener/server.example.com`.
 - The `xds_servers` list is not specified in the entry for the authority, so
   we default to the top-level `xds_servers` list, which is the same one that
   we would have used prior to this design.
@@ -286,20 +286,20 @@ The following new fields are added to the bootstrap config:
 
 ```
 // Use new-style Listener name on gRPC server.
-"server_listener_resource_name_template": "xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/server/%s",
+"server_listener_resource_name_template": "xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/server/%s",
 
 // Authorities map.
 "authorities": {
-  "xds.example.com": {
+  "xds.authority.com": {
   }
 }
 ```
 
 If a gRPC server is created listening on `0.0.0.0:8080`:
 - The server Listener resource name will be
-  `xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/server/0.0.0.0:8080`.
+  `xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/server/0.0.0.0:8080`.
 - The resource name from the template starts with `xdstp:` and has
-  authority `xds.example.com`, so that's the entry we look up in the
+  authority `xds.authority.com`, so that's the entry we look up in the
   `authorities` map.
 - The `xds_servers` list is not specified in the entry for the authority, so
   we default to the top-level `xds_servers` list, which is the same one that
@@ -314,21 +314,21 @@ Consider the following bootstrap config:
 // for any authority that does not specify a list of servers.
 "xds_servers": [
   {
-    "server_uri": "xds-server.example.com",
+    "server_uri": "xds-server.authority.com",
     "channel_creds": [ { "type": "google_default" } ]
   }
 ],
 
 // Resource name template for xds: target URIs with no authority.
-"client_default_listener_resource_name_template": "xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/client/%s?project_id=1234",
+"client_default_listener_resource_name_template": "xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/client/%s?project_id=1234",
 
 // Resource name template for xDS-enabled gRPC servers.
-"server_listener_resource_name_template": "xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/server/%s?project_id=1234",
+"server_listener_resource_name_template": "xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/server/%s?project_id=1234",
 
 // Authorities map.
 "authorities": {
-  "xds.example.com": {
-    "client_listener_resource_name_template": "xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/client/%s?project_id=1234"
+  "xds.authority.com": {
+    "client_listener_resource_name_template": "xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/client/%s?project_id=1234"
     }
   },
 
@@ -346,30 +346,30 @@ Consider the following bootstrap config:
 If a gRPC client channel is created for `xds:server.example.com`:
 - The target URI does not specify any authority, so we use
   `client_default_listener_resource_name_template`, which is
-  `xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/client/%s?project_id=1234`,
+  `xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/client/%s?project_id=1234`,
   so the resource name will be
-  `xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/client/server.example.com?project_id=1234`.
-- We look up authority `xds.example.com` in the `authorities` map.
+  `xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/client/server.example.com?project_id=1234`.
+- We look up authority `xds.authority.com` in the `authorities` map.
 - Note: We do not use the `client_listener_resource_name_template` field,
   since we have already used the top-level
   `client_default_listener_resource_name_template` field to determine
   the resource name.
 - The `xds_servers` list is not specified in the entry for the authority, so
   we default to the top-level `xds_servers` list (pointing to
-  `xds-server.example.com`), which is the same one that we would have used
+  `xds-server.authority.com`), which is the same one that we would have used
   prior to this design.
 
-If a gRPC client channel is created for `xds://xds.example.com/server.example.com`:
-- The target URI specifies authority `xds.example.com`, so we look up
+If a gRPC client channel is created for `xds://xds.authority.com/server.example.com`:
+- The target URI specifies authority `xds.authority.com`, so we look up
   that entry in the `authorities` map.
 - The authority entry's `client_listener_resource_name_template` field is set to
-  `xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/client/%s?project_id=1234`,
+  `xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/client/%s?project_id=1234`,
   so we use
-  `xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/client/server.example.com?project_id=1234`
+  `xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/client/server.example.com?project_id=1234`
   as the resource name.
 - The `xds_servers` list is not specified in the entry for the authority, so
   we default to the top-level `xds_servers` list (pointing to
-  `xds-server.example.com`), which is the same one that we would have used
+  `xds-server.authority.com`), which is the same one that we would have used
   prior to this design.
 
 If a gRPC client channel is created for `xds://xds.other.com/server.other.com`:
@@ -386,9 +386,9 @@ If a gRPC client channel is created for `xds://xds.other.com/server.other.com`:
 
 If a gRPC server is created listening on `0.0.0.0:8080`:
 - The server Listener resource name will be
-  `xdstp://xds.example.com/envoy.config.listener.v3.Listener/grpc/server/0.0.0.0:8080?project_id=1234`.
+  `xdstp://xds.authority.com/envoy.config.listener.v3.Listener/grpc/server/0.0.0.0:8080?project_id=1234`.
 - The resource name from the template starts with `xdstp:` and has
-  authority `xds.example.com`, so that's the entry we look up in the
+  authority `xds.authority.com`, so that's the entry we look up in the
   `authorities` map.
 - The `xds_servers` list is not specified in the entry for the authority, so
   we default to the top-level `xds_servers` list, which is the same one that
@@ -503,11 +503,11 @@ type Listener would be stored like this:
 ```
 
 But a resource with new-style name
-`xdstp://xds.example.com/envoy.config.listener.v3.Listener/server.example.com`
+`xdstp://xds.authority.com/envoy.config.listener.v3.Listener/server.example.com`
 would be stored like this:
 
 ```
-{authority "xds.example.com" =>
+{authority "xds.authority.com" =>
   {resource_type Listener =>
     {"xdstp:server.example.com" => <resource>}
   }
