@@ -12,19 +12,33 @@ Remove grpc_insecure_channel_create and grpc_server_add_insecure_http2_port from
 * Remove `grpc_insecure_channel_create` and `grpc_server_add_insecure_http2_port` from Core Surface API.
 * Rename `grpc_server_add_secure_http2_port` to `grpc_server_add_http2_port`.
 * Rename `grpc_secure_channel_create` to `grpc_channel_create` and re-order its parameters.
-* Move `grpc_channel_credentials` and `grpc_server_credentials`related API's from `grpc_security.h` to `grpc.h`.
+* Move `grpc_channel_credentials` and `grpc_server_credentials`related APIs from `grpc_security.h` to `grpc.h`.
 * Add `grpc_channel_create_from_fd` and `grpc_server_add_channel_from_fd` to Core Surface API.
 
 ## Background
 
-Currently, the gRPC insecure build does not include any of the functions in `grpc_security.h`, nor does it include any of the code in `src/core/lib/security`. This means that it does not support channel or call credentials, security connectors, or client/server auth filters. It also does not link in SSL libraries.
+Currently, the gRPC insecure build does not include any of the functions in `grpc_security.h`, nor does it include any of the code in `src/core/lib/security`. This means that it does not support channel or call credentials, security connectors, or client/server auth filters. It also does not link in SSL libraries. We will stop supporting insecure builds, so that all builds of gRPC include the functions in `grpc_security.h` and the code in `src/core/lib/security`. There are several reasons for getting rid of insecure builds:
 
-We could stop supporting insecure builds, so that all builds of gRPC include the functions in `grpc_security.h` and the code in `src/core/lib/security`.  However, the gRPC build would not directly include the SSL libraries.  Instead, there would be separate build targets for each of the credential types (both insecure and secure). Only those credential types that need SSL would pull in the SSL library dependencies.
+* The current approach requires different API entry points for secure vs. insecure channels and servers, and it requires a lot of conditional compilation that complicates our build system.
+* The main reason for supporting insecure builds is because there are some users that don't need security but really need to minimize binary size (e.g., embedded systems), so they need a way to build without depending on the SSL libraries. We will still satisfy this requirement after getting rid of insecure builds.
+* The current approach was decided upon early in our development, before we had the credential APIs, and it was never updated when the credential APIs were added. However, the credential APIs provide a much cleaner way to allow building gRPC without the SSL dependency.
+
+To solve this problem, we are going to move to an approach where insecure
+channels and servers are handled the same way as secure channels and servers. It
+will no longer be possible to build gRPC without support for credentials or to
+create a channel or server without specifying credentials, but we will provide
+an insecure credentials type to be used in cases where security is not needed.
+The insecure credentials type will not depend on SSL libraries and will be
+included in all gRPC builds. Other credential types that do depend on SSL
+libraries will be available in secure builds only, just as they are today.
+Also, the gRPC build will not directly include the SSL libraries.
+Instead, there will be separate build targets for each of the credential types, and
+only those credential types that need SSL will pull in the SSL library dependencies.
 
 
 ## Proposal
 
-First, move `grpc_channel_credentials` and `grpc_server_credentials`related API's from `grpc_security.h` to `grpc.h`.
+First, move `grpc_channel_credentials` and `grpc_server_credentials`related APIs from `grpc_security.h` to `grpc.h`.
 
 ```
 /** --- grpc_channel_credentials object. ---
@@ -78,9 +92,10 @@ GRPCAPI int grpc_server_add_http2_port(grpc_server* server, const char* addr,
                                        grpc_server_credentials* creds);
 ```
 
-Fourth, add `grpc_channel_create_from_fd` and `grpc_server_add_channel_from_fd` to `grpc.h`. Note that the current APIs only support
+Fourth, remove `grpc_insecure_channel_create_from_fd` and `grpc_server_add_insecure_channel_from_fd`,
+and add `grpc_channel_create_from_fd` and `grpc_server_add_channel_from_fd` instead. Note that the new APIs only support
 either insecure channel credentials (at client-side) or insecure server credentials (at server-side), and using other types of
-credentials will result in a failure. In future, the API's will be improved to support other types of credentials.
+credentials will result in a failure. In future, the APIs will be improved to support other types of credentials.
 
 
 ```
@@ -97,13 +112,12 @@ GRPCAPI grpc_channel* grpc_channel_create_from_fd(
    descriptor corresponding to a connected socket. Events from the file
    descriptor may come on any of the server completion queues (i.e completion
    queues registered via the grpc_server_register_completion_queue API).
-   The 'reserved' pointer MUST be NULL.
    TODO(hork): add channel_args to this API to allow endpoints and transports
    created in this function to participate in the resource quota feature.
    Note that this API currently only supports inseure server credentials
    Using other types of credentials will result in a failure. */
 GRPCAPI void grpc_server_add_channel_from_fd(grpc_server* server,
-                                             void* reserved, int fd,
+                                             int fd,
                                              grpc_server_credentials* creds);
 
 ```
@@ -115,9 +129,9 @@ Fifth, remove `grpc_insecure_channel_create` and `grpc_server_add_insecure_http2
 
 * From security perspective, if there is a need to restrict the usage of gRPC insecure channels, the problem is simplified to some extent because we only need to control a single means of creating insecure channels, instead of two.
 
-* Most importantly, since we introduce a different target for each credential type, for the binaries that do not rely on SSL-related functionalities, they do not need to bringin SSL dependency and thus will have a smaller binary size.
+* Most importantly, since we introduce a different target for each credential type, for the binaries that do not rely on SSL-related functionalities, they do not need to bring in SSL dependency and thus will have a smaller binary size.
 
-* The proposed change only affects users who directly interact with Core surface APIs (e.g., by calling insecure channel creation API's). For the users who interact with wrapped language implementations, the change will be no-op.
+* The proposed change only affects users who directly interact with Core surface APIs (e.g., by calling insecure channel creation APIs). For the users who interact with wrapped language implementations, the change will be no-op.
 
 ## Implementation
 
