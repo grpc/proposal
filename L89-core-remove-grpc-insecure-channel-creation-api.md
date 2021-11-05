@@ -12,7 +12,7 @@ Remove grpc_insecure_channel_create and grpc_server_add_insecure_http2_port from
 * Remove `grpc_insecure_channel_create` and `grpc_server_add_insecure_http2_port` from Core Surface API.
 * Rename `grpc_server_add_secure_http2_port` to `grpc_server_add_http2_port`.
 * Rename `grpc_secure_channel_create` to `grpc_channel_create` and re-order its parameters.
-* Move `grpc_channel_credentials` and `grpc_server_credentials`related APIs from `grpc_security.h` to `grpc.h`.
+* Move `grpc_channel_credentials` and `grpc_server_credentials` related APIs from `grpc_security.h` to `grpc.h`.
 * Add `grpc_channel_create_from_fd` and `grpc_server_add_channel_from_fd` to Core Surface API.
 
 ## Background
@@ -38,7 +38,7 @@ only those credential types that need SSL will pull in the SSL library dependenc
 
 ## Proposal
 
-First, move `grpc_channel_credentials` and `grpc_server_credentials`related APIs from `grpc_security.h` to `grpc.h`.
+First, move `grpc_channel_credentials` and `grpc_server_credentials` related APIs from `grpc_security.h` to `grpc.h`.
 
 ```
 /** --- grpc_channel_credentials object. ---
