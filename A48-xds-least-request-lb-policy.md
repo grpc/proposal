@@ -90,22 +90,22 @@ message LeastRequestLoadBalancingConfig {
 
 The `choice_count` determines the number of randomly sampled subchannels which should be compared
 for each pick by the picker.
-Envoy currently supports any `choice_count` value greater than two.
+Envoy currently supports any `choice_count` value greater than or equal to two.
 In the `least_request_experimental` policy however, only an effective `choice_count` in the
 range `[2, 10]` will be supported. If a `LeastRequestLoadBalancingConfig` with a `choice_count > 10`
 is received, the `least_request_experimental` policy will set `choice_count = 10`.
 
-##### Subchannel state handling
+##### Subchannel connectivity management
 
-The subchannel state handling implemented in the `round_robin` policy will be re-used for `least_request_experimental`.
-Implementations may break out this subchannel state handling and have `round_robin` and `least_request_experimental`
-inherit the logic instead. This would be similar to the "base balancer" already implemented in grpc-go
+The subchannel connectivity management implemented in the `round_robin` policy will be re-used
+for `least_request_experimental`.
+Implementations may break out the connectivity management logic and have `round_robin` and `least_request_experimental`
+inherit it instead. This would be similar to the "base balancer" already implemented in grpc-go
 [here](https://github.com/grpc/grpc-go/blob/03268c8ed29e801944a2265a82f240f7c0e1b1c3/balancer/base/balancer.go).
-The subchannel state handling used for the `round_robin` policy can be found in each language-specific implementation:
 
-* [Java](https://github.com/grpc/grpc-java/blob/c1e19af86dea0b9a8725969a95e116029397ad4d/core/src/main/java/io/grpc/util/RoundRobinLoadBalancer.java)
-* [C++](https://github.com/grpc/grpc/blob/79d684529d9db60aa2c5e82deb43e297a6818cfb/src/core/ext/filters/client_channel/lb_policy/round_robin/round_robin.cc)
-* [Go](https://github.com/grpc/grpc-go/blob/03268c8ed29e801944a2265a82f240f7c0e1b1c3/balancer/base/balancer.go)
+Just like the `round_robin` policy, the `least_request_experimental` policy will attempt to keep a subchannel connected
+to every address in the address list at all times. If a subchannel becomes disconnected, the policy will trigger
+re-resolution and will attempt to reconnect to the address, subject to connection back-off.
 
 ##### Aggregated Connectivity State
 
@@ -113,10 +113,13 @@ The `least_request_experimental` policy will use the same heuristic for determin
 connectivity state as the `round_robin` policy.
 The general rules in order of precedence are:
 
-1. If there is at least one subchannel with the state `READY`, the aggregated connectivity state is `READY`.
-2. If there is at least one subchannel with the state `CONNECTING` or `IDLE`,
+1. If there is at least one subchannel with the logical state `READY`, the aggregated connectivity state is `READY`.
+2. If there is at least one subchannel with the logical state `CONNECTING` or `IDLE`,
    the aggregated connectivity state is `CONNECTING`.
-3. If all subchannels have the state `TRANSIENT_FAILURE`, the aggregated connectivity state is `TRANSIENT_FAILURE`.
+3. If all subchannels have the logical state `TRANSIENT_FAILURE`, the aggregated connectivity state is `TRANSIENT_FAILURE`.
+
+Note that the aggregation rules above are using the "logical" subchannel state and not the actual subchannel state
+(which may differ).
 
 ##### Picker Behavior
 
@@ -150,7 +153,7 @@ The counter for a subchannel should be atomically incremented by one after it ha
 picked by the picker. Due to language-specifics, the increment may occur either before or during stream creation.
 In the `PickResult` for each language-specific implementation (
 [Java](https://github.com/grpc/grpc-java/blob/1f90e0e28d5628195cb1f861b73e45ed003f2973/api/src/main/java/io/grpc/LoadBalancer.java#L561-L571),
-[C++](https://github.com/grpc/grpc/blob/4567af504ed53cc8398e53bf1efd23f753d43bb8/src/core/ext/filters/client_channel/lb_policy.h#L178-L201),
+[C++](https://github.com/grpc/grpc/blob/c1089d2964528b52a25c18d748910658e4762d40/src/core/ext/filters/client_channel/lb_policy.h#L201-L217),
 [Go](https://github.com/grpc/grpc-go/blob/01ed64857e3146000ec99cdea4f2932204f17cdd/balancer/balancer.go#L256-L269)
 ), the picker should add a
 callback for atomically decrementing the subchannel counter once the RPC finishes (regardless of `Status` code).
