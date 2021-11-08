@@ -169,7 +169,7 @@ This approach entails some degree of raciness which will be discussed later
 ### Temporary environment variable protection
 
 During initial development, this feature will be enabled via the
-`GRPC_XDS_EXPERIMENTAL_ENABLE_LEAST_REQUEST` environment variable.  This
+`GRPC_EXPERIMENTAL_ENABLE_LEAST_REQUEST` environment variable.  This
 environment variable protection will be removed once the feature has
 proven stable.
 
