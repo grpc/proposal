@@ -142,6 +142,10 @@ Fifth, remove `grpc_insecure_channel_create` and `grpc_server_add_insecure_http2
 
 * The proposed change only affects users who directly interact with Core surface APIs (e.g., by calling insecure channel creation APIs). For the users who interact with wrapped language implementations, the change will be no-op.
 
+* It simplifies Core end-to-end tests. We can safely remove `_nosec` test
+  suite without losing test coverage as we removed all Core code related to insecure channel creation API
+  that is exercised by those tests.
+ 
 ## Implementation
 
 Core: https://github.com/grpc/grpc/pull/25586/files
