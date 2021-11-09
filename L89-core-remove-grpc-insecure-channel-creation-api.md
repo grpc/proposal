@@ -9,11 +9,20 @@ Remove grpc_insecure_channel_create and grpc_server_add_insecure_http2_port from
 
 ## Abstract
 
+This gRFC proposes the following code changes:
+
 * Remove `grpc_insecure_channel_create` and `grpc_server_add_insecure_http2_port` from Core Surface API.
 * Rename `grpc_server_add_secure_http2_port` to `grpc_server_add_http2_port`.
 * Rename `grpc_secure_channel_create` to `grpc_channel_create` and re-order its parameters.
 * Move `grpc_channel_credentials` and `grpc_server_credentials` related APIs from `grpc_security.h` to `grpc.h`.
 * Add `grpc_channel_create_from_fd` and `grpc_server_add_channel_from_fd` to Core Surface API.
+
+Regarding its impact on build targets:
+
+* It has no impact on existing `grpc` and `grpc_unsecure` targets in both cmake
+  and bazel regarding openssl/boringssl dependency. That is `grpc_unsecure` will
+  not depend on ssl libraries unconditionally while `grpc` will always depend on ssl
+  unconditionally.
 
 ## Background
 
