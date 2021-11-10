@@ -24,6 +24,14 @@ Regarding its impact on build targets:
   not depend on ssl libraries unconditionally while `grpc` will always depend on ssl
   unconditionally.
 
+The proposed change in this gRFC will introduce the following behavior change
+to gRPC wrapped language users (e.g., C++) that use the insecure build.
+
+* If a gRPC client sends a call credentials requiring the minimum security level
+  greater than `GRPC_SECURITY_NONE` over an insecure channel, the RPC will fail.
+  It's different from the original behavior where the RPC succeeds but the
+  call credentials is silently ignored and not sent on the wire.
+
 ## Background
 
 Currently, the gRPC insecure build does not include any of the functions in `grpc_security.h`, nor does it include any of the code in `src/core/lib/security`. This means that it does not support channel or call credentials, security connectors, or client/server auth filters. It also does not link in SSL libraries. We will stop supporting insecure builds, so that all builds of gRPC include the functions in `grpc_security.h` and the code in `src/core/lib/security`. There are several reasons for getting rid of insecure builds:
