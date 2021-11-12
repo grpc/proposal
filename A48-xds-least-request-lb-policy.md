@@ -4,7 +4,7 @@ A48: xDS Least Request LB Policy
 * Approver: markdroth
 * Status: Implementation in progress
 * Implemented in: Java in progress
-* Last updated: 2021-11-02
+* Last updated: 2021-11-12
 * Discussion at: https://groups.google.com/g/grpc-io/c/4qycdcFfMUs
 
 ## Abstract
@@ -113,13 +113,15 @@ The `least_request_experimental` policy will use the same heuristic for determin
 connectivity state as the `round_robin` policy.
 The general rules in order of precedence are:
 
-1. If there is at least one subchannel with the logical state `READY`, the aggregated connectivity state is `READY`.
-2. If there is at least one subchannel with the logical state `CONNECTING` or `IDLE`,
+1. If there is at least one subchannel with the state `READY`, the aggregated connectivity state is `READY`.
+2. If there is at least one subchannel with the state `CONNECTING` or `IDLE`,
    the aggregated connectivity state is `CONNECTING`.
-3. If all subchannels have the logical state `TRANSIENT_FAILURE`, the aggregated connectivity state is `TRANSIENT_FAILURE`.
+3. If all subchannels have the state `TRANSIENT_FAILURE`, the aggregated connectivity state is `TRANSIENT_FAILURE`.
 
-Note that the aggregation rules above are using the "logical" subchannel state and not the actual subchannel state
-(which may differ).
+For the purpose of evaluating the aggregated connectivity state in the rules above, a subchannel that enters
+`TRANSIENT_FAILURE` should be considered to stay in `TRANSIENT_FAILURE` until it reports `READY`. If a subchannel is
+bouncing back and forth between `TRANSIENT_FAILURE` and `CONNECTING` while it attempts to re-establish a connection,
+we will consider it to be in state `TRANSIENT_FAILURE` for the purpose of evaluating the aggregation rules above.
 
 ##### Picker Behavior
 
@@ -147,7 +149,11 @@ This pseudo-code is mirroring the
 
 ##### Outstanding request counters
 
-The `least_request_experimental` policy will associate one outstanding request counter for each subchannel.
+The `least_request_experimental` policy will associate each subchannel to an outstanding request counter
+(`active_requests`). Counters will be local to each instance of the `least_request_experimental` policy and
+thereby not shared in cases where subchannels are used across multiple LB instances.
+Implementations may either wrap subchannels or utilize custom subchannel attributes to provide counter access
+in the picker.
 These counters should additionally share the lifecycle with its corresponding subchannel.
 The counter for a subchannel should be atomically incremented by one after it has been successfully
 picked by the picker. Due to language-specifics, the increment may occur either before or during stream creation.
@@ -165,6 +171,14 @@ the `cluster_impl_experimental` policy (
 ).
 This approach entails some degree of raciness which will be discussed later
 (See [Outstanding request counter raciness](#outstanding-request-counter-raciness)).
+
+##### Duplicate addresses in resolution result
+
+The `least_request_experimental` policy will as the `round_robin` policy allow for duplicate addresses
+in the resolution result.
+Duplicate addresses will due to the picker behavior have a higher probability of being selected.
+The increased selection probability for some duplicated address does however not corralate well with the
+number of duplicates in relation to the total number of addresses (which is the case with the `round_robin` policy).
 
 ### Temporary environment variable protection
 
