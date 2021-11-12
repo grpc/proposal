@@ -123,30 +123,6 @@ For the purpose of evaluating the aggregated connectivity state in the rules abo
 bouncing back and forth between `TRANSIENT_FAILURE` and `CONNECTING` while it attempts to re-establish a connection,
 we will consider it to be in state `TRANSIENT_FAILURE` for the purpose of evaluating the aggregation rules above.
 
-##### Picker Behavior
-
-The picker should be given a list of all subchannels with the `READY` state.
-With this list, the picker should pick a subchannel based on the following pseudo-code:
-
-```
-candidate = null;
-for (int i = 0; i < choiceCount; ++i) {
-    sampled = subchannels[random_integer(0, subchannels.length)];
-    if (candidate == null) {
-        candidate = sampled;
-        continue;
-    }
-
-    if (sampled.active_requests < candidate.active_requests) {
-        candidate = sampled;
-    }
-}
-return candidate;
-```
-
-This pseudo-code is mirroring the
-[Envoy implementation](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/source/common/upstream/load_balancer_impl.cc#L844-L865)
-
 ##### Outstanding request counters
 
 The `least_request_experimental` policy will associate each subchannel to an outstanding request counter
@@ -171,6 +147,30 @@ the `cluster_impl_experimental` policy (
 ).
 This approach entails some degree of raciness which will be discussed later
 (See [Outstanding request counter raciness](#outstanding-request-counter-raciness)).
+
+##### Picker Behavior
+
+The picker should be given a list of all subchannels with the `READY` state.
+With this list, the picker should pick a subchannel based on the following pseudo-code:
+
+```
+candidate = null;
+for (int i = 0; i < choiceCount; ++i) {
+    sampled = subchannels[random_integer(0, subchannels.length)];
+    if (candidate == null) {
+        candidate = sampled;
+        continue;
+    }
+
+    if (sampled.active_requests < candidate.active_requests) {
+        candidate = sampled;
+    }
+}
+return candidate;
+```
+
+This pseudo-code is mirroring the
+[Envoy implementation](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/source/common/upstream/load_balancer_impl.cc#L844-L865)
 
 ##### Duplicate addresses in resolution result
 
