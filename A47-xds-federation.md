@@ -489,9 +489,7 @@ new-style names, for optimization purposes, it may be desirable to not
 include the authority and resource name in the key here, because that
 will duplicate information that is already present from the upper levels
 of the map.  One option is to encode it as the `xdstp:` URI minus the
-authority and resource type, although the `xdstp:` prefix will still be
-needed to indicate that it's a new-style name.  (Implementations could also
-do this with a bool instead of the `xdstp:` prefix.)
+authority and resource type.
 
 For example, a resource with old-style name `server.example.com` and
 type Listener would be stored like this:
