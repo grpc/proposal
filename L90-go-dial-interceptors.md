@@ -2,10 +2,10 @@ L90: Support global dial interceptors in Golang
 ----
 * Author(s): Anirudh Ramachandra
 * Approver: dfawley
-* Status: Draft
+* Status: In Review
 * Implemented in: Go
 * Last updated: 2021-11-16
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/tNbp_4DyFfw
 
 ## Abstract
 
