@@ -299,8 +299,8 @@ scheduled service(Java) which will be used to read the policy file periodically,
 and update the authorization engines. During the first file read, if the policy
 is invalid or there are I/O errrors, we will return error back to application and
 SDK authorization won't be enabled. If the error occurs on a later reload, then
-that particular reload will be skipped, and we will continue to use the latest
-valid policy to make authorization decisions.
+that particular reload will be skipped and error will be logged, and we will
+continue to use the latest valid policy to make authorization decisions.
 
 For each incoming RPC request, we will invoke the Engines (Deny engine followed
 by Allow engine), to get the authorization decision. We use a C-core filter for
