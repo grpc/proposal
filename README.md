@@ -42,7 +42,10 @@ design. Changes that are considered significant can be:
      https://github.com/grpc/proposal/pulls?q=is%3Apr+sort%3Acreated-desc)).
      Find the first _new_ proposal PR of the same type, and use the following
      number.
-1. Submit a Pull Request.
+1. Submit a Pull Request.  The PR description should be formatted as follows:
+
+        $CategoryName##: <title>
+
 1. Someone from the gRPC team will be assigned as an APPROVER as part of this
 review.
 1. For a period of at least 10 business days (the minimum comment period), it is
@@ -53,13 +56,18 @@ the proposal as possible during this period.
 the APPROVER will approve the PR on GitHub. The PR will then be merged by either
 the OWNER, if possible, or the APPROVER otherwise.
 
+All proposals merged into the repo are considered "approved" and either
+implemented or ready to implement.
+
 ## APPROVER
+
 - By default ``a11r`` is the approver unless another approver is assigned
 on a per-proposal basis.
 - If the assigned APPROVER and the OWNER cannot satisfactorily settle an issue,
 the final APPROVER is still ``a11r``.
 
 ## Proposal Categories
+
 The proposals shall be numbered in increasing order.
 
 - ``An`` - Affects all languages.
@@ -68,9 +76,13 @@ The proposals shall be numbered in increasing order.
 - ``Gnnnn`` - Protocol level changes.
 
 ## Updating proposals
+
+Sometimes small changes are needed to approved proposals.  Rather than create
+new proposals for such changes, it is often better to revise the existing one.
+
 When updating a proposal, the PR description should be named as follows:
 
-    $CategoryName## update: <description of change>``
+    $CategoryName## update: <description of change>
 
 If the update is minor (what qualifies as minor is left to the APPROVER), the PR
 may be approved and merged at the OWNER's and APPROVER's convenience.
