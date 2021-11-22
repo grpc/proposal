@@ -48,6 +48,10 @@ design. Changes that are considered significant can be:
 
 1. Someone from the gRPC team will be assigned as an APPROVER as part of this
 review.
+1. Once the APPROVER is assigned, the OWNER needs to send a notification to
+[grpc-io](https://groups.google.com/forum/#!forum/grpc-io) and update the PR
+with the discussion link.  Discussion about the RFC should take place in the PR,
+on GitHub, not on the grpc-io list.
 1. For a period of at least 10 business days (the minimum comment period), it is
 expected that the OWNER will respond to the comments and make updates to the RFC
 as new commits to the PR. The OWNER is encouraged to solicit as much feedback on
@@ -77,13 +81,16 @@ The proposals shall be numbered in increasing order.
 
 ## Updating proposals
 
-Sometimes small changes are needed to approved proposals.  Rather than create
-new proposals for such changes, it is often better to revise the existing one.
+Sometimes changes are needed to approved proposals.  Rather than create new
+proposals for such changes, it is often better to revise the existing one.
+
+For minor changes to a proposal (what qualifies as minor is left to the
+APPROVER), a PR may be approved and merged at the OWNER's and APPROVER's
+convenience.
+
+For any other changes, the original process's 10 day comment period must be
+observed.
 
 When updating a proposal, the PR description should be named as follows:
 
     $CategoryName## update: <description of change>
-
-If the update is minor (what qualifies as minor is left to the APPROVER), the PR
-may be approved and merged at the OWNER's and APPROVER's convenience.
-Otherwise, the original process's 10 day comment period must be observed.
