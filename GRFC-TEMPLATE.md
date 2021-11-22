@@ -4,6 +4,7 @@ Title
 * Approver: a11r
 * Implemented in: <language, ...>
 * Last updated: [Date]
+* Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
 
