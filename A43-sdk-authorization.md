@@ -583,8 +583,8 @@ public final class FileAuthorizationServerInterceptor implements ServerIntercept
   // Constructor
   private FileAuthorizationServerInterceptor(File policyFile) {
     // Read policy from policyFile and create an internalAuthzServerInterceptor. An
-    // IOException or IllegalArgumentException will be thrown if the policy file
-    // cannot be read initially or parsed correctly, respectively.
+    // IOException will be thrown if the policy file cannot be read initially or
+    // parsed correctly.
   }
 
   @Override
@@ -596,9 +596,8 @@ public final class FileAuthorizationServerInterceptor implements ServerIntercept
 
   // Check if the policy file has been modified, if so, read authorization policy
   // from the policy file and create a new internalAuthzServerInterceptor.
-  // Unlike the constructor, IOException or IllegalArgumentException here will be
-  // caught and logged and the previous internalAuthzServerInterceptor will be
-  // continuously used.
+  // Unlike the constructor, IOException here will be caught and logged and the
+  // previous internalAuthzServerInterceptor will be continuously used.
   void checkAndReloadPolicy();
 
   // Closeable for scheduling policy refreshes.
@@ -620,7 +619,7 @@ public final class FileAuthorizationServerInterceptor implements ServerIntercept
   }
 
   public static FileAuthorizationServerInterceptor create(File policyFile)
-      throws IllegalArgumentException, IOException {
+      throws IOException {
     return new FileAuthorizationServerInterceptor(policyFile);
   }
 }
