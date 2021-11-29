@@ -5,7 +5,7 @@ Improved handling of subdirectories and external repositories for py_proto_libra
 * Status: Draft
 * Implemented in: Starlark
 * Last updated: 2021-11-29
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/paqz77BJ0Js
 
 ## Abstract
 
