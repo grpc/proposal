@@ -218,9 +218,6 @@ Each *rule* has the following semantics -
       there are no URI SANs in certificate, or no match was found, we check
       against DNS SANs. Similarly, if certificate has no DNS SANs or match wasn't
       found, we check against Subject field from certificate.
-   
-   Consider the case where the *principals* list is empty, then we only check for
-   step 1 above, i.e. rule matches for any authenticated user.
 3. Each *request* could contain a list of URL *paths* (i.e. fully qualified RPC
    methods) and list of http *headers* to match. Refer JSON schema above to
    understand matching semantics.
