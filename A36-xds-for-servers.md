@@ -5,7 +5,7 @@ A36: xDS-Enabled Servers
 * Approver: markdroth
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
-* Last updated: 2021-02-25
+* Last updated: 2021-08-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/CDjGypQi1J0
 
 ## Abstract
@@ -165,11 +165,10 @@ The xDS client must NACK the Listener resource if any entry in
 [`filter_chains`][Listener.filter_chains] or `default_filter_chain` is invalid.
 `FilterChain`s are valid if all of their network `filters` are supported by the
 implementation, the network filters' configuration is valid, and the filter
-names are unique within the `filters` list. Additionally, the
+names are unique within the `filters` list. Additionally, the `FilterChain` is
+only valid if `filters` contains exactly one entry for the
 `envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager`
-filter, HttpConnectionManager hereafter, must be present. Any filters after
-HttpConnectionManager should be ignored during connection processing but must
-still be considered for validity.
+filter, HttpConnectionManager hereafter, as the last entry in the list.
 
 `Filter` types are the type contained in the
 [`typed_config`][Filter.typed_config] Any. If the type is
@@ -181,8 +180,6 @@ Envoy's behavior.
 
 HttpConnectionManager support is required. HttpConnectionManager must have valid
 `http_filters`, as defined by [A39: xDS HTTP Filter Support][A39].
-RouteConfiguration (via `route_config` or indirect fields like `rds`) is not
-used nor validated at this time, but may be in the future.
 
 If the `envoy.extensions.filters.http.router.v3.Router` is not present in
 `http_filters`, A39 calls for inserting a special filter that fails all RPCs. If
@@ -193,8 +190,58 @@ required. This is to allow implementations that only support L4 xDS features to
 avoid L7 plumbing and implementation. This has no impact on the resource
 validation and NACKing behavior called for in A39.
 
+If an XdsServer implementation uses RouteConfiguration or supports any HTTP
+filters other than the hard-coded Router, then
+`HttpConnectionManager.route_config` and `HttpConnectionManager.rds` must be
+supported and RouteConfigurations must be validated. RouteConfiguration
+validation logic inherits all previous validations made for client-side usage
+as RDS does not distinguish between client-side and server-side. That is
+predomenently defined in [gRFC A28][A28-validation], although note that
+configuration for all VirtualHosts have been validated on client-side since
+sharing the XdsClient was introduced, yet was not documented in a gRFC. The
+validation must be updated to allow [Route.non_forwarding_action][] as a valid
+`action`. The VirtualHost is selected on a per-RPC basis using the RPC's
+requested `:authority`. Routes are matched the same as on client-side.
+`Route.non_forwarding_action` is expected for all Routes used on server-side and
+`Route.route` continues to be expected for all Routes used on client-side; a
+Route with an inappropriate `action` causes RPCs matching that route and
+reaching the end of the filter chain to fail with UNAVAILABLE. If
+`HttpConnectionManager.rds` references a NACKed resource without a previous good
+version, an unavailable resource because of communication failures with control
+plane or a triggered loading timeout, or a non-existent resource, then all RPCs
+processed by that HttpConnectionManager will fail with UNAVAILABLE.
+
+There are situations when an XdsServer can clearly tell the configuration will
+cause errors, yet it still applies the configuration. In these situations the
+XdsServer should log a warning each time it receives updates for configuration
+in this state. This is known as "configuration error logging." If an XdsServer
+logs such a warning, then it should also log a single warning once there are no
+longer any such errors. Configuration error logging is currently limited to
+broken RDS resources and an unsupported Route `action` (i.e., is not
+`non_forwarding_action`), both of which cause RPCs to fail with UNAVAILABLE as
+described above.
+
+[Like in Envoy][envoy lds], updates to a Listener cause all older connections on
+that Listener to be gracefully shut down (i.e., "drained") with a default grace
+period of 10 minutes for long-lived RPCs, such that clients will reconnect and
+have the updated configuration apply. This applies equally to an update in a
+RouteConfiguration provided inline via the `route_config` field as it is part of
+the Listener, but it does not apply to an updated RouteConfiguration provided by
+reference via `rds` field. Draining must not cause the server to spuriously fail
+RPCs or connections, so the listening port must not be closed as part of the
+process. Applying updates to a Listener should be delayed until
+dependent resources have been attempted to be loaded (e.g., via RDS). The
+existing resource loading timeout in XdsClient prevents the update from being
+delayed indefinitely and the duplicate resource update detection in XdsClient
+prevents replacing the Listener when nothing changes. The grace period should be
+adjustable when building the XdsServer and should be described as the "drain
+grace time."
+
 [Filter.typed_config]: https://github.com/envoyproxy/envoy/blob/928a62b7a12c4d87ce215a7c4ebd376f69c2e080/api/envoy/config/listener/v3/listener_components.proto#L40
 [TypedStruct.type_url]: https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38
+[A28-validation]: A28-xds-traffic-splitting-and-routing.md#response-validation
+[Route.non_forwarding_action]: https://github.com/envoyproxy/envoy/blob/5963beae8842982803af1bef04fb5a2a0893c613/api/envoy/config/route/v3/route_components.proto#L242
+[envoy lds]: https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/lds
 
 ### FilterChainMatch
 
@@ -217,28 +264,28 @@ its present fields, which avoids repeating fields and converts the matchers into
 disjunctive normal form. That is, the matcher:
 
 ```
-destination_ports: 80, 8080
-prefix_ranges: 192.168.0.0/16, 10.0.0.0/8
+prefix_ranges: 192.168.0.0/24, 10.1.0.0/16
+source_prefix_ranges: 192.168.1.0/24, 10.2.0.0/16
 source_type: EXTERNAL
 ```
 
 Should be treated as four matchers:
 
 ```
-destination_ports: 80
-prefix_ranges: 192.168.0.0/16
+prefix_ranges: 192.168.0.0/24
+source_prefix_ranges: 192.168.1.0/24
 source_type: EXTERNAL
 
-destination_ports: 80
-prefix_ranges: 10.0.0.0/8
+prefix_ranges: 192.168.0.0/24
+source_prefix_ranges: 10.2.0.0/16
 source_type: EXTERNAL
 
-destination_ports: 8080
-prefix_ranges: 192.168.0.0/16
+prefix_ranges: 10.1.0.0/16
+source_prefix_ranges: 192.168.1.0/24
 source_type: EXTERNAL
 
-destination_ports: 8080
-prefix_ranges: 10.0.0.0/8
+prefix_ranges: 10.1.0.0/16
+source_prefix_ranges: 10.2.0.0/16
 source_type: EXTERNAL
 ```
 
@@ -308,9 +355,13 @@ object needed to communicate with the control plane.
 
 ```C
 typedef struct {
+  grpc_status_code code;
+  const char* error_message;
+} grpc_serving_status_update;
+
+typedef struct {
   void (*on_serving_status_update)(void* user_data, const char* uri,
-                                   grpc_status_code code,
-                                   const char* error_message);
+                                   grpc_serving_status_update update);
   void* user_data;
 } grpc_server_xds_status_notifier;
 
@@ -324,7 +375,7 @@ GRPCAPI grpc_server_config_fetcher* grpc_server_config_fetcher_xds_create(
 GRPCAPI void grpc_server_config_fetcher_destroy(
     grpc_server_config_fetcher* config_fetcher);
 
-/** Sets the server's config fetcher.  Takes ownership. Must be called before 
+/** Sets the server's config fetcher.  Takes ownership. Must be called before
     adding ports. */
 GRPCAPI void grpc_server_set_config_fetcher(
     grpc_server* server, grpc_server_config_fetcher* config_fetcher);
@@ -362,6 +413,10 @@ the server with the xDS server config fetcher. The server created after
 ```C++
 class XdsServerServingStatusNotifierInterface {
  public:
+  struct ServingStatusUpdate {
+    ::grpc::Status status;
+  };
+
   virtual ~XdsServerServingStatusNotifierInterface() = default;
 
   // \a uri contains the listening target associated with the notification. Note
@@ -371,7 +426,8 @@ class XdsServerServingStatusNotifierInterface {
   // The API does not provide any guarantees around duplicate updates.
   // Status::OK signifies that the server is serving, while a non-OK status
   // signifies that the server is not serving.
-  virtual void OnServingStatusUpdate(std::string uri, grpc::Status status) = 0;
+  virtual void OnServingStatusUpdate(std::string uri,
+                                     ServingStatusUpdate update) = 0;
 };
 
 class XdsServerBuilder : public ::grpc::ServerBuilder {
@@ -464,7 +520,7 @@ Create an `xds.GRPCServer` struct that would internally contain an unexported
 `grpc.Server`. It would inject its own `StreamServerInterceptor` and
 `UnaryServerInterceptor`s into the `grpc.Server`. The interceptors would be
 controlled by an `atomic.Value` or mutex-protected field that would update with
-the configuration. 
+the configuration.
 
 `GRPCServer.Serve()` takes a `net.Listener` instead of a `host:port` string to
 listen on, so as to be consistent with the `Serve()` method on the
@@ -478,7 +534,7 @@ interceptors, so the interceptors will need to look up the per-address
 configuration for each RPC.
 
 Service registration is done on a method in the generated code which
-accepts a `grpc.ServiceRegistrar` interface. Both `grpc.Server` and 
+accepts a `grpc.ServiceRegistrar` interface. Both `grpc.Server` and
 `xds.GRPCServer` implement this interface and therefore the latter can be passed to
 service registration methods just like the former.
 
@@ -540,6 +596,13 @@ waiting on the C core implementation.
   appropriate structure. So the gRFC just tries to show that the API design
   would work for C++/wrapped languages but there is currently no associated
   implementation work.
+
+  * This design changes the client-side behavior for an inappropriate `action`
+    and requires the RPC be processed by the filters before being failed. C will
+    initially fail the client-side RPCs without filter processing. Implementing
+    the full behavior will be follow-up work because the behavior difference
+    isn't important for the currently-supported filters and the change is more
+    invasive in C than other languages.
 
 * Java. Implementation work primarily by @sanjaypujare, along with gRFC A29.
   Added classes are in the `grpc-xds` artifact and `io.grpc.xds` package.
