@@ -4,7 +4,7 @@ A39: xDS HTTP Filter Support
 * Approver: ejona86, dfawley
 * Status: Approved
 * Implemented in: C-core
-* Last updated: 2021-02-12
+* Last updated: 2021-07-20
 * Discussion at: https://groups.google.com/g/grpc-io/c/M-l8k2v5snY
 
 ## Abstract
@@ -27,7 +27,7 @@ that will enable us to implement functionality that, in Envoy, is
 provided by its out-of-the-box filters (e.g., fault injection or
 authorization), which we also want to be provided out-of-the-box in gRPC.
 
-### Related Proposals: 
+### Related Proposals:
 
 - [A27: xDS-Based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
 - [A30: xDS v3 Support](https://github.com/grpc/proposal/blob/master/A30-xds-v3.md)
@@ -78,12 +78,19 @@ message type for its top-level configuration, but not all filters
 support override configuration at all, and those that do may or may not
 use the same message type for their override configuration as for their
 top-level configuration.  Therefore, every filter will be registered
-one or more message types.
+by one or more message types.
 
 Each filter implementation will provide the following:
 - Method(s) for validating the config protos when parsing an xDS response.
 - An indication of whether it is supported on the gRPC client and/or gRPC
   server.
+- An indication of whether the filter is a terminal filter (i.e., it
+  must be the last filter in the filter chain).  (Note that the
+  [router filter](#the-router-filter) is currently the only terminal
+  filter supported by gRPC, so implementations may choose to hard-code
+  the requirement that that filter is the last filter in the chain
+  instead of supporting a general-purpose mechanism to determine whether
+  a given filter is a terminal filter.)
 - Methods to generate and configure the appropriate filters or
   interceptors in gRPC to perform the necessary functionality on the
   data plane.
@@ -104,9 +111,8 @@ https://github.com/envoyproxy/envoy/issues/12274.)
 
 gRPC will also support the ability to indicate that a given filter
 is optional, as recently added in
-https://github.com/envoyproxy/envoy/pull/14982.  (Envoy does not yet
-support this feature, but it is being tracked in
-https://github.com/envoyproxy/envoy/issues/15025.)
+https://github.com/envoyproxy/envoy/pull/14982 and implemented in
+Envoy in https://github.com/envoyproxy/envoy/pull/16119.
 
 #### Top-Level Filter Configs
 
@@ -135,6 +141,8 @@ filters.  In each entry, gRPC will look at the following fields:
 
 When gRPC receives the `HttpConnectionManager` proto in the LDS
 response, it will validate the list of filters as follows:
+- There must be at least one filter in the list, or the Listener
+  resource will be NACKed.
 - Every filter in the list must have a unique instance name.  Any
   duplicate instance names will cause the Listener resource to be NACKed.
 - Every filter config in the list must be of a type (as identified by the
@@ -151,8 +159,12 @@ response, it will validate the list of filters as follows:
   `is_optional`), the fields in the filter config will be validated by
   the filter implementation.  The filter implementation will also verify
   that the config is of the right type (e.g., if it uses different types
-  for its top-level config and its override config).  Any validation error
-  will cause the Listener resource to be NACKed.
+  for its top-level config and its override config).  In addition,
+  validation will fail if a terminal filter is not the last filter in
+  the chain or if a non-terminal filter is the last filter in the chain.
+  (Note that the only currently supported terminal filter is the [router
+  filter](#the-router-filter).)  Any validation error will cause the
+  Listener resource to be NACKed.
 
 #### Filter Config Overrides
 
@@ -233,9 +245,9 @@ gRPC will support the [router
 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter),
 which is used for the proto message type
 [`envoy.extensions.filters.http.router.v3.Router`](https://github.com/envoyproxy/envoy/blob/18db4c90e3295fb2c39bfc7b2ce641cfd6c3fbed/api/envoy/extensions/filters/http/router/v3/router.proto#L23).
-In practice, in order for gRPC to function properly, this filter is
-required and must be last in the filter list, although that is not
-enforced at config validation time.
+This filter is a terminal filter, and it is currently the only terminal
+filter supported by gRPC, so it must be the last one in the filter chain.
+This will be enforced at config validation time, as described above.
 
 Note that gRPC will not actually have a discrete filter implementation
 for the router filter; instead, this filter will simply trigger the
@@ -244,13 +256,6 @@ resolver and LB policy plugins to the gRPC client channel.  However,
 in order to retain compatibility with Envoy, gRPC will still accept
 this filter configuration and treat it similarly to the way that Envoy
 does.
-
-Specifically, if the router filter is not present, then gRPC will insert
-a special filter at the end of the filter chain that fails all RPCs.
-In addition, if the router filter *is* present, any filters in the list
-after the router filter will not actually be used, although their
-configurations will still be validated when the config is received from
-the xDS server.
 
 For now, gRPC will not support any of the fields in the router filter's
 config.  All fields will be ignored.
@@ -281,3 +286,4 @@ be stable.
 C-core implementation:
 - Add dynamic filters between name resolution and load balancing: https://github.com/grpc/grpc/pull/24920
 - Add xDS HTTP filter support for gRPC client: https://github.com/grpc/grpc/pull/25310
+- Add support for filters being marked as terminal: https://github.com/grpc/grpc/pull/26742
