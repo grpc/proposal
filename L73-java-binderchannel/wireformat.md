@@ -57,7 +57,7 @@ num bytes = long;
 ping id = int;
 
 setup transport transaction = version, binder, [protocol extension flags];
-shutdown transport transaction = nothing;
+shutdown transport transaction = [protocol extension flags];
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
 ping response transaction = ping id;
@@ -73,10 +73,10 @@ The server may respond with SHUTDOWN_TRANSPORT if the client-advertised version
 is too low to be supported. The client may respond with SHUTDOWN_TRANSPORT if
 the server-selected version is too low to be supported.
 
-Both client and server transport may also include protocol extension flags at
-the end of their setup transport transaction. This is reserved for potential
-future protocol extensions, though no flags are currently specified.
-Unrecognized flags must be ignored.
+Some of the transactions specified above allow for protocol extension flags at
+the end of the Parcel. These flags are reserved for potential future protocol
+extensions, though no flags are currently specified.  Unrecognized flags must be
+ignored.
 
 ### Stream Transactions
 
