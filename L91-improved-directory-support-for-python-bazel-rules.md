@@ -32,6 +32,29 @@ locations of various generated files. The current logic discards part of the
 proto's source information that is necessary to make both proto imports and
 Python module imports work.
 
+**An example.**
+
+```python
+proto_library(
+    name = "p2_proto",
+    srcs = "subdir/p2.proto",
+)
+
+proto_library(
+    name = "p1_proto",
+    srcs = "p1.proto",
+    deps = [
+        ":p2_proto",                        # p1 contains: 'import "subdir/p2.proto";'
+        "elsewhere@//some/place:q_proto"    # p1 contains: 'import "some/place/q.proto";'
+    ],
+)
+
+# Currently broken. Should be expected to work.
+py_proto_library(
+    name = "p1_proto_pb2",
+    srcs = [":p1_proto"],
+)
+```
 
 ### Related Proposals:
 
