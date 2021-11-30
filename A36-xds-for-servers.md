@@ -369,7 +369,8 @@ typedef struct grpc_server_config_fetcher grpc_server_config_fetcher;
 
 /** Creates an xDS config fetcher. */
 GRPCAPI grpc_server_config_fetcher* grpc_server_config_fetcher_xds_create(
-    grpc_server_xds_status_notifier notifier, const grpc_channel_args* args);
+    grpc_server_xds_status_notifier notifier, int drain_grace_time_ms,
+    const grpc_channel_args* args);
 
 /** Destroys a config fetcher. */
 GRPCAPI void grpc_server_config_fetcher_destroy(
@@ -432,11 +433,18 @@ class XdsServerServingStatusNotifierInterface {
 
 class XdsServerBuilder : public ::grpc::ServerBuilder {
  public:
+  // Sets the drain grace period in ms for older connections when updates to a
+  // Listener are received.
+  void set_drain_grace_time(int drain_grace_time_ms) {
+    builder_->drain_grace_time_ms_ = drain_grace_time_ms;
+  }
+
   // It is the responsibility of the application to make sure that \a notifier
   // outlasts the life of the server. Notifications will start being made
   // asynchronously once `BuildAndStart()` has been called. Note that it is
   // possible for notifications to be made before `BuildAndStart()` returns.
   void set_status_notifier(XdsServerServingStatusNotifierInterface* notifier);
+};
 ```
 
 The support for ephemeral ports on an xDS-enabled server is based on the support
