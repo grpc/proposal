@@ -79,11 +79,10 @@ the end of their setup transport transaction. This is reserved for potential
 future protocol extensions, though no flags are currently specified.
 Unrecognized flags must be ignored.
 
-"shutdown flags" is a bit field reserved for future extensions to the shutdown
-transaction. No flags are currently defined. Receivers must ignore
-flags they do not understand and today's senders must set this field to zero.
-Zero flags can be omitted completely, although senders should include them
-anyways to avoid a Android memory leak caused by empty Parcels.
+`shutdown flags` is a bit field reserved for future extensions to the shutdown
+transaction. Receivers must ignore flags they do not understand and current
+senders must set this field to zero (since no flags have been defined yet).
+This field is optional. If missing, no flags have been set.
 
 ### Stream Transactions
 
