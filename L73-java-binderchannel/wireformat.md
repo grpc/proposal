@@ -53,11 +53,12 @@ it will shutdown the transport gracefully.
 ```
 version = int;
 protocol extension flags = int;
+shutdown flags = int;
 num bytes = long;
 ping id = int;
 
 setup transport transaction = version, binder, [protocol extension flags];
-shutdown transport transaction = [protocol extension flags];
+shutdown transport transaction = [shutdown flags];
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
 ping response transaction = ping id;
@@ -73,10 +74,16 @@ The server may respond with SHUTDOWN_TRANSPORT if the client-advertised version
 is too low to be supported. The client may respond with SHUTDOWN_TRANSPORT if
 the server-selected version is too low to be supported.
 
-Some of the transactions specified above allow for protocol extension flags at
-the end of the Parcel. These flags are reserved for potential future protocol
-extensions, though no flags are currently specified.  Unrecognized flags must be
-ignored.
+Both client and server transport may also include protocol extension flags at
+the end of their setup transport transaction. This is reserved for potential
+future protocol extensions, though no flags are currently specified.
+Unrecognized flags must be ignored.
+
+"shutdown flags" is a bit field reserved for future extensions to the shutdown
+transaction. No flags are currently defined. Receivers must ignore
+flags they do not understand and today's senders must set this field to zero.
+Zero flags can be omitted completely, although senders should include them
+anyways to avoid a Android memory leak caused by empty Parcels.
 
 ### Stream Transactions
 
