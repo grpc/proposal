@@ -53,11 +53,12 @@ it will shutdown the transport gracefully.
 ```
 version = int;
 protocol extension flags = int;
+shutdown flags = int;
 num bytes = long;
 ping id = int;
 
 setup transport transaction = version, binder, [protocol extension flags];
-shutdown transport transaction = nothing;
+shutdown transport transaction = [shutdown flags];
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
 ping response transaction = ping id;
@@ -77,6 +78,11 @@ Both client and server transport may also include protocol extension flags at
 the end of their setup transport transaction. This is reserved for potential
 future protocol extensions, though no flags are currently specified.
 Unrecognized flags must be ignored.
+
+`shutdown flags` is a bit field reserved for future extensions to the shutdown
+transaction. Receivers must ignore flags they do not understand and current
+senders must set this field to zero (since no flags have been defined yet).
+This field is optional. If missing, no flags have been set.
 
 ### Stream Transactions
 
