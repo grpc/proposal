@@ -177,11 +177,14 @@ This pseudo-code is mirroring the
 
 ##### Duplicate addresses in resolution result
 
-The `least_request_experimental` policy will as the `round_robin` policy allow for duplicate addresses
-in the resolution result.
-Duplicate addresses will due to the picker behavior have a higher probability of being selected.
-The increased selection probability for some duplicated address does however not corralate well with the
-number of duplicates in relation to the total number of addresses (which is the case with the `round_robin` policy).
+In gRPC, if an address is present more than once in an address list, that is intended to indicate that the address
+should be more heavily weighted. However, it should not result in more than one connection to that address.
+
+In keeping with this, the `least_request_experimental` policy will de-duplicate the addresses in the address list
+it receives so that it does not create more than one connection to a given address. However, because the policy
+will not initially support the weighted least request algorithm, we will ignore the additional weight given to
+the address. If at some point in the future we do add support for the weighted least request algorithm, then an
+address that is present multiple times in the list will be given appropriate weight in that algorithm.
 
 ### Temporary environment variable protection
 
