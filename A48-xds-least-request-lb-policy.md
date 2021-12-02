@@ -4,7 +4,7 @@ A48: xDS Least Request LB Policy
 * Approver: markdroth
 * Status: Implementation in progress
 * Implemented in: Java in progress
-* Last updated: 2021-11-12
+* Last updated: 2021-12-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/4qycdcFfMUs
 
 ## Abstract
@@ -53,13 +53,16 @@ The configuration for the Least Request LB policy is the
 field](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L916).
 The field is optional; if not present, defaults will be assumed for all
 of its values.  gRPC will support the
-[`choice_count`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L346)
+[`choice_count`](https://github.com/envoyproxy/envoy/blob/2e0ad0beb9625ccedaec8f3093aa5e6e1dc484f4/api/envoy/config/cluster/v3/cluster.proto#L387)
 field the same way that Envoy does with the exception of allowed values
 (More details further down in [LB Policy Config](#lb-policy-config)).
 The
-[`active_request_bias`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L371)
+[`active_request_bias`](https://github.com/envoyproxy/envoy/blob/2e0ad0beb9625ccedaec8f3093aa5e6e1dc484f4/api/envoy/config/cluster/v3/cluster.proto#L412)
 field will be ignored as it is only used in the "*all weights not equal*" (weighted least request)
 case which will not be supported as part of this proposal.
+The
+[`slow_start_config`](https://github.com/envoyproxy/envoy/blob/2e0ad0beb9625ccedaec8f3093aa5e6e1dc484f4/api/envoy/config/cluster/v3/cluster.proto#L416)
+field will also be ignored as it requires the weighted least request algorithm.
 
 #### Changes to the `xds_cluster_resolver` Policy
 
