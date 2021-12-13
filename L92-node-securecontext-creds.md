@@ -20,7 +20,7 @@ The existing `credentials.createSsl` API in the Node library handles a specific 
 
 ## Proposal
 
-The Node grpc-js library will add the function `credentials.createFromSecureContext`, which will take as arguments a [`SecureContext`](https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions) and an optional `VerifyOptions` object (the final parameter of the existing `credentials.createSsl`). gRPC has a standard chiper list, but the cipher list is part of the secure context, so these credentials objects will use Node's default cipher list instead of gRPC's default cipher list.
+The Node grpc-js library will add the function `credentials.createFromSecureContext`, which will take as arguments a [`SecureContext`](https://nodejs.org/api/tls.html#tlscreatesecurecontextoptions) and an optional `VerifyOptions` object (the final parameter of the existing `credentials.createSsl`). gRPC has a standard chiper list, but the cipher list is part of the secure context, so these credentials objects will use Node's default cipher list instead of gRPC's default cipher list. For the same reason, these credentials will use Node's default root certs list instead of gRPC's.
 
 The following two calls are almost equivlaent, other than the cipher list, demonstrating the correspondence between the existing and new APIs:
 
@@ -43,4 +43,4 @@ Internally, grpc-js's secure channel credentials implementation uses the built i
 
 ## Implementation
 
-I (murgatroid99) will implement this in the grpc-js library concurrently with the review period of this proposal.
+This is implemented in grpc-js in [PR #1988](https://github.com/grpc/grpc-node/pull/1988)
