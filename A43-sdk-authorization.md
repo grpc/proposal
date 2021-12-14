@@ -254,7 +254,7 @@ In the following policy example
 		{
 			"name": "dev-access",
 			"source": {
-				"principals": []
+				"principals": ["*", ""]
 			},
 			"request": {
 				"paths": [
