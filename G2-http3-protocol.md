@@ -122,6 +122,23 @@ appropriate for a deadline exceeded, because both stream directions should be ab
 However, `STOP_SENDING` should be sent along with `RESET_STREAM` if the deadline is exceeded
 while the request side is in-progress.
 
+### HTTP/3 negotation
+
+A client and server both need to support HTTP/3 for it to be used. There are two common
+scenarios for establishing an HTTP/3 connection:
+
+* gRPC client uses TLS and is configured in advance to only use HTTP/3. The client starts a
+  QUIC+HTTP/3 connection to server. If the server doesn't support HTTP/3 then the connection
+  fails.
+* gRPC client uses TLS and is configured to use HTTP/2 or greater. In this case an initial
+  HTTP/2 call is made, server returns response with an `alt-svc` header that tells the client
+  that HTTP/3 is available. HTTP/2 connection is replaced with QUIC+HTTP/3 and future calls
+  use HTTP/3. If the server doesn't support HTTP/3 then the client continues to use HTTP/2.
+
+HTTP/3 requires TLS and will never be used by an insecure channel.
+
+API for configuring channel HTTP negotation behavior is up to implementations.
+
 ## Rationale
 
 HTTP/3 is an upcoming Internet Protocol. There needs to be a standardized agreement for how
