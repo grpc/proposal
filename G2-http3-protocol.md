@@ -98,7 +98,7 @@ n/a|INADEQUATE_SECURITY| PERMISSION_DENIED … with additional detail indicating
 `GOAWAY` and `PING` frames exist in HTTP/3 and serve the same purpose as in HTTP/2.
 One notable difference is the `GOAWAY` frame in HTTP/2 reports the last
 successfully processed stream ID. In HTTP/3 the `GOAWAY` frame ID value must be greater
-that the last successfully processed stream ID.
+than the last successfully processed stream ID.
 
 ### Exceeding deadlines
 
