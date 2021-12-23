@@ -5,7 +5,7 @@ P5: JDK Version Support Policy
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: Java
 * Last updated: 2021-12-23
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/S1biTro_sbE
 
 ## Abstract
 
