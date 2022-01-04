@@ -78,14 +78,15 @@ users that need the older JDK support.
 
 gRPC maintainers will allow changes to the release branch for compatibility,
 bug, and security fixes and will aid the community in code reviews and
-privileged operations necessary for a release. But gRPC maintainers would not
-be expected to maintain it longer than the normal support policy; the community
-as a whole would be responsible for maintenance.
+privileged operations necessary for a release. But gRPC maintainers would not be
+expected to maintain it longer than the [normal support policy][gRPC support
+policy]; the community as a whole would be responsible for maintenance.
 
 There is no requirement to increase the major version for the release dropping
 support for an older JDK.
 
 [Oracle Java support]: https://www.oracle.com/java/technologies/java-se-support-roadmap.html
+[gRPC support policy]: https://grpc.io/docs/what-is-grpc/faq/#how-long-are-grpc-releases-supported-for
 
 ## Rationale
 
