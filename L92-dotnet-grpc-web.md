@@ -4,7 +4,7 @@ gRPC-Web in-process proxy and client for grpc-dotnet
 * Approver: Jan Tattermusch & Wenbo Zhu
 * Status: Approved
 * Implemented in: https://github.com/grpc/grpc-dotnet/pull/695
-* Last updated: 2022-01-4
+* Last updated: 2022-01-04
 * Discussion at: TBD
 
 ## Abstract
