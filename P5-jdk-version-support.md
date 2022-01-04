@@ -1,7 +1,7 @@
 P5: JDK Version Support Policy
 ----
 * Author(s): [Eric Anderson](https://github.com/ejona86)
-* Approver: dapengzhang
+* Approver: dapengzhang0
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: Java
 * Last updated: 2021-12-23
@@ -48,8 +48,8 @@ gRPC is widely used and is lower in the dependency tree, so it has more
 conservative support. gRPC Java 1.0 supported Java 6, which was dropped
 following discussion in grpc/grpc-java#3961 because Java 6 was becoming
 unsupportable as the compiler was unmaintained and other libraries were dropping
-support. The discussion for Java 7 is happening at grpc/grpc-java#4671 and is
-necessary for reasons similar to Java 6. However, both processes were
+support. The discussion for dropping Java 7 is happening at grpc/grpc-java#4671
+and is necessary for reasons similar to Java 6. However, both processes were
 time-consuming and had no predictable timeline.
 
 gRPC has suffered from supporting old Java versions. There are hidden
@@ -107,11 +107,11 @@ Java comes dangerously close to ossifying as we have seen with the slow
 historical upgrades.
 
 Applications running on JDK versions not receiving Premier Support are much less
-likely to be actively developed and so are less like to need new features. Some
-orphaned libraries have caused issues in the ecosystem because they had _no_
-updates, no matter the reason. Allowing further patch releases seems enough to
-service these users, and having those users help with maintence puts them in a
-better position to balance the cost of upgrading to a newer JDK. It also
+likely to be actively developed and so are less likely to need new features.
+Some orphaned libraries have caused issues in the ecosystem because they had
+_no_ updates, no matter the reason. Allowing further patch releases seems enough
+to service these users, and having those users help with maintence puts them in
+a better position to balance the cost of upgrading to a newer JDK. It also
 provides a signal that users are still using the older JDK version.
 
 Since the API does not change when dropping support for a JDK, [semver][] does
