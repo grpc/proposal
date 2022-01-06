@@ -140,7 +140,9 @@ The new `authorities` field will have the following format:
     //
     // The token "%s", if present in this string, will be replaced
     // with percent-encoded service authority (i.e., the path part of the
-    // target URI used to create the gRPC channel).
+    // target URI used to create the gRPC channel).  Any character not
+    // allowed in a URI path as per RFC-3986 section 3.3 must be
+    // percent-encoded.
     //
     // Must start with "xdstp://<authority_name>/".  If it does not,
     // that is considered a bootstrap file parsing error.
@@ -177,7 +179,8 @@ the following format:
 // The token "%s", if present in this string, will be replaced with
 // the service authority (i.e., the path part of the target URI
 // used to create the gRPC channel).  If the template starts with
-// "xdstp:", the replaced string will be percent-encoded.
+// "xdstp:", the replaced string will be percent-encoded.  Any character not
+// allowed in a URI path as per RFC-3986 section 3.3 must be percent-encoded.
 //
 // Defaults to "%s".
 "client_default_listener_resource_name_template": <string>,
@@ -190,7 +193,8 @@ There will be two changes to the existing
   select the relevant configuration in the `authorities` map.
 - When replacing the `%s` token, if the template starts with `xdstp:`,
   the replacement string will be percent-encoded in the resulting resource
-  name.
+  name.  Any character not allowed in a URI path as per RFC-3986 section 3.3
+  must be percent-encoded.
 
 The resulting field will have the following format:
 
@@ -205,6 +209,8 @@ The resulting field will have the following format:
 // The token "%s", if present in this string, will be replaced with
 // the IP and port on which the server is listening.  If the template
 // starts with "xdstp:", the replaced string will be percent-encoded.
+// Any character not allowed in a URI path as per RFC-3986 section 3.3
+// must be percent-encoded.
 //
 // There is no default; if unset, xDS-based server creation fails.
 //
