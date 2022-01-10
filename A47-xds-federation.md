@@ -496,17 +496,15 @@ top-level map is today.
 
 The third-level map will be the resource name.  For old-style resource
 names, this will be the full resource name, exactly as it is today.  For
-new-style names, for optimization purposes, it may be desirable to not
-include the authority and resource name in the key here, because that
-will duplicate information that is already present from the upper levels
-of the map.  One option is to encode it as the `xdstp:` URI minus the
-authority and resource type.
+new-style names, it will be the `id` part of the `xdstp:` URI (i.e., the
+URI path with the resource type prefix stripped off) and the context
+parameters.
 
 For example, a resource with old-style name `server.example.com` and
-type Listener would be stored like this:
+type Listener might be stored like this:
 
 ```
-{authority "" =>
+{authority "old:" =>
   {resource_type Listener =>
     {"server.example.com" => <resource>}
   }
@@ -514,19 +512,21 @@ type Listener would be stored like this:
 ```
 
 But a resource with new-style name
-`xdstp://xds.authority.com/envoy.config.listener.v3.Listener/server.example.com`
-would be stored like this:
+`xdstp://xds.authority.com/envoy.config.listener.v3.Listener/server.example.com?foo=bar`
+might be stored like this:
 
 ```
-{authority "xds.authority.com" =>
+{authority "xdstp:xds.authority.com" =>
   {resource_type Listener =>
-    {"xdstp:server.example.com" => <resource>}
+    {("server.example.com", {"foo"=>"bar"}) => <resource>}
   }
 }
 ```
 
-New-style resource names used as cache keys must be canonicalized.  This
-means sorting the context params in normal lexicographic order.
+New-style resource names used as cache keys must be
+[normalized](https://github.com/cncf/xds/blob/main/proposals/TP1-xds-transport-next.md#normalization).
+In particular, this means sorting the context params in normal lexicographic
+order.
 
 If a new-style name has duplicate values for the same context param, the
 behavior is undefined.  The easiest thing is probably to just use the
