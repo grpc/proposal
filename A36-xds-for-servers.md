@@ -369,8 +369,7 @@ typedef struct grpc_server_config_fetcher grpc_server_config_fetcher;
 
 /** Creates an xDS config fetcher. */
 GRPCAPI grpc_server_config_fetcher* grpc_server_config_fetcher_xds_create(
-    grpc_server_xds_status_notifier notifier, int drain_grace_time_ms,
-    const grpc_channel_args* args);
+    grpc_server_xds_status_notifier notifier, const grpc_channel_args* args);
 
 /** Destroys a config fetcher. */
 GRPCAPI void grpc_server_config_fetcher_destroy(
@@ -433,8 +432,8 @@ class XdsServerServingStatusNotifierInterface {
 
 class XdsServerBuilder : public ::grpc::ServerBuilder {
  public:
-  // Sets the drain grace period in ms for older connections when updates to a
-  // Listener are received.
+  // Sets the drain grace period in ms for existing connections when updates to
+  // a Listener are received.
   void set_drain_grace_time(int drain_grace_time_ms) {
     builder_->drain_grace_time_ms_ = drain_grace_time_ms;
   }
