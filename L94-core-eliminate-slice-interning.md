@@ -1,11 +1,11 @@
-Title
+Eliminate Slice Interning
 ----
 * Author(s): ctiller@google.com
 * Approver: roth@google.com
-* Status: Draft
+* Status: Approved
 * Implemented in: Core
-* Last updated: 1/7/2022
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 1/11/2022
+* Discussion at: https://groups.google.com/g/grpc-io/c/nJYz60XHLuo
 
 ## Abstract
 
