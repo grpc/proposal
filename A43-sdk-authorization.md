@@ -1,13 +1,9 @@
 A43: SDK authorization
 ----
 * Author(s): [Ashitha Santhosh](https://github.com/ashithasantosh)
-* Approver: [Doug Fawley](https://github.com/dfawley),
-            [Eric Anderson](https://github.com/ejona86),
-            [Mark Roth](https://github.com/markdroth),
-            [Sanjay Pujare](https://github.com/sanjaypujare),
-            [Yihua Zhang](https://github.com/yihuazhang)
-* Status: Draft {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in: <language, ...>
+* Approver: [Eric Anderson](https://github.com/ejona86)
+* Status: Ready for Implementation
+* Implemented in: C++, C-core and Go
 * Last updated: 2021-08-30
 * Discussion at: https://groups.google.com/g/grpc-io/c/m4Lns0tO-fE
 
