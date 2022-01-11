@@ -582,11 +582,30 @@ be:
 
 ```proto
 message XdsServer {
-  string server_uri = 1;
-  string channel_creds_type = 2;
-  google.protobuf.Struct channel_creds_config = 3;
-  repeated string server_features = 4;
+  string server_uri = 1 [json_name = "server_uri"];  // Required.
+
+  message ChannelCredentials {
+    string type = 1;  // Required.
+    google.protobuf.Struct config = 2;
+  }
+  // A list of channel creds.  The first supported type is used.
+  repeated ChannelCredentials channel_creds = 2 [json_name = "channel_creds"];
+
+  // Server features.
+  repeated google.protobuf.Value server_features = 3
+      [json_name = "server_features"];
 }
+```
+
+In the LB policy configs for the `xds_cluster_resolver` and `xds_cluster_impl`
+LB policies, the existing `lrs_load_reporting_server_name` field will be
+deprecated, and the following new field will be added in its place:
+
+```
+// LRS server to send load reports to.
+// If not present, load reporting will be disabled.
+// Supercedes lrs_load_reporting_server_name field.
+XdsServer lrs_load_reporting_server = 7;
 ```
 
 In C-core, the representation will probably look something like this:
