@@ -18,10 +18,10 @@ users (like network switches) to perform per-RPC authorization checks.
 Authentication verifies the identity of the requestor. Authorization ensures that
 the requestor has sufficient access to make a particular request.
 
-gRPC offers built-in authentication mechanisms like TLS, ALTS and even allow
+gRPC offers built-in authentication mechanisms like TLS, ALTS and even allows
 users to plug in their own authentication systems. However, gRPC doesn't have any
 standard authorization solution available. If a user wanted to perform per RPC
-authorization check, they have to implement their own solution in the application.
+authorization checks, they have to implement their own solution in the application.
 The standard gRPC authorization mechanism described in this proposal allows users
 to simply provide an authorization policy for their server. Then, for each RPC,
 the server verifies whether the client is authorized to make the RPC request.
@@ -435,7 +435,7 @@ package authz
 
 // StaticInterceptor contains engines used to make authorization decisions.
 type StaticInterceptor struct {
-  engines ChainEngine
+  // ...
 }
 
 // NewStatic returns a new StaticInterceptor from a static authorization policy
@@ -463,30 +463,14 @@ func (i *StaticInterceptor) StreamInterceptor(
 }
 
 type FileWatcherInterceptor struct {
-  internalInterceptors StaticInterceptors
-  policyFile           string
-  policyContents       string
-  refreshDuration      time.Duration
-  cancel               context.CancelFunc
+  // ...
 }
 
 // NewFileWatcher returns a new FileWatcherInterceptor from a policy file
 // that contains JSON string of authorization policy and a refresh duration to
 // specify the amount of time between policy refreshes.
-func NewFileWatcher(file string, duration time.Duration) (*FileWatcherInterceptor, error);
-
-// run is a long running goroutine which watches for changes in file path, and
-// updates the internalInterceptors upon modification.
-func (i *FileWatcherInterceptor) run(ctx context.Context) {
-  // ...
-}
-
-// updateInternalInterceptors checks if the policy file that is watching has changed,
-// and if so, updates the internalInterceptors with the policy. Unlike the
-// constructor, if there is an error in reading the file or parsing the policy, the
-// previous internalInterceptors will not be replaced.
-func (i *FileWatcherInterceptor) updateInternalInterceptors() {
-  // ...
+func NewFileWatcher(file string, duration time.Duration) (*FileWatcherInterceptor, error) {
+    // ...
 }
 
 func (i *FileWatcherInterceptor) UnaryInterceptor(
@@ -503,7 +487,7 @@ func (i *FileWatcherInterceptor) StreamInterceptor(
 
 // Close cleans up resources allocated by the interceptors.
 func (i *FileWatcherInterceptor) Close() {
-  i.cancel()
+  // ...
 }
 ```
 
@@ -512,12 +496,11 @@ func (i *FileWatcherInterceptor) Close() {
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
 i, err := authz.NewStatic(authzPolicy)
-serverOpts := []grpc.ServerOption{
-  grpc.Creds(creds),
-  grpc.ChainUnaryInterceptor(i.UnaryInterceptor),
-  grpc.ChainStreamInterceptor(i.StreamInterceptor),
-}
-s := grpc.NewServer(serverOpts...)
+// Ensure err is nil.
+s := grpc.NewServer(
+    grpc.Creds(creds),
+    grpc.ChainUnaryInterceptor(i.UnaryInterceptor),
+    grpc.ChainStreamInterceptor(i.StreamInterceptor))
 ```
 
 ##### Example: Using a Dynamic File Watcher Authz Interceptor in gRPC-Go Server
@@ -525,14 +508,13 @@ s := grpc.NewServer(serverOpts...)
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
 i, err := authz.NewFileWatcher(authzPolicyFile, 1 * time.Hour)
-serverOpts := []grpc.ServerOption{
-  grpc.Creds(creds),
-  grpc.ChainUnaryInterceptor(i.UnaryInterceptor),
-  grpc.ChainStreamInterceptor(i.StreamInterceptor),
-}
-s := grpc.NewServer(serverOpts...)
 // In the end, free up the resources used for policy refresh.
 defer i.Close()
+// Ensure err is nil.
+s := grpc.NewServer(
+    grpc.Creds(creds),
+    grpc.ChainUnaryInterceptor(i.UnaryInterceptor),
+    grpc.ChainStreamInterceptor(i.StreamInterceptor))
 ```
 
 #### Java
