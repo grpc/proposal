@@ -294,10 +294,11 @@ Valid user provided SDK authorization policy creates authorization engine(s).
 In the case of file watcher, we internally create thread(C-core)/ goroutine(Go)/
 scheduled service(Java) which will be used to read the policy file periodically,
 and update the authorization engines. During the first file read, if the policy
-is invalid or there are I/O errrors, we will return error back to application.
-If the error occurs on a later reload, then that particular reload will be
-skipped and error will be logged, and we will continue to use the latest valid
-policy to make authorization decisions.
+is invalid or there are I/O errrors, we will return error back to the application,
+which will generally result in the gRPC server not starting. If the error occurs
+on a later reload, then that particular reload will be skipped and error will be
+logged, and we will continue to use the latest valid policy to make authorization
+decisions.
 
 For each incoming RPC request, we will invoke the Engines (Deny engine followed
 by Allow engine), to get the authorization decision. We use a C-core filter for
@@ -685,7 +686,7 @@ was found.
 
 This engine implementation is shared by SDK-based authorization and xDS-based
 authorization. In xDS authorization, the xDS server sends an RBAC policy config to
-xDS-enabled gRPC server for authorization.([A41](https://github.com/grpc/proposal/blob/master/A41-xds-rbac.md): xDS RBAC Support)
+xDS-enabled gRPC server for authorization.([A41](A41-xds-rbac.md): xDS RBAC Support)
 
 Overall SDK authorization flow is as follows. User supplies gRPC SDK authorization
 policy to provider/interceptor. The provider then forwards the JSON policy to Policy
