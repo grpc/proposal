@@ -294,10 +294,10 @@ Valid user provided SDK authorization policy creates authorization engine(s).
 In the case of file watcher, we internally create thread(C-core)/ goroutine(Go)/
 scheduled service(Java) which will be used to read the policy file periodically,
 and update the authorization engines. During the first file read, if the policy
-is invalid or there are I/O errrors, we will return error back to application and
-SDK authorization won't be enabled. If the error occurs on a later reload, then
-that particular reload will be skipped and error will be logged, and we will
-continue to use the latest valid policy to make authorization decisions.
+is invalid or there are I/O errrors, we will return error back to application.
+If the error occurs on a later reload, then that particular reload will be
+skipped and error will be logged, and we will continue to use the latest valid
+policy to make authorization decisions.
 
 For each incoming RPC request, we will invoke the Engines (Deny engine followed
 by Allow engine), to get the authorization decision. We use a C-core filter for
@@ -315,7 +315,7 @@ different languages.
 
 #### C++
 
-1. C++ authorization provider API
+##### C++ Authorization Provider API
 
 ```C++
 // Wrapper around C-core grpc_authorization_policy_provider. Internally, it
@@ -356,7 +356,7 @@ class FileWatcherAuthorizationPolicyProvider final
 };
 ```
 
-2. C-core APIs
+##### C-core Authorization Provider API
 
 ```C++
 /** Channel args for grpc_authorization_policy_provider. If present, enables gRPC
@@ -406,9 +406,7 @@ GRPCAPI void grpc_authorization_policy_provider_release(grpc_authorization_polic
 
 ```
 
-3. Application enables SDK authorization in gRPC Server
-
-- Policy is statically initialized
+##### Example: Using a Static Authz Provider in gRPC-C++ Server
 
 ```C++
 grpc::Status status;
@@ -419,7 +417,7 @@ builder.SetAuthorizationPolicyProvider(provider);
 std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 ```
 
-- Policy is reloaded dynamically from file path
+##### Example: Using a Dynamic File Watcher Authz Provider in gRPC-C++ Server
 
 ```C++
 grpc::Status status;
@@ -433,7 +431,7 @@ std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 
 #### Go
 
-1. Authorization Server Interceptors
+##### Authorization Server Interceptors
 
 ```Go
 package authz
@@ -512,9 +510,7 @@ func (i *FileWatcherInterceptor) Close() {
 }
 ```
 
-2. Application enables SDK authorization in gRPC Server
-
-- Policy is statically initialized
+##### Example: Using a Static Authz Interceptor in gRPC-Go Server
 
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
@@ -527,7 +523,7 @@ serverOpts := []grpc.ServerOption{
 s := grpc.NewServer(serverOpts...)
 ```
 
-- Policy is reloaded dynamically from file path
+##### Example: Using a Dynamic File Watcher Authz Interceptor in gRPC-Go Server
 
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
@@ -544,7 +540,7 @@ defer i.Close()
 
 #### Java
 
-1. Authorization Server Interceptors
+##### Authorization Server Interceptors
 
 ```Java
 package io.grpc.authz;
@@ -622,9 +618,7 @@ public final class FileAuthorizationServerInterceptor implements ServerIntercept
 }
 ```
 
-2. Application enables SDK authorization in gRPC Server
-
-- Policy is statically initialized
+##### Example: Using a Static Authz Interceptor in gRPC-Java Server
 
 ```Java
 AuthorizationServerInterceptor authzServerInterceptor;
@@ -641,7 +635,7 @@ Server server =
         .start();
 ```
 
-- Policy is reloaded dynamically from file path
+##### Example: Using a Dynamic File Watcher Authz Interceptor in gRPC-Java Server
 
 ```Java
 ScheduledExecutorService scheduledExecutor =
@@ -690,9 +684,8 @@ of policy (if the policy is an allowlist or denylist) and whether a matching pol
 was found.
 
 This engine implementation is shared by SDK-based authorization and xDS-based
-authorization. In gRPC Proxyless Service Mesh (or xDS authorization), Istio or
-Traffic Director control plane sends Envoy RBAC policy configs to xDS enabled gRPC
-servers for authorization. ([A41](https://github.com/grpc/proposal/pull/237): xDS RBAC Support)
+authorization. In xDS authorization, the xDS server sends an RBAC policy config to
+xDS-enabled gRPC server for authorization.([A41](https://github.com/grpc/proposal/blob/master/A41-xds-rbac.md): xDS RBAC Support)
 
 Overall SDK authorization flow is as follows. User supplies gRPC SDK authorization
 policy to provider/interceptor. The provider then forwards the JSON policy to Policy
