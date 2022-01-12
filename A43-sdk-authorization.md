@@ -508,9 +508,9 @@ s := grpc.NewServer(
 ```Go
 creds := credentials.NewServerTLSFromFile(certFile, keyFile)
 i, err := authz.NewFileWatcher(authzPolicyFile, 1 * time.Hour)
+// Ensure err is nil.
 // In the end, free up the resources used for policy refresh.
 defer i.Close()
-// Ensure err is nil.
 s := grpc.NewServer(
     grpc.Creds(creds),
     grpc.ChainUnaryInterceptor(i.UnaryInterceptor),
