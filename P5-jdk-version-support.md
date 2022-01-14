@@ -2,7 +2,7 @@ P5: JDK Version Support Policy
 ----
 * Author(s): [Eric Anderson](https://github.com/ejona86)
 * Approver: dapengzhang0
-* Status: {Draft, In Review, Ready for Implementation, Implemented}
+* Status: Implemented
 * Implemented in: Java
 * Last updated: 2021-12-23
 * Discussion at: https://groups.google.com/g/grpc-io/c/S1biTro_sbE
