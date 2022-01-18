@@ -108,7 +108,10 @@ The following fields of `Permission` may not be obvious how they map to gRPC:
 
 Because matching supports NOT, the matcher must still be processed even if a
 rule contains references to things that don't generally match; it is not trivial
-to "optimize out" the never-matching rules.
+to "optimize out" the never-matching rules. Additionally, some matchers allow
+inverting the result of the match and this continues to hold true for fields
+that never match. For example, even though `metadata` never matches, if `invert`
+is set to true in `MetadataMatcher`, the result would be a match.
 
 The `header` field is not entirely 1:1 with gRPC Metadata, in part because which
 HTTP headers are present in Metadata is not 100% consistent cross-language.
@@ -150,7 +153,7 @@ In RBAC `metadata` refers to the Envoy metadata which has no relation to gRPC
 metadata. Envoy metadata is generic state shared between filters, which has no
 gRPC equivalent. RBAC implementations in gRPC will treat Envoy metadata as an
 empty map. Since `ValueMatcher` can only match if a value is present (even
-`NullMatch`), it is guaranteed not to match. If `invert` is set, it will match.
+`NullMatch`), the `value` matcher is guaranteed not to match.
 
 `requested_server_name` can match if the matcher accepts empty string.
 
