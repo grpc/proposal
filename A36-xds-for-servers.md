@@ -432,12 +432,6 @@ class XdsServerServingStatusNotifierInterface {
 
 class XdsServerBuilder : public ::grpc::ServerBuilder {
  public:
-  // Sets the drain grace period in ms for existing connections when updates to
-  // a Listener are received.
-  void set_drain_grace_time(int drain_grace_time_ms) {
-    builder_->drain_grace_time_ms_ = drain_grace_time_ms;
-  }
-
   // It is the responsibility of the application to make sure that \a notifier
   // outlasts the life of the server. Notifications will start being made
   // asynchronously once `BuildAndStart()` has been called. Note that it is
@@ -445,6 +439,10 @@ class XdsServerBuilder : public ::grpc::ServerBuilder {
   void set_status_notifier(XdsServerServingStatusNotifierInterface* notifier);
 };
 ```
+
+A new channel argument `GRPC_ARG_SERVER_CONFIG_CHANGE_DRAIN_GRACE_TIME_MS` will
+allow for adjusting the drain grace time for existing connections when updates
+to a `Listener` are received.
 
 The support for ephemeral ports on an xDS-enabled server is based on the support
 provided by C-Core, and hence not supported at the moment.
