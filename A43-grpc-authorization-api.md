@@ -1,6 +1,6 @@
-A43: gRPC authorization
+A43: gRPC authorization API
 ----
-* Author(s): [Ashitha Santhosh](https://github.com/ashithasantosh)
+* Author: [Ashitha Santhosh](https://github.com/ashithasantosh)
 * Approver: [Eric Anderson](https://github.com/ejona86)
 * Status: Ready for Implementation
 * Implemented in: C++, C-core and Go
