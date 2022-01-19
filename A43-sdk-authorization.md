@@ -1,4 +1,4 @@
-A43: SDK authorization
+A43: gRPC authorization
 ----
 * Author(s): [Ashitha Santhosh](https://github.com/ashithasantosh)
 * Approver: [Eric Anderson](https://github.com/ejona86)
@@ -30,10 +30,10 @@ the server verifies whether the client is authorized to make the RPC request.
 
 ### User facing Authorization Policy
 
-gRPC SDK authorization policy is the user facing policy language that allows
+gRPC authorization policy is the user facing policy language that allows
 service owners and/or security admins to enable per-RPC authorization checks.
 
-SDK authorization policy is extendable, we may add new fields in the future as
+This authorization policy is extendable, we may add new fields in the future as
 new requirements are introduced, we won’t be removing fields or updating
 semantics of existing fields. However, this means if user wants to use policy
 with new fields, they need to use the right gRPC version. Using policy with new
@@ -41,7 +41,7 @@ fields, with an older version of gRPC, will result in policy being marked invali
 This is essential, because otherwise we may end up allowing an RPC request without
 even evaluating the new field values in policy, which poses a security risk.
 
-Following is the JSON schema of SDK Authorization Policy Version 1.0
+Following is the JSON schema of gRPC Authorization Policy Version 1.0
 
 ```json
 {
@@ -186,7 +186,7 @@ Following is the JSON schema of SDK Authorization Policy Version 1.0
 
 #### Details
 
-gRPC SDK authorization policy has a list of *allow rules* and a list of *deny rules*.
+gRPC authorization policy has a list of *allow rules* and a list of *deny rules*.
 The following sequence is followed to make an authorization decision -
 1. Check for a match in *deny rules*, if a match is found, the request will be denied.
    If no match is found in deny rules, or there are no deny rules execute next step.
@@ -286,8 +286,8 @@ from filesystem. In static initialization, the policy will be provided as a JSON
 string. In dynamic file reloading, the application will specify the file path that
 contains the authorization policy in JSON format.
 
-Valid user provided SDK authorization policy creates authorization engine(s).
-In the case of file watcher, we internally create thread(C-core)/ goroutine(Go)/
+Valid user provided authorization policy creates authorization engine(s). In the
+case of file watcher, we internally create thread(C-core)/ goroutine(Go)/
 scheduled service(Java) which will be used to read the policy file periodically,
 and update the authorization engines. During the first file read, if the policy
 is invalid or there are I/O errrors, we will return error back to the application,
@@ -300,7 +300,7 @@ For each incoming RPC request, we will invoke the Engines (Deny engine followed
 by Allow engine), to get the authorization decision. We use a C-core filter for
 C++, and interceptors for Java and Go.
 
-We recommend users to use a single SDK authorization policy per gRPC server. If
+We recommend users to use a single gRPC authorization policy per gRPC server. If
 there are multiple policies, then there is a possibility that all the policies
 may not be evaluated against. For ex. if we have two policies for two different
 services say service A and service B. RPC to service B may get rejected, without
@@ -316,7 +316,7 @@ different languages.
 
 ```C++
 // Wrapper around C-core grpc_authorization_policy_provider. Internally, it
-// handles creating and updating authorization engine objects, using SDK
+// handles creating and updating authorization engine objects, using gRPC
 // authorization policy.
 class AuthorizationPolicyProviderInterface {
  public:
@@ -367,9 +367,9 @@ class FileWatcherAuthorizationPolicyProvider final
 typedef struct grpc_authorization_policy_provider grpc_authorization_policy_provider;
 
 /**
- * Creates a grpc_authorization_policy_provider using SDK authorization policy
+ * Creates a grpc_authorization_policy_provider using gRPC authorization policy
  * from static string.
- * - authz_policy is the input SDK authorization policy.
+ * - authz_policy is the input gRPC authorization policy.
  * - code is the error status code on failure. On success, it equals
  *   GRPC_STATUS_OK.
  * - error_details contains details about the error if any. If the
@@ -380,9 +380,9 @@ GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_s
     const char* authz_policy, grpc_status_code* code, const char** error_details);
 
 /**
- * Creates a grpc_authorization_policy_provider using SDK authorization policy
+ * Creates a grpc_authorization_policy_provider using gRPC authorization policy
  * from filesystem.
- * - authz_policy_path is the file path of SDK authorization policy.
+ * - authz_policy_path is the file path of gRPC authorization policy.
  * - refresh_interval_sec is the refreshing interval that we will check the
  *   policy file for updates.
  * - code is the error status code on failure. On success, it equals
@@ -646,14 +646,14 @@ closeable.close();
 ## Rationale
 
 gRPC Authorization internally implements RBAC Engine(s) based on Envoy [RBAC policy](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/rbac/v3/rbac.proto).
-We decided to create a new policy language "SDK authorization policy" instead of 
+We decided to create a new policy language "gRPC authorization policy" instead of
 consuming Envoy RBAC directly due to following reasons:
 - Envoy RBAC is a complex language, and we preferred using a simple human readable 
   policy language
 - With our own language, we can provide a stable API, even when Envoy undergoes 
   versioning updates.
 
-Note that SDK authorization policy is a subset of Envoy RBAC, and it does not
+Note that gRPC authorization policy is a subset of Envoy RBAC, and it does not
 support all the fields that are present in Envoy RBAC. 
 
 RBAC policy provides service-level and method-level access control for a service.
@@ -662,11 +662,11 @@ decision on whether to allow or deny the request. The decision depends on the ty
 of policy (if the policy is an allowlist or denylist) and whether a matching policy
 was found.
 
-This engine implementation is shared by SDK-based authorization and xDS-based
-authorization. In xDS authorization, the xDS server sends an RBAC policy config to
-xDS-enabled gRPC server for authorization.([A41](A41-xds-rbac.md): xDS RBAC Support)
+This engine implementation is also used by xDS-based authorization. In xDS
+authorization, the xDS server sends an RBAC policy config to xDS-enabled gRPC server
+for authorization.([A41](A41-xds-rbac.md): xDS RBAC Support)
 
-Overall SDK authorization flow is as follows. User supplies gRPC SDK authorization
+Overall gRPC authorization flow is as follows. User supplies gRPC authorization
 policy to provider/interceptor. The provider then forwards the JSON policy to Policy
 translator. The translator converts JSON policy to Envoy RBAC protos (Allow and/or
 Deny policy). Translator errors out on I/O errors or if the policy does not
@@ -674,8 +674,8 @@ represent JSON schema it currently supports. Ultimately the generated RBAC polic
 are used to create Envoy RBAC authorization engine(s). Then, for each incoming RPC
 request, we will invoke the Engines to get the authorization decision.
 
-SDK authorization can be enabled in xDS enabled servers, which means both
-authorization paths (SDK and xDS authorization) can co-exist. For a request to
+gRPC authorization can be enabled in xDS enabled servers, which means both
+authorization paths (gRPC and xDS authorization) can co-exist. For a request to
 be allowed, both paths must allow the request.
 
 As mentioned previously, authorization APIs take policy in JSON format, instead of
