@@ -4,7 +4,7 @@ A47: xDS Federation
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2021-10-20
+* Last updated: 2022-01-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/17pQyP31yL8
 
 ## Abstract
@@ -52,7 +52,7 @@ This design does *not* include the following features:
 - Support for dynamic parameters.  This will be necessary in the
   not-too-distant future, but it will be covered in a separate design.
 
-### Related Proposals: 
+### Related Proposals:
 * [gRFC A27: xDS-Based Global Load Balancing][A27]
 * [gRFC A28: xDS Traffic Splitting and Routing][A28]
 * [gRFC A36: xDS-Enabled Servers][A36]
@@ -680,6 +680,24 @@ arbitrary server with GoogleDefaultCredentials.  To avoid this, the
 into them is one of the servers that is already configured in the
 bootstrap file (i.e., it matches server name, channel creds, and server
 features).
+
+### xDS API Changes
+
+Currently, for the `ConfigSource` fields [in the LDS resource that points
+to the RDS resource][LDS-to-RDS-ConfigSource] and [in the CDS resource that
+points to the EDS resource][CDS-to-EDS-ConfigSource], gRPC requires the
+`ConfigSource` to have its [`ads`][ConfigSource-ads] field set.  As part of
+supporting federation, gRPC will now also allow the `ConfigSource` to have
+its [`self`][ConfigSource-self] field set.  Both fields will have the
+same meaning.
+
+[LDS-to-RDS-ConfigSource]: https://github.com/envoyproxy/envoy/blob/a86612d050e25a0e85e9b72fe7a39f6cbe0d793e/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L787
+[CDS-to-EDS-ConfigSource]: https://github.com/envoyproxy/envoy/blob/a86612d050e25a0e85e9b72fe7a39f6cbe0d793e/api/envoy/config/cluster/v3/cluster.proto#L200
+[ConfigSource-ads]: https://github.com/envoyproxy/envoy/blob/a86612d050e25a0e85e9b72fe7a39f6cbe0d793e/api/envoy/config/core/v3/config_source.proto#L185
+[ConfigSource-self]: https://github.com/envoyproxy/envoy/blob/a86612d050e25a0e85e9b72fe7a39f6cbe0d793e/api/envoy/config/core/v3/config_source.proto#L198
+
+This change is consistent with the direction for the xDS API discussed
+in https://github.com/envoyproxy/envoy/issues/13951.
 
 ### Temporary environment variable protection
 
