@@ -142,7 +142,7 @@ The new `authorities` field will have the following format:
     // with percent-encoded service authority (i.e., the path part of the
     // target URI used to create the gRPC channel).  The replacement string
     // must include only characters allowed in a URI path as per RFC-3986
-    // section 3.3 (which includes '/').  All other characters must be
+    // section 3.3 (which includes '/'), and all other characters must be
     // percent-encoded.
     //
     // Must start with "xdstp://<authority_name>/".  If it does not,
@@ -180,10 +180,10 @@ the following format:
 // The token "%s", if present in this string, will be replaced with
 // the service authority (i.e., the path part of the target URI
 // used to create the gRPC channel).  If the template starts with
-// "xdstp:", the replaced string will be percent-encoded.  The replacement
-// string must include only characters allowed in a URI path as per RFC-3986
-// section 3.3 (which includes '/').  All other characters must be
-// percent-encoded.
+// "xdstp:", the replaced string will be percent-encoded.  In that case,
+// the replacement string must include only characters allowed in a URI path
+// as per RFC-3986 section 3.3 (which includes '/'), and all other characters
+// must be percent-encoded.
 //
 // Defaults to "%s".
 "client_default_listener_resource_name_template": <string>,
@@ -196,9 +196,9 @@ There will be two changes to the existing
   select the relevant configuration in the `authorities` map.
 - When replacing the `%s` token, if the template starts with `xdstp:`,
   the replacement string will be percent-encoded in the resulting resource
-  name.  The replacement string must include only characters allowed in a
-  URI path as per RFC-3986 section 3.3 (which includes '/').  All other
-  characters must be percent-encoded.
+  name.  In that case, the replacement string must include only characters
+  allowed in a URI path as per RFC-3986 section 3.3 (which includes '/'),
+  and all other characters must be percent-encoded.
 
 The resulting field will have the following format:
 
@@ -213,9 +213,9 @@ The resulting field will have the following format:
 // The token "%s", if present in this string, will be replaced with
 // the IP and port on which the server is listening.  If the template
 // starts with "xdstp:", the replaced string will be percent-encoded.
-// The replacement string must include only characters allowed in a URI
-// path as per RFC-3986 section 3.3 (which includes '/').  All other characters
-// must be percent-encoded.
+// In that case, the replacement string must include only characters allowed
+// in a URI path as per RFC-3986 section 3.3 (which includes '/'), and all
+// other characters must be percent-encoded.
 //
 // There is no default; if unset, xDS-based server creation fails.
 //
@@ -427,16 +427,16 @@ if target_uri.authority is set:
   else:
     template = authority_config.client_listener_resource_name_template
     if template not set:
-      template = ("xdstp://" + target_uri.authority +
+      template = ("xdstp://" + PercentEncodeAuthority(target_uri.authority) +
                   "/envoy.config.listener.v3.Listener/%s")
     xds_resource_name = ExpandPercentS(template,
-                                       PercentEncode(target_hostname))
+                                       PercentEncodePath(target_hostname))
 else:  # target_uri.authority not set
   template = bootstrap.client_default_listener_resource_name_template
   if template not set:
     template = "%s"
   if template starts with "xdstp:":
-    target_hostname = PercentEncode(target_hostname)
+    target_hostname = PercentEncodePath(target_hostname)
   xds_resource_name = ExpandPercentS(template, target_hostname)
 ```
 
@@ -496,9 +496,12 @@ top-level map is today.
 
 The third-level map will be the resource name.  For old-style resource
 names, this will be the full resource name, exactly as it is today.  For
-new-style names, it will be the `id` part of the `xdstp:` URI (i.e., the
-URI path with the resource type prefix stripped off) and the context
-parameters.
+new-style names, the only really required parts are the `id` part of the
+`xdstp:` URI (i.e., the URI path with the resource type prefix stripped off)
+and the context parameters, since the authority and resource type are
+already expressed in the higher levels of the map.  For this third level
+of the map, implementations may either use the full resource name or extract
+only these required parts.
 
 For example, a resource with old-style name `server.example.com` and
 type Listener might be stored like this:
@@ -537,18 +540,19 @@ the map by iterating over the query params.
 
 When a caller starts a watch on an old-style resource name (one that
 does not start with `xdstp:`), the `XdsClient` will behave essentially as
-it does today, using the empty string as the authority name in the
-resource cache.
+it does today, using the special authority entry for old-style names in the
+resource cache.  If the resource is not already present in the cache,
+it will send a message subscribing to the resource, using the global xDS
+server from the bootstrap file.
 
 When a caller starts a watch on a new-style resource name (one that
 starts with `xdstp:`), the `XdsClient` will parse the URI.  It will use
 the authority of the URI as the primary key in the resource cache (using
 the empty string if the URI has no authority).  It will canonify any
 context parameters that are part of the resource name (i.e., removing
-duplicate keys and sorting keys in lexicographic order).  It will then
-check the cache to see if the resource is already present, in which case
-it will be returned immediately.  Otherwise, it will send a message
-subscribing to that resource, using the appropriate xDS server from the
+duplicate keys and sorting keys in lexicographic order).  If the
+resource is not already present in the cache, it will send a message
+subscribing to the resource, using the appropriate xDS server from the
 authority.
 
 #### LRS Server Representation
