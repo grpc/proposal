@@ -1,11 +1,11 @@
 Python Reflection Client
 ----
 * Author: Tomer Vromen
-* Approver: a11r, lidizheng (proposed)
-* Status: Draft
+* Approver: lidizheng, gnossen
+* Status: In Review
 * Implemented in: Python
 * Last updated: 2022-01-20
-* Discussion at: (TBD, filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/1fAWSxCy2mM
 
 ## Abstract
 
