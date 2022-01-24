@@ -2,9 +2,9 @@ A50: gRPC xDS Outlier Detection Support
 ----
 * Author(s): murgatroid99
 * Approver: markdroth
-* Implemented in: C++, Java, Go, Node
-* Last updated: 2021-11-30
-* Discussion at: <google group thread> (filled after thread exists)
+* Implemented in:
+* Last updated: 2022-01-24
+* Discussion at: https://groups.google.com/g/grpc-io/c/dk4ZX7nbBIk/m/n5r6ezQlBgAJ
 
 ## Abstract
 
@@ -25,7 +25,11 @@ This proposal builds on earlier work described in the following gRFCs:
 
 ## Proposal
 
-We will add a new `outlier_detection` load balancing policy that implements the outlier detection algorithm. This load balancing policy itself is not specific to xDS, but the xDS LB policy tree will use it.
+xDS outlier detection supports configuring many different ejection algorithms. We plan to support only two of them, [success rate](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/outlier#success-rate) and [failure percentage](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/outlier#failure-percentage). See the "Rationale" section below for why we are not supporting the other algorithms.
+
+The outlier detection functionality will be provided via a new `outlier_detection` LB policy, which delegates to a child policy to perform the actual load balancing. The outlier_detection policy will monitor the results of calls to the endpoints that the child dispatches requests to, and it will use that data to eject endpoints based on the configured ejection algorithms and thresholds. The LB policy will eject endpoints by having their subchannels report `TRANSIENT_FAILURE` to the child policy.
+
+Note that the `outlier_detection` LB policy will not be specific to xDS, so it will also be usable by non-xDS gRPC users.
 
 ### LB Policy Config
 
@@ -159,16 +163,20 @@ The subchannel wrapper will track the latest state update from the underlying su
 
 ### xDS Integration
 
-If the `Cluster` message for an underlying cluster has the `outlier_detection` field set, the `xds_cluster_resolver` will generate an `outlier_detection` LB policy config from it for each priority as the top-level LB policy for that priority. In that case, the child policy config will be the config that would otherwise be at the top level for the priority. When `outlier_detection` is configured, the LB policy tree will look like this when using round robin, and the `outlier_detection` LB policy will be inserted similarly when using ring hash:
+If the `Cluster` message for an underlying cluster has the `outlier_detection` field set, the `xds_cluster_resolver` will generate an `outlier_detection` LB policy config from it for each priority as the top-level LB policy for that priority. Each field in that message will be assigned to the corresponding field in the LB policy config. All other fields will be ignored, and all unsupported ejection algorithms will be considered disabled. In that case, the child policy config will be the config that would otherwise be at the top level for the priority. When outlier detection is configured, the `outlier_detection `policy will be inserted above the `xds_cluster_impl` policy. For example, when using round robin, the LB policy tree will look like this:
 
 ![gRPC Client Architecture Diagram](A50_graphics/grpc_xds_client_architecture.png)
 
 [Link to SVG file](A50_graphics/grpc_xds_client_architecture.svg)
 
+
+#### Validation
+
+The `google.protobuf.Duration` fields `interval`, `base_ejection_time`, and `max_ejection_time` must obey the restrictions in the [`google.protobuf.Duration` documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration) and they must have non-negative values. The fields `max_ejection_percent`, `enforcing_success_rate`, `failure_percentage_threshold`, and `enforcing_failure_percentage` must have values less than or equal to `100`. 
+
 ### Temporary environment variable protection
 
-During initial development, the xDS part of this feature will be enabled by the `GRPC_XDS_EXPERIMENTAL_ENABLE_OUTLIER_DETECTION` environment variable. This
-environment variable protection will be removed once the feature has proven stable.
+During initial development, this feature will be enabled by the `GRPC_EXPERIMENTAL_ENABLE_OUTLIER_DETECTION` environment variable. This environment variable protection will be removed once the feature has proven stable.
 
 ## Rationale
 
@@ -190,12 +198,13 @@ We chose to report address ejections by wrapping subchannels to report the TRANS
 
 ### Per-priority outlier detection
 
-The xDS spec for outlier detection defines the operations for all hosts in a cluster. We chose instead to do those operations on the addresses within each priority instead, for the following reasons:
+The xDS spec for outlier detection defines the operations for all hosts in a cluster. We chose instead to do those operations on the addresses within each priority instead, because, with the introduction of aggregate cluster support in [gRFC A37](https://github.com/grpc/proposal/blob/master/A37-xds-aggregate-and-logical-dns-clusters.md), there is not always an LB policy corresponding to the entirety of every underlying cluster. Instead, the aggregate and underlying cluster tree is flattened to a single priority list with all of the priorities for every cluster. So, there is no clear place to insert logic that applies to all of the addresses in a single underlying cluster. We considered adding a global map for outlier detection LB policies in the same cluster to share data, but it would add a lot of complexity and the returns would be minimal.
+
+We believe that this behavior difference will be acceptable for the following reasons:
 
  - The outlier detection logic is only applied to addresses that had enough traffic within the interval. gRPC only sends traffic to one priority at a time, so in almost all cases, applying the logic to a whole cluster would only actually apply it to the addresses in a single priority anyway. This differs from Envoy, which supports partial failover to a second priority while the primary priority still has some healthy hosts. There are exceptions, but we consider them to be edge cases that are acceptable to not fix:
    - If a priority switchover occurs in the middle of an interval, the addresses in both priorities will have some traffic. This situation will always be temporary, so the per-priority logic will be correct starting in the following interval.
    - The xDS specification of `failure_percentage_minimum_hosts` says that it counts all hosts in a cluster without considering traffic. As a result, looking at only individual priorities will result in gRPC not applying the failure percentage algorithm in some situations when Envoy would.
- - With the introduction of aggregate cluster support in gRFC A37, there is not always an LB policy corresponding to the entirety of every underlying cluster. Instead, the aggregate and underlying cluster tree is flattened to a single priority list with all of the priorities for every cluster. So, there is no clear place to insert logic that applies to all of the addresses in a single underlying cluster. We considered adding a global map for outlier detection LB policies in the same cluster to share data, but it would add a lot of complexity and the returns would be minimal.
   - If the xDS LB policy tree ever changes to consistently have an LB policy that represents each underlying cluster, the xDS logic in this proposal can easily be modified to put the `outlier_detection` policy at that part of the tree and make it act over the whole cluster.
 
 ### Non-xDS-specific LB policy
@@ -204,4 +213,4 @@ We decided to implement outlier detection as a generic LB policy instead of maki
 
 ## Implementation
 
-Implementation will start in Java and Node, and will happen later in C++ and Go.
+This will be implemented in C++, Java, Go, and Node in the first quarter of 2022.
