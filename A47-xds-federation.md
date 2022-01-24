@@ -2,9 +2,9 @@ A47: xDS Federation
 ----
 * Author(s): Mark D. Roth (@markdroth)
 * Approver: @ejona86, @dfawley
-* Status: {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in: <language, ...>
-* Last updated: 2022-01-19
+* Status: Implemented
+* Implemented in: C++
+* Last updated: 2022-01-24
 * Discussion at: https://groups.google.com/g/grpc-io/c/17pQyP31yL8
 
 ## Abstract
@@ -726,8 +726,6 @@ There are a few main steps to the implementation:
   xDS-enabled gRPC server.
 - Use new LRS server representation in `XdsClient` load reporting APIs and
   LB policy configs.
-
-This is currently being implemented in C-core, Java, and Go.
 
 ## Open issues (if applicable)
 
