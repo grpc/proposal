@@ -215,7 +215,7 @@ The `child_policy` config will be the `xds_cluster_impl` policy config that prev
 
 #### Validation
 
-The `google.protobuf.Duration` fields `interval`, `base_ejection_time`, and `max_ejection_time` must obey the restrictions in the [`google.protobuf.Duration` documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration) and they must have non-negative values. The fields `max_ejection_percent`, `enforcing_success_rate`, `failure_percentage_threshold`, and `enforcing_failure_percentage` must have values less than or equal to `100`. 
+The `google.protobuf.Duration` fields `interval`, `base_ejection_time`, and `max_ejection_time` must obey the restrictions in the [`google.protobuf.Duration` documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration) and they must have non-negative values. The fields `max_ejection_percent`, `enforcing_success_rate`, `failure_percentage_threshold`, and `enforcing_failure_percentage` must have values less than or equal to `100`. If any of these requirements is violated, the `Cluster` resource should be NACKed.
 
 ### Temporary environment variable protection
 
