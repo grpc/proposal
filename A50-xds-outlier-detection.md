@@ -55,53 +55,69 @@ message OutlierDetectionLoadBalancingConfig {
   // detection. Defaults to 10% but will eject at least one address regardless of the value.
   google.protobuf.UInt32Value max_ejection_percent = 4;
 
-  // This factor is used to determine the ejection threshold for success rate
-  // outlier ejection. The ejection threshold is the difference between the
-  // mean success rate, and the product of this factor and the standard
-  // deviation of the mean success rate: mean - (stdev *
-  // success_rate_stdev_factor). This factor is divided by a thousand to get a
-  // double. That is, if the desired factor is 1.9, the runtime value should
-  // be 1900. Defaults to 1900.
-  google.protobuf.UInt32Value success_rate_stdev_factor = 5;
+  // Parameters for the success rate ejection algorithm.
+  // This algorithm monitors the request success rate for all endpoints and
+  // ejects individual endpoints whose success rates are statistical outliers.
+  message SuccessRateEjection {
+    // This factor is used to determine the ejection threshold for success rate
+    // outlier ejection. The ejection threshold is the difference between the
+    // mean success rate, and the product of this factor and the standard
+    // deviation of the mean success rate: mean - (stdev *
+    // success_rate_stdev_factor). This factor is divided by a thousand to get a
+    // double. That is, if the desired factor is 1.9, the runtime value should
+    // be 1900. Defaults to 1900.
+    google.protobuf.UInt32Value stdev_factor = 1;
 
-  // The % chance that an address will be actually ejected when an outlier status
-  // is detected through success rate statistics. This setting can be used to
-  // disable ejection or to ramp it up slowly. Defaults to 100.
-  google.protobuf.UInt32Value enforcing_success_rate = 6;
+    // The % chance that an address will be actually ejected when an outlier status
+    // is detected through success rate statistics. This setting can be used to
+    // disable ejection or to ramp it up slowly. Defaults to 100.
+    google.protobuf.UInt32Value enforcing_success_rate = 2;
 
-  // The number of addresses that must have enough request volume to
-  // detect success rate outliers. If the number of addresses is less than this
-  // setting, outlier detection via success rate statistics is not performed
-  // for any addresses. Defaults to 5.
-  google.protobuf.UInt32Value success_rate_minimum_hosts = 7;
+    // The number of addresses that must have enough request volume to
+    // detect success rate outliers. If the number of addresses is less than this
+    // setting, outlier detection via success rate statistics is not performed
+    // for any addresses. Defaults to 5.
+    google.protobuf.UInt32Value minimum_hosts = 3;
 
-  // The minimum number of total requests that must be collected in one
-  // interval (as defined by the interval duration above) to include this address
-  // in success rate based outlier detection. If the volume is lower than this
-  // setting, outlier detection via success rate statistics is not performed
-  // for that address. Defaults to 100.
-  google.protobuf.UInt32Value success_rate_request_volume = 8;
+    // The minimum number of total requests that must be collected in one
+    // interval (as defined by the interval duration above) to include this address
+    // in success rate based outlier detection. If the volume is lower than this
+    // setting, outlier detection via success rate statistics is not performed
+    // for that address. Defaults to 100.
+    google.protobuf.UInt32Value request_volume = 4;
+  }
 
-  // The failure percentage to use when determining failure percentage-based outlier detection. If
-  // the failure percentage of a given address is greater than or equal to this value, it will be
-  // ejected. Defaults to 85.
-  google.protobuf.UInt32Value failure_percentage_threshold = 9;
+  // Parameters for the failure percentage algorithm.
+  // This algorithm ejects individual endpoints whose failure rate is greater than
+  // some threshold, independently of any other endpoint.
+  message FailurePercentageEjection {
+    // The failure percentage to use when determining failure percentage-based outlier detection. If
+    // the failure percentage of a given address is greater than or equal to this value, it will be
+    // ejected. Defaults to 85.
+    google.protobuf.UInt32Value threshold = 1;
 
-  // The % chance that an address will be actually ejected when an outlier status is detected through
-  // failure percentage statistics. This setting can be used to disable ejection or to ramp it up
-  // slowly. Defaults to 0.
-  google.protobuf.UInt32Value enforcing_failure_percentage = 10;
+    // The % chance that an address will be actually ejected when an outlier status is detected through
+    // failure percentage statistics. This setting can be used to disable ejection or to ramp it up
+    // slowly. Defaults to 100.
+    google.protobuf.UInt32Value enforcing_failure_percentage = 2;
 
-  // The minimum number of addresses in order to perform failure percentage-based ejection.
-  // If the total number of addresses is less than this value, failure percentage-based
-  // ejection will not be performed. Defaults to 5.
-  google.protobuf.UInt32Value failure_percentage_minimum_hosts = 11;
+    // The minimum number of addresses in order to perform failure percentage-based ejection.
+    // If the total number of addresses is less than this value, failure percentage-based
+    // ejection will not be performed. Defaults to 5.
+    google.protobuf.UInt32Value minimum_hosts = 3;
 
-  // The minimum number of total requests that must be collected in one interval (as defined by the
-  // interval duration above) to perform failure percentage-based ejection for this address. If the
-  // volume is lower than this setting, failure percentage-based ejection will not be performed for
-  // this host. Defaults to 50.
-  google.protobuf.UInt32Value failure_percentage_request_volume = 12;
+    // The minimum number of total requests that must be collected in one interval (as defined by the
+    // interval duration above) to perform failure percentage-based ejection for this address. If the
+    // volume is lower than this setting, failure percentage-based ejection will not be performed for
+    // this host. Defaults to 50.
+    google.protobuf.UInt32Value request_volume = 4;
+  }
+
+  // If set, success rate ejections will be performed
+  SuccessRateEjection success_rate_ejection = 5;
+  
+  // If set, failure rate ejections will be performed
+  FailurePercentageEjection failure_percentage_ejection = 6;
 
   // The config for the child policy
   repeated LoadBalancingConfig child_policy = 13;
@@ -126,10 +142,18 @@ The `outlier_detection` LB policy will provide a picker that delegates to the ch
 The `outlier_detection` LB policy will have a timer that triggers on a period determined by the `interval` config option, and does the following:
 
  1. For each address, swap the call counter's buckets in that address's map entry.
- 2. Run the [success rate](#success-rate-algorithm) and [falure percentage](#failure-percentage-algorithm) algorithms. To eject an address, it will set the address's ejection timestamp to the current time, increment the multiplier, and call `eject()` on each subchannel wrapper.
- 3. For each address in the map:
+ 2. If the `success_rate_ejection` configuration field is set, run the [success rate](#success-rate-algorithm) algorithm.
+ 3. If the `failure_percentage_ejection` configuration field is set, run the [falure percentage](#failure-percentage-algorithm) algorithm.
+ 4. Run the [success rate](#success-rate-algorithm) and [falure percentage](#failure-percentage-algorithm) algorithms.
+ 5. For each address in the map:
     - If the address is not ejected and the multiplier is greater than 0, decrement the multiplier.
-    - If the address is ejected, and the current time is after `ejection_timestamp + min(base_ejection_time * multiplier, max(base_ejection_time, max_ejection_time))`, un-eject the address by setting the ejection timestmap to `null` and calling `uneject` on each subchannel wrapper.
+    - If the address is ejected, and the current time is after `ejection_timestamp + min(base_ejection_time * multiplier, max(base_ejection_time, max_ejection_time))`, un-eject the address.
+
+### Ejection and Un-ejection
+
+To eject an address, set the current ejection timestamp to the current time, increment the ejection time multiplier, and call `eject()` on each subchannel wrapper in that address's subchannel wrapper list.
+
+To un-eject an address, set the current ejection timestamp to `null` and call `uneject()` on each subchannel wrapper in that address's subchannel wrapper list.
 
 ### Call Counter
 
@@ -146,24 +170,43 @@ The subchannel wrapper will track the latest state update from the underlying su
 
 ### Success Rate Algorithm
 
- 1. If the number of addresses with request volume of at least `success_rate_request_volume` is less than `success_rate_minimum_hosts`, stop.
- 2. Calculate the mean and standard deviation of the fractions of successful requests among addresses with total request volume of at least `success_rate_request_volume`.
+ 1. If the number of addresses with request volume of at least `success_rate_ejection.request_volume` is less than `success_rate_ejection.minimum_hosts`, stop.
+ 2. Calculate the mean and standard deviation of the fractions of successful requests among addresses with total request volume of at least `success_rate_ejection.request_volume`.
  3. For each address:
     1. If the percentage of ejected addresses is greater than `max_ejection_percent`, stop.
-    2. If the address's total request volume is less than `success_rate_request_volume`, continue to the next address.
-    3. If the address's success rate is less than `(mean - stdev * (success_rate_stdev_factor / 1000))`, then choose a random integer in `[0, 100)`. If that number is less than `enforcing_success_rate`, eject that address.
+    2. If the address's total request volume is less than `success_rate_ejection.request_volume`, continue to the next address.
+    3. If the address's success rate is less than `(mean - stdev * (success_rate_ejection.stdev_factor / 1000))`, then choose a random integer in `[0, 100)`. If that number is less than `success_rate_ejection.enforcing_success_rate`, eject that address.
 
 ### Failure Percentage Algorithm
 
- 1. If the number of addresses is less than `failure_percentage_minimum_hosts`, stop.
+ 1. If the number of addresses is less than `failure_percentage_ejection.minimum_hosts`, stop.
  2. For each address:
     1. If the percentage of ejected addresses is greater than `max_ejection_percent`, stop.
-    2. If the address's total request volume is less than `failure_percentage_request_volume`, continue to the next address.
-    3. If the address's failure percentage is greater than `failure_percentage_threshold`, then choose a random integer in `[0, 100)`. If that number is less than `enforcing_failure_percentage`, eject that address.
+    2. If the address's total request volume is less than `failure_percentage_ejection.request_volume`, continue to the next address.
+    3. If the address's failure percentage is greater than `failure_percentage_ejection.threshold`, then choose a random integer in `[0, 100)`. If that number is less than `failiure_percentage_ejection.enforcing_failure_percentage`, eject that address.
 
 ### xDS Integration
 
-If the `Cluster` message for an underlying cluster has the `outlier_detection` field set, the `xds_cluster_resolver` will generate an `outlier_detection` LB policy config from it for each priority as the top-level LB policy for that priority. Each field in that message will be assigned to the corresponding field in the LB policy config. All other fields will be ignored, and all unsupported ejection algorithms will be considered disabled. In that case, the child policy config will be the config that would otherwise be at the top level for the priority. When outlier detection is configured, the `outlier_detection `policy will be inserted above the `xds_cluster_impl` policy. For example, when using round robin, the LB policy tree will look like this:
+If the `Cluster` message for an underlying cluster has the `outlier_detection` field set, the `xds_cluster_resolver` will generate an `outlier_detection` LB policy config from it for each priority as the top-level LB policy for that priority. In that `outlier_detection` field message, if the `enforcing_success_rate` field is set to 0, the config `success_rate_ejection` field will be `null` and all `success_rate_*` fields will be ignored. If the `enforcing_failure_percent` field is set to 0 or `null`, the config `failure_percent_ejection` field will be `null` and all `failure_percent_*` fields will be ignored. Then the message fields will be mapped to config fields as follows:
+
+ - `interval` -> `interval`
+ - `base_ejection_time` -> `base_ejection_time`
+ - `max_ejection_time` -> `max_ejection_time`
+ - `max_ejection_percent` -> `max_ejection_percent`
+ - `success_rate_stdev_factor` -> `success_rate_ejection.stdev_factor`
+ - `enforcing_success_rate` -> `success_rate_ejection.enforcing_success_rate`
+ - `success_rate_minimum_hosts` -> `success_rate_ejection.minimum_hosts`
+ - `success_rate_request_volume` -> `success_rate_ejection.request_volume`
+ - `failure_percentage_threshold` -> `failure_percentage_ejection.threshold`
+ - `enforcing_failure_percentage` -> `failure_percentage_ejection.enforcing_failure_percentage`
+ - `failure_percentage_minimum_hosts` -> `failure_percentage_ejection.minimum_hosts`
+ - `failure_percentage_request_volume` -> `failure_percentage_ejection.request_volume`
+
+All other fields will be ignored, and all unsupported algorithms will be treated as disabled.
+
+If the `outlier_detection` field is not set in the `Cluster` message, a "no-op" `outlier_detection` config will be generated, with `interval` set to the maximum possible value and all other fields unset.
+
+The `child_policy` config will be the `xds_cluster_impl` policy config that previously would have been at the top level for the priority. For example, when using round robin, the LB policy tree will look like this:
 
 ![gRPC Client Architecture Diagram](A50_graphics/grpc_xds_client_architecture.png)
 
