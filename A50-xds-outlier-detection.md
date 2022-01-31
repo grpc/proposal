@@ -71,7 +71,7 @@ message OutlierDetectionLoadBalancingConfig {
     // The % chance that an address will be actually ejected when an outlier status
     // is detected through success rate statistics. This setting can be used to
     // disable ejection or to ramp it up slowly. Defaults to 100.
-    google.protobuf.UInt32Value enforcing_success_rate = 2;
+    google.protobuf.UInt32Value enforcement_percentage = 2;
 
     // The number of addresses that must have enough request volume to
     // detect success rate outliers. If the number of addresses is less than this
@@ -99,7 +99,7 @@ message OutlierDetectionLoadBalancingConfig {
     // The % chance that an address will be actually ejected when an outlier status is detected through
     // failure percentage statistics. This setting can be used to disable ejection or to ramp it up
     // slowly. Defaults to 100.
-    google.protobuf.UInt32Value enforcing_failure_percentage = 2;
+    google.protobuf.UInt32Value enforcement_percentage = 2;
 
     // The minimum number of addresses in order to perform failure percentage-based ejection.
     // If the total number of addresses is less than this value, failure percentage-based
@@ -144,8 +144,7 @@ The `outlier_detection` LB policy will have a timer that triggers on a period de
  1. For each address, swap the call counter's buckets in that address's map entry.
  2. If the `success_rate_ejection` configuration field is set, run the [success rate](#success-rate-algorithm) algorithm.
  3. If the `failure_percentage_ejection` configuration field is set, run the [falure percentage](#failure-percentage-algorithm) algorithm.
- 4. Run the [success rate](#success-rate-algorithm) and [falure percentage](#failure-percentage-algorithm) algorithms.
- 5. For each address in the map:
+ 4. For each address in the map:
     - If the address is not ejected and the multiplier is greater than 0, decrement the multiplier.
     - If the address is ejected, and the current time is after `ejection_timestamp + min(base_ejection_time * multiplier, max(base_ejection_time, max_ejection_time))`, un-eject the address.
 
@@ -175,7 +174,7 @@ The subchannel wrapper will track the latest state update from the underlying su
  3. For each address:
     1. If the percentage of ejected addresses is greater than `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `success_rate_ejection.request_volume`, continue to the next address.
-    3. If the address's success rate is less than `(mean - stdev * (success_rate_ejection.stdev_factor / 1000))`, then choose a random integer in `[0, 100)`. If that number is less than `success_rate_ejection.enforcing_success_rate`, eject that address.
+    3. If the address's success rate is less than `(mean - stdev * (success_rate_ejection.stdev_factor / 1000))`, then choose a random integer in `[0, 100)`. If that number is less than `success_rate_ejection.enforcement_percentage`, eject that address.
 
 ### Failure Percentage Algorithm
 
@@ -183,22 +182,22 @@ The subchannel wrapper will track the latest state update from the underlying su
  2. For each address:
     1. If the percentage of ejected addresses is greater than `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `failure_percentage_ejection.request_volume`, continue to the next address.
-    3. If the address's failure percentage is greater than `failure_percentage_ejection.threshold`, then choose a random integer in `[0, 100)`. If that number is less than `failiure_percentage_ejection.enforcing_failure_percentage`, eject that address.
+    3. If the address's failure percentage is greater than `failure_percentage_ejection.threshold`, then choose a random integer in `[0, 100)`. If that number is less than `failiure_percentage_ejection.enforcement_percentage`, eject that address.
 
 ### xDS Integration
 
-If the `Cluster` message for an underlying cluster has the `outlier_detection` field set, the `xds_cluster_resolver` will generate an `outlier_detection` LB policy config from it for each priority as the top-level LB policy for that priority. In that `outlier_detection` field message, if the `enforcing_success_rate` field is set to 0, the config `success_rate_ejection` field will be `null` and all `success_rate_*` fields will be ignored. If the `enforcing_failure_percent` field is set to 0 or `null`, the config `failure_percent_ejection` field will be `null` and all `failure_percent_*` fields will be ignored. Then the message fields will be mapped to config fields as follows:
+If the `Cluster` message for an underlying cluster has the `outlier_detection` field set, the `xds_cluster_resolver` will generate an `outlier_detection` LB policy config from it for each priority as the top-level LB policy for that priority. In that `outlier_detection` field message, if the `enforcement_percentage` field is set to 0, the config `success_rate_ejection` field will be `null` and all `success_rate_*` fields will be ignored. If the `enforcing_failure_percent` field is set to 0 or `null`, the config `failure_percent_ejection` field will be `null` and all `failure_percent_*` fields will be ignored. Then the message fields will be mapped to config fields as follows:
 
  - `interval` -> `interval`
  - `base_ejection_time` -> `base_ejection_time`
  - `max_ejection_time` -> `max_ejection_time`
  - `max_ejection_percent` -> `max_ejection_percent`
  - `success_rate_stdev_factor` -> `success_rate_ejection.stdev_factor`
- - `enforcing_success_rate` -> `success_rate_ejection.enforcing_success_rate`
+ - `enforcement_percentage` -> `success_rate_ejection.enforcement_percentage`
  - `success_rate_minimum_hosts` -> `success_rate_ejection.minimum_hosts`
  - `success_rate_request_volume` -> `success_rate_ejection.request_volume`
  - `failure_percentage_threshold` -> `failure_percentage_ejection.threshold`
- - `enforcing_failure_percentage` -> `failure_percentage_ejection.enforcing_failure_percentage`
+ - `enforcement_percentage` -> `failure_percentage_ejection.enforcement_percentage`
  - `failure_percentage_minimum_hosts` -> `failure_percentage_ejection.minimum_hosts`
  - `failure_percentage_request_volume` -> `failure_percentage_ejection.request_volume`
 
@@ -215,7 +214,7 @@ The `child_policy` config will be the `xds_cluster_impl` policy config that prev
 
 #### Validation
 
-The `google.protobuf.Duration` fields `interval`, `base_ejection_time`, and `max_ejection_time` must obey the restrictions in the [`google.protobuf.Duration` documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration) and they must have non-negative values. The fields `max_ejection_percent`, `enforcing_success_rate`, `failure_percentage_threshold`, and `enforcing_failure_percentage` must have values less than or equal to `100`. If any of these requirements is violated, the `Cluster` resource should be NACKed.
+The `google.protobuf.Duration` fields `interval`, `base_ejection_time`, and `max_ejection_time` must obey the restrictions in the [`google.protobuf.Duration` documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration) and they must have non-negative values. The fields `max_ejection_percent`, `enforcement_percentage`, `failure_percentage_threshold`, and `enforcement_percentage` must have values less than or equal to `100`. If any of these requirements is violated, the `Cluster` resource should be NACKed.
 
 ### Temporary environment variable protection
 
