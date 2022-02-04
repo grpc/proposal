@@ -218,7 +218,7 @@ The `google.protobuf.Duration` fields `interval`, `base_ejection_time`, and `max
 
 ### Temporary environment variable protection
 
-During initial development, this feature will be enabled by the `GRPC_EXPERIMENTAL_ENABLE_OUTLIER_DETECTION` environment variable. This environment variable protection will be removed once the feature has proven stable.
+During initial development, this feature will be enabled by the `GRPC_EXPERIMENTAL_ENABLE_OUTLIER_DETECTION` environment variable. If unset or not `true`, the `outlier_detection` LB policy will not be registered, and all of the logic specified in the "xDS Integration" section will be disabled. This environment variable protection will be removed once the feature has proven stable.
 
 ## Rationale
 
