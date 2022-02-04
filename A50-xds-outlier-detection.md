@@ -145,12 +145,12 @@ The `outlier_detection` LB policy will have a timer that triggers on a period de
  2. If the `success_rate_ejection` configuration field is set, run the [success rate](#success-rate-algorithm) algorithm.
  3. If the `failure_percentage_ejection` configuration field is set, run the [falure percentage](#failure-percentage-algorithm) algorithm.
  4. For each address in the map:
-    - If the address is not ejected and the multiplier is greater than 0, decrement the multiplier.
+    - If the address is not ejected and the multiplier is greater than 0, decrease the multiplier by 1.
     - If the address is ejected, and the current time is after `ejection_timestamp + min(base_ejection_time * multiplier, max(base_ejection_time, max_ejection_time))`, un-eject the address.
 
 ### Ejection and Un-ejection
 
-To eject an address, set the current ejection timestamp to the current time, increment the ejection time multiplier, and call `eject()` on each subchannel wrapper in that address's subchannel wrapper list.
+To eject an address, set the current ejection timestamp to the current time, increase the ejection time multiplier by 1, and call `eject()` on each subchannel wrapper in that address's subchannel wrapper list.
 
 To un-eject an address, set the current ejection timestamp to `null` and call `uneject()` on each subchannel wrapper in that address's subchannel wrapper list.
 
