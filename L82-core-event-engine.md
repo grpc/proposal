@@ -597,8 +597,12 @@ AJ Heller (@drfloob) is the project lead, under advisement from Mark Roth
 @dennycd, @nicolasnoble, @tamird, and @Vignesh2208. Python collaborators include
 @gnossen and @lidizheng.
 
-## TODO
+## TBD while the API remains experimental:
 
-Yet to be defined:
+* Alterations to the Time type are expected.
+* Finalized details on how custom EventEngine objects are provided.
+* Finalized details on file descriptor support.
 
-* Plans to deprecate the gRPC-Core-internal completion queue model
+## Followup work
+
+* Plans to deprecate the gRPC-Core-internal completion queue model.
