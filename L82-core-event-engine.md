@@ -450,71 +450,17 @@ class EventEngine {
 
 *Caveat: This is not final, feedback is welcome!*
 
-There are three ways in which EventEngines can be provided to gRPC.
+There will be multiple ways in which applications can provide custom
+EventEngines to gRPC.
 
-#### Setting an EventEngine instance for a Channel
+* An application can specify a _global EventEngine provider_ that returns
+  EventEngine(s) for any client code that requires one.
+* EventEngines can be specified _per Channel_ or _per Server_.
 
-EventEngines can be configured per channel, which allows customization for both
-clients and servers. To set a custom EventEngine for a client channel, you can
-do something like the following:
-
-```cpp
-ChannelArguments args;
-std::shared_ptr<EventEngine> engine = std::make_shared<MyEngine>(...);
-args.SetEventEngine(engine);
-MyAppClient client(grpc::CreateCustomChannel(
-    "localhost:50051", grpc::InsecureChannelCredentials(), args));
-```
-
-#### Setting an EventEngine instance for a Server
-
-A gRPC server can use a custom EventEngine by calling the
-`ServerBuilder::SetEventEngine` method:
-
-```cpp
-ServerBuilder builder;
-std::shared_ptr<EventEngine> engine = std::make_shared<MyEngine>(...);
-builder.SetEventEngine(engine);
-std::unique_ptr<Server> server(builder.BuildAndStart());
-server->Wait();
-```
-
-#### Providing a default EventEngine factory
-
-Before gRPC is initialized, an application can specify an EventEngine Factory
-method that will be used within gRPC when a channel- or server-specific
-EventEngine is unavailable. gRPC needs to perform I/O, run tasks, and use timers
-in scenarios that are not directly attached to channels and servers.  Providing
-a custom EventEngine factory will allow your application to avoid the creation
-of the default EventEngine provided by gRPC.
-
-```cpp
-/// Replace gRPC's default EventEngine factory.
-///
-/// Applications may call \a SetDefaultEventEngineFactory at any time to replace
-/// the default factory used within gRPC. EventEngines will be created when
-/// necessary, when they are otherwise not provided by the application.
-///
-/// To be certain that none of the gRPC-provided built-in EventEngines are
-/// created, applications must set a custom EventEngine factory method *before*
-/// grpc is initialized.
-void SetDefaultEventEngineFactory(
-    const std::function<std::unique_ptr<EventEngine>()>* factory);
-
-/// Create an EventEngine using the default factory.
-std::unique_ptr<EventEngine> CreateEventEngine();
-```
-
-### Lifetime and Ownership
-
-gRPC will take shared ownership of application-provided EventEngines via
-std::shared\_ptrs to ensure that the engines remain available until they are no
-longer needed. Depending on the use case, EventEngines may need to live until
-gRPC is shut down. Any EventEngine that is provided to gRPC is expected to
-remain valid for as long as gRPC holds a pointer to it. Application-provided
-EventEngines will not be shut down automatically when gRPC is shut down, it is
-the application's responsibility to shut down and clean up EventEngines when
-they are no longer needed, if shared\_ptr semantics aren't sufficient.
+During the experimental period, details will be refined regarding EventEngine
+lifetimes and ownership stories. In the initial phases, gRPC will rely on a
+global EventEngine factory (which applications can provide), with the
+expectation that EventEngines never need to be shut down.
 
 ### Synchronous Server Implementation
 
