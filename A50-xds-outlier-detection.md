@@ -186,7 +186,74 @@ The subchannel wrapper will track the latest state update from the underlying su
 
 ### xDS Integration
 
-If the `Cluster` message for an underlying cluster has the `outlier_detection` field set, the `xds_cluster_resolver` will generate an `outlier_detection` LB policy config from it for each priority as the top-level LB policy for that priority. In that `outlier_detection` field message, if the `enforcement_percentage` field is set to 0, the config `success_rate_ejection` field will be `null` and all `success_rate_*` fields will be ignored. If the `enforcing_failure_percent` field is set to 0 or `null`, the config `failure_percent_ejection` field will be `null` and all `failure_percent_*` fields will be ignored. Then the message fields will be mapped to config fields as follows:
+The `xds_cluster_resolver` config described in [gRFC A37: xDS Aggregate and Logical DNS Clusters](https://github.com/grpc/proposal/blob/master/A37-xds-aggregate-and-logical-dns-clusters.md) will be modified so that the `DiscoveryMechanism` inner message contains an additional `outlier_detection` field as follows:
+
+```proto
+message XdsClusterResolverLoadBalancingPolicyConfig {
+  // Describes a discovery mechanism instance.
+  // For EDS or LOGICAL_DNS clusters, there will be exactly one
+  // DiscoveryMechanism, which will describe the cluster of the parent
+  // CDS policy.
+  // For aggregate clusters, there will be one DiscoveryMechanism for each
+  // underlying cluster.
+  message DiscoveryMechanism {
+    // Cluster name.
+    string cluster = 1;
+
+    // LRS server to send load reports to.
+    // If not present, load reporting will be disabled.
+    // If set to the empty string, load reporting will be sent to the same
+    // server that we obtained CDS data from.
+    google.protobuf.StringValue lrs_load_reporting_server_name = 2;
+
+    // Maximum number of outstanding requests can be made to the upstream cluster.
+    // Default is 1024.
+    google.protobuf.UInt32Value max_concurrent_requests = 3;
+
+    enum Type { EDS, LOGICAL_DNS };
+    Type type = 4;
+
+    // For type EDS only.
+    // EDS service name, as returned in CDS.
+    // May be unset if not specified in CDS.
+    string eds_service_name = 5;
+
+    // For type LOGICAL_DNS only.
+    // DNS name to resolve in "host:port" form.
+    string dns_hostname = 6;
+
+    // The configuration for outlier_detection child policies
+    // Within this message, the child_policy field will be ignored
+    OutlierDetectionLoadBalancingConfig outlier_detection = 7;
+  }
+
+  // Ordered list of discovery mechanisms.
+  // Must have at least one element.
+  // Results from each discovery mechanism are concatenated together in successive
+  // priorities.
+  repeated DiscoveryMechanism discovery_mechanisms = 1;
+
+  // Locality-picking policy.
+  // This policy's config is expected to be in the format used
+  // by the weighted_target policy.  Note that the config should include
+  // an empty value for the "targets" field; that empty value will be
+  // replaced by one that is dynamically generated based on the EDS data.
+  // Optional; defaults to "weighted_target".
+  repeated LoadBalancingConfig locality_picking_policy = 2;
+
+  // Endpoint-picking policy.
+  // This will be configured as the policy for each child in the
+  // locality-policy's config.
+  // Optional; defaults to "round_robin".
+  repeated LoadBalancingConfig endpoint_picking_policy = 3;
+}
+```
+
+The `xds_cluster_resolver` LB policy will configure an `outlier_detection` LB policy instance for each priority as the top-level LB policy for that priority.  The configuration for that `outlier_detection` policy will be based on the `outlier_detection` field in the corresponding `DiscoveryMechanism` config for that priority.
+
+In the `cds` LB policy, if the `outlier_detection` field is not set in the `Cluster` resource, a "no-op" `outlier_detection` config will be generated in the corresponding `DiscoveryMechanism` config, with `interval` set to the maximum possible value and all other fields unset.
+
+If the `outlier_detection` field *is* set in the `Cluster` resource, if the `enforcement_percentage` field is set to 0, the config `success_rate_ejection` field will be `null` and all `success_rate_*` fields will be ignored. If the `enforcing_failure_percent` field is set to 0 or `null`, the config `failure_percent_ejection` field will be `null` and all `failure_percent_*` fields will be ignored. Then the message fields will be mapped to config fields as follows:
 
  - `interval` -> `interval`
  - `base_ejection_time` -> `base_ejection_time`
@@ -202,8 +269,6 @@ If the `Cluster` message for an underlying cluster has the `outlier_detection` f
  - `failure_percentage_request_volume` -> `failure_percentage_ejection.request_volume`
 
 All other fields will be ignored, and all unsupported algorithms will be treated as disabled.
-
-If the `outlier_detection` field is not set in the `Cluster` message, a "no-op" `outlier_detection` config will be generated, with `interval` set to the maximum possible value and all other fields unset.
 
 The `child_policy` config will be the `xds_cluster_impl` policy config that previously would have been at the top level for the priority. For example, when using round robin, the LB policy tree will look like this:
 
