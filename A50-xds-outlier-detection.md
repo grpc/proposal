@@ -133,7 +133,7 @@ Internally, the `outlier_detection` LB policy will store a map with keys that ar
  - The current ejection time multiplier, starting at 0
  - A list of subchannel wrapper objects that correspond to this address
 
-When the `outlier_detection` LB policy receives an address update, it will create a map entry for each subchannel address in the list, and remove each map entry for a subchannel address not in the list, then pass the address list along to the subchannel.
+When the `outlier_detection` LB policy receives an address update, it will create a map entry for each subchannel address in the list, and remove each map entry for a subchannel address not in the list, then pass the address list along to the child policy.
 
 When the child policy asks for a subchannel, the `outlier_detection` will wrap the subchannel with a wrapper (see [Subchannel Wrapper section](#subchannel-wrapper)). Then, the subchannel wrapper will be added to the list in the map entry for its address, if that map entry exists. If there is no map entry, or if the subchannel is created with multiple addresses, the subchannel will be ignored for outlier detection. If that address is currently ejected, that subchannel wrapper's `eject` method will be called.
 
@@ -141,16 +141,17 @@ The `outlier_detection` LB policy will provide a picker that delegates to the ch
 
 The `outlier_detection` LB policy will have a timer that triggers on a period determined by the `interval` config option, and does the following:
 
- 1. For each address, swap the call counter's buckets in that address's map entry.
- 2. If the `success_rate_ejection` configuration field is set, run the [success rate](#success-rate-algorithm) algorithm.
- 3. If the `failure_percentage_ejection` configuration field is set, run the [falure percentage](#failure-percentage-algorithm) algorithm.
- 4. For each address in the map:
+ 1. Record the timestamp for use when ejecting addresses in this iteration.
+ 2. For each address, swap the call counter's buckets in that address's map entry.
+ 3. If the `success_rate_ejection` configuration field is set, run the [success rate](#success-rate-algorithm) algorithm.
+ 4. If the `failure_percentage_ejection` configuration field is set, run the [falure percentage](#failure-percentage-algorithm) algorithm.
+ 5. For each address in the map:
     - If the address is not ejected and the multiplier is greater than 0, decrease the multiplier by 1.
     - If the address is ejected, and the current time is after `ejection_timestamp + min(base_ejection_time * multiplier, max(base_ejection_time, max_ejection_time))`, un-eject the address.
 
 ### Ejection and Un-ejection
 
-To eject an address, set the current ejection timestamp to the current time, increase the ejection time multiplier by 1, and call `eject()` on each subchannel wrapper in that address's subchannel wrapper list.
+To eject an address, set the current ejection timestamp to the timestamp that was recorded when the timer fired, increase the ejection time multiplier by 1, and call `eject()` on each subchannel wrapper in that address's subchannel wrapper list.
 
 To un-eject an address, set the current ejection timestamp to `null` and call `uneject()` on each subchannel wrapper in that address's subchannel wrapper list.
 
@@ -184,6 +185,10 @@ The subchannel wrapper will track the latest state update from the underlying su
     2. If the address's total request volume is less than `failure_percentage_ejection.request_volume`, continue to the next address.
     3. If the address's failure percentage is greater than `failure_percentage_ejection.threshold`, then choose a random integer in `[0, 100)`. If that number is less than `failiure_percentage_ejection.enforcement_percentage`, eject that address.
 
+### Validation
+
+The `google.protobuf.Duration` fields `interval`, `base_ejection_time`, and `max_ejection_time` must obey the restrictions in the [`google.protobuf.Duration` documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration) and they must have non-negative values. The fields `max_ejection_percent`, `success_rate_ejection.enforcement_percentage`, `failure_percentage_ejection.threshold`, and `failure_percentage.enforcement_percentage` must have values less than or equal to `100`. When parsing a config from JSON, if any of these requirements is violated, that should be treated as a parsing error.
+
 ### xDS Integration
 
 The `xds_cluster_resolver` config described in [gRFC A37: xDS Aggregate and Logical DNS Clusters](https://github.com/grpc/proposal/blob/master/A37-xds-aggregate-and-logical-dns-clusters.md) will be modified so that the `DiscoveryMechanism` inner message contains an additional `outlier_detection` field with the type `OutlierDetectionLoadBalancingConfig`. In this context, the `child_policy` field of that message will be ignored.
@@ -199,11 +204,11 @@ If the `outlier_detection` field *is* set in the `Cluster` resource, if the `enf
  - `max_ejection_time` -> `max_ejection_time`
  - `max_ejection_percent` -> `max_ejection_percent`
  - `success_rate_stdev_factor` -> `success_rate_ejection.stdev_factor`
- - `enforcement_percentage` -> `success_rate_ejection.enforcement_percentage`
+ - `enforcing_success_rate` -> `success_rate_ejection.enforcement_percentage`
  - `success_rate_minimum_hosts` -> `success_rate_ejection.minimum_hosts`
  - `success_rate_request_volume` -> `success_rate_ejection.request_volume`
  - `failure_percentage_threshold` -> `failure_percentage_ejection.threshold`
- - `enforcement_percentage` -> `failure_percentage_ejection.enforcement_percentage`
+ - `enforcing_failure_percentage` -> `failure_percentage_ejection.enforcement_percentage`
  - `failure_percentage_minimum_hosts` -> `failure_percentage_ejection.minimum_hosts`
  - `failure_percentage_request_volume` -> `failure_percentage_ejection.request_volume`
 
@@ -216,9 +221,9 @@ The `child_policy` config will be the `xds_cluster_impl` policy config that prev
 [Link to SVG file](A50_graphics/grpc_xds_client_architecture.svg)
 
 
-#### Validation
+#### xDS Validation
 
-The `google.protobuf.Duration` fields `interval`, `base_ejection_time`, and `max_ejection_time` must obey the restrictions in the [`google.protobuf.Duration` documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration) and they must have non-negative values. The fields `max_ejection_percent`, `enforcement_percentage`, `failure_percentage_threshold`, and `enforcement_percentage` must have values less than or equal to `100`. If any of these requirements is violated, the `Cluster` resource should be NACKed.
+The `outlier_detection` field of the `Cluster` resource should have its fields validated according to the rules for the corresponding LB policy config fields in the above "Validation" section. If any of these requirements is violated, the `Cluster` resource should be NACKed.
 
 ### Temporary environment variable protection
 
