@@ -39,7 +39,7 @@ Add an entrypoint to `grpc-tools` that would register as a `file_finer` hook wit
 simplify the implementation without introducing an additional code path, the entrypoint will target
 the same `main()` function used by the `grpc_tools.protoc` CLI. A [tool table][tool_table] within the
 file `pyproject.toml` will be used to accept configuration parameters. This will add a dependency on
-tomli for now, but this will [likely not be needed][pep_680] in future versions of Python.
+tomli for now, but this will [not be needed][pep_680] starting in Python 3.11.
 
 In order to prevent unintended behavior, the first thing the functionality will do is check the
 configuration file to see if the section has been configured. If the file does not exist or the section
