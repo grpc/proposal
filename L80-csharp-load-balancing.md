@@ -227,15 +227,6 @@ namespace Grpc.Net.Client.Balancer {
         void Complete(CompletionContext context);
         void Start();
     }
-    public abstract class AsyncResolver : Resolver {
-        protected AsyncResolver(ILoggerFactory loggerFactory);
-        protected Action<ResolverResult> Listener { get; }
-        public override sealed void Refresh();
-        public override sealed void Start(Action<ResolverResult> listener);
-        protected override void Dispose(bool disposing);
-        protected virtual void OnStarted();
-        protected abstract Task ResolveAsync(CancellationToken cancellationToken);
-    }
     public sealed class BalancerAddress {
         public BalancerAddress(DnsEndPoint endPoint);
         public BalancerAddress(string host, int port);
@@ -323,10 +314,19 @@ namespace Grpc.Net.Client.Balancer {
         public static PickResult ForQueue();
         public static PickResult ForSubchannel(Subchannel subchannel, ISubchannelCallTracker? subchannelCallTracker = null);
     }
+    public abstract class PollingResolver : Resolver {
+        protected PollingResolver(ILoggerFactory loggerFactory);
+        protected Action<ResolverResult> Listener { get; }
+        public override sealed void Refresh();
+        public override sealed void Start(Action<ResolverResult> listener);
+        protected override void Dispose(bool disposing);
+        protected virtual void OnStarted();
+        protected abstract Task ResolveAsync(CancellationToken cancellationToken);
+    }
     public abstract class Resolver : IDisposable {
         protected Resolver();
         public void Dispose();
-        public abstract void Refresh();
+        public virtual void Refresh();
         public abstract void Start(Action<ResolverResult> listener);
         protected virtual void Dispose(bool disposing);
     }
