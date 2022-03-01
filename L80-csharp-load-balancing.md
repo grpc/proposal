@@ -1,10 +1,10 @@
-L80: .NET: Load balancing, connectivity and wait for ready in client
+L96: .NET: Load balancing, connectivity and wait for ready in client
 ----
 * Author(s): James Newton-King
 * Approver: jtattermusch and markdroth
-* Status: Draft
+* Status: Approved
 * Implemented in: csharp
-* Last updated: 2021-12-12
+* Last updated: 2022-03-01
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
