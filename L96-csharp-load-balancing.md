@@ -1,4 +1,4 @@
-L80: .NET: Load balancing, connectivity and wait for ready in client
+L96: .NET: Load balancing, connectivity and wait for ready in client
 ----
 * Author(s): James Newton-King
 * Approver: jtattermusch and markdroth
@@ -24,7 +24,7 @@ grpc-dotnet currently doesn't support any form of load balancing in the client. 
 
 ## Proposal
 
-![Diagram](L80_graphics/diagram.png)
+![Diagram](L96_graphics/diagram.png)
 
 ### Initialization
 
