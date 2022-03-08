@@ -4,7 +4,7 @@ L96: .NET: Load balancing, connectivity and wait for ready in client
 * Approver: jtattermusch and markdroth
 * Status: Approved
 * Implemented in: csharp
-* Last updated: 2022-03-01
+* Last updated: 2022-03-08
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
