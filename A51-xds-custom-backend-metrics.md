@@ -107,7 +107,7 @@ public final class CallMetricRecorder {
   //Records the CPU utilization metric measurement for the call. 
   public CallMetricRecorder recordCPUUtilizationMetric(double value);
 
-  // Records the CPU utilization metric measurement for the call. 
+  // Records the memory utilization metric measurement for the call. 
   public CallMetricRecorder recordMemoryUtilizationMetric(double value);
 
   // Returns the call metric recorder attached to the current call.
@@ -133,18 +133,18 @@ For the out-of-band reporting, it requires a separate load reporting server runn
 backend server for as long as the server is alive.
 
 At the client side, typically an LB policy, opens a stream on each
-established connection to the backend server to request the load report, and then periodically receiving
-metrics data from the streaming server for each backend.
+established connection to the backend server to request the load report, and then periodically receives 
+metrics data from each backend streaming server.
 The report request should specify metrics reporting interval, the lower bound of which should be capped 
 to a server configurable value, and there is no upper bound unless it is needed in the future.
 
 #### The Server API 
 Provide builtin implementation of `OpenRCAService` streaming service defined by ORCA in each supported language.
-Server applications are free to add such a load reporting server
+A user can add such a load reporting server in their server applications
 in a normal way that they register a service.
 
-The service holds the utilization metrics data in key/value pairs using a hashmap. 
-Expose set-style APIs for user applications to update the metrics data, pseudocode below:
+The `OpenRCAService` holds the utilization metrics data in key/value pairs using a hashmap. 
+Expose set-style APIs for user's server applications to update the metrics data, pseudocode below:
 
 ```java
 class OrcaServiceImpl implements OpenRcaService {
@@ -182,8 +182,8 @@ void deleteMemoryUtilizationMetric();
 ```
 
 All the methods above should be thread safe. 
-Allowing updating each metric key individually is convenient for a server application to adopt where it 
-comes with multiple isolated components and each generates their own set of metrics.
+Allowing updating each metric key individually is convenient for a server application to adopt when it 
+has multiple isolated components and each generates their own set of metrics.
 
 A minimum reporting interval (30s by default) could be configured when creating the service.
 The minimum report interval is the lower bound of the OOB metrics report period. It means, in the 
@@ -194,8 +194,8 @@ There is no upper bound, the largest value you can specify is max integer.
 However, it might be useful to have a separate option called default report interval (default 1 minute) 
 that will be used when `report_interval` is not specified (equal to 0), see the code comment above.
 
-Alternatively we can use callback-style APIs in a pull model, but this is suboptimal because 
-it is not performance/scalability friendly.
+Alternatively we can use callback-style APIs in a pull model to update the metrics data, 
+however, this is suboptimal because it is not performance/scalability friendly.
 In a pull model, the time complexity of doing utilization measurement syscalls reaches O(M*N),
 M being the number of OOB clients and N being their frequency configuration.
 In a push model, the number of syscalls decouples with the number of OOB clients and their configurations.
