@@ -37,16 +37,54 @@ information. This could be used to generate source files based on `.proto` files
 
 ## Proposal
 
-Add an entrypoint to `grpcio-tools` that would register as a `file_finder` hook with `setuptools`. To
-simplify the implementation without introducing an additional code path, the entrypoint will target
-the same `main()` function used by the `grpc_tools.protoc` CLI. A [tool table][tool_table] within the
-file `pyproject.toml` will be used to accept configuration parameters. This will add a dependency on
-tomli for now, but this will [not be needed][pep_680] starting in Python 3.11.
+`grpcio-tools` will register a new entrypoint function to respond to the `setuptools.file_finders`
+hook. This hook will generate Python files based on the `.proto` files and tell `setuptools where
+they were generated.
 
-In order to prevent unintended behavior, the first thing the functionality will do is check the
-configuration file to see if the section has been configured. If the file does not exist or the section
-is not configured, no additional steps will be taken. `setuptools` will be provided with an empty
-list to indicate that there are no additional files to include in the distribution.
+### Configuration
+
+This functionality will use a [tool table][tool_table] in `pyproject.toml` named `tool.grpcio-tools`
+to accept configuration parameters.
+
+__TODO__: List configuration parameters and how they would be used. If anything is required, add it to
+the list in "How would a project use this feature".
+
+### Functional Implementation
+
+Add an entrypoint function to `grpcio-tools` that would register as a `file_finder` hook with
+`setuptools`. To simplify the implementation without introducing an additional code path, the
+entrypoint will target the same `main()` function used by the `grpc_tools.protoc` CLI.
+
+In order to prevent unintended behavior, the first thing the function will do is check the
+configuration file to see if the section has been configured (See [Configuration](#configuration)). If
+the file does not exist or the section is not configured, no additional steps will be taken. The
+function will return an empty list back to `setuptools` to indicate that there are no additional files
+to include in the distribution.
+
+Starting with Python 3.11, the configuration file will be readable using a
+[standard library module][pep_680]. For earlier Python versions, `tomli` will be added as an optional
+dependency.
+
+### How would a project use this feature
+
+A project that would like to use this `setuptools` integration would need to perform two actions to
+enable the functionality.
+
+* List `grpcio-tools` as a [build time dependency][build_dependency]. This will ensure that the library
+    is installed when the project's package is built.
+* Add a `tool.grpcio-tools` table to the file `pyproject.toml`.
+
+Minimal example for a project using [PEP 518][pep_518]:
+
+pyproject.toml
+```toml
+[build-system]
+requires = ["setuptools", "wheel", "grpcio-tools >= X.Y.Z"]
+build-backend = "setuptools.build_meta"
+
+[tool.grpcio-tools]
+example_parameter = "CHANGE ME"  # This is a place holder until the configuration parameters are defined
+```
 
 ## Rationale
 
@@ -101,6 +139,7 @@ I am planning work on it. I will be able to spend a few hours of each work week 
 [release_declarative_config]: https://setuptools.pypa.io/en/latest/history.html#v30-3-0
 [setuptools_entrypoint]: https://setuptools.pypa.io/en/latest/userguide/extension.html#adding-support-for-revision-control-systems
 [original_feature_request]: https://github.com/grpc/grpc/issues/28662
+[build_dependency]: https://setuptools.pypa.io/en/latest/userguide/dependency_management.html?highlight=setup_requires#build-system-requirement
 [tool_table]: https://www.python.org/dev/peps/pep-0518/#tool-table
 [pep_680]: https://www.python.org/dev/peps/pep-0680/
 [protoc_cli]: https://grpc.io/docs/languages/python/basics/#generating-client-and-server-code
