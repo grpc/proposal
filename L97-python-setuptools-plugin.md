@@ -86,6 +86,26 @@ build-backend = "setuptools.build_meta"
 example_parameter = "CHANGE ME"  # This is a place holder until the configuration parameters are defined
 ```
 
+Minimal example for a project using `setup.py`:
+
+setup.py
+```python
+from setuptools import setup
+
+setup(
+    ...,
+    setup_requires=[
+        'grpcio-tools >= X.Y.Z'
+    ],
+)
+```
+
+pyproject.toml
+```toml
+[tool.grpcio-tools]
+example_parameter = "CHANGE ME"  # This is a place holder until the configuration parameters are defined
+```
+
 ## Rationale
 
 A downside of this proposal is that it will introduce yet another way to get the Python modules that
