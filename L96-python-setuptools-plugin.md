@@ -12,7 +12,7 @@ Setuptools entrypoint for generating file
 Implement a `setuptools` entrypoint for generating files when a Python distribution is being built.
 This type of integration would be called automatically by `setuptools` and would not require and
 explicit call by the project to generate the files. The entrypoint would be configured using an
-established python project configuration file and would only require the `grpc-tools` package to be
+established python project configuration file and would only require the `grpcio-tools` package to be
 listed as a build time dependency.
 
 ## Background
@@ -35,7 +35,7 @@ information. This could be used to generate source files based on `.proto` files
 
 ## Proposal
 
-Add an entrypoint to `grpc-tools` that would register as a `file_finer` hook with `setuptools`. To
+Add an entrypoint to `grpcio-tools` that would register as a `file_finer` hook with `setuptools`. To
 simplify the implementation without introducing an additional code path, the entrypoint will target
 the same `main()` function used by the `grpc_tools.protoc` CLI. A [tool table][tool_table] within the
 file `pyproject.toml` will be used to accept configuration parameters. This will add a dependency on
@@ -58,17 +58,17 @@ the python modules. While projects are allowed to decide how to work this genera
 that best suits the project, there is no integration point. This means the project **must** decide
 how and when this command is executed, likely needing to write a script to execute this CLI.
 
-For projects that use `setuptools` to publish a package, `grpc-tools` includes a
+For projects that use `setuptools` to publish a package, `grpcio-tools` includes a
 [custom command][grpc_command]. However, it also requires a specific call like the `grpc_tools.protoc`
 CLI and is not compatible with installing from a source distribution for projects that declare
 `setuptools` as build system that should be used. Additionally, one of the top result for "grpc
 setuptools command" is [this post][setuptools_gen_question], which suggests a custom command that
-doesn't rely on the one provided by `grpc-tools`. This suggest that there is a desire for functionality
+doesn't rely on the one provided by `grpcio-tools`. This suggest that there is a desire for functionality
 that doesn't require a specific all and that the existing functionality is under-documented.
 
 gRPC also provides a way to get the Python [classes at runtime][runtime_classes]
 ([Proposal][runtime_proposal]). However, it is still [marked as experimental][runtime_api] almost 2
-years later and requires `grpc-tools` to be available at runtime. Similar to the current `setuptools`
+years later and requires `grpcio-tools` to be available at runtime. Similar to the current `setuptools`
 integration, it is not mentioned in the basic tutorial documentation.
 
 ## Implementation
