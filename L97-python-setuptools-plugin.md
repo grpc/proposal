@@ -24,7 +24,9 @@ this requires custom integration on the part of the package (example:
 
 With the introduction of [PEP 517][pep_517] and [PEP 518][pep_518], directly calling `setup.py` will
 start becoming less common. Additionally, the use of custom commands will not work with projects that
-use this mechanism and solely rely on [setup.cfg][declarative_config].
+use this mechanism and solely rely on the [declarative config in `setup.cfg`][declarative_config],
+which was added to `setuptools` in [v30.3.0][release_declarative_config] (Dec. 2016). Though, use of
+the functionality defined in this proposal does not require a project to use the declarative config.
 
 Custom commands are not the only integration point that is available. `setuptools` also supports
 entrypoints that allows for packages to act as a plugin and provide custom behavior. This is
@@ -96,6 +98,7 @@ I am planning work on it. I will be able to spend a few hours of each work week 
 [pep_517]: https://www.python.org/dev/peps/pep-0517/
 [pep_518]: https://www.python.org/dev/peps/pep-0518/
 [declarative_config]: https://setuptools.pypa.io/en/latest/userguide/declarative_config.html
+[release_declarative_config]: https://setuptools.pypa.io/en/latest/history.html#v30-3-0
 [setuptools_entrypoint]: https://setuptools.pypa.io/en/latest/userguide/extension.html#adding-support-for-revision-control-systems
 [original_feature_request]: https://github.com/grpc/grpc/issues/28662
 [tool_table]: https://www.python.org/dev/peps/pep-0518/#tool-table
