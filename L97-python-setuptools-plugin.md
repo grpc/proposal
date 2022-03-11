@@ -1,4 +1,4 @@
-Setuptools entrypoint for generating file
+L97 - Python: Setuptools entrypoint for generating file
 ----
 * Author(s): Patrick Lannigan
 * Approver: lidizheng and gnossen
