@@ -5,7 +5,7 @@ Setuptools entrypoint for generating file
 * Status: Draft
 * Implemented in: Python
 * Last updated: 2022-02-18
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/H617sSzoV-8
 
 ## Abstract
 
