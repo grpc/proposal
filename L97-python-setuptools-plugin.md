@@ -115,6 +115,7 @@ integration, it is not mentioned in the basic tutorial documentation.
 
 - [ ] Proof of Concept with hard coded values.
 - [ ] Configuration file parsing & mapping to CLI arguments.
+- [ ] Document feature and how projects would use it.
 
 Could be done later:
 
