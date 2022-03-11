@@ -37,7 +37,7 @@ information. This could be used to generate source files based on `.proto` files
 
 ## Proposal
 
-Add an entrypoint to `grpcio-tools` that would register as a `file_finer` hook with `setuptools`. To
+Add an entrypoint to `grpcio-tools` that would register as a `file_finder` hook with `setuptools`. To
 simplify the implementation without introducing an additional code path, the entrypoint will target
 the same `main()` function used by the `grpc_tools.protoc` CLI. A [tool table][tool_table] within the
 file `pyproject.toml` will be used to accept configuration parameters. This will add a dependency on
