@@ -1,7 +1,7 @@
 Setuptools entrypoint for generating file
 ----
 * Author(s): Patrick Lannigan
-* Approver: a11r
+* Approver: lidizheng and gnossen
 * Status: Draft
 * Implemented in: Python
 * Last updated: 2022-02-18
