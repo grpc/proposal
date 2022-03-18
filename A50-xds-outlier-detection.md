@@ -197,7 +197,7 @@ The `xds_cluster_resolver` LB policy will configure an `outlier_detection` LB po
 
 In the `cds` LB policy, if the `outlier_detection` field is not set in the `Cluster` resource, a "no-op" `outlier_detection` config will be generated in the corresponding `DiscoveryMechanism` config, with `interval` set to the maximum possible value and all other fields unset.
 
-If the `outlier_detection` field *is* set in the `Cluster` resource, if the `enforcement_percentage` field is set to 0, the config `success_rate_ejection` field will be `null` and all `success_rate_*` fields will be ignored. If the `enforcing_failure_percent` field is set to 0 or `null`, the config `failure_percent_ejection` field will be `null` and all `failure_percent_*` fields will be ignored. Then the message fields will be mapped to config fields as follows:
+If the `outlier_detection` field *is* set in the `Cluster` resource, if the `enforcing_success_rate` field is set to 0, the config `success_rate_ejection` field will be `null` and all `success_rate_*` fields will be ignored. If the `enforcing_failure_percent` field is set to 0 or `null`, the config `failure_percent_ejection` field will be `null` and all `failure_percent_*` fields will be ignored. Then the message fields will be mapped to config fields as follows:
 
  - `interval` -> `interval`
  - `base_ejection_time` -> `base_ejection_time`
