@@ -404,10 +404,15 @@ and its
         [weights](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L278)
         must add up to the
         [total\_weight](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L335).
-*   Can be
-    [cluster\_header](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L712)
-    *   Note: the route containing this action will be ignored. This feature can
-        be accomplished by header matching.
+*   Can be unset or an unsupported field. The route containing this action will be
+   ignored.
+    *   At the time of this gRFC,
+        [cluster\_header](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L712)
+        is the only such unsupported field. But the client must handle other
+        fields in the `oneof` being added in the future, with or without
+        recompiling the client with the new proto. Protobuf considers unknown
+        fields of a oneof as an unset oneof, as it doesn't know the field is
+        part of the oneof.
 
 Duplicate matches are allowed, but because the first match wins, the second
 will never be used.
