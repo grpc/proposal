@@ -422,6 +422,10 @@ The `ClusterLoadAssignment` proto must have the following fields set:
     is skipped; otherwise, the value is used for weighted locality picking.
   - The `priority` field will be used.  As per normal protobuf rules, if
     the field is unset, it defaults to zero.
+  - The `locality` field must be unique within a given priority.  If
+    more than one entry in the `endpoints` field has the same values in
+    both the `locality` and `priority` field, the resource will be
+    considered invalid.
   - If the `lb_endpoints` field is empty, the locality will be considered
     unreachable.  In each entry of the `lb_endpoints` field:
     - If the `health_status` field has any value other than HEALTHY or
