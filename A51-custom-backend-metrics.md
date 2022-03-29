@@ -5,7 +5,7 @@ A51: Custom Backend Metrics Support
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
 * Last updated: 2022-02
-* Discussion at: https://groups.google.com/g/grpc-io/
+* Discussion at: https://groups.google.com/g/grpc-io/c/mieHKzTigzg
 
 ## Abstract
 Support custom metrics injection at a gRPC server, and consumption at a gRPC client. This is useful 
@@ -29,9 +29,6 @@ be sent to the client and APIs to allow client-side LB policies to use those met
 ### Related Proposals:
 
 * [Open Request Cost Aggregation (ORCA)](https://github.com/envoyproxy/envoy/issues/6614)
-* [xDS custom LB policy](link place holder)
-
-[A36]: A36-xds-for-servers.md
 
 ## Proposal
 
@@ -81,26 +78,17 @@ use it to record metrics specifically for the current RPC call. Implementing thi
 and a language should implement one if not already existed.
 The metric recoder will provide these functions, pseudo-code below:
 ```
-function recordRequestCostMetric(String name, double value) {
-  // Records a request cost metric measurement for the call.
-}
+// Records a request cost metric measurement for the call.
+function recordRequestCostMetric(String name, double value);
 
-function recordUtilizationMetric(String name, double value) {
-  // Records a utilization metric measurement for the call.
-}
+// Records a utilization metric measurement for the call.
+function recordUtilizationMetric(String name, double value);
 
-function recordCPUUtilizationMetric(double value) {
-  //Records the CPU utilization metric measurement for the call. 
-}
+// Records the CPU utilization metric measurement for the call.
+function recordCPUUtilizationMetric(double value);
 
-function recordMemoryUtilizationMetric(double value) {
-  // Records the memory utilization metric measurement for the call. 
-}
-
-function  getCurrent() {
-  // Returns the call metric recorder attached to the current call.
-  return CallMetricRecorder.this
-}
+// Records the memory utilization metric measurement for the call.
+function recordMemoryUtilizationMetric(double value);
 ```
 
 Recording the same metric multiple times overrides the previously provided values. 
@@ -120,47 +108,29 @@ Meanwhile, the server registers an OOB streaming service to emit the metrics.
 #### The Server API 
 We will provide a builtin implementation of `OpenRCAService` streaming service defined by ORCA in each supported language.
 The `OrcaServiceImpl` holds the utilization metrics data in key/value pairs using a map. 
-Expose set-style APIs for user's server applications to update the metrics data, pseudo-code as follows:
+We will expose set-style APIs for user's server applications to update the metrics data, pseudo-code as follows:
 
 ```
-function OrcaServiceImpl(Duration minReportInterval) {
-  // Constructs an OOB service.
-  // Allow configuring minimum report interval. If not configured or badly configured non-positive, 
-  // the default is 30s.
-  // In the future, it might be useful to let users specify minimum report interval and default 
-  // report interval separately. If the default report interval is not configured or badly configured 
-  // non-positive, the default is 1 min. 
-  // public OpenRcaServiceImpl(long minInterval, TimeUnit timeUnit, long 
-  // defaultInterval, TimeUnit)
- }
+// Update the metrics value corresponding to the specified key.
+function setUtilizationMetric(String key, double value);
 
-function setUtilizationMetric(String key, double value) {
-  // Update the metrics value corresponding to the specified key.
-}
+// Replace the whole metrics data using the specified map.
+function setAllUtilizationMetrics(Map<String, Double> metrics);
 
-function setAllUtilizationMetrics(Map<String, Double> metrics) {
-  // Replace the whole metrics data using the specified map.
-}
+// Remove the metrics data entry corresponding to the specified key.
+function deleteUtilizationMetric(String key);
 
-function deleteUtilizationMetric(String key) {
-  // Remove the metrics data entry corresponding to the specified key.
-}
+// Update the CPU utilization metrics data.
+function setCPUUtilizationMetric(double value);
 
-function setCPUUtilizationMetric(double value) {
-  // Update the CPU utilization metrics data.
-}
+// Clear the CPU utilization metrics data.
+function deleteCPUUtilizationMetric();
 
-function deleteCPUUtilizationMetric() {
-  // Clear the CPU utilization metrics data.
-}
+// Update the memory utilization metrics data.
+function setMemoryUtilizationMetric(double value);
 
-function setMemoryUtilizationMetric(double value) {
-  // Update the memory utilization metrics data.
-}
-
-function deleteMemoryUtilizationMetric() {
-  // Clear the memory utilization metrics data.
-}
+// Clear the memory utilization metrics data.
+function deleteMemoryUtilizationMetric();
 ```
 
 Allowing updating each metric key individually is convenient for a server application to adopt when it 
@@ -168,19 +138,17 @@ has multiple isolated components and each generates their own set of metrics.
 
 A minimum reporting interval (30s by default) can be configured when creating the service.
 The minimum report interval is the lower bound of the OOB metrics report period. It means, if 
-the `report_interval` from the client OOB request message goes below the service configured minimum 
+the `report_interval` from the client OOB request message is less than the service configured minimum
 interval then it is treated as the service minimum interval. 
 If `report_interval` is not specified (equals to 0), it is also treated as service minimum.
 There is no upper bound, the largest value you can specify is max integer.
 
-Internally, the load report server will save each incoming client connection(`responseObserver`) 
-in an `RcaConnection` data structure or alike, with a custom frequency timer.
+Internally, the load report server will maintain a timer for each ORCA stream.
 Initially receiving a new request, or when the response timer fires, the server sends a response to 
-report metrics data. To generate a response, we copy the metrics data saved in the map, 
-but the response proto should only be produced once and be reused.  
+report metrics data. To generate a response, we copy the metrics data saved in the map.
 The report is always in a state-of-the-world fashion. The service should properly handle exceptions 
-when the client disconnects: it should terminate the stream, cancel the timer and remove the 
-`RcaConnection` immediately. Otherwise, the service should keep sending the report.
+when the client disconnects: it should terminate the stream and cancel the timer immediately.
+Otherwise, the service should keep sending the report.
 
 If no one called to update the metrics data during a report interval, the data remains the same. 
 And the load reporting server will keep sending the metrics data regardless of whether the data has changed or not.
@@ -215,15 +183,12 @@ Note that there may be multiple LB policies in the routing hierarchy that are in
 For example, when using xDS, the `xds_cluster_impl` policy may need to see backend metric data to 
 generate load reports for each cluster, and the WRR policy might need to see the same data for 
 endpoint-picking within a locality.
-We will provide a utility function to wrap the `LoadBalancer.Helper`, usable by both WRR policy and
-xDS LB policies. The `LoadBalancer.Helper` manages the OOB stream lifecycle and
-accepts subscriptions from any routing hierarchy. 
 Reports are published to all the subscribers as-is with no aggregation; 
 each LB policy is responsible for performing whatever aggregation is appropriate for its use.
 Note that the LB policy API should be designed such that individual LB policies that do not know or 
 care about out-of-band reporting should not have to do anything special to support them. 
-For example, it should be possible for the xDS policy to subscribe to out-of-band reports from 
-a child policy like RR, which does not know anything about out-of-band-reports and will not contain any
+For example, it should be possible for a non-leaf LB policy to subscribe to out-of-band reports from
+a child policy like round_robin, which does not know anything about out-of-band-reports and will not contain any
 code to handle them.
 
 When a subchannel first establishes a connection, if at least one LB policy is subscribing to out-of-band reporting, 
@@ -279,12 +244,14 @@ sending the unchanged metrics data since last response.
 To do that, we should not compare maps for de-duplication, instead, we can bump up a
 generation_id of the metrics data every time users make a change.
 Each client connection only needs to compare its previous generation_id to do deduplication.
-The optimization strategy can be implemented until there are concrete use cases in the future.
+The optimization strategy can be implemented in the future if there are concrete use cases.
 
+In addition to the minimum report interval configuration at the OOB server, it might be useful
+in the future to also let the users specify the default report interval separately.
 The reporting frequency in the OOB request is final because it is a server-streaming API.
 Clients would terminate the OOB stream and reconnect if they want to change the frequency.
 Switching to a bidi stream will make it possible to change the reporting frequency in flight,
-but it should not impact the public interface.
+but this can be done in the future if needed without impacting the public interface.
 
 ## Implementation
 This will be implemented in Java, Go and C++.
@@ -374,8 +341,9 @@ public void deleteMemoryUtilizationMetric();
 }
 ```
 
-At the client side, Java will provide a convenient function `OrcaHelperWrapper` that does the heavy 
-lifting of managing the out-of-band stream life cycle. 
+At the client side, Java will provide a utility function to wrap the `LoadBalancer.Helper`,
+usable by both WRR policy and xDS LB policies. The `LoadBalancer.Helper` manages the OOB stream
+lifecycle and accepts subscriptions from any routing hierarchy.
 The OOB stream will also gracefully disable itself if the server integration is not complete, 
 so users do not have to worry about client and server deployment coordination.
 
