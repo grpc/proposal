@@ -347,8 +347,10 @@ ring will be stored within the picker, so any time a new ring is
 generated, a new picker will be returned.
 
 The picker will contain not just the ring but also the current state of
-every subchannel in the ring.  Whenever a subchannel's state changes, a
-new picker will need to be generated.
+every subchannel in the ring.  Implementations may either generate a new
+picker every time a subchannel's state changes, or they may provide a
+mechanism to synchronize subchannel state data between the LB policy
+itself and the picker.
 
 ##### LB Policy Config
 
@@ -406,36 +408,72 @@ parent.
 
 ##### Aggregated Connectivity State
 
-The `ring_hash` policy will use the normal aggregation rules for reporting
-the overall connectivity state to its parent (i.e., the same rules used
-by `weighted_target`), but with one special case.  If there are 2 or more
-subchannels in state `TRANSIENT_FAILURE` and all other subchannels are in
-state `IDLE` or `CONNECTING`, then the policy will report `TRANSIENT_FAILURE`.
-This heuristic ensures that the priority policy will fail over to the
-next priority quickly when there's an outage.
+Because the `ring_hash` policy does not proactively connect to
+subchannels but rather triggers connection attempts based on picks, it
+cannot use the aggregation rules used by most LB policies (e.g., those used
+by the `weighted_target` policy) as-is.  Instead, it has two differences
+in how it handles `TRANSIENT_FAILURE`, both of which are motivated by
+ensuring that the `ring_hash` policy will work properly as a child of the
+`priority` policy.
 
-So the overall aggregation rules here are:
-1. If there is at least one subchannel in `READY` state, report `READY`.
-2. If there are 2 or more subchannels in `TRANSIENT_FAILURE` state, report
-   `TRANSIENT_FAILURE`.
-3. If there is at least one subchannel in `CONNECTING` state, report
-   `CONNECTING`.
-4. If there is at least one subchannel in `IDLE` state, report `IDLE`.
-5. Otherwise, report `TRANSIENT_FAILURE`.
+The `priority` policy essentially has an ordered list of child policies and
+will send picks to the highest priority child that is currently reporting
+`READY` or `IDLE`.  This means that for `ring_hash` to function as a child
+of the `priority` policy, it needs to report `TRANSIENT_FAILURE` when its
+subchannels are not reachable.  However, because `ring_hash` attempts to
+connect only to those subchannels that pick requests hash to, there are
+likely to be some subchannels that never attempt to connect and are reporting
+state `IDLE`, which means that under the normal aggregation rules, the
+`ring_hash` policy would never report `TRANSIENT_FAILURE`.  And more
+generally, if `ring_hash` has only attempted to connect to a small
+subset of its subchannels, it cannot truly know the overall reachability
+of all of the subchannels.  To address these problems, the `ring_hash`
+policy will use a heuristic that if there are two or more subchannels
+reporting `TRANSIENT_FAILURE` and none in state `READY`, it will report
+an aggregated connectivity state of `TRANSIENT_FAILURE`.  This heuristic
+is an attempt to balance the need to allow the `priority` policy to
+quickly failover to the next priority and the desire to avoid reporting
+the entire `ring_hash` policy as having failed when the problem is just
+one individual subchannel that happens to be unreachable.
 
-While the `ring_hash` policy is reporting `TRANSIENT_FAILURE`, it will not be
-getting any pick requests from the priority policy.  However, because the
-`ring_hash` policy does not attempt to reconnect to subchannels unless it
-is getting pick requests, it will need special handling to ensure that it
-will eventually recover from `TRANSIENT_FAILURE` state once the problem is
-resolved.  Specifically, it will make sure that it is attempting to
+In addition, once the `ring_hash` policy reports `TRANSIENT_FAILURE`, it
+needs some way to recover from that state.  The `ring_hash` policy
+normally requires pick requests to trigger subchannel connection
+attempts, but if it is being used as a child of the `priority` policy,
+it will not be getting any picks once it reports `TRANSIENT_FAILURE`.
+To work around this, it will make sure that it is attempting to
 connect (after applicable backoff period) to at least one subchannel at
 any given time.  After a given subchannel fails a connection attempt, it
 will move on to the next subchannel in the ring.  It will keep doing this
 until one of the subchannels successfully connects, at which point it
-will report `READY` and stop proactively trying to connect.  The policy
-will remain in `TRANSIENT_FAILURE` until at least one subchannel becomes
-connected, even if subchannels are in state `CONNECTING` during that time.
+will report `READY` and stop proactively trying to connect.
+
+Another issue is the way that the `priority` policy handles its failover
+timer.  The failover timer is used to apply an upper bound to the amount
+of time that `priority` policy waits for a child policy to become
+connected before it gives up and creates the child policy for the next
+priority.  The failover timer is started when the child reports state
+`CONNECTING` and is cancelled when the child reports any other state.
+To allow this timer to work properly, the `ring_hash` policy should
+remain in state `CONNECTING` until it transitions to either
+`TRANSIENT_FAILURE` or `READY`.  And, just as in the `TRANSIENT_FAILURE`
+case above, it will proactively attempt to connect to at least one
+subchannel at all times while it is reporting `CONNECTING`, so that it
+does not stay in state `CONNECTING` indefinitely if it is not receiving
+picks (e.g., if the application is only occassionally starting RPCs and
+giving them very short deadlines).
+
+Taking all of the above into account, the aggregation rules for
+the `ring_hash` policy are as follows:
+1. If there is at least one subchannel in `READY` state, report `READY`.
+2. If there are 2 or more subchannels in `TRANSIENT_FAILURE` state, report
+   `TRANSIENT_FAILURE`.
+3. If there is at least one subchannel in `TRANSIENT_FAILURE` and there
+   is more than one subchannel, report state `CONNECTING`.
+4. If there is at least one subchannel in `CONNECTING` state, report
+   `CONNECTING`.
+5. If there is at least one subchannel in `IDLE` state, report `IDLE`.
+6. Otherwise, report `TRANSIENT_FAILURE`.
 
 ##### Picker Behavior
 
@@ -504,6 +542,7 @@ if (ring[first_index].state == CONNECTING) {
   return PICK_QUEUE;
 }
 if (ring[first_index].state == TRANSIENT_FAILURE) {
+  ring[first_index].subchannel.TriggerConnectionAttemptInControlPlane();
   first_subchannel = ring[first_index].subchannel;
   found_second_subchannel = false;
   found_first_non_failed = false;
