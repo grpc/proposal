@@ -461,10 +461,18 @@ case above, it will proactively attempt to connect to at least one
 subchannel at all times while it is reporting `CONNECTING`, so that it
 does not stay in state `CONNECTING` indefinitely if it is not receiving
 picks (e.g., if the application is only occassionally starting RPCs and
-giving them very short deadlines).  Additionally, we will change the
-`priority` policy to restart the failover timer when a child reports
-`CONNECTING`, if that child has not reported `TRANSIENT_FAILURE` more
-recently than it reported `READY` or `IDLE`.
+giving them very short deadlines).
+
+Note that when the `ring_hash` policy first starts up with a completely
+new set of subchannels that are all in state `IDLE`, it will report `IDLE`
+as a consequence of the aggregation rules shown below.  This is different
+from most policies, which start in state `CONNECTING`, and it will
+prevent the failover timer in the `priority` policy from working
+correctly, because the timer will be started when the child is created
+but then immediately cancelled when it reports `IDLE`.  To address this,
+we will change the `priority` policy to restart the failover timer when a
+child reports `CONNECTING`, if that child has not reported `TRANSIENT_FAILURE`
+more recently than it reported `READY` or `IDLE`.
 
 Taking all of the above into account, the aggregation rules for
 the `ring_hash` policy are as follows:
@@ -477,11 +485,6 @@ the `ring_hash` policy are as follows:
    `CONNECTING`.
 5. If there is at least one subchannel in `IDLE` state, report `IDLE`.
 6. Otherwise, report `TRANSIENT_FAILURE`.
-
-Note that when the `ring_hash` policy first starts up with a completely
-new set of subchannels that are all in state `IDLE`, it will report `IDLE`
-as a consequence of the above aggregation rules.  This is different from
-most policies, which start in state `CONNECTING`.
 
 ##### Picker Behavior
 
