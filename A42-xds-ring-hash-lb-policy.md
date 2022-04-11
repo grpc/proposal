@@ -475,6 +475,11 @@ the `ring_hash` policy are as follows:
 5. If there is at least one subchannel in `IDLE` state, report `IDLE`.
 6. Otherwise, report `TRANSIENT_FAILURE`.
 
+Note that when the `ring_hash` policy first starts up with a completely
+new set of subchannels that are all in state `IDLE`, it will report `IDLE`
+as a consequence of the above aggregation rules.  This is different from
+most policies, which start in state `CONNECTING`.
+
 ##### Picker Behavior
 
 The picker will start by finding the subchannel on the ring that is
