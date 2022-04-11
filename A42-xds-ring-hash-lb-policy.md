@@ -456,12 +456,14 @@ priority.  The failover timer is started when a child is first created
 and is cancelled when the child reports any state other than `CONNECTING`.
 To allow this timer to work properly, the `ring_hash` policy should
 remain in state `CONNECTING` until it transitions to either
-`TRANSIENT_FAILURE` or `READY`.  And, just as in the `TRANSIENT_FAILURE`
-case above, it will proactively attempt to connect to at least one
-subchannel at all times while it is reporting `CONNECTING`, so that it
-does not stay in state `CONNECTING` indefinitely if it is not receiving
-picks (e.g., if the application is only occassionally starting RPCs and
-giving them very short deadlines).
+`TRANSIENT_FAILURE` or `READY`.  Specifically, after the first subchannel
+reports `TRANSIENT_FAILURE` and all other subchannels are in `IDLE`, it
+should continue to report `CONNECTING` instead of `IDLE`.  In this case,
+just as in the `TRANSIENT_FAILURE` case above, it will proactively attempt
+to connect to at least one subchannel at all times while it is reporting
+`CONNECTING`, so that it does not stay in state `CONNECTING` indefinitely
+if it is not receiving picks (e.g., if the application is only occassionally
+starting RPCs and giving them very short deadlines).
 
 Note that when the `ring_hash` policy first starts up with a completely
 new set of subchannels that are all in state `IDLE`, it will report `IDLE`
