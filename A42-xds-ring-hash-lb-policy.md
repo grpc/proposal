@@ -452,8 +452,8 @@ Another issue is the way that the `priority` policy handles its failover
 timer.  The failover timer is used to apply an upper bound to the amount
 of time that `priority` policy waits for a child policy to become
 connected before it gives up and creates the child policy for the next
-priority.  The failover timer is started when the child reports state
-`CONNECTING` and is cancelled when the child reports any other state.
+priority.  The failover timer is started when a child is first created
+and is cancelled when the child reports any state other than `CONNECTING`.
 To allow this timer to work properly, the `ring_hash` policy should
 remain in state `CONNECTING` until it transitions to either
 `TRANSIENT_FAILURE` or `READY`.  And, just as in the `TRANSIENT_FAILURE`
@@ -461,7 +461,10 @@ case above, it will proactively attempt to connect to at least one
 subchannel at all times while it is reporting `CONNECTING`, so that it
 does not stay in state `CONNECTING` indefinitely if it is not receiving
 picks (e.g., if the application is only occassionally starting RPCs and
-giving them very short deadlines).
+giving them very short deadlines).  Additionally, we will change the
+`priority` policy to restart the failover timer when a child reports
+`CONNECTING`, if that child has not reported `TRANSIENT_FAILURE` more
+recently than it reported `READY` or `IDLE`.
 
 Taking all of the above into account, the aggregation rules for
 the `ring_hash` policy are as follows:
