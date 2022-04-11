@@ -481,10 +481,10 @@ the `ring_hash` policy are as follows:
 1. If there is at least one subchannel in `READY` state, report `READY`.
 2. If there are 2 or more subchannels in `TRANSIENT_FAILURE` state, report
    `TRANSIENT_FAILURE`.
-3. If there is at least one subchannel in `TRANSIENT_FAILURE` and there
-   is more than one subchannel, report state `CONNECTING`.
-4. If there is at least one subchannel in `CONNECTING` state, report
+3. If there is at least one subchannel in `CONNECTING` state, report
    `CONNECTING`.
+4. If there is one subchannel in `TRANSIENT_FAILURE` and there is more than
+   one subchannel, report state `CONNECTING`.
 5. If there is at least one subchannel in `IDLE` state, report `IDLE`.
 6. Otherwise, report `TRANSIENT_FAILURE`.
 
