@@ -413,18 +413,21 @@ subchannels but rather triggers connection attempts based on picks, it
 cannot use the aggregation rules used by most LB policies (e.g., those used
 by the `weighted_target` policy) as-is.  Instead, it has two differences
 in how it handles `TRANSIENT_FAILURE`, both of which are motivated by
-ensuring that the `ring_hash` policy will work properly as a child of the
-`priority` policy.
+ensuring that the `ring_hash` policy will report reasonable connectivity
+state transitions to its parent (which today is always the `priority`
+policy but might at some point in the future be the channel itself).
 
 The `priority` policy essentially has an ordered list of child policies and
 will send picks to the highest priority child that is currently reporting
 `READY` or `IDLE`.  This means that for `ring_hash` to function as a child
 of the `priority` policy, it needs to report `TRANSIENT_FAILURE` when its
-subchannels are not reachable.  However, because `ring_hash` attempts to
-connect only to those subchannels that pick requests hash to, there are
-likely to be some subchannels that never attempt to connect and are reporting
-state `IDLE`, which means that under the normal aggregation rules, the
-`ring_hash` policy would never report `TRANSIENT_FAILURE`.  And more
+subchannels are not reachable.  However, `ring_hash` attempts to connect
+only to those subchannels that pick requests hash to, and if the first
+subchannel fails to connect, it then sequentially attempts to connecto to
+subsequent subchannels in ring order, so it may take a very long time
+for all of the subchannels to report `TRANSIENT_FAILURE` instead of `IDLE`.
+Under the normal aggregation rules, that means that the `ring_hash` policy
+would take far too long to report `TRANSIENT_FAILURE`.  And more
 generally, if `ring_hash` has only attempted to connect to a small
 subset of its subchannels, it cannot truly know the overall reachability
 of all of the subchannels.  To address these problems, the `ring_hash`
