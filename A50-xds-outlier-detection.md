@@ -137,7 +137,7 @@ When the `outlier_detection` LB policy receives an address update, it will creat
 
 When the child policy asks for a subchannel, the `outlier_detection` will wrap the subchannel with a wrapper (see [Subchannel Wrapper section](#subchannel-wrapper)). Then, the subchannel wrapper will be added to the list in the map entry for its address, if that map entry exists. If there is no map entry, or if the subchannel is created with multiple addresses, the subchannel will be ignored for outlier detection. If that address is currently ejected, that subchannel wrapper's `eject` method will be called.
 
-The `outlier_detection` LB policy will provide a picker that delegates to the child policy's picker, and when the request finishes, increment the corresponding counter in the map entry referenced by the subchannel wrapper that was picked.
+The `outlier_detection` LB policy will provide a picker that delegates to the child policy's picker, and when the request finishes, increment the corresponding counter in the map entry referenced by the subchannel wrapper that was picked. If both the `success_rate_ejection` and `failure_percentage_ejection` fields are unset in the configuration, the picker should not do that counting.
 
 The `outlier_detection` LB policy will have a timer that triggers on a period determined by the `interval` config option, and does the following:
 
@@ -148,6 +148,8 @@ The `outlier_detection` LB policy will have a timer that triggers on a period de
  5. For each address in the map:
     - If the address is not ejected and the multiplier is greater than 0, decrease the multiplier by 1.
     - If the address is ejected, and the current time is after `ejection_timestamp + min(base_ejection_time * multiplier, max(base_ejection_time, max_ejection_time))`, un-eject the address.
+
+The `outlier_detection` LB policy will store the timestamp of the most recent timer start time. When a new config is provided, if the timer start timestamp is unset, set it to the current time and start the timer for the configured interval, then for each address, reset the call counters. If the timer start timestamp is set, instead cancel the existing timer and start the timer for the configured interval minus the difference between the current time and the previous start timestamp, or 0 if that would be negative. When the timer fires, set the timer start timestamp to the current time. If a config is provided with both the `success_rate_ejection` and `failure_percentage_ejection` fields unset, skip starting the timer and unset the timer start timestamp.
 
 ### Ejection and Un-ejection
 
