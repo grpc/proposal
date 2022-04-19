@@ -50,7 +50,7 @@ Distinguish two types of metrics:
 ### Wire Format
 
 Backend metric data will be encoded in the ORCA format for transmission on the wire. 
-Specifically, it will be transmitted as a binary-encoded [LoadReport](https://github.com/cncf/udpa/blob/04548b0d99d4e70b29310ebccc8e01f2deeed43a/udpa/data/orca/v1/orca_load_report.proto#L14) protobuf.
+Specifically, it will be transmitted as a binary-encoded [xds.data.orca.v3.LoadReport](https://github.com/cncf/xds/blob/eded343319d09f30032952beda9840bbd3dcf7ac/xds/data/orca/v3/orca_load_report.proto#L15) protobuf.
 
 ### Per-Request Metrics Reporting
 
@@ -72,10 +72,11 @@ but here are a couple of possible approaches:
 Using a server interceptor, it is convenient to attach the metrics as part of the
 trailing metadata of the server call and send back with the RPC response.
 
-We will define a metric recorder that is unique per RPC. Server applications should obtain a reference and 
-use it to record metrics specifically for the current RPC call. Implementing this may leverage a 
-[context](https://grpc.github.io/grpc-java/javadoc/io/grpc/Context.html) or similar mechanism, 
-and a language should implement one if not already existed.
+We will define a metric recorder that is unique per RPC, only useful when the server interceptor is
+installed, in which case the server applications should obtain a reference and
+use it to record metrics specifically for the current RPC call.
+Implementing this may leverage a [context](https://grpc.github.io/grpc-java/javadoc/io/grpc/Context.html) or similar mechanism,
+and a language can implement one if it does not exist.
 The metric recoder will provide these functions, pseudo-code below:
 ```
 // Records a request cost metric measurement for the call.
@@ -106,8 +107,9 @@ see validation details below.
 Meanwhile, the server registers an OOB streaming service to emit the metrics.
 
 #### The Server API 
-We will provide a builtin implementation of `OpenRCAService` streaming service defined by ORCA in each supported language.
-The `OrcaServiceImpl` holds the utilization metrics data in key/value pairs using a map. 
+We will provide a builtin implementation of [xds.service.orca.v3.OpenRCAService](https://github.com/cncf/xds/blob/eded343319d09f30032952beda9840bbd3dcf7ac/xds/service/orca/v3/orca.proto#L27)
+streaming service defined by ORCA in each supported language.
+The implementation service holds the utilization metrics data in key/value pairs using a map.
 We will expose set-style APIs for user's server applications to update the metrics data, pseudo-code as follows:
 
 ```
@@ -141,12 +143,13 @@ The minimum report interval is the lower bound of the OOB metrics report period.
 the `report_interval` from the client OOB request message is less than the service configured minimum
 interval then it is treated as the service minimum interval. 
 If `report_interval` is not specified (equals to 0), it is also treated as service minimum.
-There is no upper bound, the largest value you can specify is max integer.
+There is no upper bound.
 
 Internally, the load report server will maintain a timer for each ORCA stream.
 Initially receiving a new request, or when the response timer fires, the server sends a response to 
-report metrics data. To generate a response, we copy the metrics data saved in the map.
-The report is always in a state-of-the-world fashion. The service should properly handle exceptions 
+report metrics data. To generate a response, the service copies the metrics data saved in the map.
+The report is always in a state-of-the-world fashion, including all present entries each update.
+The service should properly handle exceptions
 when the client disconnects: it should terminate the stream and cancel the timer immediately.
 Otherwise, the service should keep sending the report.
 
@@ -160,16 +163,18 @@ Out-of-band data will be sent only if the client starts a streaming call for the
 If the backend is designed to provide this information but the client never asks for it, 
 it will not be used. Conversely, if the backend does not provide the information but the client 
 does start a call asking for it, the backend will terminate the call with status `UNIMPLEMENTED`, 
-in which case the client will not retry the call.
+in which case the client must not retry the call on the same connection.
 
-Any LB policy that is interested in this out-of-band data may subscribe to it. The client will 
+Any LB policy that is interested in this out-of-band data may subscribe to it.
+there will be an API that allows LB policies to subscribe to the out-of-band data. The client will
 maintain an open `OpenRCAService/StreamCoreMetrics` call whenever there is at least one LB policy 
 subscribing to the data. When a policy subscribes, it will indicate the interval at which it would like to get updates. 
 If multiple policies subscribe with different intervals, we will use the minimum of those intervals. 
 Note that the ORCA protocol involves the client telling the server the interval at which 
 it wants reports when the call starts, so if the client needs to change its requested interval, 
 it will need to cancel and restart the call.
-A client may change its requested interval at any time; this is expected to be a fairly rare operation 
+The API provided to LB policies needs to allow changing its requested interval at any time;
+this is expected to be a fairly rare operation
 (usually triggered by a config change for one of the subscribing LB policies),
 It is important that a load balancing policy is able to re-config the frequency
 and should not require heavy-weight operations like reconnecting to backends or recreating subchannels or LB policies.
@@ -177,6 +182,8 @@ and should not require heavy-weight operations like reconnecting to backends or 
 Each policy that has subscribed to the data will get a callback whenever a new message is sent to the client on the call.
 As with per-request data, the protobuf deserialization will happen only once.
 The data provided to the callback should be exposed to the LB policy using the same type as used for per-request data.
+Currently, out-of-band reporting only supports utility metrics, details see the Rationale section,
+but we reserve the right to include costs and LP policy metrics filtering APIs in the future.
 The API for subscribing to out-of-band reports must be available to LB policies at any level of the routing hierarchy, 
 including both leaf LB policies (whose children are subchannels) and parent LB policies (whose children are other LB policies).
 Note that there may be multiple LB policies in the routing hierarchy that are interested in subscribing.
@@ -185,8 +192,8 @@ generate load reports for each cluster, and the WRR policy might need to see the
 endpoint-picking within a locality.
 Reports are published to all the subscribers as-is with no aggregation; 
 each LB policy is responsible for performing whatever aggregation is appropriate for its use.
-Note that the LB policy API should be designed such that individual LB policies that do not know or 
-care about out-of-band reporting should not have to do anything special to support them. 
+Note that the API should be designed such that it is available to any LB policy without other
+policies having to know or care about out-of-band reporting.
 For example, it should be possible for a non-leaf LB policy to subscribe to out-of-band reports from
 a child policy like round_robin, which does not know anything about out-of-band-reports and will not contain any
 code to handle them.
@@ -284,8 +291,11 @@ public final class CallMetricRecorder {
 
 At the client side, Java will provide a utility function `OrcaClientStreamTracerFactory`. 
 Users can include it in the picker result in their custom LB policy’s 
-`LoadBalancer.SubchannelPicker` to let gRPC push notifications to the application. 
+`LoadBalancer.SubchannelPicker` to let gRPC push notifications to the application.
 It requires users to implement `OrcaPerRequestReportListener` in order to receive the metrics report callback.
+Note that java avoids trailers double-parsing: each `OrcaPerRequestReportListener` registered to each
+`OrcaClientStreamTracerFactory` instance get the report delivery after java internally parses the
+trailing metadata for the call only once.
 
 ```Java
 class CustomPicker extends SubchannelPicker {
@@ -306,38 +316,38 @@ data using the exposed APIs as follows. All the methods are thread safe.
 ```java
 public class OrcaServiceImpl implements OpenRcaService {
 
-// Allow configuring minimum report interval. If not configured or badly configured non-positive, 
-// the default is 30s.
-// In the future, it might be useful to let users specify minimum report interval and default 
-// report interval separately. If the default report interval is not configured or badly configured 
-// non-positive, the default is 1 min. 
-// public OpenRcaServiceImpl(long minInterval, TimeUnit timeUnit, long 
-// defaultInterval, TimeUnit)
-public OrcaServiceImpl(long minReportInterval, TimeUnit unit);
+  // Allow configuring minimum report interval. If not configured or badly configured non-positive, 
+  // the default is 30s.
+  // In the future, it might be useful to let users specify minimum report interval and default 
+  // report interval separately. If the default report interval is not configured or badly configured 
+  // non-positive, the default is 1 min. 
+  // public OpenRcaServiceImpl(long minInterval, TimeUnit timeUnit, long 
+  // defaultInterval, TimeUnit)
+  public OrcaServiceImpl(long minReportInterval, TimeUnit unit);
 
-// Creates an OOB service using default minimum report interval = 30s.
-public OrcaServiceImpl();
+  // Creates an OOB service using default minimum report interval = 30s.
+  public OrcaServiceImpl();
 
-// Update the metrics value corresponding to the specified key.
-public void setUtilizationMetric(String key, double value);
+  // Update the metrics value corresponding to the specified key.
+  public void setUtilizationMetric(String key, double value);
 
-// Replace the whole metrics data using the specified map.
-public void setAllUtilizationMetrics(Map<String, Double> metrics);
+  // Replace the whole metrics data using the specified map.
+  public void setAllUtilizationMetrics(Map<String, Double> metrics);
 
-// Remove the metrics data entry corresponding to the specified key.
-public void deleteUtilizationMetric(String key);
+  // Remove the metrics data entry corresponding to the specified key.
+  public void deleteUtilizationMetric(String key);
 
-// Update the CPU utilization metrics data.
-public void setCPUUtilizationMetric(double value);
+  // Update the CPU utilization metrics data.
+  public void setCPUUtilizationMetric(double value);
 
-// Clear the CPU utilization metrics data.
-public void deleteCPUUtilizationMetric();
+  // Clear the CPU utilization metrics data.
+  public void deleteCPUUtilizationMetric();
 
-// Update the memory utilization metrics data.
-public void setMemoryUtilizationMetric(double value);
+  // Update the memory utilization metrics data.
+  public void setMemoryUtilizationMetric(double value);
 
-// Clear the memory utilization metrics data.
-public void deleteMemoryUtilizationMetric();
+  // Clear the memory utilization metrics data.
+  public void deleteMemoryUtilizationMetric();
 }
 ```
 
@@ -352,16 +362,17 @@ installs the out-of-band metrics reporting mechanism, and then consumes the metr
 which only requires users to register an `OrcaOobReportListener` that contains their own business logic:
 
 ```java
-class CustomLoadBalancer extends LoadBalancer {
+class CustomLoadBalancer extends LoadBalancer { 
   private final Helper helper;  // the original Helper
-  void handleNewServer(address) {
-  // Create OrcaHelperWrapper and a separate listener for each Subchannel
-  OrcaListener listener = new OrcaOobReportListener();
-  OrcaHelperWrapper orcaWrapper = OrcaUtil.newOrcaHelperWrapper(helper, listener);
-  orcaWrapper.configure(
-      OrcaReportingConfig.newBuilder().setInterval(40, SECONDS).build()); 
-  Subchannel subchannel = orcaWrapper.asHelper().create(
-  CreateSubchannelArgs.newBuilder().setAddresses(address).build());
+  void handleNewServer(ResolvedAddresses address) {
+    // Create OrcaHelperWrapper and a separate listener for each Subchannel
+    OrcaListener listener = new OrcaOobReportListener();
+    OrcaHelperWrapper orcaWrapper = OrcaUtil.newOrcaHelperWrapper(helper, listener);
+    orcaWrapper.configure(
+        OrcaReportingConfig.newBuilder().setInterval(40, SECONDS).build());
+    Subchannel subchannel = orcaWrapper.asHelper().create(
+        CreateSubchannelArgs.newBuilder().setAddresses(address).build());
+    subchannel.updateAddresses(address);
   }
 }
 
