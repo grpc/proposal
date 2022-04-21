@@ -204,7 +204,7 @@ The client does not need to wait for this call to be established before it start
 If the `StreamCoreMetrics` call fails with status `UNIMPLEMENTED`, the client will not retry the call, 
 and the subscribing LB polic(ies) will not receive any callbacks.
 However, the client will record a channel trace event indicating that this has happened. 
-It will also log a message at priority ERROR.
+It will also log a message at priority WARNING.
 If the `StreamCoreMetrics` call returns any other status, the client will retry the call.
 To avoid hammering a server that may be experiencing problems, the client will use exponential backoff between attempts.
 When the client receives a message from the server on a given call, the backoff state is reset, 
