@@ -5,7 +5,7 @@ Requiring C++14 in gRPC Core/C++ Library
 * Status: Draft
 * Implemented in: n/a
 * Last updated: April 25, 2022
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/cpSVzf3rZYY
 
 ## Abstract
 
@@ -15,7 +15,7 @@ gRPC starts requiring C++14.
 
 gRPC has been requiring C++11 from 2017 by
 [Allow C++ in gRPC Core Library](L6-core-allow-cpp.md). As all compilers
-that gRPC supports is now capable of C++14, gRPC is going to require
+that gRPC supports are now capable of C++14, gRPC is going to require
 C++14 to benefit from new C++14 features.
 
 ## Proposal
