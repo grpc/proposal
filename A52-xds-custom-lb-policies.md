@@ -4,7 +4,7 @@ A52: gRPC xDS Custom Load Balancer Configuration
 * Approver: markdroth
 * Implemented in: Java, Go and C-core
 * Last updated: 2022-04-22
-* Discussion at: 
+* Discussion at: https://groups.google.com/g/grpc-io/c/BoRazEVUEz0
 
 ## Abstract
 Adds the ability to configure custom load balancing policies retrieved from a control plane via the xDS API.
