@@ -115,7 +115,7 @@ message OutlierDetectionLoadBalancingConfig {
 
   // If set, success rate ejections will be performed
   SuccessRateEjection success_rate_ejection = 5;
-  
+
   // If set, failure rate ejections will be performed
   FailurePercentageEjection failure_percentage_ejection = 6;
 
@@ -186,6 +186,30 @@ The subchannel wrapper will track the latest state update from the underlying su
     1. If the percentage of ejected addresses is greater than `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `failure_percentage_ejection.request_volume`, continue to the next address.
     3. If the address's failure percentage is greater than `failure_percentage_ejection.threshold`, then choose a random integer in `[0, 100)`. If that number is less than `failiure_percentage_ejection.enforcement_percentage`, eject that address.
+
+### Update Addresses
+
+In Java and Go, a Subchannel can specify that its address list has changed. This set of scenarios can occur with respect to the plurality of the address list, with the behavior specified for each scenario:
+
+1. Single to single:
+    1. Forward the update to the Client Conn.
+    2. Update (create/delete map entries) the map of addresses if applicable.
+    3. Relay state with eject() recalculated (using the corresponding map entry to see if it's currently ejected).
+      * Note: this is racey in regards to what state gets sent to the Subchannel between an UpdateSubConnState() from the ClientConn from the forwarded UpdateAddress() call. This is fine, as the state from the ClientConn will eventually make it's way down to the SubConn, with no negative externalities.
+
+2. Single to multiple:
+    1. Remove the map entry if only Subchannel for that address.
+    2. Clear the Subchannel wrapper's Call Counter entry.
+
+3. Multiple to single:
+    1. Add map entry for that Address if applicable.
+    2. Add Subchannel to Addresses map entry.
+
+4. Multiple to multiple:
+
+No op, as the Subchannel continues to be ignored by the Outlier Detection Load Balancer.
+
+In order to support these algorithms, every Subchannel must be wrapped, as at any point any Subchannel has the potential to be added to the address map.
 
 ### Validation
 
