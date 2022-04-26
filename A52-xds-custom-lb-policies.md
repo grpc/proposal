@@ -2,7 +2,7 @@ A52: gRPC xDS Custom Load Balancer Configuration
 ----
 * Author(s): temawi
 * Approver: markdroth
-* Implemented in: Java and Go (C-core later)
+* Implemented in: Java, Go and C-core
 * Last updated: 2022-04-22
 * Discussion at: 
 
@@ -11,17 +11,18 @@ Adds the ability to configure custom load balancing policies retrieved from a co
 
 ## Background
 
-The Java and Go gRPC clients (and eventually C-core) provide interfaces for users to plug in their own load balancing policy implementations that can be deployed with a gRPC client. Currently no solution is provided for configuring these custom policies via the control plane and users are left to e.g. deploy bespoke configuration files.
+gRPC clients provide interfaces for users to plug in their own load balancing policy implementations that can be deployed with a gRPC client. Currently no solution is provided for configuring these custom policies via the control plane and users are left to e.g. deploy bespoke configuration files.
 
 ### Related Proposals:
 
 This proposal builds on earlier work described in the following gRFCs:
 * [gRFC A27: xDS-based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
 * [gRFC A24: Load Balancing Policy Configuration](https://github.com/grpc/proposal/blob/master/A24-lb-policy-config.md)
+* [gRFC A42: xDS Ring Hash LB Policy](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md)
 
 ## Proposal
 
-Load balancing configuration of a gRPC client is based on the fields in the [`Cluster`](https://github.com/envoyproxy/envoy/blob/305a200ce2002de9984e7fb7bb98d92b8e9fbcca/api/envoy/config/cluster/v3/cluster.proto#L48) xDS message delivered to the client by the [`ClusterDiscoveryService`](https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cds). Currently the combination of the [`lb_policy`](https://github.com/envoyproxy/envoy/blob/55a506f4cc053c9841c44644238aced88dea191d/api/envoy/config/cluster/v3/cluster.proto#L779) enum value and a policy specific configuration field in the [`lb_config`](https://github.com/envoyproxy/envoy/blob/305a200ce2002de9984e7fb7bb98d92b8e9fbcca/api/envoy/config/cluster/v3/cluster.proto#L991) oneof are used to determine the policy configuration. What will be added is the additional support for the newer [`load_balancing_policy`](https://github.com/envoyproxy/envoy/blob/305a200ce2002de9984e7fb7bb98d92b8e9fbcca/api/envoy/config/cluster/v3/cluster.proto#L1064) field.
+Load balancing configuration of a gRPC client is based on the fields in the [`Cluster`](https://github.com/envoyproxy/envoy/blob/305a200ce2002de9984e7fb7bb98d92b8e9fbcca/api/envoy/config/cluster/v3/cluster.proto#L48) xDS resource delivered to the client by the [`AggregatedDiscoveryService`](https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/discovery/v3/ads.proto.html). Currently the combination of the [`lb_policy`](https://github.com/envoyproxy/envoy/blob/55a506f4cc053c9841c44644238aced88dea191d/api/envoy/config/cluster/v3/cluster.proto#L779) enum value and a policy specific configuration field in the [`lb_config`](https://github.com/envoyproxy/envoy/blob/305a200ce2002de9984e7fb7bb98d92b8e9fbcca/api/envoy/config/cluster/v3/cluster.proto#L991) oneof are used to determine the policy configuration. What will be added is the additional support for the newer [`load_balancing_policy`](https://github.com/envoyproxy/envoy/blob/305a200ce2002de9984e7fb7bb98d92b8e9fbcca/api/envoy/config/cluster/v3/cluster.proto#L1064) field.
 
 If the `load_balancing_policy` field is provided, it will be used instead of the `lb_policy` and `lb_config` fields. If `load_balancing_policy` is not provided, full backward compatibility with the old fields will be maintained.
 
@@ -29,7 +30,7 @@ If the `load_balancing_policy` field is provided, it will be used instead of the
 
 When the xDS client receives a CDS update it notifies its listeners/watchers of the configuration changes, including the load balancing policy to be used. Currently the xDS client only considers the `lb_policy` field in the CDS update when constructing the update information it sends out. This logic will change to consider the new `load_balancing_policy` field that will be used as the source of LB policy configuration if it is populated.
 
-Regardless of the field that load balancing policy configuration is picked up from, internally `XdsClient` will represent the information in a uniform manner. The CDS update struct will be updated to carry LB policy configuration in JSON form. We move from an enum for the policy selection and a set of `oneof` configuration fields to having a [LoadBalancingConfig](https://github.com/grpc/grpc-proto/blob/master/grpc/service_config/service_config.proto) JSON object.
+Regardless of the field that load balancing policy configuration is picked up from, internally `XdsClient` will represent the information in a uniform manner. The CDS update struct will be updated to carry LB policy configuration in JSON form. We move from an enum for the policy selection and a set of `oneof` configuration fields to having a [LoadBalancingConfig](https://github.com/grpc/grpc-proto/blob/ab96cf12ec7ce135e03d6ea91d96213fa4cb02af/grpc/service_config/service_config.proto#L560) JSON object.
 
 The load balancer config portion of the CDS update struct will change to take the following form:
 
@@ -45,14 +46,14 @@ The load balancer config portion of the CDS update struct will change to take th
 
 The XdsClient will transfer the responsibility of converting the xDS configuration to the internal JSON format to a new *xDS LB policy registry*. This new registry will return an error if the xDS load balancing configuration cannot be converted, but it will not validate a converted configuration. It will be the responsibility of the XdsClient to validate that the converted configuration. It will do this by having the gRPC LB policy registry parse the configuration.
 
-The CDS resource is rejected and a NACK returned to the control plane if:
+The CDS resource is rejected and a NACK returned to the control plane in either of the following cases:
 
 - xDS LB policy registry cannot convert the configuration and returns an error 
-- gRPC LB policy registry cannot parse a converted configuration.
+- gRPC LB policy registry cannot parse the converted configuration.
 
 ### xDS LB Policy Registry
 
-This new registry will maintain a set of converters that are able to map from the xDS LoadBalancingPolicy message to the internal gRPC JSON format. The conversion process will be recursive so that e.g. the conversion of the new xDS WRR Locality policy will call into the registry to convert the child policies.
+This new registry will maintain a set of converters that are able to map from the xDS LoadBalancingPolicy message to the internal gRPC JSON format. The conversion process will be recursive so that e.g. the conversion of the new xDS WRR Locality policy (see below) will call into the registry to convert the child policies.
 
 The registry will provide the following function:
 
@@ -69,18 +70,18 @@ string convertToServiceConfig(envoy.config.cluster.v3.LoadBalancingPolicy loadBa
 This function will iterate over the list of `Policy` messages in `LoadBalancingPolicy`, attempting to convert each one to gRPC form, stopping at the first supported policy. The `Policy` message contains a `TypedExtensionConfig` message with the configuration information. `TypedExtensionConfig` in turn uses an Any typed `typed_config` field to store policy configuration of any type. This `typed_config` field is used to determine both the name of a policy and the configuration for it, depending on its type:
 
 - `envoy.extensions.load_balancing_policies.ring_hash.v3.RingHash`
-  - The policy name will be `ring_hash_experimental`.
+  - The gRPC policy name will be `ring_hash_experimental`.
   - The `minimum_ring_size` and `maximum_ring_size` xDS fields are converted to the `minRingSize` and `maxRingSize` fields in service config
   - The `hash_function` field will not be converted, but will need to be validated. Any function besides `XX_HASH` will cause the conversion to fail
 - `envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin`
-  - The policy name will be `round_robin`.
+  - The gRPC policy name will be `round_robin`.
   - Has no configuration - an empty JSON object is returned
 - `envoy.extensions.load_balancing_policies.round_robin.v3.WrrLocality`
-  - The policy name will be `xds_wrr_locality_experimental`
+  - The gRPC policy name will be `xds_wrr_locality_experimental`
   - Contains a `LoadBalancingPolicy` field that has a list of endpoint picking policies. This field will be processed by recursively calling the xDS LB policy registry, and the result will be used in the `child_policy` field in the configuration for the `xds_wrr_locality_experimental` policy (see the “xDS WRR Locality Load Balancer” sections for details on the config format).
 - `xds.type.v3.TypedStruct`
   - This type represents a custom policy, deployed with the gRPC client by a user
-  - The policy name will be value of the `type_url` field in the `TypedStruct`, with the "`type.googleapis.com/`" prefix stripped out
+  - The gRPC policy name will be value of the `type_url` field in the `TypedStruct`, with the "`type.googleapis.com/`" prefix stripped out
   - The `Struct` contained in the `TypedStruct` will be returned as-is as the configuration JSON object.
   - Note that when registering custom policy implementations in the gRPC load balancer registry, the name should follow valid protobuf message naming conventions and use a custom package, e.g. "`myorg.MyCustomLb`".
 
@@ -127,7 +128,7 @@ These two elements will be combined to create the `weighted_target_experimental`
 
 ### xDS Cluster Resolver Load Balancer
 
-This load balancer today determines the load balancer hierarchy when it creates the configuration for the priority policy. If the policy it receives is `ring_hash`, it will pass that policy selection directly to the priority policy. If it is given an endpoint picking policy (like `round_robin`), it will instead create a weighted target policy selection that contains the endpoint picking policy selection as a child, creating a two level hierarchy.
+As described in [gRFC A42](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md#change-child-policy-config-generation-in-xds_cluster_resolver-policy), this load balancer today determines the load balancer hierarchy when it creates the configuration for the priority policy. If the policy it receives is `ring_hash`, it will pass that policy selection directly to the priority policy. If it is given an endpoint picking policy (like `round_robin`), it will instead create a weighted target policy selection that contains the endpoint picking policy selection as a child, creating a two level hierarchy.
 
 With the xDS client now creating a configuration that represents the whole policy hierarchy, this special logic can be removed and the policy selection received can be directly passed to the priority policy.
 
@@ -136,20 +137,13 @@ The cluster resolver configuration documentation in service_config.proto is upda
 ```protobuf
 // Configuration for xds_cluster_resolver LB policy.
 message XdsClusterResolverLoadBalancingPolicyConfig {
-  // xDS LB policy.
-  // This represents the xDS LB policy, which does not necessarily map
-  // one-to-one to a gRPC LB policy.  Currently, the following policies
-  // are supported:
-  // - "ROUND_ROBIN" (config is empty)
-  // - "RING_HASH" (config is a RingHashLoadBalancingConfig)
-
   // xDS LB policy. Will be used as the child config of the xds_cluster_impl LB policy. 
   repeated LoadBalancingConfig xds_lb_policy = 2;
 
 }
 ```
 
-To provide the `wrr_locality` load balancer information about locality weights received from EDS, the cluster resolver will populate a new attribute in the resolved addresses. The new attribute will use the key “`io.grpc.xds.InternalXdsAttributes.localityWeights`” and the data will contain a map from a locality struct to a locality weight integer. Note that a change in this attribute would still allow associated subchannels to be reused - it will not affect their uniqueness.
+To provide the `xds_wrr_locality` load balancer information about locality weights received from EDS, the cluster resolver will populate a new attribute in the resolved addresses. The new attribute will contain a map from a locality struct to a locality weight integer. Note that a change in this attribute would still allow associated subchannels to be reused - it will not affect their uniqueness.
 
 ### Configuration Example
 
@@ -315,4 +309,4 @@ The `weighted_target` configuration will be:
 ```
 
 ## Implementation
-Some initial refactoring to accommodate this desing has happened for Java. The Go library is yet to pick this up. In C-core the APIs that allow users to register custom LB policies are currently private. The plan is to make them public and once done this design can also be picked up for C-core.
+In C-core, the LB policy API is not yet public, but it will be made public in the future when the EventEngine migration is far enough along to allow it. In the interim, C-core will get the same changes to support custom xDS-based LB policies, so that when the C-core LB policy API later becomes public, this functionality will already be present.
