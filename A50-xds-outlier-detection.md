@@ -198,18 +198,19 @@ In Java and Go, a Subchannel can specify that its address list has changed. This
       * Note: this is racey in regards to what state gets sent to the Subchannel between an UpdateSubConnState() from the ClientConn from the forwarded UpdateAddress() call. This is fine, as the state from the ClientConn will eventually make it's way down to the SubConn, with no negative externalities.
 
 2. Single to multiple:
-    1. Remove the map entry if only Subchannel for that address.
-    2. Clear the Subchannel wrapper's Call Counter entry.
+    1. Remove Subchannel from Addresses map entry.
+    2. Remove the map entry if only Subchannel for that address.
+    3. Clear the Subchannel wrapper's Call Counter entry.
 
 3. Multiple to single:
     1. Add map entry for that Address if applicable.
     2. Add Subchannel to Addresses map entry.
 
 4. Multiple to multiple:
-
-No op, as the Subchannel continues to be ignored by the Outlier Detection Load Balancer.
+    1. No op, as the Subchannel continues to be ignored by the Outlier Detection Load Balancer.
 
 In order to support these algorithms, every Subchannel must be wrapped, as at any point any Subchannel has the potential to be added to the address map.
+
 
 ### Validation
 
