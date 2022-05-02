@@ -397,7 +397,66 @@ TODO
 TODO
 
 ### C++
+
+C-core's LB policies do have the ability to obtain backend metric data
+for both per-RPC and OOB mechanisms.  However, the C-core LB policy API
+is not yet ready to be made public, so this gRFC does not describe those
+APIs.  They will be described in a subsequent gRFC when the LB policy
+API is ready to be made public.
+
+This section describes only the C++ server-side APIs.
+
 #### Per-Query Reporting APIs
-TODO
+
+TODO(nicolasnoble): Fill this in.
+
 #### OOB Reporting APIs
-TODO
+
+C++ provides the following API for running the ORCA service:
+
+```c++
+class OrcaService {
+ public:
+  struct Options {
+    // Minimum report interval.  If a client requests an interval lower
+    // than this value, this value will be used instead.
+    absl::Duration min_report_duration = absl::Seconds(30);
+
+    Options() = default;
+    Options& set_min_report_duration(absl::Duration duration) {
+      min_report_duration = duration;
+      return *this;
+    }
+  };
+
+  explicit OrcaService(Options options);
+
+  // Sets or removes the CPU utilization value to be reported to clients.
+  void SetCpuUtilization(double cpu_utilization);
+  void DeleteCpuUtilization();
+
+  // Sets of removes the memory utilization value to be reported to clients.
+  void SetMemoryUtilization(double memory_utilization);
+  void DeleteMemoryUtilization();
+
+  // Sets or removes named utilization values to be reported to clients.
+  void SetNamedUtilization(std::string name, double utilization);
+  void DeleteNamedUtilization(const std::string& name);
+  void SetAllNamedUtilization(std::map<std::string, double> named_utilization);
+};
+```
+
+To use this, an application can simply register this service via their
+`ServerBuilder`, like so:
+
+```c++
+OrcaService orca_service(OrcaService::Options());
+ServerBuilder server_builder;
+server_builder.AddListeningPort(...);
+server_builder.RegisterService(&orca_service);
+auto server = server_builder.BuildAndStart();
+```
+
+The application can set utilization data on the `OrcaService` object at
+any time, and it will automatically be sent to any connected clients at
+the next scheduled reporting interval.
