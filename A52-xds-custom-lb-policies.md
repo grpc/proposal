@@ -34,7 +34,7 @@ Regardless of the field that load balancing policy configuration is picked up fr
 
 The load balancer config portion of the CDS update struct will change to take the following form:
 
-```json
+```c
 {
   ...
 
@@ -54,6 +54,8 @@ The CDS resource is rejected and a NACK returned to the control plane in either 
 ### xDS LB Policy Registry
 
 This new registry will maintain a set of converters that are able to map from the xDS LoadBalancingPolicy message to the internal gRPC JSON format. The conversion process will be recursive so that e.g. the conversion of the new xDS WRR Locality policy (see below) will call into the registry to convert the child policies.
+
+The implementation should not allow excessive recursion. Configurations that require more than 16 levels of recursion are considered invalid and should result in a NACK response.
 
 The registry will provide the following function:
 
@@ -81,7 +83,7 @@ This function will iterate over the list of `Policy` messages in `LoadBalancingP
   - Contains a `LoadBalancingPolicy` field that has a list of endpoint picking policies. This field will be processed by recursively calling the xDS LB policy registry, and the result will be used in the `child_policy` field in the configuration for the `xds_wrr_locality_experimental` policy (see the “xDS WRR Locality Load Balancer” sections for details on the config format).
 - `xds.type.v3.TypedStruct`
   - This type represents a custom policy, deployed with the gRPC client by a user
-  - The gRPC policy name will be value of the `type_url` field in the `TypedStruct`, with the "`type.googleapis.com/`" prefix stripped out
+  - The gRPC policy name will be the "type name" part of the value of the `type_url` field in the `TypedStruct`. We get this by using the part after the last `/` character.
   - The `Struct` contained in the `TypedStruct` will be returned as-is as the configuration JSON object.
   - Note that when registering custom policy implementations in the gRPC load balancer registry, the name should follow valid protobuf message naming conventions and use a custom package, e.g. "`myorg.MyCustomLb`".
 
@@ -147,7 +149,7 @@ To provide the `xds_wrr_locality` load balancer information about locality weigh
 
 ### Configuration Example
 
-This is a step-by-step example of how and example xDS configuration gets converted within a gRPC client. The example configuration is:
+This is a step-by-step example of how an example xDS configuration gets converted within a gRPC client. The example configuration is:
 
 ```textproto
 { // Cluster
@@ -202,6 +204,7 @@ This is a step-by-step example of how and example xDS configuration gets convert
           },
         }]
       }
+    }
   ]
 
   …
@@ -292,7 +295,7 @@ The `weighted_target` configuration will be:
             "choiceCount" : 2
           }
         },
-      }
+      ]
     }
     "Locality B" : {
       "weight": 2
@@ -302,7 +305,7 @@ The `weighted_target` configuration will be:
             "choiceCount" : 2
           }
         },
-      }
+      ]
     }
   }
 }
