@@ -29,17 +29,19 @@ which was added to `setuptools` in [v30.3.0][release_declarative_config] (Dec. 2
 the functionality defined in this proposal does not require a project to use the declarative config.
 
 Custom commands are not the only integration point that is available. `setuptools` also supports
-entrypoints that allows for packages to act as a plugin and provide custom behavior. This is
-[documented with examples][setuptools_entrypoint] of generating files based on revision control
-information. This could be used to generate source files based on `.proto` files.
+entrypoints that allows for packages to act as a plugin and provide custom behavior. There are a few
+different options for entrypoint hooks ([1][setuptools_customize], [2][setuptools_file_finder]) which
+could be used to generate source files based on `.proto` files. (There is also an
+[open proposal][setuptools_sub_commands] to allow for adding `build` sub-commands. Which more directly
+represents what we are trying to achieve.)
 
 [Original Feature Request][original_feature_request]
 
 ## Proposal
 
-`grpcio-tools` will register a new entrypoint function to respond to the `setuptools.file_finders`
-hook. This hook will generate Python files based on the `.proto` files and tell `setuptools where
-they were generated.
+`grpcio-tools` will register a new entrypoint function to respond to the
+`setuptools.finalize_distribution_options` hook. This hook will generate Python files based on the
+`.proto` files.
 
 ### Configuration
 
@@ -133,7 +135,9 @@ integration, it is not mentioned in the basic tutorial documentation.
 
 ## Implementation
 
-- [ ] Proof of Concept with hard coded values.
+[Pull Request][feature_pr]
+
+- [x] Proof of Concept with hard coded values.
 - [ ] Configuration file parsing & mapping to CLI arguments.
 - [ ] Document feature and how projects would use it.
 
@@ -158,7 +162,9 @@ I am planning work on it. I will be able to spend a few hours of each work week 
 [pep_518]: https://www.python.org/dev/peps/pep-0518/
 [declarative_config]: https://setuptools.pypa.io/en/latest/userguide/declarative_config.html
 [release_declarative_config]: https://setuptools.pypa.io/en/latest/history.html#v30-3-0
-[setuptools_entrypoint]: https://setuptools.pypa.io/en/latest/userguide/extension.html#adding-support-for-revision-control-systems
+[setuptools_customize]: https://setuptools.pypa.io/en/latest/userguide/extension.html#customizing-distribution-options
+[setuptools_file_finder]: https://setuptools.pypa.io/en/latest/userguide/extension.html#adding-support-for-revision-control-systems
+[setuptools_sub_commands]: https://github.com/pypa/setuptools/issues/2591
 [original_feature_request]: https://github.com/grpc/grpc/issues/28662
 [build_dependency]: https://setuptools.pypa.io/en/latest/userguide/dependency_management.html?highlight=setup_requires#build-system-requirement
 [tool_table]: https://www.python.org/dev/peps/pep-0518/#tool-table
@@ -168,3 +174,4 @@ I am planning work on it. I will be able to spend a few hours of each work week 
 [runtime_classes]: https://github.com/grpc/grpc/blob/a72c8ebb7def13a317a1afc7c08455388d1fa2e4/src/python/grpcio/grpc/_runtime_protos.py#L1
 [runtime_proposal]: ./L64-python-runtime-proto-parsing.md
 [runtime_api]: https://grpc.github.io/grpc/python/grpc.html#runtime-protobuf-parsing
+[feature_pr]: https://github.com/grpc/grpc/pull/29541
