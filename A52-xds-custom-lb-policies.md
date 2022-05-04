@@ -44,7 +44,7 @@ The load balancer config portion of the CDS update struct will change to take th
 }
 ```
 
-The XdsClient will transfer the responsibility of converting the xDS configuration to the internal JSON format to a new *xDS LB policy registry*. This new registry will return an error if the xDS load balancing configuration cannot be converted, but it will not validate a converted configuration. It will be the responsibility of the XdsClient to validate that the converted configuration. It will do this by having the gRPC LB policy registry parse the configuration.
+The XdsClient will transfer the responsibility of converting the xDS configuration to the internal JSON format to a new *xDS LB policy registry*. This new registry will return an error if the xDS load balancing configuration cannot be converted, but it will not validate a converted configuration. It will be the responsibility of the XdsClient to validate the converted configuration. It will do this by having the gRPC LB policy registry parse the configuration.
 
 The CDS resource is rejected and a NACK returned to the control plane in either of the following cases:
 
