@@ -2,7 +2,7 @@ A52: gRPC xDS Custom Load Balancer Configuration
 ----
 * Author(s): temawi
 * Approver: markdroth
-* Implemented in: Java, Go and C-core
+* Implemented in: 
 * Last updated: 2022-04-22
 * Discussion at: https://groups.google.com/g/grpc-io/c/BoRazEVUEz0
 
