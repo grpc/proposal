@@ -32,15 +32,16 @@ When the xDS client receives a CDS update it notifies its listeners/watchers of 
 
 Regardless of the field that load balancing policy configuration is picked up from, internally `XdsClient` will represent the information in a uniform manner. The CDS update struct will be updated to carry LB policy configuration in JSON form. We move from an enum for the policy selection and a set of `oneof` configuration fields to having a [LoadBalancingConfig](https://github.com/grpc/grpc-proto/blob/ab96cf12ec7ce135e03d6ea91d96213fa4cb02af/grpc/service_config/service_config.proto#L560) JSON object.
 
-The load balancer config portion of the CDS update struct will change to take the following form:
+The load balancer config portion of the CDS update struct will change to take the following form (in C++):
 
 ```c
-{
-  ...
+struct XdsClusterResource {
+  // ...
 
-  "lb_policy_config": <array of LoadBalancingConfig JSON objects>
-  
-  ...
+  // The gRPC LB policy config to be used as the child of the xds_cluster_impl LB policy.
+  Json::Array lb_policy_config;
+
+  // ...
 }
 ```
 
