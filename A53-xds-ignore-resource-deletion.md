@@ -66,16 +66,11 @@ When this feature is enabled, the XdsClient will not invoke the
 watchers' `OnResourceDoesNotExist()` method when a resource is deleted,
 nor will it remove the existing resource value from its cache.
 
-Note that the state-of-the-world xDS protocol variant, which is the only
-one that gRPC supports currently, does not provide a way for the server
-to explicitly indicate a deletion for any resource type except for LDS and
-CDS.  However, for the other resource types, the client assumes that the
-resource does not exist when it initially subscribes to the resource and
-the server does not provide the requested resource within 15 seconds, so
-this can occur for the other resource types when the ADS stream is
-closed and reestablished.  Also, in the future, if/when gRPC adds support
-for the incremental xDS protocol variant, this behavior would affect all
-resource types even without closing and reestablishing the ADS stream.
+Currently, this behavior will affect only LDS and CDS, because those are
+the only two resource types for which the state-of-the-world xDS protocol
+variant allows the server to indicate a deletion to a client.  However,
+in the future, if/when gRPC adds support for the incremental xDS
+protocol variant, this behavior would affect all resource types.
 
 ### Temporary environment variable protection
 
