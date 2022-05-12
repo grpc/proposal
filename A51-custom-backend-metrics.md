@@ -205,7 +205,7 @@ The client does not need to wait for this call to be established before it start
 If the `StreamCoreMetrics` call fails with status `UNIMPLEMENTED`, the client will not retry the call, 
 and the subscribing LB polic(ies) will not receive any callbacks.
 However, the client will record a channel trace event indicating that this has happened. 
-It will also log a message at priority WARNING.
+It will also log a message at priority ERROR.
 If the `StreamCoreMetrics` call returns any other status, the client will retry the call.
 To avoid hammering a server that may be experiencing problems, the client will use exponential backoff between attempts.
 When the client receives a message from the server on a given call, the backoff state is reset, 
@@ -368,16 +368,20 @@ which only requires users to register an `OrcaOobReportListener` corresponding t
 
 ```java
 class CustomLoadBalancer extends LoadBalancer { 
-  private final Helper helper;  // the original Helper
-  void handleNewServer(ResolvedAddresses address) {
-    // Create OrcaHelperWrapper and a separate listener for each Subchannel
-    OrcaListener listener = new OrcaOobReportListener();
-    OrcaHelperWrapper orcaWrapper = OrcaUtil.newOrcaHelperWrapper(helper);
-    Subchannel subchannel = orcaWrapper.asHelper().create(
+  private final Helper orcaHelper;
+  
+  public CustomLoadBalancer(Helper originalHelper) {
+    orcaHelper = OrcaUtil.newOrcaHelper(helper);
+  } 
+  
+  private Subchannel handleNewServer(ResolvedAddresses address) {
+    Subchannel subchannel = orcaHelper.create(
         CreateSubchannelArgs.newBuilder().setAddresses(address).build());
-    orcaWrapper.setListener(subchannel, listener,
+    // Create a separate listener for each Subchannel.
+    OrcaOobReportListener listener = new OrcaOobReportListenerImpl(subchannel);
+    OrcaUtil.setListener(subchannel, listener, 
             OrcaReportingConfig.newBuilder().setInterval(40, SECONDS).build());
-    subchannel.updateAddresses(address);
+    return subchannel;
   }
 }
 
