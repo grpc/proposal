@@ -312,5 +312,9 @@ The `weighted_target` configuration will be:
 }
 ```
 
+### Temporary environment variable protection
+During initial development, this feature will be enabled by the `GRPC_EXPERIMENTAL_ENABLE_CUSTOM_LB_CONFIG` environment variable. If unset or not true, the `load_balancing_policy` field in xDS Cluster proto will not be considered and load balancing policy configuration will be based on the `lb_policy` field. This environment variable protection will be removed once the feature has proven stable.
+
+
 ## Implementation
 In C-core, the LB policy API is not yet public, but it will be made public in the future when the EventEngine migration is far enough along to allow it. In the interim, C-core will get the same changes to support custom xDS-based LB policies, so that when the C-core LB policy API later becomes public, this functionality will already be present.
