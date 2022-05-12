@@ -370,12 +370,12 @@ which only requires users to register an `OrcaOobReportListener` corresponding t
 class CustomLoadBalancer extends LoadBalancer { 
   private final Helper orcaHelper;
   
-  public CustomLoadBalancer(Helper originalHelper) {
+  public CustomLoadBalancer(Helper helper) {
     orcaHelper = OrcaUtil.newOrcaHelper(helper);
   } 
   
   private Subchannel handleNewServer(ResolvedAddresses address) {
-    Subchannel subchannel = orcaHelper.create(
+    Subchannel subchannel = orcaHelper.createSubchannel(
         CreateSubchannelArgs.newBuilder().setAddresses(address).build());
     // Create a separate listener for each Subchannel.
     OrcaOobReportListener listener = new OrcaOobReportListenerImpl(subchannel);
