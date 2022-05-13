@@ -79,7 +79,7 @@ This function will iterate over the list of `Policy` messages in `LoadBalancingP
 - `envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin`
   - The gRPC policy name will be `round_robin`.
   - Has no configuration - an empty JSON object is returned
-- `envoy.extensions.load_balancing_policies.round_robin.v3.WrrLocality`
+- `envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality`
   - The gRPC policy name will be `xds_wrr_locality_experimental`
   - Contains a `LoadBalancingPolicy` field that has a list of endpoint picking policies. This field will be processed by recursively calling the xDS LB policy registry, and the result will be used in the `child_policy` field in the configuration for the `xds_wrr_locality_experimental` policy (see the “xDS WRR Locality Load Balancer” sections for details on the config format).
 - `xds.type.v3.TypedStruct`
