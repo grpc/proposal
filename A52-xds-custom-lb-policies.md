@@ -313,7 +313,7 @@ The `weighted_target` configuration will be:
 ```
 
 ### Temporary environment variable protection
-During initial development, this feature will be enabled by the `GRPC_EXPERIMENTAL_ENABLE_CUSTOM_LB_CONFIG` environment variable. If unset or not true, the `load_balancing_policy` field in xDS Cluster proto will not be considered and load balancing policy configuration will be based on the `lb_policy` field. This environment variable protection will be removed once the feature has proven stable.
+During initial development, this feature will be enabled by the `GRPC_EXPERIMENTAL_XDS_CUSTOM_LB_CONFIG` environment variable. If unset or not true, the `load_balancing_policy` field in xDS Cluster proto will not be considered and load balancing policy configuration will be based on the `lb_policy` field. This environment variable protection will be removed once the feature has proven stable.
 
 
 ## Implementation
