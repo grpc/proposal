@@ -371,15 +371,15 @@ class CustomLoadBalancer extends LoadBalancer {
   private final Helper orcaHelper;
   
   public CustomLoadBalancer(Helper helper) {
-    orcaHelper = OrcaUtil.newOrcaHelper(helper);
+    orcaHelper = OrcaOobUtil.newOrcaHelper(helper);
   } 
   
   private Subchannel handleNewServer(ResolvedAddresses address) {
     Subchannel subchannel = orcaHelper.createSubchannel(
-        CreateSubchannelArgs.newBuilder().setAddresses(address).build());
+        CreateSubchannelArgs.newBuilder().setAddresses(address.getAddresses()).build());
     // Create a separate listener for each Subchannel.
     OrcaOobReportListener listener = new OrcaOobReportListenerImpl(subchannel);
-    OrcaUtil.setListener(subchannel, listener, 
+    OrcaOobUtil.setListener(subchannel, listener, 
             OrcaReportingConfig.newBuilder().setInterval(40, SECONDS).build());
     return subchannel;
   }
@@ -393,12 +393,6 @@ public interface OrcaOobReportListener {
 }
 
 ```
-
-### Go
-#### Per-Query Reporting APIs
-TODO
-#### OOB Reporting APIs
-TODO
 
 ### C++
 
