@@ -305,7 +305,7 @@ class CustomPicker extends SubchannelPicker {
   Subchannel subchannel = … // WRR picking logic
   return PickResult.withSubchannel(
     subchannel,
-    OrcaUtil.newOrcaClientStreamTracerFactory(listener));
+    OrcaPerRequestUtil.newOrcaClientStreamTracerFactory(listener));
   }
 }
 ```
@@ -316,23 +316,7 @@ reporting interval configuration when creating the object. Then they can update 
 data using the exposed APIs as follows. All the methods are thread safe.
 
 ```java
-public class OrcaMetrics {
-
-  // Create a bindable service and allow configuring minimum report interval.
-  // If not configured or badly configured non-positive,
-  // the default is 30s. Bind the returned service to the server.
-  public BindableService createService(ScheduledExecutorService timeService, long minReportInterval,
-                                     TimeUnit unit);
-
-  // In the future, it might be useful to let users specify minimum report interval and default 
-  // report interval separately. If the default report interval is not configured or badly configured 
-  // non-positive, the default is 1 min. 
-  // public BindableService createService(long minInterval, TimeUnit minUnit,
-  // long defaultInterval, TimeUnit defaultUnit)
-
-  // Creates an OOB bindable service using default minimum report interval = 30s.
-  public BindableService createService(ScheduledExecutorService timeService);
-
+public class MetricRecorder {
   // Update the metrics value corresponding to the specified key.
   public void setUtilizationMetric(String key, double value);
 
