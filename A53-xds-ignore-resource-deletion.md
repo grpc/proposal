@@ -72,6 +72,19 @@ variant allows the server to indicate a deletion to a client.  However,
 in the future, if/when gRPC adds support for the incremental xDS
 protocol variant, this behavior would affect all resource types.
 
+The XdsClient will generate an ERROR log when a resource deletion is
+ignored and a subsequent INFO log message when the condition clears, either
+because the server once again started sending the resource or because
+the client has unsubscribed from the resource.  To implement this, the
+XdsClient will maintain a bit in the cache entry for each resource
+indicating whether a deletion has been ignored.  When the XdsClient
+receives an LDS or CDS update that does not include the resource, if the
+bit is not set, it will log the ERROR message and set the bit; when the
+XdsClient receives an LDS or CDS update that includes a resource for
+which the cache entry bit is set, it will log the INFO message and unset the
+bit; when the XdsClient unsubscribes from a resource, if the cache entry bit
+is set, it will log the INFO message before deleting the cache entry.
+
 ### Temporary environment variable protection
 
 This behavior is not configured via remote interaction, so it does not
@@ -82,6 +95,14 @@ require environment variable protection.
 As mentioned above, we cannot make this behavior unconditionally
 enabled, because it may lead to an outage due to human operators being
 blind to a bad push until clients are restarted.
+
+For the logging behavior, we considered logging on every LDS or CDS
+response in which the resource is not present, even if the resource
+was already absent in the previous response.  However, we decided
+against this, because when we eventually add support for the incremental
+xDS protocol variant, it will no longer be possible to log repeatedly,
+so we don't want users to get used to a behavior that we will not be
+able to continue to provide in the future.
 
 ## Implementation
 
