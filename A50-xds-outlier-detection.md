@@ -254,7 +254,11 @@ The `outlier_detection` field of the `Cluster` resource should have its fields v
 
 ### Temporary environment variable protection
 
-During initial development, this feature will be enabled by the `GRPC_EXPERIMENTAL_ENABLE_OUTLIER_DETECTION` environment variable. If unset or not `true`, the `outlier_detection` LB policy will not be registered, and all of the logic specified in the "xDS Integration" section will be disabled. This environment variable protection will be removed once the feature has proven stable.
+During initial development, this feature will be enabled by the `GRPC_EXPERIMENTAL_ENABLE_OUTLIER_DETECTION` environment variable. If unset or not `true`, the `outlier_detection` LB policy will not be registered, and all of the logic specified in the "xDS Integration" section will be disabled. This environment variable protection will be removed once the feature has proven stable. The environment variable protection will specifically apply to the following:
+
+ 1. The code that registers the Outlier Detection LB policy in the LB policy registry
+ 2. The code in the `XdsClient` that checks the fields in the `Cluster` resource and populates the resulting Outlier Detection config to return to the watcher
+ 3. The code in the `xds_cluster_resolver` LB policy that configures Outlier Detection in its child config
 
 ## Rationale
 
