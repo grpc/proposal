@@ -87,7 +87,8 @@ is set, it will log the INFO message before deleting the cache entry.
 
 ### Temporary environment variable protection
 
-This behavior is not configured via remote interaction, so it does not
+This behavior is not configured via remote interaction, and older clients
+will ignore unknown fields in the bootstrap config, so it does not
 require environment variable protection.
 
 ## Rationale
