@@ -1,7 +1,7 @@
-Requiring C++14 in gRPC Core/C++ Library
+L99: Requiring C++14 in gRPC Core/C++ Library
 ----
 * Author(s): veblush
-* Approver: a11r
+* Approver: markdroth
 * Status: Draft
 * Implemented in: n/a
 * Last updated: April 25, 2022
