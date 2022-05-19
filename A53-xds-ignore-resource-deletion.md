@@ -4,8 +4,8 @@ A53: Option for Ignoring xDS Resource Deletion
 * Approver: @ejona86, @dfawley
 * Status: In Review
 * Implemented in: <language, ...>
-* Last updated: 2022-05-10
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 2022-05-19
+* Discussion at: https://groups.google.com/g/grpc-io/c/eh7En9CY3oY
 
 ## Abstract
 
