@@ -72,7 +72,8 @@ variant allows the server to indicate a deletion to a client.  However,
 in the future, if/when gRPC adds support for the incremental xDS
 protocol variant, this behavior would affect all resource types.
 
-The XdsClient will generate an ERROR log when a resource deletion is
+The XdsClient will generate a WARNING log (may be ERROR on
+implementations that don't support WARNING) when a resource deletion is
 ignored and a subsequent INFO log message when the condition clears, either
 because the server once again started sending the resource or because
 the client has unsubscribed from the resource.  To implement this, the
