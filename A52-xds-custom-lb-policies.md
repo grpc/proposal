@@ -82,7 +82,7 @@ This function will iterate over the list of `Policy` messages in `LoadBalancingP
 - `envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality`
   - The gRPC policy name will be `xds_wrr_locality_experimental`
   - Contains a `LoadBalancingPolicy` field that has a list of endpoint picking policies. This field will be processed by recursively calling the xDS LB policy registry, and the result will be used in the `child_policy` field in the configuration for the `xds_wrr_locality_experimental` policy (see the “xDS WRR Locality Load Balancer” sections for details on the config format).
-- `xds.type.v3.TypedStruct`
+- `xds.type.v3.TypedStruct` or `udpa.type.v1.TypedStruct`
   - This type represents a custom policy, deployed with the gRPC client by a user
   - The gRPC policy name will be the "type name" part of the value of the `type_url` field in the `TypedStruct`. We get this by using the part after the last `/` character.
   - The `Struct` contained in the `TypedStruct` will be returned as-is as the configuration JSON object.
