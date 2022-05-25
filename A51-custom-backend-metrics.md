@@ -318,25 +318,25 @@ data using the exposed APIs as follows. All the methods are thread safe.
 ```java
 public class MetricRecorder {
   // Update the metrics value corresponding to the specified key.
-  public void setUtilizationMetric(String key, double value);
+  public void putUtilizationMetric(String key, double value);
 
   // Replace the whole metrics data using the specified map.
   public void setAllUtilizationMetrics(Map<String, Double> metrics);
 
   // Remove the metrics data entry corresponding to the specified key.
-  public void deleteUtilizationMetric(String key);
+  public void clearUtilizationMetric(String key);
 
   // Update the CPU utilization metrics data.
   public void setCPUUtilizationMetric(double value);
 
   // Clear the CPU utilization metrics data.
-  public void deleteCPUUtilizationMetric();
+  public void clearCPUUtilizationMetric();
 
   // Update the memory utilization metrics data.
   public void setMemoryUtilizationMetric(double value);
 
   // Clear the memory utilization metrics data.
-  public void deleteMemoryUtilizationMetric();
+  public void clearMemoryUtilizationMetric();
 }
 ```
 
