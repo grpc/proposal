@@ -202,6 +202,7 @@ Before all: Forward the update to the Client Conn.
 2. Single to multiple:
     1. Remove Subchannel from Addresses map entry if present in Addresses map.
     2. Clear the Subchannel wrapper's Call Counter entry.
+    3. Uneject the Subchannel in case it was previously ejected.
 
 3. Multiple to single:
     1. Add Subchannel to Addresses map entry if new address present in map.
