@@ -146,6 +146,12 @@ status code INTERNAL, or RST_STREAM with HTTP/2 error code PROTOCOL_ERROR. These
 restrictions and behavior produce a singular, unambiguous authority for every
 request to be used by RBAC and the application itself.
 
+If a header is not present, `HeaderMatch` will not match _except_ for
+`present_match` when `present_match == invert_match`. This is because
+`HeaderMatcher.invert_match` inverts the comparison operation so
+something like `exact_match` changes from an `==` comparison to a `!=`
+comparison, and both fail to match if the header is not present.
+
 In RBAC `metadata` refers to the Envoy metadata which has no relation to gRPC
 metadata. Envoy metadata is generic state shared between filters, which has no
 gRPC equivalent. RBAC implementations in gRPC will treat Envoy metadata as an
