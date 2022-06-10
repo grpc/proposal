@@ -19,6 +19,7 @@ This proposal builds on earlier work described in the following gRFCs:
 * [gRFC A27: xDS-based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
 * [gRFC A24: Load Balancing Policy Configuration](https://github.com/grpc/proposal/blob/master/A24-lb-policy-config.md)
 * [gRFC A42: xDS Ring Hash LB Policy](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md)
+* [gRFC A48: xDS Least Request LB Policy](https://github.com/grpc/proposal/blob/master/A48-xds-least-request-lb-policy.md)
 
 ## Proposal
 
@@ -82,6 +83,9 @@ This function will iterate over the list of `Policy` messages in `LoadBalancingP
 - `envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality`
   - The gRPC policy name will be `xds_wrr_locality_experimental`
   - Contains a `LoadBalancingPolicy` field that has a list of endpoint picking policies. This field will be processed by recursively calling the xDS LB policy registry, and the result will be used in the `child_policy` field in the configuration for the `xds_wrr_locality_experimental` policy (see the “xDS WRR Locality Load Balancer” sections for details on the config format).
+- `envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest` (if least_request is supported by the client)
+  - The gRPC policy name will be `least_request_experimental`
+  - The `choice_count` xDS field is converted to the `choiceCount` field in service config.
 - `xds.type.v3.TypedStruct` or `udpa.type.v1.TypedStruct`
   - This type represents a custom policy, deployed with the gRPC client by a user
   - The gRPC policy name will be the "type name" part of the value of the `type_url` field in the `TypedStruct`. We get this by using the part after the last `/` character.
