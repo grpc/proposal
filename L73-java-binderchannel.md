@@ -42,12 +42,7 @@ corresponding channel and server builders. This transport will support the
 inclusion of Android Parcelable objects in Metadata, to allow Parcelables when
 necessary, while discouraging Parcelables as a general message format.
 
-In addition we propose the creation of an "on-device" gRPC server concept, which
-is simultaneously a "binder" server and an in-process server, with a
-NameResolver to choose the most efficient transport mechanism for a given client
-context.
-
-In both cases, we're unable to support channel creation via [ManagedChannelBuilder]
+We're unable to support channel creation via [ManagedChannelBuilder]
 since a [bound service] connection requires an Android [Context] object to bind
 _from_.
 
@@ -164,68 +159,6 @@ Supplier<IBinder> binderSupplier =
       .buildAndAttachToServiceLifecycle();
 ```
 
-### OnDeviceServer
-
-Like BinderServer, OnDeviceSever is an implementation of [InternalServer],
-created via a corresponding OnDeviceServerBuilder class. However, an
-OnDeviceServer instance wraps two other InternalServer instances, BinderServer
-(described above) and gRPC's existing InProcessServer.
-
-This allows rpcs to use an in-process channel if the client happens to be 
-in the same process.
-
-### OnDeviceChannelBuilder
-
-OnDeviceChannelBuilder is used to create a channel to an on-device server. This
-typically deals with logical server uris of the form “ondevice://server_name”,
-and relies on name resolution to produce either an InProcessSocketAddress or an
-AndroidComponentAddress.
-
-Like BinderChannelBuilder, each channel can be created either globally for the
-entire application, or tied to the lifecycle of one component via a [Lifecycle]
-instance.
-
-```java
-OnDeviceChannelBuilder.forTarget(
-        application,
-        "ondevice://example")
-    .build();
-
-OnDeviceChannelBuilder.forTarget(
-        activity,
-        activity.getLifecycle(),
-        "ondevice://example")
-    .build();
-```
-
-### OnDeviceNameResolverProvider
-
-OnDeviceNameResolverProvider handles name resolution from logical names to
-either in-process (InProcessSocketAddress) or cross-process
-(AndroidComponentAddress) addresses. An instance is created using a Builder API
-with server names being either mapped to ComponentName instances (for
-out-of-process servers), or to `Supplier<Server>` for in-process servers.
-
-The use of `Supplier<Server>` for in-process name resolution, means server
-creation can happen lazily. This is particularly important since we're running
-in a mobile operating system, where processes are often started from cold in
-response to user invocation.
-
-### OnDeviceServerEndpoint
-
-OnDeviceServerEndpoint enables a concrete [bound service] to expose a
-cross-process endpoint to an internal `OnDeviceServer`. An instance of
-OnDeviceEndpoint holds an instance of `Binder` to be returned from the concrete
-service's [onBind] method. We'll require the concrete service to be an instance
-of [LifecycleService], in order to shutdown transports if that service is
-destroyed by the platform.
-
-Each OnDeviceEndpoint instance is created, via a corresponding builder, with the
-the logical name of the server it's exposing. An instance of
-OnDeviceNameResolverProvider is used to resolve (and potentially create) the
-real Server instance in response to incoming connections, with transactions
-being passed to the internal _BinderServer_.
-
 ### Security
 
 During transport setup, both client and server transport implementations will lookup the
@@ -236,12 +169,10 @@ An instance of the `SecurityPolicy` class decides whether any given UID can
 be communicated with. The default policy is to only allow comunnication with the
 same UID.
 
-Both OnDeviceChannelBuilder and BinderChannelBuilder take a SecurityPolicy in
-order to validate the connected-to server's UID.
+BinderChannelBuilder takes a SecurityPolicy in order to validate the connected-to server's UID.
 
-OnDeviceServerEndpointBuilder and BinderServerBuilder take a ServerSecurityPolicy to validate
-the UID of each client. ServerSecurityPolicy allows for a separate SecurityPolicy to be
-set for each service name.
+BinderServerBuilder takes a ServerSecurityPolicy to validate the UID of each client. 
+ServerSecurityPolicy allows for a separate SecurityPolicy to be set for each service name.
 
 ## Rationale
 
