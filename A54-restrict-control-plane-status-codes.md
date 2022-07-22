@@ -6,7 +6,7 @@ A54: Restrict Control-Plane Status Codes
 * Status: In Review
 * Implemented in: <language, ...>
 * Last updated: 2022-07-22
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/Yp0X2IHiVlA/m/7QyU4mYKDgAJ
 
 ## Abstract
 
