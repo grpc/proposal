@@ -153,6 +153,7 @@ The `outlier_detection` LB policy will store the timestamp of the most recent ti
 
 If a config is provided with both the `success_rate_ejection` and `failure_percentage_ejection` fields unset, skip starting the timer and do the following:
 
+ - Cancel the existing timer, if there is one.
  - Unset the timer start timestamp.
  - Un-eject all currently ejected addresses.
  - Reset each address's ejection time multiplier to 0.
