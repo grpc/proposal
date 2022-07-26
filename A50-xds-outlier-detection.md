@@ -149,7 +149,13 @@ The `outlier_detection` LB policy will have a timer that triggers on a period de
     - If the address is not ejected and the multiplier is greater than 0, decrease the multiplier by 1.
     - If the address is ejected, and the current time is after `ejection_timestamp + min(base_ejection_time * multiplier, max(base_ejection_time, max_ejection_time))`, un-eject the address.
 
-The `outlier_detection` LB policy will store the timestamp of the most recent timer start time. When a new config is provided, if the timer start timestamp is unset, set it to the current time and start the timer for the configured interval, then for each address, reset the call counters. If the timer start timestamp is set, instead cancel the existing timer and start the timer for the configured interval minus the difference between the current time and the previous start timestamp, or 0 if that would be negative. When the timer fires, set the timer start timestamp to the current time. If a config is provided with both the `success_rate_ejection` and `failure_percentage_ejection` fields unset, skip starting the timer and unset the timer start timestamp.
+The `outlier_detection` LB policy will store the timestamp of the most recent timer start time. When a new config is provided, if the timer start timestamp is unset, set it to the current time and start the timer for the configured interval, then for each address, reset the call counters. If the timer start timestamp is set, instead cancel the existing timer and start the timer for the configured interval minus the difference between the current time and the previous start timestamp, or 0 if that would be negative. When the timer fires, set the timer start timestamp to the current time.
+
+If a config is provided with both the `success_rate_ejection` and `failure_percentage_ejection` fields unset, skip starting the timer and do the following:
+
+ - Unset the timer start timestamp.
+ - Un-eject all currently ejected addresses.
+ - Reset each address's ejection time multiplier to 0.
 
 ### Ejection and Un-ejection
 
@@ -223,7 +229,7 @@ The `xds_cluster_resolver` config described in [gRFC A37: xDS Aggregate and Logi
 
 The `xds_cluster_resolver` LB policy will configure an `outlier_detection` LB policy instance for each priority as the top-level LB policy for that priority.  The configuration for that `outlier_detection` policy will be based on the `outlier_detection` field in the corresponding `DiscoveryMechanism` config for that priority.
 
-In the `cds` LB policy, if the `outlier_detection` field is not set in the `Cluster` resource, a "no-op" `outlier_detection` config will be generated in the corresponding `DiscoveryMechanism` config, with `interval` set to the maximum possible value and all other fields unset.
+In the `cds` LB policy, if the `outlier_detection` field is not set in the `Cluster` resource, a "no-op" `outlier_detection` config will be generated in the corresponding `DiscoveryMechanism` config, with all fields unset.
 
 If the `outlier_detection` field *is* set in the `Cluster` resource, if the `enforcing_success_rate` field is set to 0, the config `success_rate_ejection` field will be `null` and all `success_rate_*` fields will be ignored. If the `enforcing_failure_percent` field is set to 0 or `null`, the config `failure_percent_ejection` field will be `null` and all `failure_percent_*` fields will be ignored. Then the message fields will be mapped to config fields as follows:
 
