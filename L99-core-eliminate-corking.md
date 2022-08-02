@@ -1,11 +1,11 @@
-Eliminate Corking
+L99: C-Core Eliminate Corking
 ----
 * Author(s): ctiller
 * Approver: markdroth
 * Status: In Review
 * Implemented in: C Core
 * Last updated: 8/2/2022
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/6GzDzAoiySk
 
 ## Abstract
 
