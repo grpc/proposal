@@ -69,6 +69,7 @@ passing "inappropriate statuses" to the data plane. Specifically:
  * When applying a failed Config Selector result from the name resolver (an
    internal API for xDS in [gRFC A31][])
  * When applying a failed Picker result from the load balancer
+ * When CallCredentials fail an RPC
 
 The check locations are precise and apply only to the places where the control
 plane passes status codes to the data plane. At the time of this gRFC, this list
@@ -112,6 +113,10 @@ still be considered a bug and the `INTERNAL` error code will cause such bugs to
 fail noticably. The point of the gRFC is to reduce the damage to the system when
 these bugs are triggered. This does not improve reliability directly, but it
 does ease recovery.
+
+We normally don't think about CallCredentials being part of the control plane,
+but they do share the same architectural risks as load balancers and name
+resolvers.
 
 This gRFC purposefully does not limit interceptors, even interceptors that
 communicate with a control plane (e.g., [RLQS][rlqs.proto]). An interceptor like
