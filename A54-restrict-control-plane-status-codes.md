@@ -33,12 +33,12 @@ broken status code usages.
 
 Now, however, it is more common to implement custom name resolvers and load
 balancers and for those components to use gRPC themselves. This happened first
-with gRPC-LB, but also happens with xDS, Route Lookup Service (RLS), and others.
-It is now harder to audit all the code running in the control plane and it is
-very hard to find status "leaks" from a remote control plane server into the
-data plane. This is a serious risk as control plane errors can't be copied
-verbatim to the data plane; they need to be reinterpreted for the new context
-(generally by becoming `UNAVAILABLE` and attaching additional context).
+with gRPC-LB, but also happens with xDS and others. It is now harder to audit
+all the code running in the control plane and it is very hard to find status
+"leaks" from a remote control plane server into the data plane. This is a
+serious risk as control plane errors can't be copied verbatim to the data plane;
+they need to be reinterpreted for the new context (generally by becoming
+`UNAVAILABLE` and attaching additional context).
 
 As an example, if a name resolver is looking up the host `example.com`, that
 could be implemented as a gRPC call to a service. That service might fail the
@@ -52,14 +52,22 @@ caused a serious [Spotify outage][] because of [a bug in gRPC Java][issue 8950].
 [Spotify outage]: https://engineering.atspotify.com/2022/03/incident-report-spotify-outage-on-march-8/
 [issue 8950]: https://github.com/grpc/grpc-java/issues/8950
 
+## Related Proposals
+
+ * [A6: gRPC Retry Design][gRFC A6]
+ * [A31: gRPC xDS Timeout Support and Config Selector Design][gRFC A31]
+
+[gRFC A6]: A6-client-retries.md
+[gRFC A31]: A31-xds-timeout-support-and-config-selector.md
+
 ## Proposal
 
 Add checks to each language's Channel that prevents the control plane from
 passing "inappropriate statuses" to the data plane. Specifically:
 
- * When applying a failed Service Config parsing result from the name resolver
+ * When applying a failed Service Config result from the name resolver
  * When applying a failed Config Selector result from the name resolver (an
-   internal API for xDS)
+   internal API for xDS in [gRFC A31][])
  * When applying a failed Picker result from the load balancer
 
 The check locations are precise and apply only to the places where the control
@@ -83,10 +91,14 @@ If an "inappropriate status" is detected, the status should be rewritten to use
 clear a bug occurred. The original status code and message should be included
 within the new status message so the error information is not lost.
 
-Retry policy status code matching may only be checked after the control plane
-status check and rewrite. However, if an inappropriate status is rewritten and
-the retry policy allows retrying `INTERNAL`, implementations are free to not
-retry the RPC.
+If a failed Picker result occurs, retry policy status code matching may only
+occur after the control plane status check and rewrite. However, if an
+inappropriate status is rewritten and the retry policy allows retrying
+`INTERNAL`, implementations are free to not retry the RPC. The rewrite does not
+impact transparent retries as transparent retries are not performed for pick
+failures. Similarly, retries are not impacted by rewriting failed Service Config
+and Config Selector results as those results must be successful to determine the
+retry policy.
 
 ### Temporary environment variable protection
 
@@ -102,13 +114,13 @@ these bugs are triggered. This does not improve reliability directly, but it
 does ease recovery.
 
 This gRFC purposefully does not limit interceptors, even interceptors that
-communicate with a control plane (e.g., RLQS). An interceptor like fault
-injection legitimately needs to fail RPCs with any status code. There's no
-API-distinguishing feature between interceptors that communicate with a control
-plane and those that do not, so we simply accept the risk, especially since
-interceptors communicating with a remote control plane are relatively rare.
-Because interceptors remain unrestricted, we are not aware of any existing code
-that will be impacted by this new restriction.
+communicate with a control plane (e.g., [RLQS][rlqs.proto]). An interceptor like
+[fault injection][gRFC A33] legitimately needs to fail RPCs with any status
+code. There's no API-distinguishing feature between interceptors that
+communicate with a control plane and those that do not, so we simply accept the
+risk, especially since interceptors communicating with a remote control plane
+are relatively rare. Because interceptors remain unrestricted, we are not aware
+of any existing code that will be impacted by this gRFC.
 
 "Inappropriate status" codes is an easy topic for debate. The listed codes are
 clearly inappropriate, but there are other codes that may also seem
@@ -129,6 +141,9 @@ twice, redo if heads both times). The status is only used if there is another
 bug, so it should rarely be seen. Although the decision is arbitrary, the
 expected behavior is defined in this gRFC and implementatiors should not choose
 a different status code.
+
+[rlqs.proto]: https://github.com/envoyproxy/envoy/blob/2222039d775c45c583f5eef833a482e2be150d21/api/envoy/service/rate_limit_quota/v3/rlqs.proto
+[gRFC A33]: A33-Fault-Injection.md
 
 ## Implementation
 
