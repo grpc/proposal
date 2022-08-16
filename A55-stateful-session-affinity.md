@@ -5,7 +5,7 @@ A55: Stateful Session Affinity for Proxyless gRPC
 * Status: In Review
 * Implemented in: <language, ...>
 * Last updated: 2022-08-14
-* Discussion at: 
+* Discussion at: https://groups.google.com/g/grpc-io/c/F84rRVNgml4
 
 ## Abstract
 
