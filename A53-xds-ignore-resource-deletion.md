@@ -3,7 +3,7 @@ A53: Option for Ignoring xDS Resource Deletion
 * Author(s): Mark D. Roth (@markdroth)
 * Approver: @ejona86, @dfawley
 * Status: In Review
-* Implemented in: <language, ...>
+* Implemented in: C-core, Java
 * Last updated: 2022-05-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/eh7En9CY3oY
 
@@ -111,7 +111,10 @@ able to continue to provide in the future.
 
 ## Implementation
 
-C-core implementation in https://github.com/grpc/grpc/pull/29633.
+ * C-core implementation in https://github.com/grpc/grpc/pull/29633 released in
+   v1.48.0
+ * Java implementation in https://github.com/grpc/grpc-java/pull/9339 released
+   in v1.48.0
 
 ## Open issues (if applicable)
 
