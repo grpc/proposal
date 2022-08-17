@@ -1,10 +1,10 @@
 A55: Stateful Session Affinity for Proxyless gRPC
 ----
 * Author(s): Sanjay Pujare (@sanjaypujare)
-* Approver: 
+* Approver: markdroth
 * Status: In Review
 * Implemented in: <language, ...>
-* Last updated: 2022-08-14
+* Last updated: 2022-08-17
 * Discussion at: https://groups.google.com/g/grpc-io/c/F84rRVNgml4
 
 ## Abstract
@@ -256,7 +256,7 @@ or `"ring_hash_experimental"`) as the child policy of
 ## Rationale
 
 The stateful session affinity requirement is not satisfied by the
-[ring-hash LB policy][A55] because any time a backend host is removed or
+[ring-hash LB policy][A42] because any time a backend host is removed or
 added, the hash mapping of 1/N client sessions gets affected (where N is the
 total number of backends) which would lead to dropped requests in some cases
 which is unacceptable.
