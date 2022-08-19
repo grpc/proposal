@@ -95,12 +95,12 @@ Here is how gRPC will handle each type of hash policy:
   requests on a given gRPC channel. In order to facilitate an even selection
   of backends across different channels (which may or may not be in the same
   process or machine), the value of `io.grpc.channel_id` should be initialized
-  with a uniform random number. This can be used in similar situations to where
-  Envoy uses `connection_properties` to hash on the source IP address. (Note
-  that we do not recommend that applications create multiple gRPC channels to
-  the same virtual host, but if you do that, then the behavior here will not be
-  exactly the same as using `connection_properties`, because each channel
-  may use a different endpoint.)
+  with a random number from a uniform distribution. This can be used in similar
+  situations to where Envoy uses `connection_properties` to hash on the source
+  IP address. (Note that we do not recommend that applications create multiple
+  gRPC channels to the same virtual host, but if you do that, then the behavior
+  here will not be exactly the same as using `connection_properties`, because
+  each channel may use a different endpoint.)
 
 #### XdsClient Changes
 
