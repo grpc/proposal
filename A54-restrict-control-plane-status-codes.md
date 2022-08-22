@@ -23,7 +23,7 @@ from the control plane needs to pass to the data plane when errors are
 occurring, but the gRPC data plane is restricted from generating [status codes
 reserved for application use][statuscodes.md]: `INVALID_ARGUMENT`, `NOT_FOUND`,
 `ALREADY_EXISTS`, `FAILED_PRECONDITION`, `ABORTED`, `OUT_OF_RANGE`, and
-`DATA_LOSS`. Those status codes are reserved for each service.
+`DATA_LOSS`.
 
 Earlier in gRPC's life, there was relatively low risk of using a reserved status
 code in the data plane. There was a relatively fixed amount of control plane
@@ -80,7 +80,7 @@ an API that passes status codes from the control plane to the data plane.
 
  * `OK` (in some APIs this is okay, but it must not be copied to an RPC)
  * `INVALID_ARGUMENT`
- * `NOT_FOUND`,
+ * `NOT_FOUND`
  * `ALREADY_EXISTS`
  * `FAILED_PRECONDITION`
  * `ABORTED`
