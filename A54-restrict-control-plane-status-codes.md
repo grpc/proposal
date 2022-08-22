@@ -92,12 +92,12 @@ If an "inappropriate status" is detected, the status should be rewritten to use
 clear a bug occurred. The original status code and message should be included
 within the new status message so the error information is not lost.
 
-If a failed Picker result occurs, [retry policy][gRFC A6] status code matching
-may only occur after the control plane status check and rewrite. The rewrite
-does not impact transparent retries as transparent retries are not performed for
-pick failures. Similarly, retries are not impacted by rewriting failed Service
-Config and Config Selector results as those results must be successful to
-determine the retry policy.
+If a failed Picker result or CallCredentials failure occurs, [retry policy][gRFC
+A6] status code matching may only occur after the control plane status check and
+rewrite. The rewrite does not impact transparent retries as transparent retries
+are not performed for pick failures. Similarly, retries are not impacted by
+rewriting failed Service Config and Config Selector results as those results
+must be successful to determine the retry policy.
 
 ### Temporary environment variable protection
 
