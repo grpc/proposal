@@ -252,6 +252,30 @@ or `"ring_hash_experimental"`) as the child policy of
 
 ![LB Policy Hierarchy Diagram](A55_graphics/lb-hierarchy.png)
 
+To propagate [`common_lb_config.override_host_status`][or-host-status] the
+following changes are required:
+
+* the [`XdsClient`][grpc-client-arch] to parse
+[`common_lb_config.override_host_status`][or-host-status] and copy the value
+in its CDS update to the watchers.
+
+* `cds_experimental` policy (which receives the CDS update) copies the value
+into `ClusterResolverConfig` for its child policy
+`cluster_resolver_experimental`. `ClusterResolverConfig` will be modified to
+contain this value.
+
+* `cluster_resolver_experimental` policy copies the value into
+`ClusterImplConfig` and passes that via its child policy
+`priority_experimental`.
+
+* `priority_experimental` policy extracts `ClusterImplConfig` from the
+config passed to it and uses that child config for creating its child
+`xds_cluster_impl` policy.
+
+* `xds_cluster_impl` extracts `override_host_status` from its config and uses
+that to conditionally create `override-host-experimental` as described above.
+
+
 
 ## Rationale
 
@@ -294,3 +318,4 @@ requests.
 [or-host-status]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L615
 [filter-section]: #cookiebasedstatefulsessionfilter-processing
 [rfc-6265]: https://www.rfc-editor.org/rfc/rfc6265.html
+[grpc-client-arch]: https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md#grpc-client-architecture
