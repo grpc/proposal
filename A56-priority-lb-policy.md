@@ -242,15 +242,15 @@ addresses (see "Hierarchical Addresses" above).
 Note that when the `priority_experimental` policy sends updates to its
 child policies, that may cause those child policies to immediately send an
 updated picker back up to the `priority_experimental` policy.  However,
-if there are multiple children, the report of the updated picker from a
-child may result in the `priority_experimental` policy attempting to
-attempt to choose a new priority while its state has been only partially
-updated (i.e., some of the children have been updated but not others).
-To avoid this, the `priority_experimental` policy must not attempt to
-choose a new priority as a result of a child's picker update if it is
-still in the middle of applying a config update from its parent.
-Instead, it should explicitly choose a new priority once it has finished
-applying the update from its parent to all of its children.
+if there are multiple children, the report of the updated picker from
+a child may result in the `priority_experimental` policy attempting to
+choose a new priority while its state has been only partially updated
+(i.e., some of the children have been updated but not others).  To avoid
+this, the `priority_experimental` policy must not attempt to choose a
+new priority as a result of a child's picker update if it is still in
+the middle of applying a config update from its parent.  Instead, it
+should explicitly choose a new priority once it has finished applying
+the update from its parent to all of its children.
 
 ### Algorithm for Choosing a Priority
 
@@ -267,7 +267,6 @@ The algorithm will be as follows (Python-style pseudo-code):
 
 ```
 def SetCurrentPriority(self, priority, deactivate_lower_priorities):
-  self.current_priority = priority
   # Deactivate lower priorities if needed.
   if deactivate_lower_priorities:
     for p in range(priority + 1, self.config.priorities.size()):
@@ -288,7 +287,6 @@ def ChoosePriority(self):
     return
   # Iterate through priorities, searching for one in READY or IDLE,
   # creating new children as needed.
-  self.current_priority = None
   for priority in range(0, self.config.priorities.size()):
     child_name = self.config.priorities[priority]
     # If the child does not exist, create it.
