@@ -205,8 +205,10 @@ RPC routing logic as follows:
   address(es) as the key and the subchannel as the value.
 
     * In Java, this may result into more than one entry if the
-      createSubchannel arg’s `equivalentGroupAddress` has more than one
-      address.
+      createSubchannel arg’s `EquivalentAddressGroup` has more than one
+      address. Alternatively, we may choose to wait until we know which
+      specific address the subchannel is connected to before we add it
+      to the map.
 
     * in C-core and Node, LB policies create a new subchannel for every address
       every time there is a new address list. In the map, we will just replace
@@ -235,6 +237,20 @@ RPC routing logic as follows:
     * if an entry is found, get that subchannel’s connectivity state and
       if it is not one of [`CONNECTING`, `READY`, `IDLE`] then delegate to
       the child policy.
+
+        * note that a subchannel in `CONNECTING` or `IDLE` state needs to
+	  transition to `READY` before the RPC can actually be sent.
+	  This transition may succeed or fail but in either case there is
+	  a potential delay and in case of failure the RPC will be delivered
+	  to another host. So by allowing `IDLE` and `CONNECTING` states,
+	  we are accepting the possibility of delays in favor of not
+	  immediately failing over to another host because delivering to the
+	  intended host is more important for this feature and use-case.
+
+        * the policy should also implement the "sticky transient failure" logic
+	  where a subchannel in `TRANSIENT_FAILURE` state can only transition
+	  to `READY` state i.e. the `CONNECTING` and `IDLE` states are
+	  "hidden" from the picker.
 
     * otherwise return the subchannel from the entry as the pick result.
 
