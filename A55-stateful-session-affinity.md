@@ -43,7 +43,14 @@ the same backend B1 if it is still in a valid state.
 
 ## Proposal
 
-This design involves the following 4 parts.
+The goal of this design is to make it consistent with the Envoy implementation
+so it will interoperate with it. For example, one can create an xDS
+configuration for Envoy and the exact same configuration will work with
+proxyless gRPC. Similarly, an application using some cookie implementation
+that works with Envoy will continue to work with proxyless gRPC without any
+modifications.
+
+The design involves following 4 parts.
 
 ### Listener and Route Configuration through xDS
 
@@ -69,7 +76,10 @@ sample configuration (expressed as yaml) is as follows:
 
 `name` is the name of the cookie used in this feature.
 
-`path` is the path for which this cookie is applied.
+`path` is the path for which this cookie is applied. **Note:** the path value
+here needs to match any path specified in a RouteConfiguration when route
+based [Filter Config Override][filter_config_override] is used.
+
 
 `ttl` is the time-to-live for the cookie. It is set on the cookie but will not
 be enforced by gRPC.
@@ -335,3 +345,4 @@ requests.
 [filter-section]: #cookiebasedstatefulsessionfilter-processing
 [rfc-6265]: https://www.rfc-editor.org/rfc/rfc6265.html
 [grpc-client-arch]: https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md#grpc-client-architecture
+[filter_config_override]: https://github.com/grpc/proposal/blob/master/A39-xds-http-filters.md#filter-config-overrides
