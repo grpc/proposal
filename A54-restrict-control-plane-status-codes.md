@@ -3,9 +3,9 @@ A54: Restrict Control-Plane Status Codes
 * Author(s): [Eric Anderson](https://github.com/ejona86), [Mark
   Roth](https://github.com/markdroth), [Doug Fawley](https://github.com/dfawley)
 * Approver: [Doug Fawley](https://github.com/dfawley)
-* Status: In Review
+* Status: Ready for Implementation
 * Implemented in: <language, ...>
-* Last updated: 2022-07-22
+* Last updated: 2022-08-22
 * Discussion at: https://groups.google.com/g/grpc-io/c/Yp0X2IHiVlA/m/7QyU4mYKDgAJ
 
 ## Abstract
