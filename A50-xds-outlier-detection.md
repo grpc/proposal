@@ -186,7 +186,7 @@ The subchannel wrapper will track the latest state update from the underlying su
  1. If the number of addresses with request volume of at least `success_rate_ejection.request_volume` is less than `success_rate_ejection.minimum_hosts`, stop.
  2. Calculate the mean and standard deviation of the fractions of successful requests among addresses with total request volume of at least `success_rate_ejection.request_volume`.
  3. For each address:
-    1. If the percentage of ejected addresses is greater than `max_ejection_percent`, stop.
+    1. If the percentage of ejected addresses is greater than or equal to `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `success_rate_ejection.request_volume`, continue to the next address.
     3. If the address's success rate is less than `(mean - stdev * (success_rate_ejection.stdev_factor / 1000))`, then choose a random integer in `[0, 100)`. If that number is less than `success_rate_ejection.enforcement_percentage`, eject that address.
 
@@ -194,7 +194,7 @@ The subchannel wrapper will track the latest state update from the underlying su
 
  1. If the number of addresses with request volume of at least `failure_percentage_ejection.request_volume` is less than `failure_percentage_ejection.minimum_hosts`, stop.
  2. For each address:
-    1. If the percentage of ejected addresses is greater than `max_ejection_percent`, stop.
+    1. If the percentage of ejected addresses is greater than or equal to `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `failure_percentage_ejection.request_volume`, continue to the next address.
     3. If the address's failure percentage is greater than `failure_percentage_ejection.threshold`, then choose a random integer in `[0, 100)`. If that number is less than `failiure_percentage_ejection.enforcement_percentage`, eject that address.
 
