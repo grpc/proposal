@@ -192,7 +192,7 @@ The subchannel wrapper will track the latest state update from the underlying su
 
 ### Failure Percentage Algorithm
 
- 1. If the number of addresses is less than `failure_percentage_ejection.minimum_hosts`, stop.
+ 1. If the number of addresses with request volume of at least `failure_percentage_ejection.request_volume` is less than `failure_percentage_ejection.minimum_hosts`, stop.
  2. For each address:
     1. If the percentage of ejected addresses is greater than `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `failure_percentage_ejection.request_volume`, continue to the next address.
