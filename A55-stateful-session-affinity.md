@@ -132,6 +132,12 @@ the `“cluster_resolver_experimental”` policy which passes down the update to
 the `“xds_cluster_impl”` policy where it is used to create the additional
 child policy as described below.
 
+Also note that [common_lb_config][] field is incompatible with the new
+[load_balancing_policy][] field used for custom LB policies which means custom
+LB policies and stateful session affinity features will be incompatible with
+each other. This will need to be fixed eventually to be able to use these
+two features together.
+
 ### `CookieBasedStatefulSessionFilter` Processing
 
 A channel configured for stateful session affinity will have the
@@ -358,3 +364,5 @@ requests.
 [grpc-client-arch]: https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md#grpc-client-architecture
 [filter_config_override]: https://github.com/grpc/proposal/blob/master/A39-xds-http-filters.md#filter-config-overrides
 [rfc6265-path-match]: https://www.rfc-editor.org/rfc/rfc6265#section-5.1.4
+[common_lb_config]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L1014
+[load_balancing_policy]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L1069
