@@ -91,11 +91,20 @@ is present in the configuration, gRPC will create the appropriate client filter
 plane RPCs. We call this filter `CookieBasedStatefulSessionFilter`. It will
 copy the 3 configuration values - `name`, `ttl`  and `path` -  into the filter
 object. Validation and processing are further described in
-[Stateful session][stateful-session]. Note that
-[StatefulSessionPerRoute][stateful-session-per-route] *will* be supported.
+[Stateful session][stateful-session].
+
+Note that
+[StatefulSessionPerRoute][stateful-session-per-route] *will* be supported as
+[Filter Config Overrides][filter_config_override]. For example, let's say
+the top level config (in `HttpConnectionManager.http_filters`) contains certain
+`StatefulSession` configuration. This configuration can either be
+overridden or disabled by a
+[StatefulSessionPerRoute][stateful-session-per-route] config for a particular
+virtual host or route through a merged configuration as described in
+[A39 Filter Config Overrides][filter_config_override].
 
 The filter is described in more detail in the section
-[`CookieBasedStatefulSessionFilter` Processing][filter-section]
+[`CookieBasedStatefulSessionFilter` Processing][filter-section].
 
 ### Load Balancer Configuration Containing `override_host_status`
 
@@ -144,7 +153,8 @@ The filter performs the following steps:
 skip any further processing and just pass the RPC through (to the next
 filter). For example if the `path` configuration value is `/Package1.Service2`
 and the RPC method is `/Package2.Service1/Method3` then just pass the RPC
-through.
+through. Note, for path matching the rules described in
+[rfc6265 section-5.1.4][rfc6265-path-match] will apply.
 
 * Search the RPC headers (metadata) for header(s) named `Cookie` and get the
 set of all the cookies present. If the set does not contain a cookie whose
@@ -212,7 +222,8 @@ RPC routing logic as follows:
 
 * whenever a new subchannel is created (as a result of an endpoint update from
   the control plane), add a new entry to `overrideHostMap` with the subchannel
-  address(es) as the key and the subchannel as the value.
+  address(es) (i.e. the peer address) as the key and the subchannel as the
+  value.
 
     * In Java, this may result into more than one entry if the
       createSubchannel arg’s `EquivalentAddressGroup` has more than one
@@ -346,3 +357,4 @@ requests.
 [rfc-6265]: https://www.rfc-editor.org/rfc/rfc6265.html
 [grpc-client-arch]: https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md#grpc-client-architecture
 [filter_config_override]: https://github.com/grpc/proposal/blob/master/A39-xds-http-filters.md#filter-config-overrides
+[rfc6265-path-match]: https://www.rfc-editor.org/rfc/rfc6265#section-5.1.4
