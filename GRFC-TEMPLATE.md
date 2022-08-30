@@ -23,6 +23,10 @@ Title
 
 [A precise statement of the proposed change.]
 
+### Temporary environment variable protection
+
+[Name the environment variable(s) used to enable/disable the feature(s) this proposal introduces and their default(s).  Generally, features that are enabled by I/O should include this type of control until they have passed some testing criteria, which should also be detailed here.  This section may be omitted if there are none.]
+
 ## Rationale
 
 [A discussion of alternate approaches and the trade offs, advantages, and disadvantages of the specified approach.]
@@ -34,4 +38,4 @@ Title
 
 ## Open issues (if applicable)
 
-[A discussion of issues relating to this proposal for which the author does not  know the solution. This section may be omitted if there are none.]
+[A discussion of issues relating to this proposal for which the author does not know the solution. This section may be omitted if there are none.]

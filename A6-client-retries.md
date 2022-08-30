@@ -2,9 +2,9 @@ gRPC Retry Design
 ----
 * Author(s): [Noah Eisen](https://github.com/ncteisen) and [Eric Gribkoff](https://github.com/ericgribkoff)
 * Approver: a11r
-* Status: Ready for Implementation
-* Implementation: In progress for all language stacks
-* Last updated: 2017-09-13
+* Status: Implemented
+* Implemented in: Java, .NET, Go except hedging, and C-Core except hedging
+* Last updated: 2022-02-14
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/zzHIICbwTZE
 
 Table of Contents
@@ -161,7 +161,7 @@ Hedged requests should be sent to distinct backends, if possible. To facilitate 
 If `hedgingPolicy` is specified in a service config choice, the following validation rules apply:
 1. `maxAttempts` MUST be specified and MUST be a JSON integer value greater than 1. Values greater than 5 are treated as 5 without being considered a validation error.
 2. `hedgingDelay` is an optional field but if specified MUST follow the JSON representation of proto3 Duration type.
-3. `nonFatalStatusCodes` MUST be specified as a JSON array of status codes and be non-empty. Each status code MUST be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
+3. `nonFatalStatusCodes` is an optional field but if specified MUST be specified as a JSON array of status codes. Each status code MUST be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
 
 ![State Diagram](A6_graphics/basic_hedge.png)
 
@@ -322,6 +322,8 @@ Eventually, retry logic should be taken out of the wrapping libraries, and only 
 
 #### Retry and Hedging Statistics
 
+__Notice__: Retry statistics has been updated in the new design [gRFC-A45](A45-retry-stats.md). The original design below is obsolete.
+
 gRPC will treat each retry attempt or hedged RPC as a distinct RPC with regards to the current per-RPC metrics. For example, when an RPC fails with a retryable status code and a retry attempt is made, the original request and the retry attempt will be recorded as two separate RPCs.
 
 Additionally, to present a clearer picture of retry attempts, we add three additional per-method metrics:
@@ -476,7 +478,7 @@ The retry policy is transmitted to the client through the service config mechani
         // Status codes are specified in the integer form or the case-insensitive
         // string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"])
         //
-        // This field is required and must be non-empty.
+        // This field is optional.
         "nonFatalStatusCodes": []
       }
 

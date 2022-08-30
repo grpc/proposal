@@ -4,7 +4,7 @@ Standalone Node.js gRPC+Protobuf.js Library API
 * Approver: wenbozhu
 * Status: Ready for Implementation
 * Implemented in: Node.js
-* Last updated: 2018-04-30
+* Last updated: 2019-05-15
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/t7XFE7Wevow
 
 ## Abstract
@@ -34,7 +34,7 @@ The library exposes the following function:
 ```js
 /**
  * Asynchronously load a .proto file and all of its transitive imports
- * @param {string} filename File path to the .proto file to load.
+ * @param {string|string[]} filename File path to the .proto file(s) to load.
  * @param {Object} options Options for loading the file and setting up the deserializers
  * @return {Promise<PackageDefinition>} A promise for an object containing definitions for all of the loaded services
  */
@@ -42,12 +42,14 @@ load(filename, options)
 
 /**
  * Synchronously load a .proto file and all of its transitive imports
- * @param {string} filename File path to the .proto file to load.
+ * @param {string|string[]} filename File path to the .proto file(s) to load.
  * @param {Object} options Options for loading the file and setting up the deserializers
  * @return {PackageDefinition} A promise for an object containing definitions for all of the loaded services
  */
 loadSync(filename, options)
 ```
+
+The `filename` parameter can be either a string or an array of strings. If it's a string, it contains a path to a `.proto` file to load. If it's an array of strings, each element is a path to a `.proto` file to load, and the resulting `PackageDefinition` will contain services and methods from all `.proto` files in the array. This is the same behavior as in Protobuf.js's [`Root.load`](https://github.com/protobufjs/protobuf.js/blob/c72c752352347555406bafd7121acaed240fbf23/src/root.js#L190-L191).
 
 The `options` parameter of those functions is the union of Protobuf.js's [`IParseOptions`](https://github.com/dcodeIO/protobuf.js/blob/cf7b26789f310dccf4c047c2e8ef5a3854f7f41e/index.d.ts#L1014) (which modifies how files are loaded) and [`IConversionOptions`](https://github.com/dcodeIO/protobuf.js/blob/cf7b26789f310dccf4c047c2e8ef5a3854f7f41e/index.d.ts#L1632) (which modifies deserialization functions), plus an `include` option to specify directories to search for dependencies. The full set of options is as follows:
 

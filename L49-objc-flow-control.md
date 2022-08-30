@@ -2,7 +2,7 @@ gRPC Objective-C Flow Control
 ----
 * Author(s): mxyan
 * Approver: psrini
-* Status: In Review
+* Status: Approved
 * Implemented in: Objective-C
 * Last updated: 2019-03-14
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/xSOtIAKSESk
