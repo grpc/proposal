@@ -45,8 +45,8 @@ were valid, the gRPC config would still be considered invalid as a whole.
 2. The client validates the choice based on the criteria outlined in the
 section below.
 3. If no service config is found, the client falls back on the default service
-config. If there is no default service configured either, the client selects no
-service config.
+config set via the client/channel API. If there is no default service
+configured either, the client uses an empty service config.
 4. If the service config is valid, the client uses the configuration provided.
 5. If the service config is invalid, the clients should reject the received
 config in its entirety and do different things depending on its state and
