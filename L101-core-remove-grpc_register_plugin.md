@@ -5,7 +5,7 @@ L101: C-Core Remove grpc_register_plugin
 * Status: In Review
 * Implemented in: C Core
 * Last updated: 2022/09/04
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/mFpiC_LyW1o
 
 ## Abstract
 
