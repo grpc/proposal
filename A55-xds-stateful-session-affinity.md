@@ -1,4 +1,4 @@
-A55: Stateful Session Affinity for Proxyless gRPC
+A55: xDS-Based Stateful Session Affinity for Proxyless gRPC
 ----
 * Author(s): Sanjay Pujare (@sanjaypujare)
 * Approver: markdroth
@@ -32,13 +32,14 @@ configured LB policy. When gRPC receives the response for that first RPC from
 B1, it attaches a configured cookie to the response before delivering the
 response to the client application. The cookie encodes some identifying
 information about B1 (for example its IP-address). The client application
-saves the cookie and uses that cookie in all future RPCs of that session. gRPC
-uses the cookie and gets the encoded backend information to route the RPC to
-the same backend B1 if it is still in a valid state.
+saves the cookie and uses that cookie in all future RPCs of that session
+(e.g. by using a separate cookie jar for each session). gRPC uses the
+cookie and gets the encoded backend information to route the RPC to the
+same backend B1 if it is still reachable.
 
 ### Related Proposals: 
 
-* [gRFC A27: xDS-Based Global Load Balancing][A27]
+* [A27: xDS-Based Global Load Balancing][A27]
 * [A42: xDS Ring Hash LB Policy][A42]
 
 ## Proposal
@@ -56,22 +57,31 @@ The design involves following 4 parts.
 
 The feature is enabled and configured using the
 [cookie based stateful session extension][cookie-ext] which
-is an [http-filter][] in the HttpConnectionManager for the target service. A
-sample configuration (expressed as yaml) is as follows:
+is an [http-filter][] in the `HttpConnectionManager` for the target service.
+A sample configuration is as follows:
 
-```yaml
-   http_filters:
-   - name: envoy.filters.http.stateful_session
-     typed_config:
-       "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
-       session_state:
-         name: envoy.http.stateful_session.cookie
-         typed_config:
-           "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
-           cookie:
-             name: global-session-cookie
-             path: /Package1.Service2/Method3
-             ttl: 120s
+```textproto
+{ // HttpConnectionManager
+  http_filters: [
+    {
+      name: "envoy.filters.http.stateful_session"
+      typed_config: {
+        "@type": "type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession"
+        session_state: {
+          name: "envoy.http.stateful_session.cookie"
+          typed_config: {
+            "@type": "type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState"
+            cookie: {
+              name: "global-session-cookie"
+              path: "/Package1.Service2/Method3"
+              ttl: "120s"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
 ```
 
 `name` is the name of the cookie used in this feature.
@@ -185,14 +195,12 @@ For example,
       call context element whose API will be extended to allow the
       filter to add a new call element.
 
-* In the response path of the RPC, if the RPC path does not match the
-  `path` config value of the filter then skip further processing and
-  pass the response through. Otherwise check if `upstreamAddress` is
-  set (in the RPC context of this filter) and get the value. Also get
-  the peer address for the RPC; let’s call it `hostAddress` here. For
-  example, in Java you get the peer address through the
-  `Grpc.TRANSPORT_ATTR_REMOTE_ADDR` attribute of the current
-  ClientCall. If `upstreamAddress` is not set or `upstreamAddress` and
+* In the response path - if the filter was not skipped based on the RPC
+  path - it should check if `upstreamAddress` is set (in the RPC context of
+  this filter) and get the value. Also get the peer address for the RPC;
+  let’s call it `hostAddress` here. For example, in Java you get the peer
+  address through the `Grpc.TRANSPORT_ATTR_REMOTE_ADDR` attribute of the
+  current ClientCall. If `upstreamAddress` is not set or `upstreamAddress` and
   `hostAddress` are different, then create a cookie using our Cookie config
   which has the `name`, `ttl` and `path` values. Set the value of the cookie
   to be the base64-encoded string value of `hostAddress`. Add this Cookie to
@@ -311,16 +319,27 @@ over to another host because delivering to the intended host is necessary
 for maintaining session affinity. If the new subchannel goes into
 `TRANSIENT_FAILURE`, we just delegate to the child policy.
 
-Note that we create the `“override-host-experimental”` policy as the child of
-`“xds_cluster_impl”` only when the `override_host_status` config is present
-which is passed through
-[`common_lb_config.override_host_status`][or-host-status]. The
-`“cluster_resolver_experimental”` policy will receive this value in its CDS
-update and pass this config via its child (`“priority_experimental”`) to the
-`“xds_cluster_impl”` policy. Only when `override_host_status` is set it will
-create the `“override-host-experimental”` policy as its child and make one of
-the existing policies (`"wrr-locality-experimental"`, `"weighted_target"`
-or `"ring_hash_experimental"`) as the child policy of
+
+Note that we unconditionally create the `"override_host_experimental"` policy
+as the child of `“xds_cluster_impl”` even if the feature is not configured
+(in which case, it will be a no-op). The policy's config will have a boolean
+field called `enabled` which will be set by the
+`"cluster_resolver_experimental"` policy based on the boolean in its own
+config which will be set based on whether the
+[`common_lb_config.override_host_status`][or-host-status] field
+in the CDS resource includes UNKNOWN or HEALTHY. The
+`“cluster_resolver_experimental”` policy receives the CDS update and passes
+the boolean via its child (`“priority_experimental”`) to the
+`“xds_cluster_impl”` policy.
+
+If the `"override_host_experimental"` policy is disabled, it should still
+maintain the `overrideHostMap`, so that it has all of the necessary data
+to start working if it becomes enabled later, but it does not inject its
+own picker when disabled.
+
+
+One of the existing policies (`"wrr-locality-experimental"`, `"weighted_target"`
+or `"ring_hash_experimental"`) is made as the child policy of
 `“override-host-experimental”` as shown in the following diagram.
 
 ![LB Policy Hierarchy Diagram](A55_graphics/lb-hierarchy.png)
