@@ -226,9 +226,7 @@ implemented in a new and separate LB policy at an appropriate place in the
 hierarchy.
 
 RPC load reporting happens in the `xds_cluster_impl_experimental` policy and
-we do want all RPCs to be included in the load reports. And this policy
-conditionally routes an RPC based on the `override-host` value if present, or
-else delegates to the currently configured LB policy. Hence the new policy
+we do want all RPCs to be included in the load reports. Hence the new policy
 needs to be just below the `xds_cluster_impl_experimental` as its child policy.
 Let's call this new policy `override_host_experimental`. This policy contains
 subchannel management, endpoint management, and RPC routing logic as follows:
@@ -329,7 +327,8 @@ a boolean field called `enabled` which will be set by the
 `xds_cluster_resolver_experimental` policy based on the boolean in its own
 config which will be set based on whether the
 [`common_lb_config.override_host_status`][or-host-status] field
-in the CDS resource includes UNKNOWN or HEALTHY. The
+in the CDS resource includes UNKNOWN or HEALTHY. If the field is unset, we
+treat it the same as if it was explicitly set to the default set. The
 `xds_cluster_resolver_experimental` policy receives the CDS update and passes
 the boolean via its child (`priority_experimental`) to the
 `xds_cluster_impl_experimental` policy.
@@ -384,7 +383,7 @@ This feature avoids the problem by using HTTP cookies as described above.
 
 ## Implementation
 
-The design will be implemented in gRPC C++, Java and Go - in that order.
+The design will be implemented in gRPC C++, Java and Go.
 Wrapped languages should be able to use the feature provided they can do
 cookie management in their client code.
 
@@ -392,11 +391,11 @@ Cookies are rarely used with gRPC so the implementations should also
 include a recipe for cookie management. This could involve illustrative
 examples using cookie jar implementations which are available in various
 languages such as Java, Go and Node.js. Wherever possible the
-implementations may also include a reference or example implementation of
-an interceptor that does cookie management using a cookie jar object. The
-interceptor is instantiated for a session and it processes the `Set-Cookie`
-header in a response to save the cookie, and uses that cookie in subsequent
-requests.
+implementations may also include a reference implementation (which could
+be interceptor based) that does cookie management using cookie jars. If
+based on interceptors, the interceptor is instantiated for a session
+and it processes the `Set-Cookie` header in a response to save the cookie,
+and uses that cookie in subsequent requests.
 
 
 [envoy-ssp]: https://docs.google.com/document/d/1IU4b76AgOXijNa4sew1gfBfSiOMbZNiEt5Dhis8QpYg/edit#heading=h.sobqsca7i45e
