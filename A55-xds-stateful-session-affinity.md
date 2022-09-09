@@ -87,8 +87,11 @@ A sample configuration is as follows:
 `name` is the name of the cookie used in this feature.
 
 `path` is the path for which this cookie is applied. **Note:** the path value
-here needs to match any path specified in a RouteConfiguration when route
-based [Filter Config Override][filter_config_override] is used.
+here needs to be consistent with any path specified in a RouteConfiguration
+when route based [Filter Config Override][filter_config_override] is used.
+As an example, if this `path` value is `/Service1/Method2` and the path
+specified in the route based filter config override is `/Service3/Method4`
+then the filter will never be applied.
 
 
 `ttl` is the time-to-live for the cookie. It is set on the cookie but will not
@@ -138,9 +141,9 @@ the CDS update when unsupported values are present, however it was discarded
 because of the difficulty in using such configuration in mixed deployments.
 
 The `override_host_status` value is included in the config update sent to
-the `“cluster_resolver_experimental”` policy which passes down the update to
-the `“xds_cluster_impl”` policy where it is used to create the additional
-child policy as described below.
+the `xds_cluster_resolver_experimental` policy which passes down the update to
+the `xds_cluster_impl_experimental` policy where it is used to create the
+additional child policy as described below.
 
 Also note that [common_lb_config][] field is incompatible with the new
 [load_balancing_policy][] field used for custom LB policies which means custom
@@ -223,13 +226,13 @@ this value to route the RPC appropriately. The required logic needs to be
 implemented in a new and separate LB policy at an appropriate place in the
 hierarchy.
 
-RPC load reporting happens in the `“xds_cluster_impl”` policy and we do want
-all RPCs to be included in the load reports. And this policy conditionally
-routes an RPC based on the `override-host` value if present, or else delegates
-to the currently configured LB policy. Hence the new policy needs to be just
-below the `“xds_cluster_impl”` as its child policy. Let's call this new policy
-`“override-host-experimental”`. This policy contains subchannel management,
-endpoint management, and RPC routing logic as follows:
+RPC load reporting happens in the `xds_cluster_impl_experimental` policy and
+we do want all RPCs to be included in the load reports. And this policy
+conditionally routes an RPC based on the `override-host` value if present, or
+else delegates to the currently configured LB policy. Hence the new policy
+needs to be just below the `xds_cluster_impl_experimental` as its child policy.
+Let's call this new policy `override_host_experimental`. This policy contains
+subchannel management, endpoint management, and RPC routing logic as follows:
 
 * maintain a map of valid endpoints (or `ResolvedAddresses`) and keep it
   up-to-date based on endpoint updates from the resolver. Let's call this
@@ -320,27 +323,28 @@ for maintaining session affinity. If the new subchannel goes into
 `TRANSIENT_FAILURE`, we just delegate to the child policy.
 
 
-Note that we unconditionally create the `"override_host_experimental"` policy
-as the child of `“xds_cluster_impl”` even if the feature is not configured
-(in which case, it will be a no-op). The policy's config will have a boolean
-field called `enabled` which will be set by the
-`"cluster_resolver_experimental"` policy based on the boolean in its own
+Note that we unconditionally create the `override_host_experimental` policy
+as the child of `xds_cluster_impl_experimental` even if the feature is not
+configured (in which case, it will be a no-op). The policy's config will have
+a boolean field called `enabled` which will be set by the
+`xds_cluster_resolver_experimental` policy based on the boolean in its own
 config which will be set based on whether the
 [`common_lb_config.override_host_status`][or-host-status] field
 in the CDS resource includes UNKNOWN or HEALTHY. The
-`“cluster_resolver_experimental”` policy receives the CDS update and passes
-the boolean via its child (`“priority_experimental”`) to the
-`“xds_cluster_impl”` policy.
+`xds_cluster_resolver_experimental` policy receives the CDS update and passes
+the boolean via its child (`priority_experimental`) to the
+`xds_cluster_impl_experimental` policy.
 
-If the `"override_host_experimental"` policy is disabled, it should still
+If the `override_host_experimental` policy is disabled, it should still
 maintain the `overrideHostMap`, so that it has all of the necessary data
 to start working if it becomes enabled later, but it does not inject its
 own picker when disabled.
 
 
-One of the existing policies (`"wrr-locality-experimental"`, `"weighted_target"`
-or `"ring_hash_experimental"`) is made as the child policy of
-`“override-host-experimental”` as shown in the following diagram.
+One of the existing policies (`wrr_locality_experimental`,
+`weighted_target_experimental` or `ring_hash_experimental`) is made as
+the child policy of `override_host_experimental` as shown in the following
+diagram.
 
 ![LB Policy Hierarchy Diagram](A55_graphics/lb-hierarchy.png)
 
@@ -353,19 +357,20 @@ in its CDS update to the watchers.
 
 * `cds_experimental` policy (which receives the CDS update) copies the value
 into `ClusterResolverConfig` for its child policy
-`cluster_resolver_experimental`. `ClusterResolverConfig` will be modified to
+`xds_cluster_resolver_experimental`. `ClusterResolverConfig` will be modified to
 contain this value.
 
-* `cluster_resolver_experimental` policy copies the value into
+* `xds_cluster_resolver_experimental` policy copies the value into
 `ClusterImplConfig` and passes that via its child policy
 `priority_experimental`.
 
 * `priority_experimental` policy extracts `ClusterImplConfig` from the
 config passed to it and uses that child config for creating its child
-`xds_cluster_impl` policy.
+`xds_cluster_impl_experimental` policy.
 
-* `xds_cluster_impl` extracts `override_host_status` from its config and uses
-that to conditionally create `override-host-experimental` as described above.
+* `xds_cluster_impl_experimental` extracts `override_host_status` from its
+config and uses that to conditionally create `override_host_experimental` as
+described above.
 
 
 
@@ -391,7 +396,7 @@ examples using cookie jar implementations which are available in various
 languages such as Java, Go and Node.js. Wherever possible the
 implementations may also include a reference implementation of an interceptor
 that does cookie management using a cookie jar object. The interceptor
-is instantiated for a session and it processes the `"Set-Cookie"` header
+is instantiated for a session and it processes the `Set-Cookie` header
 in a response to save the cookie, and uses that cookie in subsequent
 requests.
 
