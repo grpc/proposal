@@ -86,16 +86,14 @@ A sample configuration is as follows:
 
 `name` is the name of the cookie used in this feature.
 
-`path` is the path for which this cookie is applied. **Note:** the path value
-here needs to be consistent with any path specified in a RouteConfiguration
-when route based [Filter Config Override][filter_config_override] is used.
-As an example, if this `path` value is `/Service1/Method2` and the path
-specified in the route based filter config override is `/Service3/Method4`
-then the filter will never be applied.
+`path` is the path for which this cookie is applied. **Note:** Stateful
+session affinity will not work if the cookie's path does not match the
+request's path. For example, if a given route matches requests with path
+`/service/foo` but the corresponding per-route filter config specifies a
+cookie path of `/service/bar`, then the cookie will never be set.
 
-
-`ttl` is the time-to-live for the cookie. It is set on the cookie but will not
-be enforced by gRPC.
+`ttl` is the time-to-live for the cookie. It is set on the cookie but will
+not be enforced by gRPC.
 
 This new filter will be added to the HTTP Filter Registry and processed as
 described in [A39: xDS HTTP Filter Support][A39]. Specifically when this filter
@@ -141,9 +139,10 @@ the CDS update when unsupported values are present, however it was discarded
 because of the difficulty in using such configuration in mixed deployments.
 
 The `override_host_status` value is included in the config update sent to
-the `xds_cluster_resolver_experimental` policy which passes down the update to
-the `xds_cluster_impl_experimental` policy where it is used to create the
-additional child policy as described below.
+the `xds_cluster_resolver_experimental` policy which will set a boolean in
+its own config (based on the value of `override_host_status`) and passes
+down the boolean to the `xds_cluster_impl_experimental` policy where it is
+used to create the additional child policy as described below.
 
 Also note that [common_lb_config][] field is incompatible with the new
 [load_balancing_policy][] field used for custom LB policies which means custom
@@ -341,10 +340,9 @@ to start working if it becomes enabled later, but it does not inject its
 own picker when disabled.
 
 
-One of the existing policies (`wrr_locality_experimental`,
-`weighted_target_experimental` or `ring_hash_experimental`) is made as
-the child policy of `override_host_experimental` as shown in the following
-diagram.
+One of the existing policies (`xds_wrr_locality_experimental`,
+or `ring_hash_experimental`) is made as the child policy of
+`override_host_experimental` as shown in the following diagram.
 
 ![LB Policy Hierarchy Diagram](A55_graphics/lb-hierarchy.png)
 
