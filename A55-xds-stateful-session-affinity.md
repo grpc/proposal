@@ -394,10 +394,10 @@ Cookies are rarely used with gRPC so the implementations should also
 include a recipe for cookie management. This could involve illustrative
 examples using cookie jar implementations which are available in various
 languages such as Java, Go and Node.js. Wherever possible the
-implementations may also include a reference implementation of an interceptor
-that does cookie management using a cookie jar object. The interceptor
-is instantiated for a session and it processes the `Set-Cookie` header
-in a response to save the cookie, and uses that cookie in subsequent
+implementations may also include a reference or example implementation of
+an interceptor that does cookie management using a cookie jar object. The
+interceptor is instantiated for a session and it processes the `Set-Cookie`
+header in a response to save the cookie, and uses that cookie in subsequent
 requests.
 
 
