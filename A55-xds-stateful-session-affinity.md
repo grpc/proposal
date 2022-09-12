@@ -347,22 +347,19 @@ following changes are required:
 [`common_lb_config.override_host_status`][or-host-status] and copy the value
 in its CDS update to the watchers.
 
-* `cds_experimental` policy (which receives the CDS update) copies the value
-into `ClusterResolverConfig` for its child policy
-`xds_cluster_resolver_experimental`. `ClusterResolverConfig` will be modified to
-contain this value.
+* `cds_experimental` policy (which receives the CDS update) uses the value of
+`override_host_status` to set the boolean `override_host_enabled` 
+into its child policy config for `xds_cluster_resolver_experimental`.
 
-* `xds_cluster_resolver_experimental` policy copies the value into
-`ClusterImplConfig` and passes that via its child policy
-`priority_experimental`.
+* `xds_cluster_resolver_experimental` passes the policy config to its child
+policy `priority_experimental`.
 
-* `priority_experimental` policy extracts `ClusterImplConfig` from the
-config passed to it and uses that child config for creating its child
-`xds_cluster_impl_experimental` policy.
+* `priority_experimental` policy similarly passes the policy config to its child
+policy `xds_cluster_impl_experimental`.
 
-* `xds_cluster_impl_experimental` extracts `override_host_status` from its
-config and uses that to conditionally create `override_host_experimental` as
-described above.
+* `xds_cluster_impl_experimental` extracts `override_host_enable` from its
+config and passes that to `override_host_experimental` so it will be enabled
+(or disabled).
 
 
 
