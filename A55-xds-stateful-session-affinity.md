@@ -138,17 +138,19 @@ other values. We considered the alternative of NACKing (i.e. rejecting)
 the CDS update when unsupported values are present, however it was discarded
 because of the difficulty in using such configuration in mixed deployments.
 
-The `override_host_status` value is included in the config update sent to
-the `xds_cluster_resolver_experimental` policy which will set a boolean in
-its own config (based on the value of `override_host_status`) and passes
-down the boolean to the `xds_cluster_impl_experimental` policy where it is
-used to create the additional child policy as described below.
+The `override_host_status` value is converted to a boolean and included in
+the config update sent to the `xds_cluster_resolver_experimental` policy
+which will copy the boolean in its own config and passes it down to the
+`xds_cluster_impl_experimental` policy where it is used to create the
+additional child policy as described below.
 
 Also note that [common_lb_config][] field is incompatible with the new
-[load_balancing_policy][] field used for custom LB policies which means custom
-LB policies and stateful session affinity features will be incompatible with
-each other. This will need to be fixed eventually to be able to use these
-two features together.
+[load_balancing_policy][] field used for custom LB policies (see
+[A52: gRPC xDS Custom Load Balancer Configuration][grfc_a52]) which means
+custom LB policies and stateful session affinity features will be incompatible
+with each other. This will need to be fixed eventually to be able to use these
+two features together. Until it is fixed, stateful session affinity cannot be
+used when custom LB policies are used.
 
 ### `CookieBasedStatefulSessionFilter` Processing
 
@@ -318,15 +320,13 @@ to the child policy.
 Note that we unconditionally create the `override_host_experimental` policy
 as the child of `xds_cluster_impl_experimental` even if the feature is not
 configured (in which case, it will be a no-op). The policy's config will have
-a boolean field called `enabled` which will be set by the
-`xds_cluster_resolver_experimental` policy based on the boolean in its own
-config which will be set based on whether the
-[`common_lb_config.override_host_status`][or-host-status] field
-in the CDS resource includes UNKNOWN or HEALTHY. If the field is unset, we
-treat it the same as if it was explicitly set to the default set. The
-`xds_cluster_resolver_experimental` policy receives the CDS update and passes
-the boolean via its child (`priority_experimental`) to the
-`xds_cluster_impl_experimental` policy.
+a boolean called `override_host_enabled` that's part of the LB policy config
+that is passed down the hierarchy. `cds_experimental` sets the boolean
+based on whether the [`common_lb_config.override_host_status`][or-host-status]
+field in the CDS update includes UNKNOWN or HEALTHY. If the field is unset, we
+treat it the same as if it was explicitly set to the default set.
+`cds_experimental` passes down the config through the hierarchy to
+`override_host_experimental` as shown in the diagram below.
 
 If the `override_host_experimental` policy is disabled, it should still
 maintain the `overrideHostMap`, so that it has all of the necessary data
@@ -335,8 +335,8 @@ own picker when disabled.
 
 
 One of the existing policies (`xds_wrr_locality_experimental`,
-or `ring_hash_experimental`) is made as the child policy of
-`override_host_experimental` as shown in the following diagram.
+or `ring_hash_experimental`) is created as the child policy of
+`override_host_experimental` as shown in the diagram below.
 
 ![LB Policy Hierarchy Diagram](A55_graphics/lb-hierarchy.png)
 
@@ -412,3 +412,4 @@ and uses that cookie in subsequent requests.
 [rfc6265-path-match]: https://www.rfc-editor.org/rfc/rfc6265#section-5.1.4
 [common_lb_config]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L1014
 [load_balancing_policy]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L1069
+[grfc_a52]: https://github.com/grpc/proposal/blob/master/A52-xds-custom-lb-policies.md
