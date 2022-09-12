@@ -231,26 +231,24 @@ needs to be just below the `xds_cluster_impl_experimental` as its child policy.
 Let's call this new policy `override_host_experimental`. This policy contains
 subchannel management, endpoint management, and RPC routing logic as follows:
 
-* maintain a map of valid endpoints (or `ResolvedAddresses`) and keep it
-  up-to-date based on endpoint updates from the resolver. Let's call this
-  map `validEndpoints` where the key is an address (IP:port) and the value
-  is a list of equivalent-addresses (from the endpoint updates).
-
 * maintain a map - let’s call this `overrideHostMap`. The key is (IP:port)
   and the value is the tuple
   `[subchannel, list of other equivalent addresses]`. When a host (endpoint)
   has multiple addresses (e.g. IPv6 vs IPv4 or due to multiple network
-  interfaces) they are said to be equivalent addresses.
+  interfaces) they are said to be equivalent addresses. Whenever we get an
+  updated list of addresses from the resolver, we create an entry in the map
+  for each address, and populate the list of equivalent addresses. The
+  subchannel is based on subchannel creation/destruction or
+  connection/disconnection from the child policy.
 
 * whenever a new subchannel is created (by the child policy that is
   routing an RPC - see below), add a new entry to `overrideHostMap` with
   the subchannel address (i.e. the peer address) as the key and the value as
-  `[subchannel, other equivalent addresses of the subchannel]`. The "other
-  equivalent addresses of the subchannel" are a property of the subchannel.
+  `[subchannel, other equivalent addresses of the subchannel]`.
 
-    * we may have to wait for subchannel to be `READY` in order to know which
-      specific address the subchannel is connected to before we add it to the
-      map.
+    * in Java and Go, we may have to wait for subchannel to be `READY` in order
+      to know which specific address the subchannel is connected to before we
+      add it to the map.
 
     * in C-core and Node, LB policies create a new subchannel for every address
       every time there is a new address list. In the map, we will just replace
@@ -267,40 +265,39 @@ subchannel management, endpoint management, and RPC routing logic as follows:
 * the policy's subchannel picker pseudo-code is as follows:
 
 ```
-   func pickSubchannel() {
+   func pick() {
      overrideHost = value of "override-host" pick argument;
      if overrideHost is not present then {
-       childSubchannel = subchannel from delegated child policy;
-       add childSubchannel to overrideHostMap as described above;
-       return childSubchannel as the pick;
+       // delegate pick to the child policy
+       return childPicker.pick(); // will add subchannel to our map
      }
-     processedSet = empty  /* used to skip already processed addresses */
      create equivalentAddressList and add overrideHost to it;
+     idleSubchannel = none;
+     foundConnecting = false;
      for-each address in equivalentAddressList {
-       add address to processedSet;
        entry = overrideHostMap entry for address;
        if entry found then {
          subchannel = subchannel from entry;
          if subchannel is READY then {
            return subchannel as the pick;
+         } else if subchannel is IDLE and idleSubchannel is none then {
+           idleSubchannel = subchannel;
+         } else if subchannel is CONNECTING {
+           foundConnecting = true;
          }
-         equEquivalentAddresses = equivalent addresses from entry;
-         newAddresses = subset of equEquivalentAddresses not present in processedSet;
-         add newAddresses to equivalentAddresses at the end;
+         equAddresses = equivalent addresses from entry;
+         newAddresses = subset of equAddresses not already present in equivalentAddressList;
+         add newAddresses to the end of equivalentAddressList;
        }
      }
-     /* no suitable entry found in overrideHostMap */
-     if overrideHost address is not in validEndpoints map {
-       return subchannel from delegated child policy;
+     if idleSubchannel is not none then {
+       trigger connection attempt on idleSubchannel;
+       return queue as pick result;
      }
-     endpointEntry = validEndpoints entry for overrideHost;
-     create a subchannel with overrideHost and equivalentAddresses from endpointEntry;
-     if and when subchannel goes READY then {
-       add it to overrideHostMap and return as the pick;
-     } else {
-       /* subchannel is in TRANSIENT_FAILURE */
-       return subchannel from delegated child policy;
+     if foundConnecting then {
+       return queue as pick result;
      }
+     return childPicker.pick();
    }
 ```
 
@@ -311,14 +308,12 @@ or `TRANSIENT_FAILURE` states) because we assume that the equivalent address
 is pointing to the same host thereby maintaining session affinity with the
 pick.
 
-If we do not find an entry in `overrideHostMap` for the original or an
-equivalent address then we create a new subchannel and wait for that subchannel
-to become `READY` before returning that subchannel as the pick. By waiting,
-we are accepting the possibility of delays in favor of not immediately failing
-over to another host because delivering to the intended host is necessary
-for maintaining session affinity. If the new subchannel goes into
-`TRANSIENT_FAILURE`, we just delegate to the child policy.
-
+If we do not find a `READY` subchannel, and find an `IDLE` one, we trigger a
+connection attempt on that subchannel and return queue as the pick result
+(i.e. the RPC stays buffered). If we instead find a `CONNECTING` subchannel,
+we just return queue as the pick result i.e. the RPC stays buffered until the
+connection attempt completes. If we do not find a subchannel, we just delegate
+to the child policy.
 
 Note that we unconditionally create the `override_host_experimental` policy
 as the child of `xds_cluster_impl_experimental` even if the feature is not
