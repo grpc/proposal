@@ -138,11 +138,12 @@ other values. We considered the alternative of NACKing (i.e. rejecting)
 the CDS update when unsupported values are present, however it was discarded
 because of the difficulty in using such configuration in mixed deployments.
 
-The `override_host_status` value is converted to a boolean and included in
-the config update sent to the `xds_cluster_resolver_experimental` policy
-which will copy the boolean in its own config and passes it down to the
-`xds_cluster_impl_experimental` policy where it is used to create the
-additional child policy as described below.
+The `override_host_status` value is converted to a boolean (called
+`override_host_enabled` described below) and included in the config update
+sent to the `xds_cluster_resolver_experimental` policy which will copy the
+boolean in its own config and pass it down to the
+`xds_cluster_impl_experimental` policy where it is used to enable the
+new child policy as described below.
 
 Also note that [common_lb_config][] field is incompatible with the new
 [load_balancing_policy][] field used for custom LB policies (see
@@ -319,14 +320,15 @@ to the child policy.
 
 Note that we unconditionally create the `override_host_experimental` policy
 as the child of `xds_cluster_impl_experimental` even if the feature is not
-configured (in which case, it will be a no-op). The policy's config will have
-a boolean called `override_host_enabled` that's part of the LB policy config
-that is passed down the hierarchy. `cds_experimental` sets the boolean
-based on whether the [`common_lb_config.override_host_status`][or-host-status]
-field in the CDS update includes UNKNOWN or HEALTHY. If the field is unset, we
-treat it the same as if it was explicitly set to the default set.
-`cds_experimental` passes down the config through the hierarchy to
-`override_host_experimental` as shown in the diagram below.
+configured (in which case, it will be a no-op). The
+`xds_cluster_resolver_experimental` policy's config will have
+a boolean called `override_host_enabled` and this config is passed down in
+the hierarchy. `cds_experimental` sets the boolean based on whether the
+[`common_lb_config.override_host_status`][or-host-status]
+field in the CDS update includes UNKNOWN or HEALTHY. If the field is unset,
+we treat it the same as if it was explicitly set to the default set.
+The diagram below shows how the configuration is passed down the hierarchy
+all the way from `cds_experimental` to `override_host_experimental`.
 
 If the `override_host_experimental` policy is disabled, it should still
 maintain the `overrideHostMap`, so that it has all of the necessary data
