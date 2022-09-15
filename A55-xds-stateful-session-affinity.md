@@ -138,12 +138,11 @@ other values. We considered the alternative of NACKing (i.e. rejecting)
 the CDS update when unsupported values are present, however it was discarded
 because of the difficulty in using such configuration in mixed deployments.
 
-The `override_host_status` value is converted to a boolean (called
-`override_host_enabled` described below) and included in the config update
-sent to the `xds_cluster_resolver_experimental` policy which will copy the
-boolean in its own config and pass it down to the
-`xds_cluster_impl_experimental` policy where it is used to enable the
-new child policy as described below.
+The `override_host_status` value is converted to a boolean and included in
+the new policy `override_host_experimental` config
+(called `OverrideHostLoadBalancingPolicyConfig` described below) and this
+config will be embedded in the `xds_lb_policy` field of the
+`xds_cluster_resolver_experimental` config.
 
 Also note that [common_lb_config][] field is incompatible with the new
 [load_balancing_policy][] field used for custom LB policies (see
@@ -171,11 +170,12 @@ Also note that the filter is initialized with 3 configuration values - `name`,
 The filter performs the following steps:
 
 * If the incoming RPC “path” does not match the `path` configuration value,
-skip any further processing and just pass the RPC through (to the next
-filter). For example if the `path` configuration value is `/Package1.Service2`
-and the RPC method is `/Package2.Service1/Method3` then just pass the RPC
-through. Note, for path matching the rules described in
-[rfc6265 section-5.1.4][rfc6265-path-match] will apply.
+skip any further processing (including response processing) and just pass the
+RPC through (to the next filter). For example if the `path` configuration
+value is `/Package1.Service2` and the RPC method is
+`/Package2.Service1/Method3` then just pass the RPC through. Note, for path
+matching the rules described in [rfc6265 section-5.1.4][rfc6265-path-match]
+will apply.
 
 * Search the RPC headers (metadata) for header(s) named `Cookie` and get the
 set of all the cookies present. If the set does not contain a cookie whose
@@ -184,7 +184,7 @@ through. If you find more than one cookie with that `name` then log a local
 warning and pass the RPC through. Otherwise get the value of that cookie and
 base64-decode the value to get the `override-host` for the RPC. This value
 should be a syntactically valid IP:port address: if not, then log a local
-warning and pass the RPC through. For a valid `override-host` value set it
+warning and pass the RPC through. For a valid `override-host` value, set it
 in the RPC context as the value of `upstreamAddress` state variable which
 will be used in the response processing of that RPC.
 
@@ -201,9 +201,8 @@ For example,
       filter to add a new call element.
 
 * In the response path - if the filter was not skipped based on the RPC
-  path - it should check if `upstreamAddress` is set (in the RPC context of
-  this filter) and get the value. Also get the peer address for the RPC;
-  let’s call it `hostAddress` here. For example, in Java you get the peer
+  path - get the value of `upstreamAddress`. Also get the peer address for the
+  RPC; let’s call it `hostAddress` here. For example, in Java you get the peer
   address through the `Grpc.TRANSPORT_ATTR_REMOTE_ADDR` attribute of the
   current ClientCall. If `upstreamAddress` is not set or `upstreamAddress` and
   `hostAddress` are different, then create a cookie using our Cookie config
@@ -320,10 +319,23 @@ to the child policy.
 
 Note that we unconditionally create the `override_host_experimental` policy
 as the child of `xds_cluster_impl_experimental` even if the feature is not
-configured (in which case, it will be a no-op). The
-`xds_cluster_resolver_experimental` policy's config will have
-a boolean called `override_host_enabled` and this config is passed down in
-the hierarchy. `cds_experimental` sets the boolean based on whether the
+configured (in which case, it will be a no-op). A new config
+for the `override_host_experimental` policy will be defined as follows:
+
+```proto
+// Configuration for the override_host LB policy.
+message OverrideHostLoadBalancingPolicyConfig {
+  // if set to false this LB policy will be a no-op
+  bool enabled = 1;
+
+  repeated LoadBalancingConfig child_policy = 2;
+}
+```
+
+The `xds_cluster_resolver_experimental` policy's config will have this config
+embedded in its `xds_lb_policy` field and this config is passed down the
+hierarchy. `cds_experimental` sets the boolean `enabled` in
+`OverrideHostLoadBalancingPolicyConfig` based on whether the
 [`common_lb_config.override_host_status`][or-host-status]
 field in the CDS update includes UNKNOWN or HEALTHY. If the field is unset,
 we treat it the same as if it was explicitly set to the default set.
@@ -350,20 +362,9 @@ following changes are required:
 in its CDS update to the watchers.
 
 * `cds_experimental` policy (which receives the CDS update) uses the value of
-`override_host_status` to set the boolean `override_host_enabled` 
-into its child policy config for `xds_cluster_resolver_experimental`.
-
-* `xds_cluster_resolver_experimental` passes the policy config to its child
-policy `priority_experimental`.
-
-* `priority_experimental` policy similarly passes the policy config to its child
-policy `xds_cluster_impl_experimental`.
-
-* `xds_cluster_impl_experimental` extracts `override_host_enable` from its
-config and passes that to `override_host_experimental` so it will be enabled
-(or disabled).
-
-
+`override_host_status` to set the boolean `enabled` in the config of
+`override_host_experimental` and embed this config in the `xds_lb_policy` field
+of the config for `xds_cluster_resolver_experimental`.
 
 ## Rationale
 
