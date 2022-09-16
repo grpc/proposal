@@ -241,7 +241,30 @@ subchannel management, endpoint management, and RPC routing logic as follows:
   updated list of addresses from the resolver, we create an entry in the map
   for each address, and populate the list of equivalent addresses. The
   subchannel is based on subchannel creation/destruction or
-  connection/disconnection from the child policy.
+  connection/disconnection from the child policy. The equivalent address list
+  computation on each resolver update is performed as per the following
+  pseudo-code:
+
+```
+resolver_list = list of equivalent_addresses from the resolver
+// resolver_list is a list of lists
+for equ_address_list in resolver_list:
+  // first loop to compute transitive closure
+  complete_list = equ_address_list
+  for address in complete_list:
+    entry = lb_policy.address_map[address]
+    if entry found:
+      cur_list = entry.equivalent_addresses
+      append to complete_list elements of cur_list not already in complete_list
+
+  // second loop to set the computed complete_list in each entry
+  for address in complete_list:
+    entry = lb_policy.address_map[address]
+    if entry not found:
+      entry = new map entry
+      lb_policy.address_map[address] = entry
+    entry.equivalent_addresses = complete_list minus address
+```
 
 * whenever a new subchannel is created (by the child policy that is
   routing an RPC - see below), add a new entry to `overrideHostMap` with
@@ -267,40 +290,42 @@ subchannel management, endpoint management, and RPC routing logic as follows:
 * the policy's subchannel picker pseudo-code is as follows:
 
 ```
-   func pick() {
-     overrideHost = value of "override-host" pick argument;
-     if overrideHost is not present then {
-       // delegate pick to the child policy
-       return childPicker.pick(); // will add subchannel to our map
-     }
-     create equivalentAddressList and add overrideHost to it;
-     idleSubchannel = none;
-     foundConnecting = false;
-     for-each address in equivalentAddressList {
-       entry = overrideHostMap entry for address;
-       if entry found then {
-         subchannel = subchannel from entry;
-         if subchannel is READY then {
-           return subchannel as the pick;
-         } else if subchannel is IDLE and idleSubchannel is none then {
-           idleSubchannel = subchannel;
-         } else if subchannel is CONNECTING {
-           foundConnecting = true;
-         }
-         equAddresses = equivalent addresses from entry;
-         newAddresses = subset of equAddresses not already present in equivalentAddressList;
-         add newAddresses to the end of equivalentAddressList;
-       }
-     }
-     if idleSubchannel is not none then {
-       trigger connection attempt on idleSubchannel;
-       return queue as pick result;
-     }
-     if foundConnecting then {
-       return queue as pick result;
-     }
-     return childPicker.pick();
-   }
+if override_host is set in pick arguments:
+  entry = lb_policy.address_map[override_host]
+  if entry found:
+    idle_subchannel = None
+    found_connecting = False
+    if entry.subchannel is set:
+      if entry.subchannel.connectivity_state == READY:
+        return entry.subchannel as pick result
+      elif entry.subchannel.connectivity_state == IDLE:
+        idle_subchannel = entry.subchannel
+      elif entry.subchannel.connectivity_state == CONNECTING:
+        found_connecting = True
+    // Java-only, for now: check equivalent addresses
+    for address in entry.equivalent_addresses:
+      other_entry = lb_policy.address_map[address]
+      if other_entry.subchannel is set:
+        if other_entry.subchannel.connectivity_state == READY:
+          return other_entry.subchannel as pick result
+        elif other_entry.subchannel.connectivity_state == IDLE:
+          idle_subchannel = other_entry.subchannel
+        elif other_entry.subchannel.connectivity_state == CONNECTING:
+          found_connecting = True
+    // No READY subchannel found.  If we found an IDLE subchannel,
+    // trigger a connection attempt and queue the pick until that attempt
+    // completes.
+    if idle_subchannel is not None:
+      hop into control plane to trigger connection attempt for idle_subchannel
+      return queue as pick result
+    // No READY or IDLE subchannels.  If we found a CONNECTING
+    // subchannel, queue the pick and wait for the connection attempt
+    // to complete.
+    if found_connecting:
+      return queue as pick result
+// override_host not set or did not find a matching subchannel,
+// so delegate to the child picker
+return child_picker.Pick()
 ```
 
 In the above logic we prefer a subchannel in the `READY` state for a different
