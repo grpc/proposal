@@ -18,10 +18,13 @@ gRPC has been requiring C++11 from 2017 by
 that gRPC supports are now capable of C++14, gRPC is going to require
 C++14 to benefit from new C++14 features.
 
-This is aligned with the forthcoming OSS C++ support policy that says
+This is aligned with
+[the OSS Foundational C++ support policy](https://opensource.google/documentation/policies/cplusplus-support)
+that says
 
-*  We will support modern C++ standards, from some oldest standard to the
+*  We will support all modern C++ standards, from some oldest standard to the
    newest.
+
 *  We will drop support for our oldest supported C++ standard when one of the
    following happens:
     *  All supported compilers default to a newer version

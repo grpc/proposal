@@ -222,12 +222,12 @@ all but the last transaction having FLAG_MESSAGE_DATA_IS_PARTIAL set.
 
 Due to Android's limited per-process transaction buffer of 1MB, BinderTransport
 supports transport-level flow control, aiming to keep use of the process
-transaction buffer to at most 128KB. Each transaction we send adds to an
+transaction buffer to at most 128KB. Each stream transaction we send adds to an
 internal count of unacknowledged outbound data (here the count refers to the
 "data size" of the parcels). If that exceeds 128KB, we’ll stop sending
-transactions until we receive an acknowledgement message from the transport
-peer. Each transport sends an acknowledgement for each 16KB received, which
-should avoid blocking the transport most of the time.
+stream transactions until we receive an acknowledgement message from the transport
+peer. Each transport sends an acknowledgement for each 16KB of stream transaction
+received, which should avoid blocking the transport most of the time.
 
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel
