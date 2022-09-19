@@ -3,7 +3,7 @@ L102: New gRPC C++ version macros
 * Author(s): veblush
 * Approver: markdroth
 * Status: Draft
-* Implemented in: 
+* Implemented in: gRPC C++
 * Last updated: Sep 16, 2022
 * Discussion at: https://groups.google.com/g/grpc-io/c/X2VsZ1MlySg
 
