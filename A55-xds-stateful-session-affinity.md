@@ -139,7 +139,7 @@ the CDS update when unsupported values are present, however it was discarded
 because of the difficulty in using such configuration in mixed deployments.
 
 The `override_host_status` value is converted to a boolean and included in
-the new policy `override_host_experimental` config
+the new policy `xds_override_host_experimental` config
 (called `OverrideHostLoadBalancingPolicyConfig` described below) and this
 config will be embedded in the `xds_lb_policy` field of the
 `xds_cluster_resolver_experimental` config.
@@ -230,8 +230,9 @@ hierarchy.
 RPC load reporting happens in the `xds_cluster_impl_experimental` policy and
 we do want all RPCs to be included in the load reports. Hence the new policy
 needs to be just below the `xds_cluster_impl_experimental` as its child policy.
-Let's call this new policy `override_host_experimental`. This policy contains
-subchannel management, endpoint management, and RPC routing logic as follows:
+Let's call this new policy `xds_override_host_experimental`. This policy
+contains subchannel management, endpoint management, and RPC routing logic as
+follows:
 
 * maintain a map - let’s call this `overrideHostMap`. The key is (IP:port)
   and the value is the tuple
@@ -342,10 +343,10 @@ we just return queue as the pick result i.e. the RPC stays buffered until the
 connection attempt completes. If we do not find a subchannel, we just delegate
 to the child policy.
 
-Note that we unconditionally create the `override_host_experimental` policy
+Note that we unconditionally create the `xds_override_host_experimental` policy
 as the child of `xds_cluster_impl_experimental` even if the feature is not
 configured (in which case, it will be a no-op). A new config
-for the `override_host_experimental` policy will be defined as follows:
+for the `xds_override_host_experimental` policy will be defined as follows:
 
 ```proto
 // Configuration for the override_host LB policy.
@@ -365,9 +366,9 @@ hierarchy. `cds_experimental` sets the boolean `enabled` in
 field in the CDS update includes UNKNOWN or HEALTHY. If the field is unset,
 we treat it the same as if it was explicitly set to the default set.
 The diagram below shows how the configuration is passed down the hierarchy
-all the way from `cds_experimental` to `override_host_experimental`.
+all the way from `cds_experimental` to `xds_override_host_experimental`.
 
-If the `override_host_experimental` policy is disabled, it should still
+If the `xds_override_host_experimental` policy is disabled, it should still
 maintain the `overrideHostMap`, so that it has all of the necessary data
 to start working if it becomes enabled later, but it does not inject its
 own picker when disabled.
@@ -375,7 +376,7 @@ own picker when disabled.
 
 One of the existing policies (`xds_wrr_locality_experimental`,
 or `ring_hash_experimental`) is created as the child policy of
-`override_host_experimental` as shown in the diagram below.
+`xds_override_host_experimental` as shown in the diagram below.
 
 ![LB Policy Hierarchy Diagram](A55_graphics/lb-hierarchy.png)
 
@@ -388,8 +389,8 @@ in its CDS update to the watchers.
 
 * `cds_experimental` policy (which receives the CDS update) uses the value of
 `override_host_status` to set the boolean `enabled` in the config of
-`override_host_experimental` and embed this config in the `xds_lb_policy` field
-of the config for `xds_cluster_resolver_experimental`.
+`xds_override_host_experimental` and embed this config in the `xds_lb_policy`
+field of the config for `xds_cluster_resolver_experimental`.
 
 ## Rationale
 
