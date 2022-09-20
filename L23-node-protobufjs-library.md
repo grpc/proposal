@@ -17,7 +17,7 @@ The Node gRPC library currently depends on Protobuf.js version 5. Since Protobuf
 
 ## Proposal
 
-For the purpose of definiing services in general, the existing gRPC library has defined the types [`MethodDefinition`](https://grpc.io/grpc/node/grpc.html#~MethodDefinition__anchor) and [`ServiceDefinition`](https://grpc.io/grpc/node/grpc.html#~ServiceDefinition__anchor). A `MethodDefinition` is an object with the following properties:
+For the purpose of defining services in general, the existing gRPC library has defined the types [`MethodDefinition`](https://grpc.io/grpc/node/grpc.html#~MethodDefinition__anchor) and [`ServiceDefinition`](https://grpc.io/grpc/node/grpc.html#~ServiceDefinition__anchor). A `MethodDefinition` is an object with the following properties:
 
  - `path`: The URL path for accessing this method
  - `requestStream`: A boolean indicating whether there is a stream of request messages instead of a single message.
