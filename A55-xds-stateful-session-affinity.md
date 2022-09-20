@@ -149,8 +149,10 @@ Also note that [common_lb_config][] field is incompatible with the new
 [A52: gRPC xDS Custom Load Balancer Configuration][grfc_a52]) which means
 custom LB policies and stateful session affinity features will be incompatible
 with each other. This will need to be fixed eventually to be able to use these
-two features together. Until it is fixed, stateful session affinity cannot be
-used when custom LB policies are used.
+two features together. Until that happens, we assume the default value
+for the [`common_lb_config.override_host_status`][or-host-status] field
+when one is using the new [load_balancing_policy][] field so the user is still
+able to use the feature.
 
 ### `CookieBasedStatefulSessionFilter` Processing
 
@@ -230,7 +232,12 @@ hierarchy.
 RPC load reporting happens in the `xds_cluster_impl_experimental` policy and
 we do want all RPCs to be included in the load reports. Hence the new policy
 needs to be just below the `xds_cluster_impl_experimental` as its child policy.
-Let's call this new policy `xds_override_host_experimental`. This policy
+Note that the new policy will be beneath the `priority_experimental` policy,
+which means that if we pick a host for a session while we are failed over to a
+lower priority and then a higher priority comes back online, we will switch
+hosts at that point and this behavior is different from Envoy.
+
+Let's call the new policy `xds_override_host_experimental`. This policy
 contains subchannel management, endpoint management, and RPC routing logic as
 follows:
 
