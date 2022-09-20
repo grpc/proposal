@@ -254,24 +254,28 @@ follows:
   pseudo-code:
 
 ```
-resolver_list = list of equivalent_addresses from the resolver
-// resolver_list is a list of lists
-for equ_address_list in resolver_list:
-  // first loop to compute transitive closure
-  complete_list = equ_address_list
-  for address in complete_list:
-    entry = lb_policy.address_map[address]
-    if entry found:
-      cur_list = entry.equivalent_addresses
-      append to complete_list elements of cur_list not already in complete_list
-
-  // second loop to set the computed complete_list in each entry
-  for address in complete_list:
-    entry = lb_policy.address_map[address]
-    if entry not found:
-      entry = new map entry
-      lb_policy.address_map[address] = entry
-    entry.equivalent_addresses = complete_list minus address
+// Find the transitive closure of all EAGs.
+eags_to_process = [set(eag) for eag in resolver_update]
+completed_eag_sets = []
+all_addresses = set()
+while not eags_to_process.empty():
+  current_eag = eags_to_process.pop_front()
+  for eag in eags_to_process:
+    if eag.intersects(current_eag):  // If they have any elements in common
+      add elements from eag to current_eag
+      remove eag from eags_to_process
+  completed_eag_sets.push_back(current_eag)
+  add elements from current_eag to all_addresses
+// Now completed_eag_sets contains the sets we want.
+// Use that to update the LB policy's map.
+// First, update the equivalent addresses for every address in the update.
+for eag in completed_eag_sets:
+  for address in eag:
+    lb_policy.address_map[address].equivalent_addresses = eag
+// Now remove equivalencies for any address not found in the current update.
+for address, entry in lb_policy.address_map:
+  if address not in all_addresses:
+    entry.equivalent_addresses.clear()
 ```
 
 * whenever a new subchannel is created (by the child policy that is
