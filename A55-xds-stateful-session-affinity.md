@@ -12,7 +12,9 @@ A55: xDS-Based Stateful Session Affinity for Proxyless gRPC
 This design specifies a mechanism to implement session affinity where backend
 services maintain a local state per "session" and RPCs of a session are always
 routed to the same backend (as long as it is in a valid state) that is
-assigned to that session. This specification is based on and is compatible
+assigned to that session. The valid state for a backend typically includes
+the [`HEALTHY` and `DRAINING` states][eds-health-status] with special semantics
+for the `DRAINING` state. This specification is based on and is compatible
 with [stateful session persistence][envoy-ssp] that is implemented in Envoy.
 See Envoy PRs [17848][], [18207][].
 
@@ -37,6 +39,16 @@ saves the cookie and uses that cookie in all future RPCs of that session
 cookie and gets the encoded backend information to route the RPC to the
 same backend B1 if it is still reachable.
 
+With stateful session affinity, session draining of backends is an important
+requirement. In this use-case, the user wants to stop or restart service
+backends (let's say to optimize resources or to perform upgrades). However a
+terminating backend first needs to "drain" all assigned sessions before
+exiting. In this state - let's call it `DRAINING` - the terminating backend is
+only sent RPCs of its existing assigned sessions and no new traffic is sent.
+Once all assigned sessions have finished (or a timeout triggers), the backend
+application exits at which point the backend is now removed from the endpoints
+list (EDS). This design includes support for session draining.
+
 ### Related Proposals: 
 
 * [A27: xDS-Based Global Load Balancing][A27]
@@ -51,7 +63,14 @@ proxyless gRPC. Similarly, an application using some cookie implementation
 that works with Envoy will continue to work with proxyless gRPC without any
 modifications.
 
-The design involves following 4 parts.
+The design involves following 5 parts.
+
+### `XdsClient` to Include Endpoint Health Status
+
+The `EdsUpdate` struct from the `XdsClient` will be enhanced to include the
+[endpoint health status][eds-health-status] for each endpoint. `XdsClient`
+will also be modified to include endpoints in `DRAINING` state in the
+`EdsUpdate` reported to the watchers.
 
 ### Listener and Route Configuration through xDS
 
@@ -125,22 +144,18 @@ valid backend (host) as defined by
 state is invalid, gRPC will use the configured load balancing policy to pick
 the backend.
 
-Note that gRPC currently ignores endpoints with health status other than
-`HEALTHY` or `UNKNOWN` and even `XdsClient` excludes such endpoints in its
-update to the watchers. We will need a separate design to include such
-endpoints if we determine that such behavior is needed for this feature to
-be useful to our users.
-
-As a result, for this design gRPC will only consider the `UNKNOWN` or
-`HEALTHY` states that are specified in
+As described above the `XdsClient` will be modified to include endpoints with
+the health status `DRAINING` in addition to `HEALTHY` or `UNKNOWN` and will
+include the health status in the update. As a result, gRPC will only consider
+`UNKNOWN`, `HEALTHY` or `DRAINING` states that are specified in
 [`common_lb_config.override_host_status`][or-host-status] and ignore all
 other values. We considered the alternative of NACKing (i.e. rejecting)
-the CDS update when unsupported values are present, however it was discarded
+the CDS update when unsupported values are present, however it was rejected
 because of the difficulty in using such configuration in mixed deployments.
 
-The `override_host_status` value is converted to a boolean and included in
-the new policy `xds_override_host_experimental` config
-(called `OverrideHostLoadBalancingPolicyConfig` described below) and this
+The `override_host_status` value is included in the new policy
+`xds_override_host_experimental` config (called
+`OverrideHostLoadBalancingPolicyConfig` described below) and this
 config will be embedded in the `xds_lb_policy` field of the
 `xds_cluster_resolver_experimental` config.
 
@@ -161,7 +176,7 @@ A channel configured for stateful session affinity will have the
 This filter will process incoming RPCs and set an appropriate LB pick value
 which will be passed to the Load Balancing Policy's Pick method.
 
-When an RPC arrives on a configured channel the Config Selector processes it
+When an RPC arrives on a configured channel, the Config Selector processes it
 as described in [A31: gRPC xDS Config Selector Design][A31]. This includes the
 `CookieBasedStatefulSessionFilter` which is installed as one of the filters in
 the channel. Note that the filter maintains a context for an RPC and processes
@@ -225,7 +240,7 @@ For example,
 
 After the `CookieBasedStatefulSessionFilter` has passed the `override-host`
 value to the Load Balancer as a "pick-argument", the Load Balancer uses
-this value to route the RPC appropriately. The required logic needs to be
+this value to route the RPC appropriately. The required logic will be
 implemented in a new and separate LB policy at an appropriate place in the
 hierarchy.
 
@@ -241,37 +256,38 @@ Let's call the new policy `xds_override_host_experimental`. This policy
 contains subchannel management, endpoint management, and RPC routing logic as
 follows:
 
-* maintain a map - let’s call this `overrideHostMap`. The key is (IP:port)
+* maintain a map - let's call it `address_map`. The key is (IP:port)
   and the value is the tuple
-  `[subchannel, list of other equivalent addresses]`. When a host (endpoint)
-  has multiple addresses (e.g. IPv6 vs IPv4 or due to multiple network
-  interfaces) they are said to be equivalent addresses. Whenever we get an
-  updated list of addresses from the resolver, we create an entry in the map
-  for each address, and populate the list of equivalent addresses. The
-  subchannel is based on subchannel creation/destruction or
-  connection/disconnection from the child policy. The equivalent address list
-  computation on each resolver update is performed as per the following
-  pseudo-code:
+  `[subchannel, EDS health-status, list of other equivalent addresses]`.
+  When a host (endpoint) has multiple addresses (e.g. IPv6 vs IPv4 or due to
+  multiple network interfaces) they are said to be equivalent addresses.
+  Whenever we get an updated list of addresses from the resolver, we create an
+  entry in the map for each address, and populate the list of equivalent
+  addresses and EDS health-status. The subchannel is based on subchannel
+  creation/destruction or connection/disconnection from the child policy. The
+  equivalent address list computation on each resolver update is performed as
+  shown in the following pseudo-code:
 
 ```
 // Find the transitive closure of all EAGs.
-eags_to_process = [set(eag) for eag in resolver_update]
-completed_eag_sets = []
+eags_to_process = [set([eag,health_status]) for eag in resolver_update]
+completed_eag_sets = []   // each entry is a tuple [eag, health_status]
 all_addresses = set()
 while not eags_to_process.empty():
-  current_eag = eags_to_process.pop_front()
+  current_eag, current_health_status = eags_to_process.pop_front()
   for eag in eags_to_process:
     if eag.intersects(current_eag):  // If they have any elements in common
       add elements from eag to current_eag
       remove eag from eags_to_process
-  completed_eag_sets.push_back(current_eag)
+  completed_eag_sets.push_back([current_eag, current_health_status])
   add elements from current_eag to all_addresses
 // Now completed_eag_sets contains the sets we want.
 // Use that to update the LB policy's map.
 // First, update the equivalent addresses for every address in the update.
-for eag in completed_eag_sets:
-  for address in eag:
-    lb_policy.address_map[address].equivalent_addresses = eag
+for entry in completed_eag_sets:
+  for address in entry.eag:
+    lb_policy.address_map[address].equivalent_addresses = entry.eag
+    lb_policy.address_map[address].health_status = entry.health_status
 // Now remove equivalencies for any address not found in the current update.
 for address, entry in lb_policy.address_map:
   if address not in all_addresses:
@@ -279,9 +295,10 @@ for address, entry in lb_policy.address_map:
 ```
 
 * whenever a new subchannel is created (by the child policy that is
-  routing an RPC - see below), add a new entry to `overrideHostMap` with
-  the subchannel address (i.e. the peer address) as the key and the value as
-  `[subchannel, other equivalent addresses of the subchannel]`.
+  routing an RPC - see below), update the entry in `address_map` (for
+  the subchannel address i.e. the peer address as the key) with the new
+  subchannel value updated in the tuple
+  `[subchannel, health-status, equivalent addresses]`.
 
     * in Java and Go, we may have to wait for subchannel to be `READY` in order
       to know which specific address the subchannel is connected to before we
@@ -294,12 +311,13 @@ for address, entry in lb_policy.address_map:
       that address.
 
 * whenever a subchannel is shut down, remove the associated entries from
-  `overrideHostMap`.
+  `address_map`.
 
     * this can be achieved by wrapping a subchannel to intercept subchannel
       shutdown and the wrapper is returned by `createSubchannel`.
 
-* the policy's subchannel picker pseudo-code is as follows:
+* the policy's subchannel picker pseudo-code is as follows. `policy_config`
+  is the `OverrideHostLoadBalancingPolicyConfig` object for this policy.
 
 ```
 if override_host is set in pick arguments:
@@ -307,7 +325,8 @@ if override_host is set in pick arguments:
   if entry found:
     idle_subchannel = None
     found_connecting = False
-    if entry.subchannel is set:
+    if entry.subchannel is set AND
+     entry.health_status is in policy_config.override_host_status:
       if entry.subchannel.connectivity_state == READY:
         return entry.subchannel as pick result
       elif entry.subchannel.connectivity_state == IDLE:
@@ -317,7 +336,8 @@ if override_host is set in pick arguments:
     // Java-only, for now: check equivalent addresses
     for address in entry.equivalent_addresses:
       other_entry = lb_policy.address_map[address]
-      if other_entry.subchannel is set:
+      if other_entry.subchannel is set AND
+       other_entry.health_status is in policy_config.override_host_status:
         if other_entry.subchannel.connectivity_state == READY:
           return other_entry.subchannel as pick result
         elif other_entry.subchannel.connectivity_state == IDLE:
@@ -362,8 +382,19 @@ for the `xds_override_host_experimental` policy will be defined as follows:
 ```proto
 // Configuration for the override_host LB policy.
 message OverrideHostLoadBalancingPolicyConfig {
-  // if set to false this LB policy will be a no-op
-  bool enabled = 1;
+  enum HealthStatus {
+    UNKNOWN = 0;
+    HEALTHY = 1;
+    UNHEALTHY = 2;
+    DRAINING = 3;
+    TIMEOUT = 4;
+    DEGRADED = 5;
+  }
+
+  // valid health status for hosts that are considered when using
+  // `xds_override_host_experimental` policy
+  // Default is [UNKNOWN, HEALTHY, DEGRADED]
+  repeated HealthStatus override_host_status = 1;
 
   repeated LoadBalancingConfig child_policy = 2;
 }
@@ -371,19 +402,15 @@ message OverrideHostLoadBalancingPolicyConfig {
 
 The `xds_cluster_resolver_experimental` policy's config will have this config
 embedded in its `xds_lb_policy` field and this config is passed down the
-hierarchy. `cds_experimental` sets the boolean `enabled` in
-`OverrideHostLoadBalancingPolicyConfig` based on whether the
+hierarchy. `cds_experimental` just copies
 [`common_lb_config.override_host_status`][or-host-status]
-field in the CDS update includes UNKNOWN or HEALTHY. If the field is unset,
-we treat it the same as if it was explicitly set to the default set.
-The diagram below shows how the configuration is passed down the hierarchy
-all the way from `cds_experimental` to `xds_override_host_experimental`.
-
-If the `xds_override_host_experimental` policy is disabled, it should still
-maintain the `overrideHostMap`, so that it has all of the necessary data
-to start working if it becomes enabled later, but it does not inject its
-own picker when disabled.
-
+field in the CDS update to the `override_host_status` field in
+`OverrideHostLoadBalancingPolicyConfig`. The repeated enum field will just be
+represented as a list of strings in JSON form. If the field is unset,
+we treat it the same as if it was explicitly set to the default set which is
+[`UNKNOWN`, `HEALTHY`, `DEGRADED`]. The diagram below shows how the
+configuration is passed down the hierarchy all the way from `cds_experimental`
+to `xds_override_host_experimental`.
 
 One of the existing policies (`xds_wrr_locality_experimental`,
 or `ring_hash_experimental`) is created as the child policy of
@@ -398,10 +425,10 @@ following changes are required:
 [`common_lb_config.override_host_status`][or-host-status] and copy the value
 in its CDS update to the watchers.
 
-* `cds_experimental` policy (which receives the CDS update) uses the value of
-`override_host_status` to set the boolean `enabled` in the config of
-`xds_override_host_experimental` and embed this config in the `xds_lb_policy`
-field of the config for `xds_cluster_resolver_experimental`.
+* `cds_experimental` policy (which receives the CDS update) copies the value
+of `override_host_status` into the config of `xds_override_host_experimental`
+and embed this config in the `xds_lb_policy` field of the config of
+`xds_cluster_resolver_experimental`.
 
 ## Rationale
 
@@ -450,3 +477,4 @@ and uses that cookie in subsequent requests.
 [common_lb_config]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L1014
 [load_balancing_policy]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L1069
 [grfc_a52]: https://github.com/grpc/proposal/blob/master/A52-xds-custom-lb-policies.md
+[eds-health-status]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/health_check.proto#envoy-v3-api-enum-config-core-v3-healthstatus
