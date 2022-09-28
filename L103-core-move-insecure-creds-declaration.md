@@ -5,7 +5,7 @@ Move function declarations for insecure credentials from `grpc/grpc_security.h`
 * Status: Ready for Implementation
 * Implemented in: C Core
 * Last updated: 09/28/2022
-* Discussion at: Placeholder
+* Discussion at: https://groups.google.com/g/grpc-io/c/6qvo-UVs-uI
 
 ## Abstract
 
