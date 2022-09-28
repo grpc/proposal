@@ -150,7 +150,7 @@ message XdsClusterResolverLoadBalancingPolicyConfig {
 }
 ```
 
-To provide the `xds_wrr_locality` load balancer information about locality weights received from EDS, the cluster resolver will populate a new attribute in the resolved addresses. The new attribute will contain a map from a locality struct to a locality weight integer. Note that a change in this attribute would still allow associated subchannels to be reused - it will not affect their uniqueness.
+To provide the `xds_wrr_locality` load balancer information about locality weights received from EDS, the cluster resolver will populate a new top-level attribute (not specific to any particular address) in the resolved addresses. The new attribute will contain a map from a locality struct to a locality weight integer. Note that a change in this attribute would still allow associated subchannels to be reused - it will not affect their uniqueness.
 
 ### Configuration Example
 
