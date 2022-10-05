@@ -63,7 +63,7 @@ proxyless gRPC. Similarly, an application using some cookie implementation
 that works with Envoy will continue to work with proxyless gRPC without any
 modifications.
 
-The design involves following 5 parts.
+The design involves the following 5 parts.
 
 ### `XdsClient` to Include Endpoint Health Status
 
@@ -156,7 +156,7 @@ because of the difficulty in using such configuration in mixed deployments.
 The `override_host_status` value is included in the new policy
 `xds_override_host_experimental` config (called
 `OverrideHostLoadBalancingPolicyConfig` described below) and this
-config will be embedded in the `xds_lb_policy` field of the
+config will be embedded in the `DiscoveryMechanism` inner message of the
 `xds_cluster_resolver_experimental` config.
 
 Also note that [common_lb_config][] field is incompatible with the new
@@ -385,32 +385,38 @@ message OverrideHostLoadBalancingPolicyConfig {
   enum HealthStatus {
     UNKNOWN = 0;
     HEALTHY = 1;
-    UNHEALTHY = 2;
     DRAINING = 3;
-    TIMEOUT = 4;
-    DEGRADED = 5;
   }
 
   // valid health status for hosts that are considered when using
   // `xds_override_host_experimental` policy
-  // Default is [UNKNOWN, HEALTHY, DEGRADED]
+  // Default is [UNKNOWN, HEALTHY]
   repeated HealthStatus override_host_status = 1;
 
   repeated LoadBalancingConfig child_policy = 2;
 }
 ```
 
-The `xds_cluster_resolver_experimental` policy's config will have this config
-embedded in its `xds_lb_policy` field and this config is passed down the
-hierarchy. `cds_experimental` just copies
-[`common_lb_config.override_host_status`][or-host-status]
-field in the CDS update to the `override_host_status` field in
-`OverrideHostLoadBalancingPolicyConfig`. The repeated enum field will just be
-represented as a list of strings in JSON form. If the field is unset,
+The `xds_cluster_resolver_experimental` config will be modified so that the
+`DiscoveryMechanism` inner message contains an additional
+`override_host_status` field of the type
+`OverrideHostLoadBalancingPolicyConfig`. In this context,
+the `child_policy` field of `OverrideHostLoadBalancingPolicyConfig` will be
+ignored.
+
+`cds_experimental` policy will copy the
+[`common_lb_config.override_host_status`][or-host-status] value it gets
+in the CDS update from the `XdsClient` to the appropriate `DiscoveryMechanism`
+entry's `override_host_status` field in the config of the
+`xds_cluster_resolver_experimental` policy. If the field is unset,
 we treat it the same as if it was explicitly set to the default set which is
-[`UNKNOWN`, `HEALTHY`, `DEGRADED`]. The diagram below shows how the
-configuration is passed down the hierarchy all the way from `cds_experimental`
-to `xds_override_host_experimental`.
+[`UNKNOWN`, `HEALTHY`].
+
+The `xds_cluster_resolver_experimental` LB policy will copy the
+`override_host_status` value from its config's appropriate `DiscoveryMechanism`
+entry into the config for the `xds_override_host_experimental` policy. The
+diagram below shows how the configuration is passed down the hierarchy all the
+way from `cds_experimental` to `xds_override_host_experimental`.
 
 One of the existing policies (`xds_wrr_locality_experimental`,
 or `ring_hash_experimental`) is created as the child policy of
@@ -421,14 +427,17 @@ or `ring_hash_experimental`) is created as the child policy of
 To propagate [`common_lb_config.override_host_status`][or-host-status] the
 following changes are required:
 
-* the [`XdsClient`][grpc-client-arch] to parse
+* CDS update message will be modified to include the `override_host_status`
+field.
+
+* the [`XdsClient`][grpc-client-arch] will parse
 [`common_lb_config.override_host_status`][or-host-status] and copy the value
 in its CDS update to the watchers.
 
-* `cds_experimental` policy (which receives the CDS update) copies the value
-of `override_host_status` into the config of `xds_override_host_experimental`
-and embed this config in the `xds_lb_policy` field of the config of
-`xds_cluster_resolver_experimental`.
+* `cds_experimental` policy (which receives the CDS update) will copy the
+value of `override_host_status` into the appropriate `DiscoveryMechanism`
+entry's `override_host_status` field in the config of the
+`xds_cluster_resolver_experimental` policy.
 
 ## Rationale
 
