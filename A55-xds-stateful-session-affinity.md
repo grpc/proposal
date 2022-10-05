@@ -63,7 +63,7 @@ proxyless gRPC. Similarly, an application using some cookie implementation
 that works with Envoy will continue to work with proxyless gRPC without any
 modifications.
 
-The design involves the following 5 parts.
+The design involves the following parts.
 
 ### `XdsClient` to Include Endpoint Health Status
 
@@ -427,17 +427,22 @@ or `ring_hash_experimental`) is created as the child policy of
 To propagate [`common_lb_config.override_host_status`][or-host-status] the
 following changes are required:
 
-* CDS update message will be modified to include the `override_host_status`
-field.
-
-* the [`XdsClient`][grpc-client-arch] will parse
-[`common_lb_config.override_host_status`][or-host-status] and copy the value
-in its CDS update to the watchers.
+* The [XdsClient][grpc-client-arch] will parse the
+  [common_lb_config.override_host_status][or-host-status] field from the
+  `Cluster` resource and copy the value to a new `override_host_status` field
+  in the CDS update that it sends to the watchers.
 
 * `cds_experimental` policy (which receives the CDS update) will copy the
-value of `override_host_status` into the appropriate `DiscoveryMechanism`
-entry's `override_host_status` field in the config of the
-`xds_cluster_resolver_experimental` policy.
+  value of `override_host_status` into the appropriate `DiscoveryMechanism`
+  entry's `override_host_status` field in the config of the
+  `xds_cluster_resolver_experimental` policy.
+
+* When the `xds_cluster_resolver_experimental` policy generates the config for
+  each priority, it will configure the `xds_override_host_experimental` policy
+  underneath the `xds_cluster_impl_experimental` policy. The generated config
+  for the `xds_override_host_experimental policy` will include the
+  `override_host_status` field from the `DiscoveryMechanism` associated with
+  that priority.
 
 ## Rationale
 
