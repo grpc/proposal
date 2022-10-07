@@ -292,6 +292,18 @@ for address, entry in lb_policy.address_map:
     entry.equivalent_addresses.clear()
 ```
 
+* The `xds_override_host_experimental` policy will always remove addresses in
+  state `DRAINING` when passing an update down to its child policy, regardless
+  of the value of `override_host_status`.
+
+* When the policy gets an update that changes an address's health status to
+  `DRAINING`, if (and only if) the `override_host_status` set includes
+  `DRAINING`, it will avoid closing the connection on that subchannel, even
+  when the child policy tries to do so. Instead, this policy will maintain the
+  connection until either (a) the connection closes due to the server closing
+  it or a network failure, or (b) the policy receives a subsequent EDS update
+  that completely removes the endpoint.
+
 * whenever a new subchannel is created (by the child policy that is
   routing an RPC - see below), update the entry in `address_map` (for
   the subchannel address i.e. the peer address as the key) with the new
@@ -360,7 +372,7 @@ return child_picker.Pick()
 
 In the above logic we prefer a subchannel in the `READY` state for a different
 equivalent address instead of waiting for the subchannel for the original
-`overrideHost` address to become `READY` (from one of `IDLE`, `CONNECTING`
+`override-host` address to become `READY` (from one of `IDLE`, `CONNECTING`
 or `TRANSIENT_FAILURE` states) because we assume that the equivalent address
 is pointing to the same host thereby maintaining session affinity with the
 pick.
