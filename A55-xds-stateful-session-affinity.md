@@ -268,24 +268,23 @@ follows:
 
 ```
 // Find the transitive closure of all EAGs.
-eags_to_process = [set([eag,health_status]) for eag in resolver_update]
-completed_eag_sets = []   // each entry is a tuple [eag, health_status]
+eags_to_process = [set(eag) for eag in resolver_update]
+completed_eag_sets = []
 all_addresses = set()
 while not eags_to_process.empty():
-  current_eag, current_health_status = eags_to_process.pop_front()
+  current_eag = eags_to_process.pop_front()
   for eag in eags_to_process:
     if eag.intersects(current_eag):  // If they have any elements in common
       add elements from eag to current_eag
       remove eag from eags_to_process
-  completed_eag_sets.push_back([current_eag, current_health_status])
+  completed_eag_sets.push_back(current_eag)
   add elements from current_eag to all_addresses
 // Now completed_eag_sets contains the sets we want.
 // Use that to update the LB policy's map.
 // First, update the equivalent addresses for every address in the update.
-for entry in completed_eag_sets:
-  for address in entry.eag:
-    lb_policy.address_map[address].equivalent_addresses = entry.eag
-    lb_policy.address_map[address].health_status = entry.health_status
+for eag in completed_eag_sets:
+  for address in eag:
+    lb_policy.address_map[address].equivalent_addresses = eag
 // Now remove equivalencies for any address not found in the current update.
 for address, entry in lb_policy.address_map:
   if address not in all_addresses:
