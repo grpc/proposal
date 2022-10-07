@@ -387,7 +387,7 @@ message OverrideHostLoadBalancingPolicyConfig {
   }
 
   // valid health status for hosts that are considered when using
-  // `xds_override_host_experimental` policy
+  // xds_override_host_experimental policy.
   // Default is [UNKNOWN, HEALTHY]
   repeated HealthStatus override_host_status = 1;
 
