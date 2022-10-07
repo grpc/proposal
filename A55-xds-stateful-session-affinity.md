@@ -153,11 +153,9 @@ other values. We considered the alternative of NACKing (i.e. rejecting)
 the CDS update when unsupported values are present, however it was rejected
 because of the difficulty in using such configuration in mixed deployments.
 
-The `override_host_status` value is included in the new policy
-`xds_override_host_experimental` config (called
-`OverrideHostLoadBalancingPolicyConfig` described below) and this
-config will be embedded in the `DiscoveryMechanism` inner message of the
-`xds_cluster_resolver_experimental` config.
+The `override_host_status` value will be included in both the config of the
+`xds_override_host_experimental` policy and in the `DiscoveryMessage` inner
+message of the config of the `xds_cluster_resolver_experimental` policy.
 
 Also note that [common_lb_config][] field is incompatible with the new
 [load_balancing_policy][] field used for custom LB policies (see
@@ -399,10 +397,7 @@ message OverrideHostLoadBalancingPolicyConfig {
 
 The `xds_cluster_resolver_experimental` config will be modified so that the
 `DiscoveryMechanism` inner message contains an additional
-`override_host_status` field of the type
-`OverrideHostLoadBalancingPolicyConfig`. In this context,
-the `child_policy` field of `OverrideHostLoadBalancingPolicyConfig` will be
-ignored.
+`override_host_status` field of type `repeated HealthStatus`.
 
 `cds_experimental` policy will copy the
 [`common_lb_config.override_host_status`][or-host-status] value it gets
@@ -443,6 +438,11 @@ following changes are required:
   for the `xds_override_host_experimental policy` will include the
   `override_host_status` field from the `DiscoveryMechanism` associated with
   that priority.
+
+### Notes
+
+Note that if stateful session affinity and retries (gRFC [A44][]) are both
+configured, all retry attempts will be routed to the same endpoint.
 
 ## Rationale
 
@@ -492,3 +492,4 @@ and uses that cookie in subsequent requests.
 [load_balancing_policy]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L1069
 [grfc_a52]: https://github.com/grpc/proposal/blob/master/A52-xds-custom-lb-policies.md
 [eds-health-status]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/health_check.proto#envoy-v3-api-enum-config-core-v3-healthstatus
+[A44]: https://github.com/grpc/proposal/blob/master/A44-xds-retry.md
