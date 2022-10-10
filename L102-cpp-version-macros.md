@@ -19,10 +19,18 @@ It's a widely used code pattern to behave differenly based on the version
 information available at compile-time. Following is an example
 
 ```
-#if GRPC_CPP_VERSION_MAJOR > 1 || (GRPC_CPP_VERSION_MAJOR == 1 && GRPC_CPP_VERSION_MINOR >= 50)
-// Use a new feature available from gRPC C++ 1.50
+#ifdef GRPC_CPP_VERSION_MAJOR
+#  if GRPC_CPP_VERSION_MAJOR == 1
+#    if GRPC_CPP_VERSION_MINOR >= 60
+       // Use a new feature available from gRPC C++ 1.60
+#    else
+       // Do some workaround for gRPC C++ 1.59 or older
+#    endif
+#  else
+       // New major version!
+#  endif
 #else
-// Do some workaround
+// Do some workaround for old gRPC C++
 #endif
 ```
 
