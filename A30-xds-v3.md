@@ -2,16 +2,15 @@ A30: xDS v3 Support
 ----
 * Author(s): Mark D. Roth (markdroth)
 * Approver: ejona86, dfawley
-* Status: In Review
-* Implemented in: 
-* Last updated: 2020-06-25
+* Status: Final
+* Implemented in: C-core, Java, Go, Node
+* Last updated: 2022-10-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/YRVqRMUQwhM
 
 ## Abstract
 
 The purpose of this proposal is to describe how gRPC will handle the
-transition from v2 to v3 of the xDS API and to document how gRPC will handle
-xDS versioning on an ongoing basis.
+transition from v2 to v3 of the xDS API.
 
 ## Background
 
@@ -20,16 +19,6 @@ gRPC has recently added support for obtaining configuration via the
 implementation uses v2 of the xDS API, but we are now adding support
 for [xDS
 v3](https://docs.google.com/document/d/1xeVvJ6KjFBkNjVspPbY_PwEDHC7XPi0J5p1SqUXcCl8/edit).
-In addition, we have been working with the xDS community on the new
-[minor/patch versioning
-proposal](https://docs.google.com/document/d/1afQ9wthJxofwOMCAle8qF-ckEfNWUuWtxbmdhxji0sI/edit),
-which should provide a smoother transition mechanism going forward.
-
-Regardless of whether a new version is indicated by bumping the
-major version (as was done with the v2 to v3 transition) or by bumping
-the minor version (as will probably be done for most new versions going
-forward), the current plan is that there will still be one new version of
-the xDS API per year.
 
 ### Related Proposals: 
 
@@ -37,42 +26,23 @@ the xDS API per year.
 
 ## Proposal
 
-### Version Support Policy
+### Migration Timing
 
-gRPC's policy will be to support two versions of xDS at any given time.
-So if gRPC currently supports versions N-1 and N, then when xDS version
-N+1 is released, gRPC will add support for version N+1 and drop support
-for version N-1 at the same time, so that we will support versions N
-and N+1.
-
-This policy will give users 1-2 years to upgrade their xDS servers in
+We will give users 1-2 years to upgrade their xDS servers to xDS v3 in
 order to continue using the latest release of gRPC.  Older releases of
-gRPC will of course continue to function using the older versions of the
-xDS API.
+gRPC will of course continue to support xDS v2.
 
 ### Deciding What Version to Use
 
-For each new version of xDS that gRPC adds support for, there will be a
-server feature defined in the bootstrap file (see below) to indicate that
-the server supports that version of xDS.  When speaking to the server,
-gRPC will use the highest version that is common to both itself and
-the server.
+There will be a server feature defined in the bootstrap file (see below)
+to indicate that the server supports xDS v3.  If this server feature is
+set in the bootstrap file for a given server, then when speaking to the
+server, gRPC will use xDS v3; if the server feature is not present, then
+gRPC will use xDS v2.
 
-For example, let's say that the gRPC binary supports versions N-1 and N.
-If the bootstrap file contains only the server feature for version N-1,
-the highest version that is common to both the client and the server is
-N-1, so the client will speak version N-1.  However, if the bootstrap file
-contains the server features for both versions N-1 and N, the highest
-version that is common to both the client and server is N, so the client
-will speak version N.
-
-As a special case for backward compatibility, there will be no server
-feature defined for xDS v2 support.  Existing releases of gRPC
-automatically assume that servers support v2, and we will continue to
-assume that when we add support for v3.  When we add support for the
-next version beyond v3 (probably v3.1), we will drop support for v2, and
-from that point on, all versions will be explicitly indicated via a
-server feature in the bootstrap file.
+In the future, when we drop support for xDS v2, gRPC will stop looking
+at the server feature in the config file, and it will unconditionally
+use xDS v3.
 
 ### Server Features in the Bootstrap File
 
@@ -115,72 +85,9 @@ follows:
 }
 ```
 
-For each new version of xDS, a server feature will be defined.  The
+For xDS v3 support, the server feature will be the string `xds_v3`.  The
 presence of that feature in the `server_features` list will indicate
-that the server supports that version of xDS.
-
-Note that because each release of gRPC will support only two versions
-of xDS, the server feature for version N-1 will no longer be used by a
-release of gRPC that supports version N+1.  However, it will not cause
-any problems to be left in the bootstrap file.  So at any given time, it
-is useful to have a bootstrap file indicating the total set of versions
-supported by your xDS server, and each client will use the latest version
-it supports.
-
-For xDS v3, the server feature will be the string `xds_v3`.
-
-### Transition Examples
-
-Let's say that your xDS server currently supports versions N-1 and N.
-Your bootstrap files can contain the server features for both of those
-versions (if applicable -- there is no server feature for xDS v2).  This
-allows the following:
-
-- Older gRPC clients that support versions N-2 and N-1 will see the
-  server feature for version N-1 in the bootstrap file, so they will use
-  version N-1.
-- Newer gRPC clients that support versions N-1 and N will see the server
-  feature for version N in the bootstrap file, so they will use version
-  N.  (If for some reason the server feature for version N was not
-  present in the bootstrap file, they would also work using version N-1,
-  as long as that server feature is present.)
-
-Now let's say that you want to drop support for version N-1 in your xDS
-server, so that it supports only version N.  Before you can do that,
-you need to upgrade the older gRPC clients that speak only versions N-2
-and N-1.  You have two choices:
-
-- Upgrade the clients to a release supporting versions N-1 and N.  These
-  clients will use version N by virtue of the server feature for version
-  N in the bootstrap file.
-- Upgrade the clients to the newest release supporting versions N and
-  N+1.  These clients will not see a server feature for version N+1 in
-  the bootstrap file, but they will see a server feature for version N,
-  so they will use version N.
-
-Once you are sure that you have no more clients using version N-1, you
-can drop support for that version from your xDS server.  At this point,
-you should remove the server feature for version N-1 from your bootstrap
-files, just in case any older clients are started.
-
-Next, let's say that xDS version N+1 has been released, and you want to add
-support for that version to your xDS server.  You can of course do this at
-any time, but none of the existing gRPC clients will actually use it
-unless you take additional steps.
-
-- For gRPC clients that support versions N and N+1, all you need to do
-  is add the server feature for version N+1 to the bootstrap file.  That
-  will cause these clients to start using version N+1.
-- For older gRPC clients that support versions N-1 and N, they will
-  ignore the server feature for version N+1 in the bootstrap file, so
-  they will continue to use version N.  You will need to upgrade to a
-  more recent release of gRPC to get them to use version N+1.
-
-Note that the only case in which users will need to upgrade their gRPC
-binaries in lock step with their xDS server is if they are migrating
-their xDS server from version N-1 to version N+1 in a single step,
-without adding support for version N in between.  We do not recommend
-this kind of transition.
+that the server supports xDS v3.
 
 ### Details of the v2 to v3 Transition
 
@@ -263,13 +170,9 @@ new server feature in the bootstrap file will only be used if the
 `true`.  This environment variable guard will be removed once we have
 performed the necessary interop testing.
 
-For future version transitions, we hope to be able to perform interop
-testing before we release support for the new version, in which case
-this kind of environment variable protection will not be needed.
-
 ## Rationale
 
 
 ## Implementation
 
-C-core implementation in progress in https://github.com/grpc/grpc/pull/23281.
+C-core implementation in https://github.com/grpc/grpc/pull/23281.
