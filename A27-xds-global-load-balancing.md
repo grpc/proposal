@@ -441,6 +441,9 @@ The `ClusterLoadAssignment` proto must have the following fields set:
         - The `socket_address` field must be set.  Inside of it:
           - The `address` field must be set to an IPv4 or IPv6 address.
           - The `port_value` field must be set.
+        - The endpoint address must be unique within the cluster (across
+          all priorities and localities); if an address is duplicated,
+          the resource will be considered invalid.
 - The `policy.drop_overloads` field may be set.
 - Note: The `policy.overprovisioning_factor` field will be ignored if
   set; see description of the EDS LB policy above for details.
