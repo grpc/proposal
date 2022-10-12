@@ -455,6 +455,24 @@ following changes are required:
 Note that if stateful session affinity and retries (gRFC [A44][]) are both
 configured, all retry attempts will be routed to the same endpoint.
 
+### Temporary environment variable protection
+
+During initial development, this feature will be enabled by the
+`GRPC_EXPERIMENTAL_XDS_ENABLE_HOST_OVERRIDE` environment variable. This
+environment variable protection will be removed once the feature has
+proven stable. The environment variable protection will specifically apply
+to the following:
+
+* creation of `xds_override_host_experimental` LB policy
+
+* all of the logic related to processing of the cookie based stateful session
+  extension http_filter
+
+* processing of `common_lb_config.override_host_status` in the CDS update
+
+If the environment variable is unset or not true, none of the above will be
+enabled.
+
 ## Rationale
 
 The stateful session affinity requirement is not satisfied by the
