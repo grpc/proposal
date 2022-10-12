@@ -5,7 +5,8 @@ A30: xDS v3 Support
 * Status: Final
 * Implemented in: C-core, Java, Go, Node
 * Last updated: 2022-10-11
-* Discussion at: https://groups.google.com/g/grpc-io/c/YRVqRMUQwhM
+* Discussion at: https://groups.google.com/g/grpc-io/c/YRVqRMUQwhM and
+  https://groups.google.com/g/grpc-io/c/pfwDmD7cpp0
 
 ## Abstract
 
