@@ -465,8 +465,9 @@ to the following:
 
 * creation of `xds_override_host_experimental` LB policy
 
-* all of the logic related to processing of the cookie based stateful session
-  extension http_filter
+* processing of the cookie based stateful session extension http_filter.
+  Note: `XdsClient` will only accept the filter when the environment variable
+  is set, otherwise it will respond as it responds today.
 
 * processing of `common_lb_config.override_host_status` in the CDS update
 
@@ -485,9 +486,10 @@ This feature avoids the problem by using HTTP cookies as described above.
 
 ## Implementation
 
-The design will be implemented in gRPC C++, Java and Go.
-Wrapped languages should be able to use the feature provided they can do
-cookie management in their client code.
+We are planning to implement the design in gRPC C-core and there are no
+current plans to implement in any other language. Wrapped languages should be
+able to use the feature provided they can do cookie management in their client
+code.
 
 Cookies are rarely used with gRPC so the implementations should also
 include a recipe for cookie management. This could involve illustrative
