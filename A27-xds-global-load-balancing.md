@@ -420,8 +420,13 @@ The `ClusterLoadAssignment` proto must have the following fields set:
   itself as being unreachable.  In each entry in the `endpoints` field:
   - If the `load_balancing_weight` field is unset, the `endpoints` entry
     is skipped; otherwise, the value is used for weighted locality picking.
+    If the sum of the locality weights within a priority exceeds the max
+    value of a uint32, the resource will be considered invalid.
   - The `priority` field will be used.  As per normal protobuf rules, if
-    the field is unset, it defaults to zero.
+    the field is unset, it defaults to zero.  The priority list must not
+    have any gaps in it; if there is a locality with priority N > 0 but
+    there is no locality with priority N-1, the resource will be
+    considered invalid.
   - The `locality` field must be unique within a given priority.  If
     more than one entry in the `endpoints` field has the same values in
     both the `locality` and `priority` field, the resource will be
@@ -436,6 +441,9 @@ The `ClusterLoadAssignment` proto must have the following fields set:
         - The `socket_address` field must be set.  Inside of it:
           - The `address` field must be set to an IPv4 or IPv6 address.
           - The `port_value` field must be set.
+        - The endpoint address must be unique within the cluster (across
+          all priorities and localities); if an address is duplicated,
+          the resource will be considered invalid.
 - The `policy.drop_overloads` field may be set.
 - Note: The `policy.overprovisioning_factor` field will be ignored if
   set; see description of the EDS LB policy above for details.
