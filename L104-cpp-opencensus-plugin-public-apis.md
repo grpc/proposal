@@ -5,7 +5,7 @@ L104: C++ OpenCensus Plugin Public APIs
 * Status: Draft
 * Implemented in:
 * Last updated: Oct 12, 2022
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/E4cEp6BbCWA
 
 ## Abstract
 
