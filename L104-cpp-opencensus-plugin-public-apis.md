@@ -9,11 +9,11 @@ L104: C++ OpenCensus Plugin Public APIs
 
 ## Abstract
 
-Move the gRPC C++ OpenCensus plugin APIs that were designed as public API to include/grpcpp/opencensus.h from src/cpp/ext/cpp/filter/census.
+Move the gRPC C++ OpenCensus plugin APIs that were designed as public API to [`include/grpcpp/opencensus.h`](https://github.com/grpc/grpc/blob/v1.50.x/include/grpcpp/opencensus.h) from [`src/cpp/ext/cpp/filter/census`](https://github.com/grpc/grpc/tree/v1.50.x/src/cpp/ext/filters/census).
 
 ## Background
 
-The gRPC C++ OpenCensus filter was proposed in [L29-cpp-opencensus-filter](L29-cpp-opencensus-filter.md) and added two public APIs for registering the OpenCensus plugin and registering the default views. It seems that it was intended for users to be able to create their own views or some of the additional views provided in `src/cpp/ext/cpp/filter/census/grpc_plugin.h`, but those APIs were not moved to `include/grpcpp/opencensus.h`. This is also the case for the class `grpc::CensusContext` currently available in `src/cpp/ext/cpp/filter/census/context.h` which users should be able to use in conjunction with the `set_cencus_context` API on `grpc::ClientContext`.
+The gRPC C++ OpenCensus filter was proposed in [L29-cpp-opencensus-filter](L29-cpp-opencensus-filter.md) and added two public APIs for registering the OpenCensus plugin and registering the default views. It seems that it was intended for users to be able to create their own views or some of the additional views provided in [`src/cpp/ext/cpp/filter/census/grpc_plugin.h`](https://github.com/grpc/grpc/blob/v1.50.x/src/cpp/ext/filters/census/grpc_plugin.h), but those APIs were not moved to `include/grpcpp/opencensus.h`. This is also the case for the class `grpc::CensusContext` currently available in [`src/cpp/ext/cpp/filter/census/context.h`](https://github.com/grpc/grpc/blob/v1.50.x/src/cpp/ext/filters/census/context.h) which users should be able to use in conjunction with the [`set_cencus_context`](https://github.com/grpc/grpc/blob/91091e3668144de9c6aa392f496bb7639f7025a7/include/grpcpp/impl/codegen/client_context.h#L375) API on `grpc::ClientContext`.
 
 
 ### Related Proposals: 
@@ -126,7 +126,7 @@ const ::opencensus::stats::ViewDescriptor& ServerStartedRpcsHour();
 const ::opencensus::stats::ViewDescriptor& ServerCompletedRpcsHour();
 ```
 
-From `src/cpp/ext/filter/census/context.h`, move the class grpc::CensusContext to `include/grpcpp/opencensus.h`.
+From `src/cpp/ext/filter/census/context.h`, move the class [`grpc::CensusContext`](https://github.com/grpc/grpc/blob/91091e3668144de9c6aa392f496bb7639f7025a7/src/cpp/ext/filters/census/context.h#L44) to `include/grpcpp/opencensus.h`.
 
 
 ## Rationale
