@@ -195,13 +195,13 @@ will apply.
 * Search the RPC headers (metadata) for header(s) named `Cookie` and get the
 set of all the cookies present. If the set does not contain a cookie whose
 name matches the `name` configuration value of the filter, then pass the RPC
-through. If you find more than one cookie with that `name` then log a local
-warning and pass the RPC through. Otherwise get the value of that cookie and
-base64-decode the value to get the `override-host` for the RPC. This value
-should be a syntactically valid IP:port address: if not, then log a local
-warning and pass the RPC through. For a valid `override-host` value, set it
-in the RPC context as the value of `upstreamAddress` state variable which
-will be used in the response processing of that RPC.
+through. If you find more than one cookie with that `name`, then just pick the
+first cookie. Get the value of the cookie and base64-decode the value to get
+the `override-host` for the RPC. This value should be a syntactically valid
+IP:port address: if not, then log a local warning and pass the RPC through.
+For a valid `override-host` value, set it in the RPC context as the value of
+`upstreamAddress` state variable which will be used in the response processing
+of that RPC.
 
 * In case of a valid `override-host` value, pass this value as a
 "pick-argument" to the Load Balancer's pick method as described in [A31][].
