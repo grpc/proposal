@@ -166,7 +166,7 @@ package client
 
 // TransportBuilder constructs Transports connected to addresses.
 type TransportBuilder interface {
-	// Build begins connecting to the address.  It must return a Transport that
+	// Build connects to the address provided.  It must return a Transport that
 	// is ready to accept new streams or an error.
 	Build(context.Context, resolver.Address, TransportMonitor, TransportBuildOptions) (Transport, error)
 }
@@ -180,11 +180,6 @@ type TransportBuildOptions struct {
 
 // A TransportMonitor is a monitor for client-side transports.
 type TransportMonitor interface {
-	// Connected reports that the Transport is fully connected - i.e. the
-	// remote server has confirmed it is a gRPC server.
-	//
-	// May only be called once.
-	Connected()
 	// OnError reports that the Transport has closed due to the error provided.
 	// Existing streams may or may not continue.
 	//
@@ -192,10 +187,7 @@ type TransportMonitor interface {
 	OnError(error)
 }
 
-// A Transport is a client-side gRPC transport.  It begins in a
-// "half-connected" state where the client may opportunistically start new
-// streams by calling NewStream.  Some clients will wait until the
-// TransportMonitor's Connected method is called.
+// A Transport is a client-side gRPC transport.
 type Transport interface {
 	// NewStream begins a new Stream on the Transport.  Blocks until sufficient
 	// stream quota is available, if applicable.  If the Transport is closed,
