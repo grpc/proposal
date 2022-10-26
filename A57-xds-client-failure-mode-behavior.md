@@ -5,7 +5,7 @@ A57: XdsClient Failure Mode Behavior
 * Status: Draft
 * Implemented in: 
 * Last updated: 2022-10-26
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/rpAl1ZElzZQ
 
 ## Abstract
 
