@@ -38,7 +38,7 @@ cause gRPC to incorrectly fail data plane RPCs).
 This document describes exactly how the XdsClient should behave in the
 face of these failure modes.
 
-### Related Proposals: 
+### Related Proposals:
 * [A27: xDS-Based Global Load Balancing][A27]
 
 [A27]: A27-xds-global-load-balancing.md
@@ -136,15 +136,15 @@ period should start as soon as both of the following are true:
 In other words, if the XdsClient starts an ADS stream and sends the initial
 subscription message for a resource, but the channel is not yet reporting
 `READY`, it should not yet start the timer.  This will occur most frequently
-when the XdsClient first starts and the ADS stream cannot actually be sent
+when the XdsClient first starts and the xDS channel queues the ADS stream
 until the xDS channel becomes connected.  However, it can also occur if
-the channel was initially connected and then becomes disconnected (i.e.,
+the xDS channel was initially connected and then becomes disconnected (i.e.,
 the channel transitions from `READY` to `IDLE`, since it's using the
 `pick_first` LB policy).  In that case, the original ADS stream will fail,
 and XdsClient will start a new ADS stream and immediately send the
 subscription requests for the resources that it needs from this server,
-but because those requests will not actually go out on the wire until
-the channel reports `READY`, we don't want to start the timers for those
+but because those requests will actually be queued in the xDS channel until
+the xDS channel reports `READY`, we don't want to start the timers for those
 resources until that happens.
 
 Note that if the XdsClient does start the timers while the xDS channel
