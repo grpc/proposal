@@ -115,7 +115,7 @@ connectivity failure.
 
 As per the xDS spec, the SotW protocol variants do not provide any
 explicit mechanism for the server to indicate that that the client has
-subscribed a resource that does not exist.  Therefore, when the client
+subscribed to a resource that does not exist.  Therefore, when the client
 initially subscribes to a resource, the client is expected to assume that
 the resource does not exist if the server has not sent the resource within
 a [15-second
