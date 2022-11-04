@@ -1,11 +1,11 @@
-Title
+L104: C-core: Ban GRPC_OP_SEND_STATUS_FROM_SERVER in combination with recv ops
 ----
 * Author(s): ctiller
 * Approver: markdroth
 * Status: In Review
 * Implemented in: C Core
 * Last updated: 2022/11/03
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/MAxqC_LI5O8
 
 ## Abstract
 
