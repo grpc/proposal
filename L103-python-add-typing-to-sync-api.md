@@ -4,12 +4,12 @@ Add Typing to gRPC Python Sync API
 * Approver: gnossen
 * Status: Draft
 * Implemented in: Python
-* Last updated: 11/09/2022
+* Last updated: 11/10/2022
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
 
-Add type annotation to Python Sync API.
+Add type annotations to the remainder of the gRPC Python API.
 
 ## Background
 
@@ -19,26 +19,19 @@ This proposal plans to add type annotation to python Sync public APIs which allo
 
 
 ### Related Proposals: 
-* Loosely related: https://github.com/lidizheng/proposal/blob/grpc-python-async-api/L58-python-async-api.md#introduce-typing-to-generated-code
+* Loosely related to [Async API proposal](https://github.com/lidizheng/proposal/blob/grpc-python-async-api/L58-python-async-api.md#introduce-typing-to-generated-code).
   * The proposal includes the part to introduce typing to gRPC Python Async APIs.
 
 
 ## Proposal
 
-Add type annotation to the following Python APIs:
-* All APIs in `__init__.py` (the actuall list is too long, please refer to following PR for changes):
+Add type annotation to the following:
+* All public Python APIs listed in [`__all__` variable](https://github.com/grpc/grpc/blob/54dd7563c2d563bff74e4b558f2e985db4a01f2d/src/python/grpcio/grpc/__init__.py#L2100) (the actuall list is too long, please refer to the following PR for changes):
   * [PR link holder]
-* `grpc/src/python/grpcio/grpc/_runtime_protos.py`
-```python
-def protos(protobuf_path):  # pylint: disable=unused-argument
-  ...
-
-def services(protobuf_path):  # pylint: disable=unused-argument
-  ...
-
-def protos_and_services(protobuf_path):  # pylint: disable=unused-argument
-  ...
-```
+* gRPC Python generated Code.
+  * [PR Link holder]
+* Python ancillary packages.
+  * [PR link holder]
 
 ## Rationale
 
@@ -70,9 +63,11 @@ def __call__(self,
 
 ## Implementation
 
-1. Add typing to internal APIs.
-2. Add typing to public API and test though pre-release.
-3. Add typing to public APIs.
+* Add typing to internal APIs.
+  * [PR1: Add typing for some internal python files.](https://github.com/grpc/grpc/pull/31514)
+* Add typing to public API and test though pre-release.
+  * [PR link holder]
+* Release typed public APIs.
 
 ## Open issues (if applicable)
 
