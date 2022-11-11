@@ -2,7 +2,7 @@ G2: gRPC over HTTP/3
 ----
 * Author(s): [James Newton-King](https://github.com/jamesnk)
 * Approver: ejona86
-* Status: In review
+* Status: Implemented
 * Implemented in: grpc-dotnet
 * Last updated: 2021-08-25
 * Discussion at: https://groups.google.com/g/grpc-io/c/b1dWReBGyX4
