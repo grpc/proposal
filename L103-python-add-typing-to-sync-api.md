@@ -30,8 +30,14 @@ Add type annotation to the following:
   * [PR link holder]
 * gRPC Python generated Code.
   * [PR Link holder]
-* Python ancillary packages.
-  * [PR link holder]
+* Python ancillary packages, including:
+  * grpcio-admin
+  * grpcio-channelz
+  * grpcio-csds
+  * grpcio-health-checking
+  * grpcio-reflection
+  * grpcio-status
+  * grpcio-testing
 
 ## Rationale
 
@@ -65,7 +71,7 @@ def __call__(self,
 
 * Add typing to internal APIs.
   * [PR1: Add typing for some internal python files.](https://github.com/grpc/grpc/pull/31514)
-* Add typing to public API and test though pre-release.
+* Add typing to public API and mark it as experimental for at least one release.
   * [PR link holder]
 * Release typed public APIs.
 
