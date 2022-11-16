@@ -4,7 +4,7 @@ L103: C-core: Move function declarations for each credential type from `grpc/grp
 * Approver: [@markdroth](https://github.com/markdroth)
 * Status: Ready for Implementation
 * Implemented in: C Core
-* Last updated: 11/16/2022
+* Last updated: 2022-11-16
 * Discussion at: https://groups.google.com/g/grpc-io/c/6qvo-UVs-uI
 
 ## Abstract
@@ -21,13 +21,13 @@ However, the issue https://github.com/grpc/grpc/issues/31012 points out the fact
 
 Move function declarations for each credential type from `grpc/grpc_security.h` to its own header file. The following is the list of mapping.
 
-* google_default_credentials: grpc/credentials/google_default.h
-* ssl_credentials: grpc/credentials/ssl.h
-* alts_credentials: grpc/credentials/alts.h
-* local_credentials: grpc/credentials/local.h
-* tls_credentials: grpc/credentials/tls.h
-* insecure_credentials: grpc/credentials/insecure.h
-* xds_credentials: grpc/credentials/xds.h
+* google_default_credentials: grpc/channel_credentials/google_default.h
+* ssl_credentials: grpc/channel_credentials/ssl.h
+* alts_credentials: grpc/channel_credentials/alts.h
+* local_credentials: grpc/channel_credentials/local.h
+* tls_credentials: grpc/channel_credentials/tls.h
+* insecure_credentials: grpc/channel_credentials/insecure.h
+* xds_credentials: grpc/channel_credentials/xds.h
 
 ## Rationale
 
