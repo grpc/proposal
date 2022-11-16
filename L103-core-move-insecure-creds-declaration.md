@@ -1,15 +1,15 @@
-L103: C-core: Move function declarations for insecure credentials from `grpc/grpc_security.h`
+L103: C-core: Move function declarations for each credential type from `grpc/grpc_security.h` to its own header file
 ----
 * Author(s): [Cheng-Yu Chung (@ralphchung)](https://github.com/ralphchung)
 * Approver: [@markdroth](https://github.com/markdroth)
 * Status: Ready for Implementation
 * Implemented in: C Core
-* Last updated: 09/28/2022
+* Last updated: 11/16/2022
 * Discussion at: https://groups.google.com/g/grpc-io/c/6qvo-UVs-uI
 
 ## Abstract
 
-Move function declarations for insecure credentials from `grpc/grpc_security.h` to a new header file `grpc/grpc_insecure_credentials.h`.
+Move function declarations for each credential type from `grpc/grpc_security.h` to its own header file.
 
 ## Background
 
@@ -19,17 +19,25 @@ However, the issue https://github.com/grpc/grpc/issues/31012 points out the fact
 
 ## Proposal
 
-Move function declarations for insecure credentials from `grpc/grpc_security.h` to a new header file `grpc/grpc_insecure_credentials.h`.
+Move function declarations for each credential type from `grpc/grpc_security.h` to its own header file. The following is the list of mapping.
+
+* google_default_credentials: grpc/credentials/google_default.h
+* ssl_credentials: grpc/credentials/ssl.h
+* alts_credentials: grpc/credentials/alts.h
+* local_credentials: grpc/credentials/local.h
+* tls_credentials: grpc/credentials/tls.h
+* insecure_credentials: grpc/credentials/insecure.h
+* xds_credentials: grpc/credentials/xds.h
 
 ## Rationale
 
-Moving function declarations to `grpc/grpc.h` seems to be convenient but not right. Moving them to a new file `grpc/grpc_insecure_credentials.h` makes more sense and is aligned with our goal to move every credential type to its own target.
+Moving function declarations to `grpc/grpc.h` seems to be convenient but not right. Moving them to their own files makes more sense because our goal is to make every credential type have its own target.
 
-Note that we do not plan to reserve backward compatibility by including `grpc/grpc_insecure_credentials.h` in `grpc/grpc_security.h` since we do not promise backward compatibility for C-core API.
+Note that we do not plan to reserve backward compatibility by including `grpc/credentials/*.h` in `grpc/grpc_security.h` since we do not promise backward compatibility for C-core API.
 
 ## Implementation
 
-Move function declarations for insecure credentials from `grpc/grpc_security.h` to a new header file `grpc/grpc_insecure_credentials.h`.
+Move function declarations for each credential type from `grpc/grpc_security.h` to its own header file as indicated in the "Proposal" section.
 
 ## Open issues (if applicable)
 
