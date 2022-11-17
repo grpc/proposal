@@ -299,7 +299,7 @@ In the first case, in which the RPC fails at the load balancing step, the approp
 
 In the second case, in which load balancing succeeds but the RPC never leaves the client, the client library can transparently retry until a success occurs, or the RPC's deadline passes.
 
-If the RPC reaches the gRPC server library, but has never been seen by the server application logic (the third case), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy. This extra caution is needed because this case involves extra load on the wire. The client knows it is in this case if the stream ends with an `RST_STREAM` frame with the error code `REFUSED_STREAM` or if the HTTP/2 connection closes with a `GOAWAY` frame with the last stream identifier less than the stream's ID.
+If the RPC reaches the gRPC server library, but has never been seen by the server application logic (the third case), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy. This extra caution is needed because this case involves extra load on the wire. In the gRPC HTTP/2 transport, the client library knows it is in this case if the stream ends with an `RST_STREAM` frame with the error code `REFUSED_STREAM` or if the HTTP/2 connection closes with a `GOAWAY` frame with the last stream identifier less than the stream's ID.
 
 Since retry throttling is designed to prevent server application overload, and these transparent retries do not make it to the server application layer, they do not count as failures when deciding whether to throttle retry attempts.
 
