@@ -33,7 +33,7 @@ Move function declarations for each credential type from `grpc/grpc_security.h` 
 
 Moving function declarations to `grpc/grpc.h` seems to be convenient but not right. Moving them to their own files makes more sense because our goal is to make every credential type have its own target.
 
-Note that we do not plan to reserve backward compatibility by including `grpc/credentials/*.h` in `grpc/grpc_security.h` since we do not promise backward compatibility for C-core API.
+Note that we do not plan to reserve backward compatibility by including `grpc/channel_credentials/*.h` in `grpc/grpc_security.h` since we do not promise backward compatibility for C-core API.
 
 ## Implementation
 
