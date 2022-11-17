@@ -157,7 +157,11 @@ of its values.  gRPC will support the
 [`minimum_ring_size`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L397)
 and
 [`maximum_ring_size`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L406)
-fields the same way that Envoy does.  The
+fields.  Note that gRPC has different restrictions on ring size than
+Envoy does and a different default for the max ring size (see below for
+details), so to ensure correct xDS defaults, the xDS code must explicitly
+set this field in the gRPC LB policy config even if the field is unset
+in the xDS resource (and therefore the default xDS value is used).  The
 [`hash_function`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L401)
 field will be required to be set to `XX_HASH`; if it is set to any other
 value (at present, the only other value is `MURMUR_HASH_2`), gRPC will
@@ -361,13 +365,35 @@ The `ring_hash_experimental` policy will have the following config:
 
 ```
 message RingHashLoadBalancingConfig {
+  // A client-side option will cap these values to 4096.  If either of these
+  // values are greater than the client-side cap, they will be treated
+  // as the client-side cap value.
   uint64 min_ring_size = 1;  // Optional, defaults to 1024.
-  uint64 max_ring_size = 2;  // Optional, defaults to 8M.
+  uint64 max_ring_size = 2;  // Optional, defaults to 4096, max is 8M.
 }
 ```
 
 These parameters are used to determine how the ring is constructed, just
-as they are in the Envoy implementation.
+as they are in the Envoy implementation.  However, in order to limit the
+possibility of a control plane causing a client to OOM by creating a lot
+of large rings, we want to limit the ring size to a much smaller value
+than Envoy does.  The `max_ring_size` field will default to 4096 instead
+of 8M as in Envoy, although it will still accept values up to 8M for
+compatibility with Envoy.  In addition, the client will have a local
+option (either per-channel or global) to set a cap for the ring size,
+which will also default to 4096; if either the `min_ring_size` or
+`max_ring_size` values in the LB policy config are greater than the
+locally configured cap, they will be treated as the locally configured
+cap.  The resulting behavior will be:
+- When used via xDS, `max_ring_size` will get the xDS default of 8M, but
+  will be capped by the locally configured cap of 4096.  So if an
+  xDS-enabled client needs a larger ring size, they can just change the
+  locally configured cap without needing to modify the xDS config.
+- In the future, when we can use the `ring_hash` policy without xDS, the
+  default for `max_ring_size` will be 4096, the same as the locally
+  configured cap.  So if a client needs a larger ring size, they will
+  need to increase both the locally configured cap and the value of
+  `max_ring_size` in the config.
 
 The hash function will be `XX_HASH`, as defined in
 https://github.com/Cyan4973/xxHash in the `XXH64()` function with seed 0.
