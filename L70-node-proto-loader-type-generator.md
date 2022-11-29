@@ -80,6 +80,10 @@ The options will correspond directly to the `protoLoader.load` options as follow
 
 The output will be one file for each `message` and `enum` loaded, with file paths based on the package and type names, plus a master file per input file that combines all of those to produce the type that the user will load, as described above. `ProtoGrpcType` types from different files can be intersected to get the type that results from loading those files together at runtime. Messages will have an additional type generated, suffixed with `__Output`, that describes the type of objects that will be output by gRPC, i.e. response messages on the client, and request messages on the server. These "output" message types will be subtypes of the main message type, restricted based on the options that are set.
 
+The following options can be used to override the default naming patterns for gRPC messages:
+ - `--outputTemplate`: The naming template for gRPC messages output from the client. (default: `%s__Output`)
+ - `--inputTemplate`: The naming template for the more permissive input messages. (default: `%s` (no change))
+
 To support this generated code, `@grpc/proto-loader` will need to re-export the `Long` type from `protobufjs`, because that is a type that can be used by generated message types.
 
 ### Example Generated Code
