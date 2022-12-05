@@ -84,6 +84,10 @@ The following options can be used to override the default naming patterns for gR
  - `--outputTemplate`: The naming template for gRPC messages output from the client. (default: `%s__Output`)
  - `--inputTemplate`: The naming template for the more permissive input messages. (default: `%s` (no change))
 
+The following options can be used to support nominal typing. If enabled, a special compile-time only property (i.e., type brand) representing their type will be outputted for each message:
+ - `--outputBranded`: Enable type branding for gRPC messages output from the client. (default: false)
+ - `--inputBranded`: Enable type branding for the more permissive input messages. (default: false)
+
 To support this generated code, `@grpc/proto-loader` will need to re-export the `Long` type from `protobufjs`, because that is a type that can be used by generated message types.
 
 ### Example Generated Code
