@@ -265,7 +265,7 @@ This algorithm will be run in two events:
 
 The algorithm will be as follows (Python-style pseudo-code):
 
-```
+```python
 def SetCurrentPriority(self, priority, deactivate_lower_priorities):
   # Deactivate lower priorities if needed.
   if deactivate_lower_priorities:
