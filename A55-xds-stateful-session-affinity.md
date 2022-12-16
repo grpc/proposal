@@ -103,21 +103,25 @@ A sample configuration is as follows:
 }
 ```
 
-The XdsClient will NACK if the `typed_config` inside the `session_state`
-struct is not the value
+The fields and their validation are described below. In case of
+failed validation, the config will be NACKed.
+
+The `typed_config` inside the `session_state` struct has to be the value
 `type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState`.
 
-`name` is the name of the cookie used in this feature.
+`name` is the name of the cookie used in this feature. This must not be
+empty.
 
-`path` is the path for which this cookie is applied. **Note:** Stateful
-session affinity will not work if the cookie's path does not match the
-request's path. For example, if a given route matches requests with path
-`/service/foo` but the corresponding per-route filter config specifies a
-cookie path of `/service/bar`, then the cookie will never be set.
+`path` is the path for which this cookie is applied. This is optional and
+if not present, then the default is root i.e. `/` in which case all paths are
+considered. **Note:** Stateful session affinity will not work if the cookie's
+path does not match the request's path. For example, if a given route matches
+requests with path `/service/foo` but the corresponding per-route filter config
+specifies a cookie path of `/service/bar`, then the cookie will never be set.
 
-`ttl` is the time-to-live for the cookie. It is set on the cookie but will
-not be enforced by gRPC. If the `ttl` value is negative the config will be
-NACKed.
+`ttl` is the time-to-live for the cookie. It is set on the cookie, but will
+not be enforced by gRPC. `ttl` is optional and if present has to be non-negative.
+If not present, the default is 0.
 
 This new filter will be added to the HTTP Filter Registry and processed as
 described in [A39: xDS HTTP Filter Support][A39]. Specifically when this filter
