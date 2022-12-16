@@ -458,8 +458,6 @@ environment variable protection will be removed once the feature has
 proven stable. The environment variable protection will specifically apply
 to the following:
 
-* creation of `xds_override_host_experimental` LB policy
-
 * processing of the cookie based stateful session extension http_filter.
   Note: `XdsClient` will only accept the filter when the environment variable
   is set, otherwise it will respond as it responds today.
