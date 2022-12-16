@@ -166,16 +166,6 @@ The `override_host_status` value will be included in both the config of the
 `xds_override_host_experimental` policy and in the `DiscoveryMessage` inner
 message of the config of the `xds_cluster_resolver_experimental` policy.
 
-Also note that [common_lb_config][] field is incompatible with the new
-[load_balancing_policy][] field used for custom LB policies (see
-[A52: gRPC xDS Custom Load Balancer Configuration][grfc_a52]) which means
-custom LB policies and stateful session affinity features will be incompatible
-with each other. This will need to be fixed eventually to be able to use these
-two features together. Until that happens, we assume the default value
-for the [`common_lb_config.override_host_status`][or-host-status] field
-when one is using the new [load_balancing_policy][] field so the user is still
-able to use the feature.
-
 ### `CookieBasedStatefulSessionFilter` Processing
 
 A channel configured for stateful session affinity will have the
