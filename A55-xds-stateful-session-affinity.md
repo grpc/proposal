@@ -103,6 +103,10 @@ A sample configuration is as follows:
 }
 ```
 
+The XdsClient will NACK if the `typed_config` inside the `session_state`
+struct is not the value
+`type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState`.
+
 `name` is the name of the cookie used in this feature.
 
 `path` is the path for which this cookie is applied. **Note:** Stateful
@@ -112,7 +116,8 @@ request's path. For example, if a given route matches requests with path
 cookie path of `/service/bar`, then the cookie will never be set.
 
 `ttl` is the time-to-live for the cookie. It is set on the cookie but will
-not be enforced by gRPC.
+not be enforced by gRPC. If the `ttl` value is negative the config will be
+NACKed.
 
 This new filter will be added to the HTTP Filter Registry and processed as
 described in [A39: xDS HTTP Filter Support][A39]. Specifically when this filter
@@ -460,6 +465,8 @@ to the following:
   is set, otherwise it will respond as it responds today.
 
 * processing of `common_lb_config.override_host_status` in the CDS update
+
+* inclusion of `DRAINING` state endpoints in `EdsUpdate` to watchers
 
 If the environment variable is unset or not true, none of the above will be
 enabled.
