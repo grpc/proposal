@@ -265,12 +265,13 @@ follows:
 
 * maintain a map - let's call it `address_map`. The key is (IP:port)
   and the value is the tuple
-  `[subchannel, EDS health-status, list of other equivalent addresses]`.
+  `[subchannel, connectivity-state, EDS health-status, list of other equivalent addresses]`.
   When a host (endpoint) has multiple addresses (e.g. IPv6 vs IPv4 or due to
   multiple network interfaces) they are said to be equivalent addresses.
   Whenever we get an updated list of addresses from the resolver, we create an
   entry in the map for each address, and populate the list of equivalent
-  addresses and EDS health-status. The subchannel is based on subchannel
+  addresses and EDS health-status. The subchannel is wrapped and is
+  updated, also the `connectivity-state`, based on subchannel
   creation/destruction or connection/disconnection from the child policy. The
   equivalent address list computation on each resolver update is performed as
   shown in the following pseudo-code:
@@ -306,7 +307,7 @@ for address, entry in lb_policy.address_map:
   routing an RPC - see below), update the entry in `address_map` (for
   the subchannel address i.e. the peer address as the key) with the new
   subchannel value updated in the tuple
-  `[subchannel, health-status, equivalent addresses]`.
+  `[subchannel, connectivity-state, EDS health-status, list of other equivalent addresses]`.
 
     * in Java and Go, we may have to wait for subchannel to be `READY` in order
       to know which specific address the subchannel is connected to before we
@@ -321,11 +322,16 @@ for address, entry in lb_policy.address_map:
 * whenever a subchannel is shut down, remove the associated entries from
   `address_map`.
 
-    * this can be achieved by wrapping a subchannel to intercept subchannel
+    * this is achieved by wrapping a subchannel to intercept subchannel
       shutdown and the wrapper is returned by `createSubchannel`.
 
 * the policy's subchannel picker pseudo-code is as follows. `policy_config`
   is the `OverrideHostLoadBalancingPolicyConfig` object for this policy.
+
+Note: there needs to be synchronization between map update described above
+and the following picker logic. Ideally this would be a global [MRSW][] lock
+where the update code holds the lock for Write and a picker holds the lock
+for Read while scanning the map.
 
 ```
 if override_host is set in pick arguments:
@@ -523,3 +529,4 @@ and uses that cookie in subsequent requests.
 [grfc_a52]: https://github.com/grpc/proposal/blob/master/A52-xds-custom-lb-policies.md
 [eds-health-status]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/health_check.proto#envoy-v3-api-enum-config-core-v3-healthstatus
 [A44]: https://github.com/grpc/proposal/blob/master/A44-xds-retry.md
+[MRSW]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock
