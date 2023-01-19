@@ -123,9 +123,9 @@ message LoadBalancingConfig {
 This load balancer will be responsible for generating the configuration of its child policy, `weighted_target_experimental`. To do this, two sources of information will be combined:
 
 - The newly defined xDS WRR Locality configuration with the child policy config
-- Locality weights from a new resolved address attribute
-  - Passed in similar manner as the xDS client
+- Locality weight from a new address attribute
   - Populated by the `xds_cluster_resolver` policy
+  - Added for each address, just like the locality attribute today
 
 These two elements will be combined to create the `weighted_target_experimental` configuration with a weighted policy selection for each locale. The format of this configuration will not change, allowing the `weighted_target_experimental` policy to remain unchanged.
 
@@ -150,7 +150,9 @@ message XdsClusterResolverLoadBalancingPolicyConfig {
 }
 ```
 
-To provide the `xds_wrr_locality` load balancer information about locality weights received from EDS, the cluster resolver will populate a new attribute in the resolved addresses. The new attribute will contain a map from a locality struct to a locality weight integer. Note that a change in this attribute would still allow associated subchannels to be reused - it will not affect their uniqueness.
+To provide the `xds_wrr_locality` load balancer information about locality weights received from EDS, the cluster resolver will populate a new locality weight attribute for each address. The attribute will have the weight (as an integer) of the locality the address is part of. This alongside the already existing locality attribute will be used to generate the `weighted_target` configuration by `xds_wrr_locality`. Note that a change in this attribute would still allow associated subchannels to be reused - it will not affect their uniqueness.
+
+Since an xDS configuration can place a given locality under multiple priorities, it is possible to see locality weight attributes with different values for the same locality. We do not support this kind of an edge case and just use the weight in the first attribute we encounter. A warning should be logged about any locality weights being discarded.
 
 ### Configuration Example
 
@@ -280,11 +282,18 @@ The priority config will contain the config for `xds_cluster_impl` that then has
 
 #### 4. `wrr_locality` combines the priority child config with locality weights to generate `weighted_target` configuration.
 
-Given the following locality weight attribute map:
+Given the following locality and locality weight attributes for two addresses in two different localities:
 
-```json
-"Locality A": 1
-"Locality B": 2
+Address 1
+```
+"io.grpc.xds.InternalXdsAttributes.locality" = {region="region_a", zone="zone_a", subZone="subZone_a"}
+"io.grpc.xds.InternalXdsAttributes.localityWeight" = 1
+```
+
+Address 2
+```
+"io.grpc.xds.InternalXdsAttributes.locality" = {region="region_b", zone="zone_b", subZone="subZone_b"}
+"io.grpc.xds.InternalXdsAttributes.localityWeight" = 2
 ```
 
 The `weighted_target` configuration will be:
@@ -292,7 +301,7 @@ The `weighted_target` configuration will be:
 ```json
 {
   "targets": {
-    "Locality A" : {
+    "Locality{region=region_a,zone=zone_a,subZone=subZone_a}" : {
       "weight": 1
       "child_policy": [
         {
@@ -302,7 +311,7 @@ The `weighted_target` configuration will be:
         },
       ]
     }
-    "Locality B" : {
+    "Locality{region=region_b,zone=zone_b,subZone=subZone_b}" : {
       "weight": 2
       "child_policy": [
         {
