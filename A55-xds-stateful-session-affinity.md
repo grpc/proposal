@@ -127,7 +127,7 @@ This new filter will be added to the HTTP Filter Registry and processed as
 described in [A39: xDS HTTP Filter Support][A39]. Specifically when this filter
 is present in the configuration, gRPC will create the appropriate client filter
 (aka interceptor in Java/Go) and install it in the channel to process data
-plane RPCs. We call this filter `CookieBasedStatefulSessionFilter`. It will
+plane RPCs. We call this filter `StatefulSessionFilter`. It will
 copy the 3 configuration values - `name`, `ttl`  and `path` -  into the filter
 object. Validation and processing are further described in
 [Stateful session][stateful-session].
@@ -143,7 +143,7 @@ virtual host or route through a merged configuration as described in
 [A39 Filter Config Overrides][filter_config_override].
 
 The filter is described in more detail in the section
-[`CookieBasedStatefulSessionFilter` Processing][filter-section].
+[`StatefulSessionFilter` Processing][filter-section].
 
 ### Load Balancer Configuration Containing `override_host_status`
 
@@ -166,16 +166,16 @@ The `override_host_status` value will be included in both the config of the
 `xds_override_host_experimental` policy and in the `DiscoveryMessage` inner
 message of the config of the `xds_cluster_resolver_experimental` policy.
 
-### `CookieBasedStatefulSessionFilter` Processing
+### `StatefulSessionFilter` Processing
 
 A channel configured for stateful session affinity will have the
-`CookieBasedStatefulSessionFilter` installed (interceptor in Java/Go).
+`StatefulSessionFilter` installed (interceptor in Java/Go).
 This filter will process incoming RPCs and set an appropriate LB pick value
 which will be passed to the Load Balancing Policy's Pick method.
 
 When an RPC arrives on a configured channel, the Config Selector processes it
 as described in [A31: gRPC xDS Config Selector Design][A31]. This includes the
-`CookieBasedStatefulSessionFilter` which is installed as one of the filters in
+`StatefulSessionFilter` which is installed as one of the filters in
 the channel. Note that the filter maintains a context for an RPC and processes
 both the outgoing request and incoming response of the RPC within that context.
 Also note that the filter is initialized with 3 configuration values - `name`,
@@ -235,7 +235,7 @@ For example,
 
 ### LB Policy for Stateful Session Affinity
 
-After the `CookieBasedStatefulSessionFilter` has passed the `override-host`
+After the `StatefulSessionFilter` has passed the `override-host`
 value to the Load Balancer as a "pick-argument", the Load Balancer uses
 this value to route the RPC appropriately. The required logic will be
 implemented in a new and separate LB policy at an appropriate place in the
@@ -453,7 +453,7 @@ configured, all retry attempts will be routed to the same endpoint.
 ### Temporary environment variable protection
 
 During initial development, this feature will be enabled by the
-`GRPC_EXPERIMENTAL_XDS_ENABLE_HOST_OVERRIDE` environment variable. This
+`GRPC_EXPERIMENTAL_XDS_ENABLE_OVERRIDE_HOST` environment variable. This
 environment variable protection will be removed once the feature has
 proven stable. The environment variable protection will specifically apply
 to the following:
@@ -509,7 +509,7 @@ and uses that cookie in subsequent requests.
 [stateful-session]: https://www.envoyproxy.io/docs/envoy/v1.22.0/configuration/http/http_filters/stateful_session_filter#config-http-filters-stateful-session
 [stateful-session-per-route]: https://www.envoyproxy.io/docs/envoy/v1.22.0/api-v3/extensions/filters/http/stateful_session/v3/stateful_session.proto#extensions-filters-http-stateful-session-v3-statefulsessionperroute
 [or-host-status]: https://github.com/envoyproxy/envoy/blob/15d8b93608bc5e28569f8b042ae666a5b09b87e9/api/envoy/config/cluster/v3/cluster.proto#L615
-[filter-section]: #cookiebasedstatefulsessionfilter-processing
+[filter-section]: #statefulsessionfilter-processing
 [rfc-6265]: https://www.rfc-editor.org/rfc/rfc6265.html
 [grpc-client-arch]: https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md#grpc-client-architecture
 [filter_config_override]: https://github.com/grpc/proposal/blob/master/A39-xds-http-filters.md#filter-config-overrides
