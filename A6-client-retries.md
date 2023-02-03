@@ -3,8 +3,8 @@ gRPC Retry Design
 * Author(s): [Noah Eisen](https://github.com/ncteisen) and [Eric Gribkoff](https://github.com/ericgribkoff)
 * Approver: a11r
 * Status: Implemented
-* Implemented in: Java, .NET, Go except hedging, and C-Core except hedging
-* Last updated: 2022-02-14
+* Implemented in: Java, .NET, Node, Go except hedging, and C-Core except hedging
+* Last updated: 2022-11-17
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/zzHIICbwTZE
 
 Table of Contents
@@ -154,8 +154,6 @@ If all instances of a hedged RPC fail, there are no additional retry attempts. E
 
 If server pushback that specifies not to retry is received in response to a hedged request, no further hedged requests should be issued for the call.
 
-Hedged requests should be sent to distinct backends, if possible. To facilitate this, the gRPC client will maintain a list of previously used backend addresses for each hedged RPC. This list will be passed to the gRPC client's local load-balancing policy. The load balancing policy may use this information to send the hedged request to an address that was not previously used. If all available backend addresses have already been used, the load-balancing policy's response is implementation-dependent.
-
 ##### Validation of hedgingPolicy
 
 If `hedgingPolicy` is specified in a service config choice, the following validation rules apply:
@@ -266,7 +264,7 @@ To clarify the second scenario, we define an *outgoing message* as everything th
 
 #### Memory Management (Buffering)
 
-The gRPC client library will support application-configured limits for the amount of memory used for retries. It is suggested that the client sets `retry_buffer_size_in_bytes` to limit the total amount of memory used to buffer retryable or hedged RPCs. The client should also set `per_rpc_buffer_limit_in_bytes` to limit the amount of memory used by any one RPC (to prevent a single large RPC from using the whole buffer and preventing retries of subsequent smaller RPCs). These limits are configured by the client, rather than coming from the service config.
+The gRPC client library will support application-configured limits for the amount of memory used for retries, and these configuration options may include limits on per-channel memory usage and per-RPC memory usage. These limits are configured by the client, rather than coming from the service config.
 
 RPCs may only be retried when they are contained in the buffer. New RPCs which do not fit in the available buffer space (either due to the total available buffer space, or due to the per-RPC limit) will not be retryable, but the original RPC will still be sent.
 
@@ -284,21 +282,24 @@ When an RPC is evicted from the buffer, pending hedged requests should be cancel
 
 #### Transparent Retries
 
-RPC failures can occur in three distinct ways:
+RPC failures can occur in four distinct ways:
 
-1. The RPC never leaves the client.
-2. The RPC reaches the server, but has never been seen by the server application logic.
-3. The RPC is seen by the server application logic, and fails.
+1. The RPC fails at the client-side load balancing step.
+2. Load balancing succeeds but the RPC never leaves the client.
+3. The RPC reaches the server, but has never been seen by the server application logic.
+4. The RPC is seen by the server application logic, and fails.
 
 ![Where RPCs Fail](A6_graphics/WhereRPCsFail.png)
 
 [Link to SVG file](A6_graphics/WhereRPCsFail.svg)
 
-The last case is handled by the configurable retry policy that is the main focus of this document. The first two cases are retried automatically by the gRPC client library, **regardless** of the retry configuration set by the service owner. We are able to do this because these request have not made it to the server application logic, and thus are always safe to retry.
+The last case is handled by the configurable retry policy that is the main focus of this document. The second and third cases are retried automatically by the gRPC client library, **regardless** of the retry configuration set by the service owner. We are able to do this because these request have not made it to the server application logic, and thus are always safe to retry.
 
-In the first case, in which the RPC never leaves the client, the client library can transparently retry until a success occurs, or the RPC's deadline passes.
+In the first case, in which the RPC fails at the load balancing step, the appropriate action depends on what pick result type caused that failure. If the pick result type was `DROP`, the RPC will fail immediately, without any retries. If the pick result type was `TRANSIENT_FAILURE`, the RPC will be handled by the configured retry policy.
 
-If the RPC reaches the gRPC server library, but has never been seen by the server application logic (the second case), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy. This extra caution is needed because this case involves extra load on the wire.
+In the second case, in which load balancing succeeds but the RPC never leaves the client, the client library can transparently retry until a success occurs, or the RPC's deadline passes.
+
+If the RPC reaches the gRPC server library, but has never been seen by the server application logic (the third case), the client library will immediately retry it once. If this fails, then the RPC will be handled by the configured retry policy. This extra caution is needed because this case involves extra load on the wire. In the gRPC HTTP/2 transport, the client library knows it is in this case if the stream ends with an `RST_STREAM` frame with the error code `REFUSED_STREAM` or if the HTTP/2 connection closes with a `GOAWAY` frame with the last stream identifier less than the stream's ID.
 
 Since retry throttling is designed to prevent server application overload, and these transparent retries do not make it to the server application layer, they do not count as failures when deciding whether to throttle retry attempts.
 
@@ -310,9 +311,7 @@ Similarly, transparent retries do not count toward the limit of configured RPC a
 
 #### Exposed Retry Metadata
 
-Both client and server application logic will have access to data about retries via gRPC metadata. Upon seeing an RPC from the client, the server will know if it was a retry, and moreover, it will know the number of previously made attempts. Likewise, the client will receive the number of retry attempts made when receiving the results of an RPC.
-
-The header name for exposing the metadata will be `"grpc-previous-rpc-attempts"` to give clients and servers access to the attempt count. This value represents the number of preceding retry attempts. Thus, it will not be present on the first RPC, will be 1 for the second RPC, and so on. The value for this field will be an integer.
+In order to make data about retries available to the server application logic, the client library will set the outgoing initial metadata entry `"grpc-previous-rpc-attempts"` with a value equal to the number of preceding retry atttempts. Thus, it will not be present on the first RPC, will be 1 for the second RPC, and so on. The value for this field will be an integer. The client library may also set this entry in the received initial metadata that it provides to the client application.
 
 #### Disabling Retries
 
