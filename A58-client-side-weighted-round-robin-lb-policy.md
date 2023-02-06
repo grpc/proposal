@@ -70,7 +70,7 @@ message WeightedRoundRobinLbConfig {
 
 ### Earliest Deadline First (EDF) Scheduler
 
-`weighted_round_robin` introduces a scheduler that manages weighted subchannel selection. A new scheduler will be created periodically to take new weight information into account. A state object is passed when created so that the scheduler can start where it last left across multiple instances. The scheduler must be light and cheap to create and allow concurrent pick calls. The scheduler returns the index in the input weight array and the caller has to map the index to a subchannel.
+`weighted_round_robin` introduces a scheduler that manages weighted subchannel selection. A new scheduler will be created periodically to take new weight information into account. A state object is passed when created so that the scheduler can start where it last left across multiple instances. The scheduler must be light and cheap to create and allow concurrent pick calls. The scheduler returns the index in the input weight array and the caller has to map the index to a subchannel. The scheduler's state is stored in the LB policy and not the picker, and is atomically updated at the end of each pick by the scheduler.
 
 The scheduler implements the [earliest deadline first][EDF] (EDF) scheduling. In its implementation, each subchannel is treated as a job whose deadline is inversely proportional to its weight. To avoid synchronization, each subchannel is given a random credit in the range [0, deadline] when first inserted. The subchannel with the next earliest deadline is selected each time and then inserted back with its deadline.
 
