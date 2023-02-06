@@ -153,30 +153,21 @@ function GetWeight() {
 
 `weighted_round_robin` defaults to per-call load reporting. The client does nothing when the per-call load report is expected but missing in the trailing metadata of the response. While `enable_oob_load_report` is set, per-call load reports are never parsed on the client side. The client does nothing when the per-call load report is present in the response when not expected.
 
-#### C/C++
-Processing per-call load reports is supported with `SubchannelCallTrackerInterface`. `weighted_round_robin` implements this interface and attaches it to a subchannel `PickResult`. Later Finish() is called back with the load metrics and updates the weight.
+In C/C++, processing per-call load reports is supported with `SubchannelCallTrackerInterface`. `weighted_round_robin` implements this interface and attaches it to a subchannel `PickResult`. Later Finish() is called back with the load metrics and updates the weight.
 
-#### Java
-`OrcaPerRequestUtil.OrcaReportingTracerFactory` is available in `io.grpc.xds.orca` to process per-call backend load reports in `ClusterImplLoadBalancer`. This needs to be moved to a new package and shared with `weighted_round_robin`. Then the picker attaches this tracer to the subchannel selection and the listener takes the reference to the subchannel to which it updates the weight to in `onLoadReport()`.
+In Java, `OrcaPerRequestUtil.OrcaReportingTracerFactory` is available in `io.grpc.xds.orca` to process per-call backend load reports.
 
-#### Go
-Picker selection result `PickResult` has an optional callback `Done()` that is passed with the backend load metrics parsed from the response if available. With `weighted_round_robin`, the picker only sets Done() in `PickResult` when per-call load reporting is enabled, and the callback updates the weight.
+In Go, picker selection result `PickResult` has an optional callback `Done()` that is passed with the backend load metrics parsed from the response if available where `weighted_round_robin` can process per-call load reports.
 
 ### OOB Load Reporting
 
 When OOB reporting is enabled, the LB policy gets data via an OOB watch on each subchannel with the requested reporting interval set to the value of the `oob_reporting_period` LB config field. The watcher is started whenever the `enable_oob_load_report` LB config field becomes true and stopped whenever it becomes false, and it is restarted whenever the value of the `oob_reporting_period` field changes. (In C++, these changes happen automatically, because we create a new subchannel for each resolver update, and we create a new OOB watcher if appropriate for each new subchannel object.)
 
-#### C/C++
+In C/C++,  processing OOB load reports is supported with `OobBackendMetricWatcher`. `weighted_round_robin` implements this interface. The watcher takes the reference of the subchannel weight object and update weights to it.
 
-Processing OOB load reports is supported with `OobBackendMetricWatcher`. `weighted_round_robin` implements this interface. The watcher takes the reference of the subchannel weight object and update weights to it.
+In Java, `OrcaOobUtil` is available in `io.grpc.xds.orca` for OOB load reports but a new API is needed to set and unset the listener in `OrcaOobUtil` to toggle the OOB load report processing.
 
-#### Java
-
-`OrcaOobUtil` is available in `io.grpc.xds.orca` but currently not in use. This needs to be moved to a new package and shared with `weighted_round_robin`, which implements `ForwardingLoadBalancerHelper` that takes the helper from `OrcaOobUtil`. The listener takes the reference to the subchannel to which it updates the weight to in `onLoadReport()`. A new API is needed to set and unset the listener in `OrcaOobUtil` to toggle the OOB load report processing.
-
-#### Go
-
-`orca.OOBListener` is available for OOB load reporting. `weighted_round_robin` extends it and attach it to the subchannel to which it updates the weight in `onLoadReport()`. A new API is needed to support enabling and disabling OOB load reporting.
+In Go, `orca.OOBListener` is available for OOB load reporting but a new API is needed to support enabling and disabling OOB load reporting.
 
 
 ### xDS Integration
