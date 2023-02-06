@@ -1,10 +1,10 @@
 A51: Custom Backend Metrics Support
 ----
-* Author(s): [Yifei Zhuang](https://github.com/YifeiZhuang), [Mark Roth](https://github.com/markdroth)
+* Author(s): [Yifei Zhuang](https://github.com/YifeiZhuang), [Mark Roth](https://github.com/markdroth), [Yousuk Seung](https://github.com/yousukseung)
 * Approver: Eric Anderson
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
-* Last updated: 2022-02
+* Last updated: 2023-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/mieHKzTigzg
 
 ## Abstract
@@ -47,33 +47,26 @@ Distinguish two types of metrics:
 * Request cost metrics show the amount of resources it takes to handle a request, specific for each RPC.
 * Utilization metrics show the server status machine wide, independent of any RPC.
 
+And two APIs for the backend server to record metrics:
+
+* Per-query recording: Only needed for per-query metrics reporting. Unique per
+  RPC.
+* Machine-wide recording: Used for OOB metrics reporting, and may optionally be
+  used for per-query metrics reporting. Machine-wide.
+
 ### Wire Format
 
 Backend metric data will be encoded in the ORCA format for transmission on the wire. 
 Specifically, it will be transmitted as a binary-encoded [xds.data.orca.v3.LoadReport](https://github.com/cncf/xds/blob/eded343319d09f30032952beda9840bbd3dcf7ac/xds/data/orca/v3/orca_load_report.proto#L15) protobuf.
 
-### Per-Request Metrics Reporting
+### Recorder APIs
 
-#### Wire Format
-For metrics reported on a per-request basis, the ORCA LoadReport protobuf will be encoded in the 
-trailing metadata sent by the backend.  The metadata key will be `endpoint-load-metrics-bin`.
+We will provide two server APIs to record metrics: one for recording per-query and another for reporting machine-wide.
 
-#### The Client API
-LB policies will have the ability to access the load report data 
-as part of intercepting the trailing metadata sent from the server.
-Note that the API must be structured such that if multiple LB policies are interested in the data (e.g., both xDS and WRR),
-the protobuf deserialization needs to happen only once. The exact API for this may differ across languages, 
-but here are a couple of possible approaches:
-* The deserialized data can be attached to the metadata element, so that it can be deserialized once and accessed multiple times.
-* The deserialized data can be stored in the call data and accessed by the LB policy code when it intercepts the trailing metadata.
+#### Per-Query Recording
 
-
-#### The Server API 
-Using a server interceptor, it is convenient to attach the metrics as part of the
-trailing metadata of the server call and send back with the RPC response.
-
-We will define a metric recorder that is unique per RPC, only useful when the server interceptor is
-installed, in which case the server applications should obtain a reference and
+We will define a metric recorder that is unique per RPC, used only when
+per-query metrics reporting is enabled. The server applications should obtain a reference and
 use it to record metrics specifically for the current RPC call.
 Implementing this may leverage a [context](https://grpc.github.io/grpc-java/javadoc/io/grpc/Context.html) or similar mechanism,
 and a language can implement one if it does not exist.
@@ -90,26 +83,22 @@ function recordCPUUtilizationMetric(double value);
 
 // Records the memory utilization metric measurement for the call.
 function recordMemoryUtilizationMetric(double value);
+
+// Records the queries per second measurement.
+function recordQpsMetric(double value);
 ```
 
 Recording the same metric multiple times overrides the previously provided values. 
 The methods can be called at any time during an RPC lifecycle,
 depending on the particular type of the cost or utilization measurement. For example, an RPC request size may
 be recorded at the beginning of the call, while a queue-size may be reported at any time during the call lifetime.
-The data is dumped and translated to an `OrcaLoadReport` at the end of each RPC by the interceptor, 
-and sent out as the trailing metadata.
+The data is translated to an `OrcaLoadReport` at the end of each RPC and sent out as the trailing metadata.
 
-### Out of Band Metrics Reporting
-To periodically receive metrics data from a backend server, the client opens a stream on the 
-established connection to the server to request the load report.
-The request should specify metrics reporting interval. The interval will be validated by the server, 
-see validation details below.
-Meanwhile, the server registers an OOB streaming service to emit the metrics.
 
-#### The Server API 
-We will provide a builtin implementation of [xds.service.orca.v3.OpenRCAService](https://github.com/cncf/xds/blob/eded343319d09f30032952beda9840bbd3dcf7ac/xds/service/orca/v3/orca.proto#L27)
-streaming service defined by ORCA in each supported language.
-The implementation service holds the utilization metrics data in key/value pairs using a map.
+#### Machine-Wide Recording
+
+We will define a metric recorder that is machine-wide. This can be used with
+both per-query and out-of-band metrics reporting. The implementation holds the utilization metrics data in key/value pairs using a map.
 We will expose set-style APIs for user's server applications to update the metrics data, pseudo-code as follows:
 
 ```
@@ -133,10 +122,47 @@ function setMemoryUtilizationMetric(double value);
 
 // Clear the memory utilization metrics data.
 function deleteMemoryUtilizationMetric();
+
+// Update the queries-per-second metrics data.
+function setQpsMetric(double value);
+
+// Clear the queries-per-second metrics data.
+function deleteQpsMetric();
 ```
 
-Allowing updating each metric key individually is convenient for a server application to adopt when it 
-has multiple isolated components and each generates their own set of metrics.
+All metrics are initially unset. Once set metrics stay in place until cleared. Recording the same metric overrides the previously provided values.
+No atomicity is guaranteed across multiple updates and all APIs may be called concurrently.
+
+### Per-Query Metrics Reporting
+
+#### Wire Format
+For metrics reported on a per-query basis, the ORCA LoadReport protobuf will be encoded in the
+trailing metadata sent by the backend.  The metadata key will be `endpoint-load-metrics-bin`.
+
+#### The Client API
+LB policies will have the ability to access the load report data
+as part of intercepting the trailing metadata sent from the server.
+Note that the API must be structured such that if multiple LB policies are interested in the data (e.g., both xDS and WRR),
+the protobuf deserialization needs to happen only once. The exact API for this may differ across languages,
+but here are a couple of possible approaches:
+* The deserialized data can be attached to the metadata element, so that it can be deserialized once and accessed multiple times.
+* The deserialized data can be stored in the call data and accessed by the LB policy code when it intercepts the trailing metadata.
+
+#### The Server API
+The server will add a channel filter (C/C++) or an interceptor (Java/Go) that
+adds recorded metrics to the trailing metadata of the response. It reads from both the per-call and machine-wide metrics recorder if they exist. When the same metric is recorded with both the per-query and the machine-wide recorder, metrics recorded with per-query recorder takes a higher precedence.
+
+### Out of Band Metrics Reporting
+To periodically receive metrics data from a backend server, the client opens a stream on the
+established connection to the server to request the load report.
+The request should specify metrics reporting interval. The interval will be validated by the server,
+see validation details below.
+Meanwhile, the server registers an OOB streaming service to emit the metrics.
+
+#### The Server API
+We will provide a builtin implementation of [xds.service.orca.v3.OpenRCAService](https://github.com/cncf/xds/blob/eded343319d09f30032952beda9840bbd3dcf7ac/xds/service/orca/v3/orca.proto#L27)
+streaming service defined by ORCA in each supported language.
+The implementation will accept the above mentioned machine-wide metrics recorder implementation to read recorded metrics. This is required.
 
 A minimum reporting interval (30s by default) can be configured when creating the service.
 The minimum report interval is the lower bound of the OOB metrics report period. It means, if 
@@ -196,7 +222,7 @@ each LB policy is responsible for performing whatever aggregation is appropriate
 Note that the API should be designed such that it is available to any LB policy without other
 policies having to know or care about out-of-band reporting.
 For example, it should be possible for a non-leaf LB policy to subscribe to out-of-band reports from
-a child policy like round_robin, which does not know anything about out-of-band-reports and will not contain any
+a child policy like `round_robin`, which does not know anything about out-of-band-reports and will not contain any
 code to handle them.
 
 When a subchannel first establishes a connection, if at least one LB policy is subscribing to out-of-band reporting, 
@@ -250,8 +276,8 @@ It is by design that the OOB server sends the data regardless of whether it has 
 not since the last time it was sent. We considered a potential optimization, that is to skip 
 sending the unchanged metrics data since last response.
 To do that, we should not compare maps for de-duplication, instead, we can bump up a
-generation_id of the metrics data every time users make a change.
-Each client connection only needs to compare its previous generation_id to do deduplication.
+`generation_id` of the metrics data every time users make a change.
+Each client connection only needs to compare its previous `generation_id` to do deduplication.
 The optimization strategy can be implemented in the future if there are concrete use cases.
 
 In addition to the minimum report interval configuration at the OOB server, it might be useful
@@ -265,10 +291,44 @@ but this can be done in the future if needed without impacting the public interf
 This will be implemented in Java, Go and C++.
 
 ### Java
-#### Per-Query Reporting 
 
-At the server side, Java will provide a per-RPC metrics recorder for the user applications to record both utilization and
-request cost metrics. They can obtain a reference to the `CallMetricRecorder` using the static 
+#### Server
+Java will provide a machine-wide metrics recorder on the server. The user
+creates an instance and records metrics to it. All the methods are thread safe.
+This is optional for per-call load reporting and required for OOB load reporting
+```java
+public class ServerMetricRecorder {
+  // Update the metrics value corresponding to the specified key.
+  public void putUtilizationMetric(String key, double value);
+
+  // Replace the whole metrics data using the specified map.
+  public void putAllUtilizationMetrics(Map<String, Double> metrics);
+
+  // Remove the metrics data entry corresponding to the specified key.
+  public void clearUtilizationMetric(String key);
+
+  // Update the CPU utilization metrics data.
+  public void putCPUUtilizationMetric(double value);
+
+  // Clear the CPU utilization metrics data.
+  public void clearCPUUtilizationMetric();
+
+  // Update the memory utilization metrics data.
+  public void putMemoryUtilizationMetric(double value);
+
+  // Clear the memory utilization metrics data.
+  public void clearMemoryUtilizationMetric();
+
+  // Update the queries-per-second metrics data.
+  public void putQpsMetric(double value);
+
+  // Clear the queries-per-second metrics data.
+  public void clearQpsMetric();
+}
+```
+
+Java will also provide a per-RPC metrics recorder for the user applications to record both utilization and
+request cost metrics. They can obtain a reference to the `CallMetricRecorder` using the static
 `getCurrent()` method. All the methods are thread safe.
 
 ```Java
@@ -279,18 +339,22 @@ public final class CallMetricRecorder {
   // Records a utilization metric measurement for the call.
   public CallMetricRecorder recordUtilizationMetric(String name, double value);
 
-  //Records the CPU utilization metric measurement for the call. 
+  //Records the CPU utilization metric measurement for the call.
   public CallMetricRecorder recordCPUUtilizationMetric(double value);
 
-  // Records the memory utilization metric measurement for the call. 
+  // Records the memory utilization metric measurement for the call.
   public CallMetricRecorder recordMemoryUtilizationMetric(double value);
+
+  // Records the queries per second measurement.
+  public CallMetricRecorder recordQpsMetric(double value);
 
   // Returns the call metric recorder attached to the current call.
   public static CallMetricRecorder getCurrent();
 }
 ```
 
-At the client side, Java will provide a utility function `OrcaClientStreamTracerFactory`. 
+#### Per-Query Reporting on Client
+Java will provide a utility function `OrcaClientStreamTracerFactory`. 
 Users can include it in the picker result in their custom LB policy’s 
 `LoadBalancer.SubchannelPicker` to let gRPC push notifications to the application.
 It requires users to implement `OrcaPerRequestReportListener` in order to receive the metrics report callback.
@@ -310,37 +374,8 @@ class CustomPicker extends SubchannelPicker {
 }
 ```
 
-#### Out-of-Band Reporting 
-At the server side, Java implemented the OOB service `OrcaServiceImpl`: users can optionally provide the minimum
-reporting interval configuration when creating the object. Then they can update utilization metrics
-data using the exposed APIs as follows. All the methods are thread safe.
-
-```java
-public class MetricRecorder {
-  // Update the metrics value corresponding to the specified key.
-  public void putUtilizationMetric(String key, double value);
-
-  // Replace the whole metrics data using the specified map.
-  public void setAllUtilizationMetrics(Map<String, Double> metrics);
-
-  // Remove the metrics data entry corresponding to the specified key.
-  public void clearUtilizationMetric(String key);
-
-  // Update the CPU utilization metrics data.
-  public void setCPUUtilizationMetric(double value);
-
-  // Clear the CPU utilization metrics data.
-  public void clearCPUUtilizationMetric();
-
-  // Update the memory utilization metrics data.
-  public void setMemoryUtilizationMetric(double value);
-
-  // Clear the memory utilization metrics data.
-  public void clearMemoryUtilizationMetric();
-}
-```
-
-At the client side, Java will provide a utility function to wrap the `LoadBalancer.Helper`,
+#### Out-of-Band Reporting on Client
+Java will provide a utility function to wrap the `LoadBalancer.Helper`,
 usable by both WRR policy and xDS LB policies. The `LoadBalancer.Helper` manages the OOB stream
 lifecycle and accepts subscriptions from any routing hierarchy.
 The OOB stream will also gracefully disable itself if the server integration is not complete, 
@@ -380,21 +415,122 @@ public interface OrcaOobReportListener {
 
 ### C++
 
-C-core's LB policies do have the ability to obtain backend metric data
-for both per-RPC and OOB mechanisms.  However, the C-core LB policy API
-is not yet ready to be made public, so this gRFC does not describe those
-APIs.  They will be described in a subsequent gRFC when the LB policy
-API is ready to be made public.
+#### Server
 
-This section describes only the C++ server-side APIs.
+C++ will provide `ServerMetricRecorder` to record metrics machine-wide.
+The user creates an instance and records metrics to it. All the methods are thread safe.
+This is optional for per-call load reporting and required for OOB load reporting
+```c++
+class ServerMetricRecorder {
+ public:
+  // Factory method. Use this to create.
+  static std::unique_ptr<ServerMetricRecorder> Create();
+  // Records the server CPU utilization in the range [0, 1].
+  // Values outside of the valid range are rejected.
+  // Overrides the stored value when called again with a valid value.
+  void SetCpuUtilization(double value);
+  // Records the server memory utilization in the range [0, 1].
+  // Values outside of the valid range are rejected.
+  // Overrides the stored value when called again with a valid value.
+  void SetMemoryUtilization(double value);
+  // Records number of queries per second to the server in the range [0, infy).
+  // Values outside of the valid range are rejected.
+  // Overrides the stored value when called again with a valid value.
+  void SetQps(double value);
+  // Records a named resource utilization value in the range [0, 1].
+  // Values outside of the valid range are rejected.
+  // Overrides the stored value when called again with the same name.
+  // The name string should remain valid while this utilization remains
+  // in this recorder. It is assumed that strings are common names that are
+  // global constants.
+  void SetNamedUtilization(string_ref name, double value);
+  // Replaces all named resource utilization values. No range validation.
+  // The name strings should remain valid while utilization values remain
+  // in this recorder. It is assumed that strings are common names that are
+  // global constants.
+  void SetAllNamedUtilization(std::map<string_ref, double> named_utilization);
 
-#### Per-Query Reporting APIs
+  // Clears the server CPU utilization if recorded.
+  void ClearCpuUtilization();
+  // Clears the server memory utilization if recorded.
+  void ClearMemoryUtilization();
+  // Clears number of queries per second to the server if recorded.
+  void ClearQps();
+  // Clears a named utilization value if exists.
+  void ClearNamedUtilization(string_ref name);
+};
+```
 
-TODO(nicolasnoble): Fill this in.
+C++ will also provide a per-RPC metrics recorder for the user applications to record
+metrics. They can obtain a reference to the `CallMetricRecorder` from the server
+context. All the methods are thread safe.
 
-#### OOB Reporting APIs
+```c++
+class CallMetricRecorder {
+ public:
+   ~CallMetricRecorder() = default;
 
-C++ provides the following API for running the ORCA service:
+  // Records a call metric measurement for CPU utilization.
+  // Multiple calls to this method will override the stored value.
+  // Values outside of the valid range [0, 1] are ignored.
+  CallMetricRecorder& RecordCpuUtilizationMetric(double value);
+
+  // Records a call metric measurement for memory utilization.
+  // Multiple calls to this method will override the stored value.
+  // Values outside of the valid range [0, 1] are ignored.
+  CallMetricRecorder& RecordMemoryUtilizationMetric(double value);
+
+  // Records a call metric measurement for queries per second.
+  // Multiple calls to this method will override the stored value.
+  // Values outside of the valid range [0, infy) are ignored.
+  CallMetricRecorder& RecordQpsMetric(double value);
+
+  // Records a call metric measurement for utilization.
+  // Multiple calls to this method with the same name will
+  // override the corresponding stored value. The lifetime of the
+  // name string needs to be longer than the lifetime of the RPC
+  // itself, since it's going to be sent as trailers after the RPC
+  // finishes. It is assumed the strings are common names that
+  // are global constants.
+  // Values outside of the valid range [0, 1] are ignored.
+  CallMetricRecorder& RecordUtilizationMetric(string_ref name,
+                                                      double value);
+
+  // Records a call metric measurement for request cost.
+  // Multiple calls to this method with the same name will
+  // override the corresponding stored value. The lifetime of the
+  // name string needs to be longer than the lifetime of the RPC
+  // itself, since it's going to be sent as trailers after the RPC
+  // finishes. It is assumed the strings are common names that
+  // are global constants.
+  CallMetricRecorder& RecordRequestCostMetric(string_ref name,
+                                                      double value);
+};
+
+class ServerContextBase {
+ public:
+  // Get the a CallMetricRecorder object for the current RPC.
+  // Use it to record metrics during your RPC to send back to the
+  // client in order to make load balancing decisions. This will
+  // return nullptr if the feature hasn't been enabled using
+  // EnableCallMetricRecording().
+  CallMetricRecorder* GetCallMetricRecorder();
+};
+```
+
+To enable per-call load reporting, an application must enable call metric recording when building the server.
+The application may optionally pass `ServerMetricRecorder` to also include machine-wide metrics in per-call load reports.
+
+```c++
+std::unique_ptr<ServerMetricRecorder> server_metric_recorder_ =
+ServerMetricRecorder::Create();
+
+ServerBuilder server_builder;
+server_builder.EnableCallMetricRecording(
+  server_metric_recorder_.get());
+```
+
+For OOB load reporting, C++ provides the following API for running the ORCA service:
 
 ```c++
 class OrcaService {
@@ -411,20 +547,8 @@ class OrcaService {
     }
   };
 
-  explicit OrcaService(Options options);
-
-  // Sets or removes the CPU utilization value to be reported to clients.
-  void SetCpuUtilization(double cpu_utilization);
-  void DeleteCpuUtilization();
-
-  // Sets of removes the memory utilization value to be reported to clients.
-  void SetMemoryUtilization(double memory_utilization);
-  void DeleteMemoryUtilization();
-
-  // Sets or removes named utilization values to be reported to clients.
-  void SetNamedUtilization(std::string name, double utilization);
-  void DeleteNamedUtilization(const std::string& name);
-  void SetAllNamedUtilization(std::map<std::string, double> named_utilization);
+  OrcaService(ServerMetricRecorder* const server_metric_recorder,
+              Options options);
 };
 ```
 
@@ -442,3 +566,15 @@ auto server = server_builder.BuildAndStart();
 The application can set utilization data on the `OrcaService` object at
 any time, and it will automatically be sent to any connected clients at
 the next scheduled reporting interval.
+
+#### Per-Query Reporting on Client
+C++ provides `SubchannelCallTrackerInterface` to track subchannel calls.
+The LB policy implementation can implement this and include it in the subchannel selection
+result `PickResult`. The LB policy is called back when the call completes with
+backend metrics received and can process them.
+
+#### Out-of-Band Reporting on Client
+C++ provides `OobBackendMetricWatcher` that can be added to a subchannel via `AddDataWatcher()`.
+The LB policy implementation can implement this and attach it to subchannels.
+The LB policy is called back each time a load report is received from the server
+and can process them.
