@@ -4,8 +4,8 @@ A58: `weighted_round_robin` LB policy
 * Approver: @markdroth
 * Status: Draft
 * Implemented in: -
-* Last updated: 2023-01-24
-* Discussion at: -
+* Last updated: 2023-02-05
+* Discussion at: https://groups.google.com/g/grpc-io/c/p18GXTlDapM
 
 ## Abstract
 
@@ -18,7 +18,7 @@ Currently, gRPC does not have any first-class support for weighted round robin l
 As part of the effort to move away from `grpclb`, we will now provide first-class weighted round robin functionality via a new client-side LB policy called `weighted_round_robin`. Instead of depending on centralized backend metric collection, this LB policy will obtain the backend metrics directly from the endpoints using the mechanism described in [gRFC A51][A51], which it will use to compute the endpoint weights.
 
 ### Related Proposals:
-* [gRFC A34 (pending)][A34]
+* [gRFC A34][A34] (pending)
 * [gRFC A51][A51]
 * [gRFC A52][A52]
 
@@ -183,7 +183,7 @@ Processing OOB load reports is supported with `OobBackendMetricWatcher`. `weight
 
 `weighted_round_robin` is enabled as the endpoint picking policy of `WrrLocality` of [gRFC A52][A52].
 
-`weighted_round_robin` is added as a new LB policy per [gRFC A52][A52] and is added to `XdsLbPolicyRegistry`. The name is prefixed with `ClientSide` to avoid confusion with the [gRFC A34 (pending)][A34] where the endpoint weights are sent by the control plane.
+`weighted_round_robin` is added as a new LB policy per [gRFC A52][A52] and is added to `XdsLbPolicyRegistry`. The name is prefixed with `ClientSide` to avoid confusion with the pending [gRFC A34][A34] where the endpoint weights are sent by the control plane.
 
 ```textproto
 package envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3;
