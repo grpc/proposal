@@ -102,7 +102,7 @@ The ordered list of discovery mechanisms will be passed down in the
 config for the new `xds_cluster_resolver_experimental` policy, which is the
 child of the CDS policy. If an underlying cluster appears more than once in
 the list of clusters, only one discovery mechanism entry should be created for
-it.
+it, in the earliest position in the list in which it is seen.
 
 Note that if a cluster is used both by itself and via an aggregate
 cluster, the XdsClient will have two CDS watchers for the cluster
@@ -118,6 +118,9 @@ This is not ideal but is considered acceptable (and if it becomes a
 problem, we might be able to fix this later via subchannel pooling
 functionality).  However, we will share the atomic used for circuit breaking
 thresholds across all connections for a given cluster, as discussed below.
+
+The tree of aggregate clusters has a depth limit of 16. If a CDS policy's
+tree exceeds that depth, it should report that it is in TRANSIENT_FAILURE.
 
 If any of a CDS policy's watchers reports that the resource does not exist, the
 policy should report that it is in TRANSIENT_FAILURE. If any of the watchers
