@@ -150,7 +150,7 @@ but here are a couple of possible approaches:
 
 #### The Server API
 The server will add a channel filter (C/C++) or an interceptor (Java/Go) that
-adds recorded metrics to the trailing metadata of the response. It reads from both the per-call and machine-wide metrics recorder if they exist. When the same metric is recorded with both the per-query and the machine-wide recorder, metrics recorded with per-query recorder takes a higher precedence.
+adds recorded metrics to the trailing metadata of the response. It reads from both the per-call and machine-wide metrics recorder if they exist. When the same metric is recorded with both the per-query and the machine-wide recorder, metrics recorded with per-query recorder take a higher precedence.
 
 ### Out of Band Metrics Reporting
 To periodically receive metrics data from a backend server, the client opens a stream on the
@@ -162,7 +162,7 @@ Meanwhile, the server registers an OOB streaming service to emit the metrics.
 #### The Server API
 We will provide a builtin implementation of [xds.service.orca.v3.OpenRCAService](https://github.com/cncf/xds/blob/eded343319d09f30032952beda9840bbd3dcf7ac/xds/service/orca/v3/orca.proto#L27)
 streaming service defined by ORCA in each supported language.
-The implementation will accept the above mentioned machine-wide metrics recorder implementation to read recorded metrics. This is required.
+The implementation will accept the above mentioned machine-wide metrics recorder to read metrics.
 
 A minimum reporting interval (30s by default) can be configured when creating the service.
 The minimum report interval is the lower bound of the OOB metrics report period. It means, if 
@@ -295,7 +295,7 @@ This will be implemented in Java, Go and C++.
 #### Server
 Java will provide a machine-wide metrics recorder on the server. The user
 creates an instance and records metrics to it. All the methods are thread safe.
-This is optional for per-call load reporting and required for OOB load reporting
+This is optional for per-call load reporting and required for OOB load reporting.
 ```java
 public class ServerMetricRecorder {
   // Update the metrics value corresponding to the specified key.
@@ -419,7 +419,7 @@ public interface OrcaOobReportListener {
 
 C++ will provide `ServerMetricRecorder` to record metrics machine-wide.
 The user creates an instance and records metrics to it. All the methods are thread safe.
-This is optional for per-call load reporting and required for OOB load reporting
+This is optional for per-call load reporting and required for OOB load reporting.
 ```c++
 class ServerMetricRecorder {
  public:
@@ -522,12 +522,12 @@ To enable per-call load reporting, an application must enable call metric record
 The application may optionally pass `ServerMetricRecorder` to also include machine-wide metrics in per-call load reports.
 
 ```c++
-std::unique_ptr<ServerMetricRecorder> server_metric_recorder_ =
+std::unique_ptr<ServerMetricRecorder> server_metric_recorder =
 ServerMetricRecorder::Create();
 
 ServerBuilder server_builder;
 server_builder.EnableCallMetricRecording(
-  server_metric_recorder_.get());
+  server_metric_recorder.get());
 ```
 
 For OOB load reporting, C++ provides the following API for running the ORCA service:
