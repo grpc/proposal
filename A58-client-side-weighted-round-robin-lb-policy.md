@@ -70,7 +70,7 @@ message WeightedRoundRobinLbConfig {
 
 ### Earliest Deadline First (EDF) Scheduler
 
-`weighted_round_robin` introduces a scheduler that manages weighted subchannel selection. A new scheduler will be created periodically to take new weight information into account. A state object is passed when created so that the scheduler can start where it last left across multiple instances. The scheduler must be light and cheap to create and allow concurrent pick calls. The scheduler returns the index in the input weight array and the caller has to map the index to a subchannel. The scheduler's state is stored in the LB policy and not the picker, and is atomically updated at the end of each pick by the scheduler.
+`weighted_round_robin` introduces a scheduler that manages weighted subchannel selection. A new scheduler will be created periodically or when the set of weights change to take new weight information into account. The scheduler must be cheap to create and allow concurrent pick calls to proceed with no or minimal contention. The scheduler returns the index in the input weight array and the caller has to map the index to a subchannel.
 
 The scheduler implements the [earliest deadline first][EDF] (EDF) scheduling. In its implementation, each subchannel is treated as a job whose deadline is inversely proportional to its weight. To avoid synchronization, each subchannel is given a random credit in the range [0, deadline] when first inserted. The subchannel with the next earliest deadline is selected each time and then inserted back with its deadline.
 
@@ -205,31 +205,37 @@ XdsLbPolicyRegistry::XdsLbPolicyRegistry() {
 In the xDS configuration for the client, `client_side_weighted_round_robin` is wrapped in `wrr_locality` as a child policy. Below is an example xDS configuration with `client_side_weighted_round_robin`. The config includes `round_robin` as a backup policy to fallback in case the client does not support `client_side_weighted_round_robin`. On the client the new xDS LB hierarchy in [gRFC A52][A52] creates the gRPC LB policy `weighted_round_robin` as the endpoint-picking policy.
 
 ```textproto
-{ // Cluster
-  name: "..."
+  # Cluster
+  name: "cluster"
   type: EDS
   load_balancing_policy {
     policies {
       typed_extension_config {
-        name: "..."
+        name: "policy"
         typed_config {
           [type.googleapis.com/envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality] {
-          endpoint_picking_policy {
-            policies {
-              typed_extension_config {
-                name: "weighted_round_robin"
-                typed_config {
-                  [type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin] {}
+            endpoint_picking_policy {
+              policies {
+                typed_extension_config {
+                  name: "weighted_round_robin"
+                  typed_config {
+                    [type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin] {}
+                  }
+                }
+                # Backup RR policy to fall back if WRR is unsupported.
+                typed_extension_config: {
+                  name: "round_robin"
+                  typed_config {
+                    [type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin] {}
+                  }
                 }
               }
-              // Backup RR policy to fall back if WRR is unsupported.
-              typed_extension_config: {
-                name: "round_robin"
-                typed_config {
-                  [type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin] {}
-                }
-              }
-    // …
+            }
+          }
+        }
+      }
+    }
+  }
 }
 ```
 
