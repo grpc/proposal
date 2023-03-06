@@ -65,6 +65,10 @@ message WeightedRoundRobinLbConfig {
 
   // How often endpoint weights are recalculated.  Default is 1 second.
   google.protobuf.Duration weight_update_period = 5;
+
+  // The multiplier used to adjust endpoint weights with the error rate
+  // calculated as eps/qps. Default is 1.0.
+  google.protobuf.FloatValue error_utilization_penalty = 6;
 }
 ```
 
@@ -100,7 +104,7 @@ When `enable_oob_load_report` value changes, either per-call or OOB load report 
 
 When `oob_reporting_period` changes, the client implementation starts a new OOB load reporting stream as outlined in [gRFC A51][A51].
 
-Changes to `weight_update_period`, `blackout_period`, and `weight_expiration_period` take effective with a new picker that we always create upon receiving a resolver update.
+Changes to the rest of parameters take effective with a new picker that we always create upon receiving a resolver update.
 
 In all languages, `weighted_round_robin` policy de-duplicates redundant addresses in resolver updates.
 
@@ -121,12 +125,16 @@ In all languages, when a subchannel state is updated to `IDLE`, the LB policy im
 
 To enforce `blackout_period` and `weight_expiration_period`, the LB policy tracks two timestamps along with the weight. `last_updated` tracks the last time a report with non-zero `cpu_utilization` and `qps` was received. `non_empty_since` tracks when the first non-zero load report was received, and it is reset when a subchannel comes back to `READY` or the weight expires so that it can be updated with the next non-zero load report. The blackout and expiration are enforced when the weight value is looked up.
 
-The weight of a backend is calculated as ***weight = qps / cpuutilization***.
+The weight of a backend is calculated using `qps` (queries per second), `eps` (errors per second) and `cpu_utilization` reported by the backend. `eps` is only used when `error_utilization_penalty` is set to non-zero and applies a penalty based on the error rate calculated as `eps/qps`. The formula used is as follows:
+
+$$weight = \dfrac{qps}{cpu\_utilization + \dfrac{eps}{qps} * error\_utilization\_penalty}$$
 
 In Java and Go, the weight will be stored in a wrapped subchannel. However, in C++, that approach won't work, because we create a new subchannel object for each address whenever we get a new address list, and we don't want to lose existing weight information when that happens. So instead, we store the weights in a map keyed by address, and each subchannel list will take its own ref to the entry in the map for each subchannel in the list.
 
 ```
-function UpdateWeight(qps, cpu_utilization) {
+function UpdateWeight(qps, eps, cpu_utilization) {
+  if (cpu_utilization > 0 && qps > 0)
+    cpu_utilization += eps / qps * config.error_utilization_penalty;
   var new_weight =
      cpu_utilization == 0 ? 0 : qps / cpu_utilization;
   if (new_weight == 0) return;
