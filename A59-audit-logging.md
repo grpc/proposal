@@ -1,7 +1,7 @@
 A59: gRPC Audit Logging
 ----
 * Author(s): [Luwei Ge](https://github.com/rockspore)
-* Approver:
+* Approver: [Eric Anderson](https://github.com/ejona86)
 * Status: Draft {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in:
 * Last updated: 2023-03-09
@@ -50,17 +50,17 @@ one from the server.
 |-------------------|-----------------------------------------------------------------------------------|-----------------------|
 |RPC Method         |Method the RPC hit.                                                                |"/pkg.service/foo"     |
 |Principal          |Identity the RPC. Currently only available in certificate-based TLS authentication.|"spiffe://foo/user1"   |
-|Timestamp          |Time when the RPC happens.                                                         |1649376211             |
-|Denying Policy Name|Policy name that denied the RPC. Empty if RPC is allowed.                          |"policy_name"          |
-|Status             |gRPC status from the authorization enforcement, not the eventual RPC status.       |OK or PERMISSION_DENIED|
+|Timestamp          |Time when the server saw the RPC.                                                  |1649376211             |
+|Policy Name        |Name of the policy that invokes audit logging.                                     |"policy_name"          |
+|Authorized         |Boolean indicating whether the RPC is authorized or not.                           |true                   |
 
 ### xDS API Changes
 
-xDS API changes are needed because gRPC authorization is entirely based on [xDS RBAC policy][RBAC policy]. Moreoever, audit logging is a common feature
-that other xDS clients (namely Envoy) should benefit from as well.
+xDS API changes are needed because gRPC authorization is entirely based on [xDS RBAC policy][RBAC policy].
+Moreoever, audit logging is a common feature that other xDS clients (namely Envoy) should benefit from as well.
 
-We will add an audit condition enum in the [xDS RBAC policy][RBAC policy] as
-below:
+We will add an audit condition enum (see [PR](https://github.com/envoyproxy/envoy/pull/26001))
+in the [xDS RBAC policy][RBAC policy] as below:
 
 ```
 package envoy.config.rbac.v3;
@@ -91,7 +91,9 @@ message RBAC {
 ```
 
 Note that `DENY` and `ALLOW` in the enum refer to the RBAC decisions, not
-RBAC actions.
+RBAC actions. For example, we consider it as `DENY` decision when a RBAC
+rejects the RPC whether there is no policy match from a RBAC with `ALLOW`
+action or there is a match from a RBAC with `DENY` policy. Likewise for `ALLOW`.
 
 For the audit logger configuration, we will follow the existing `access_log`
 field in the [HTTP Connection Manager][HttpConnectionManager proto] by adding
@@ -143,7 +145,7 @@ in [A43: gRPC authorization API][A43]:
         },
         "typed_config": {
           "description": "The typed config for the audit_log."
-            "This needs to be a json object mapped from google.protobuf.Any"
+            "This needs to be a json object mapped from google.protobuf.Struct"
             "proto message.",
           "type": "object",
         }
@@ -177,19 +179,55 @@ message AuthorizationPolicy {
     NONE = 0;
     ON_DENY = 1;
     ON_ALLOW = 2;
-    ALWAYS = 3;
+    ON_DENY_AND_ALLOW = 3;
   }
 
   AuditCondition audit_condition = 1;
 
-  // See https://github.com/cncf/xds/blob/main/xds/core/v3/extension.proto.
-  xds.core.v3.TypedExtensionConfig audit_log = 2;
+  message AuditLog {
+    string name = 1;
+    google.protobuf.Struct config = 2;  
+  }
+  
+  AuditLog audit_log = 2;
 }
 ```
 
 Note that the definition above is only for illustration purposes and does not
 actually exist anywhere as a `.proto` file. Nor does gRPC process the policy
 as protobuf by any means.
+
+Since the authorization policy is backed by two RBAC filters, it's necessary
+to clarify how this top-level audit condition is converted to two conditions
+in those RBACs.
+
+First of all, note that the RBAC with `DENY` is placed before the RBAC with
+`ALLOW`. We assume users will want to audit one particular RPC once if the
+condition is met.
+
+If users want to audit on deny, then both of the RBACs will have `ON_DENY` as
+the audit condition. The `ALLOW` RBAC will not be evaluated so audit logging
+will never happen twice. 
+
+If users want to audit on allow, then the `DENY` RBAC will have no audit enabled
+and the `ALLOW` RBAC with `ON_ALLOW`. So audit logging will at most happen once
+when the RPC passes through both RBACs.
+
+If users want to audit on both cases, then the `DENY` RBAC needs `ON_DENY` and
+the `ALLOW` RBAC needs `ON_DENY_AND_ALLOW`.
+
+Following is the table summarzing the combinations.
+
+|Authorization Policy  |DENY RBAC          |ALLOW RBAC           |
+|----------------------|-------------------|---------------------|
+|NONE                  |NONE               |NONE                 |
+|ON_DENY               |ON_DENY            |ON_DENY              |
+|ON_ALLOW              |NONE               |ON_ALLOW             |
+|ON_DENY_AND_ALLOW     |ON_DENY            |ON_DENY_AND_ALLOW    |
+
+Again this is a subset of what users can technically do with xDS RBACs in the way
+described in the earlier section. But we think this represents the most common
+use cases.
 
 ### Language Specific APIs
 
