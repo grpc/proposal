@@ -72,7 +72,7 @@ message WeightedRoundRobinLbConfig {
 
 `weighted_round_robin` introduces a scheduler that manages weighted subchannel selection. A new scheduler will be created periodically or when the set of weights change to take new weight information into account. The scheduler must be cheap to create and allow concurrent pick calls to proceed with no or minimal contention. The scheduler returns the index in the input weight array and the caller has to map the index to a subchannel.
 
-The scheduler implements the [earliest deadline first][EDF] (EDF) scheduling. In its implementation, each subchannel is treated as a job whose deadline is inversely proportional to its weight. To avoid synchronization, each subchannel is given a random credit in the range [0, deadline] when first inserted. The subchannel with the next earliest deadline is selected each time and then inserted back with its deadline.
+The scheduler implements the [earliest deadline first][EDF] (EDF) scheduling. In its implementation, each subchannel is treated as a job whose period is inversely proportional to its weight. To avoid synchronization, each subchannel's deadline is set to a random value in the range [0, period] when first inserted. The subchannel with the next earliest deadline is selected each time and then inserted back with their period added to their previous deadline.
 
 The scheduler resides in the picker. When compared to `round_robin`, the scheduler conceptually replaces the monotonically increasing index counter of the picker. The picker in `weighted_round_robin` otherwise works the same externally as in `round_robin`.
 
@@ -80,9 +80,7 @@ In C/C++, the scheduler is reference counted and its access is mutex protected. 
 
 The picker starts a timer to swap the scheduler to update update weights every `weight_update_period`. This timer iterates over the subchannel list (wrapper) of the picker, loads the latest weight from each, builds a new scheduler and replaces it with the current one. Note that synchronization must be used to access the weights, since they are going to be set based on backend metric reports in either RPC reports or OOB responses but then accessed in this timer. When the scheduler is swapped, ongoing pick calls that already took a reference of the outgoing scheduler can continue to refer to the old scheduler until the call returns.
 
-Note only subchannels in `READY` state are passed to the scheduler. Subchannels that are included with a zero weight are still picked but with the average weight. When less than two subchannels have load info, it degrades to `round_robin`.
-
-`weighted_round_robin` uses the earliest deadline first (EDF) scheduling with a monotonically increasing counter as the state. This counter is persisted across multiple scheduler instances for continuity between weight updates.
+Note only subchannels in `READY` state are passed to the scheduler. Subchannels that are included with a zero weight are still picked but with the average weight. When less than two subchannels have load info, all subchannels will get the same weight and the policy will behave the same as `round_robin`.
 
 ```
 EDFScheduler {
@@ -104,7 +102,7 @@ When `oob_reporting_period` changes, the client implementation starts a new OOB 
 
 Changes to `weight_update_period`, `blackout_period`, and `weight_expiration_period` take effective with a new picker that we always create upon receiving a resolver update.
 
-In all languages, `weighted_round_robin` policy de-duplicates redundant addresses in resolver updates. This behavior is different from `round_robin` where it uses the number of representations in the list as a resolver supplied weight.
+In all languages, `weighted_round_robin` policy de-duplicates redundant addresses in resolver updates.
 
 ### Handling Subchannel Connectivity State Notifications
 The behavior remains the same as in `round_robin` in all languages.
@@ -121,7 +119,7 @@ In all languages, when a subchannel state is updated to `IDLE`, the LB policy im
 
 ### Subchannel Weights
 
-To enforce `blackout_period` and `weight_expiration_period`, the LB policy tracks two timestamps along with the weight. `last_updated` tracks the last time a non-zero report was received. `non_empty_since` tracks when the first non-zero load report was received, and it is reset when a subchannel comes back to `READY` or the weight expires so that it can be updated with the next non-zero load report. The blackout and expiration are enforced when the weight value is looked up.
+To enforce `blackout_period` and `weight_expiration_period`, the LB policy tracks two timestamps along with the weight. `last_updated` tracks the last time a report with non-zero `cpu_utilization` and `qps` was received. `non_empty_since` tracks when the first non-zero load report was received, and it is reset when a subchannel comes back to `READY` or the weight expires so that it can be updated with the next non-zero load report. The blackout and expiration are enforced when the weight value is looked up.
 
 The weight of a backend is calculated as ***weight = qps / cpuutilization***.
 
@@ -165,14 +163,14 @@ When OOB reporting is enabled, the LB policy gets data via an OOB watch on each 
 
 In C/C++,  processing OOB load reports is supported with `OobBackendMetricWatcher`. `weighted_round_robin` implements this interface. The watcher takes the reference of the subchannel weight object and update weights to it.
 
-In Java, `OrcaOobUtil` is available in `io.grpc.xds.orca` for OOB load reports but a new API is needed to set and unset the listener in `OrcaOobUtil` to toggle the OOB load report processing.
+In Java, `OrcaOobUtil` is available in `io.grpc.xds.orca` for OOB load reports but a new API is needed to unset the listener in `OrcaOobUtil` to toggle the OOB load report processing.
 
 In Go, `orca.OOBListener` is available for OOB load reporting but a new API is needed to support enabling and disabling OOB load reporting.
 
 
 ### xDS Integration
 
-`weighted_round_robin` is enabled as the endpoint picking policy of `WrrLocality` of [gRFC A52][A52].
+`weighted_round_robin` is enabled as an endpoint picking policy of `WrrLocality` of [gRFC A52][A52].
 
 `weighted_round_robin` is added as a new LB policy per [gRFC A52][A52] and is added to `XdsLbPolicyRegistry`. The name is prefixed with `ClientSide` to avoid confusion with the pending [gRFC A34][A34] where the endpoint weights are sent by the control plane.
 
