@@ -43,7 +43,7 @@ The table below lists the metadata we will include in the audit context,
 which will be made available to audit loggers during an audit event.
 
 It is worth noting that audit happens right after the authorization
-decision is made, so the status only reflects that but not the eventual
+decision is made, so the status only reflects that, but not the eventual
 one from the server. 
 
 |Fields             |Additional Information                                                             |Example                |
@@ -91,9 +91,12 @@ message RBAC {
 ```
 
 Note that `DENY` and `ALLOW` in the enum refer to the RBAC decisions, not
-RBAC actions. For example, we consider it as `DENY` decision when a RBAC
-rejects the RPC whether there is no policy match from a RBAC with `ALLOW`
-action or there is a match from a RBAC with `DENY` policy. Likewise for `ALLOW`.
+RBAC actions. For example, we consider it to be a `DENY` decision when a RBAC
+rejects the RPC, regardless of whether it is because there is no policy match
+from a RBAC with the `ALLOW` action, or because there is a match for a RBAC
+with a `DENY` action. Likewise, it is an `ALLOW` decision when there are no
+matches to RBACs with a `DENY` action and at least one match to an RBAC with an
+`ALLOW` action.
 
 For the audit logger configuration, we will follow the existing `access_log`
 field in the [HTTP Connection Manager][HttpConnectionManager proto] by adding
@@ -117,7 +120,7 @@ The list of configured audit loggers will all be invoked by an RBAC filter when
 the audit condition is met. This is analogus to the semantics that all access
 loggers will be run after the response is sent.
 
-### gRPC Authorzation Policy Changes
+### gRPC Authorization Policy Changes
 
 The gRPC authorization policy consists of `deny_rules` and `allow_rules`, which
 are mapped to two RBACs. Overall it's a subset of the RBAC as stated in [A43: gRPC authorization API][A43].
@@ -216,7 +219,7 @@ when the RPC passes through both RBACs.
 If users want to audit on both cases, then the `DENY` RBAC needs `ON_DENY` and
 the `ALLOW` RBAC needs `ON_DENY_AND_ALLOW`.
 
-Following is the table summarzing the combinations.
+Following is the table summarizing the combinations.
 
 |Authorization Policy  |DENY RBAC          |ALLOW RBAC           |
 |----------------------|-------------------|---------------------|
