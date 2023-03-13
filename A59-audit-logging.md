@@ -241,7 +241,28 @@ implementations registered by users._
 
 ## Rationale
 
-So far, we have considered alternatives in a number of othorgonal aspects.
+Audit logging helps users answer the questions of "who did what, where and when?".
+It is valuable for users to detect anomalous traffic patterns or monitor accesses
+to certain services.
+
+Therefore, authentication and authorization information needs to be available
+in the audit context. Since gRPC authorization is based on the [RBAC policy][RBAC policy],
+we design the audit logging feature around it to provide consistent APIs across
+xDS and non-xDS use cases. The proposed xDS API changes should also benefit
+other xDS clients which are currently lacking this feature as well.
+
+In both xDS and non-xDS cases, we expect users to configure the audit condition
+and audit loggers in language-agnostic configs and have the capability to inject
+their own logger implementations via the APIs we expose. This allows users to
+plug in their own audit logic while not having to restart the servers when
+reconfiguring the loggers.
+
+For auditing purposes, users should not log every incoming RPCs. In other words,
+`ON_DENY_AND_ALLOW` should seldom be used. But this is added as an option to
+support special cases where logging everything is required.
+
+Regarding alternative design options, following are what we have considered in
+a number of othorgonal aspects.
 
 ### Utilizing the Access Log
 
