@@ -237,6 +237,11 @@ In the xDS configuration for the client, `client_side_weighted_round_robin` is w
 }
 ```
 
+### Temporary environment variable protection
+
+Enabling `weighted_round_robin` as an endpoint picking policy of `WrrLocality` of [gRFC A52][A52] is currently protected by an environment variable `GRPC_EXPERIMENTAL_XDS_WRR_LB`.
+
+
 ## Implementation
 
 This will be implemented in all languages C++, Java, and Go.
