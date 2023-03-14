@@ -46,12 +46,13 @@ It is worth noting that audit happens right after the authorization
 decision is made, so the status only reflects that, but not the eventual
 one from the server. 
 
-|Fields             |Additional Information                                                             |Example                |
-|-------------------|-----------------------------------------------------------------------------------|-----------------------|
-|RPC Method         |Method the RPC hit.                                                                |"/pkg.service/foo"     |
-|Principal          |Identity the RPC. Currently only available in certificate-based TLS authentication.|"spiffe://foo/user1"   |
-|Policy Name        |Name of the policy that invokes audit logging.                                     |"policy_name"          |
-|Authorized         |Boolean indicating whether the RPC is authorized or not.                           |true                   |
+|Fields             |Additional Information                                                                 |Example                |
+|-------------------|---------------------------------------------------------------------------------------|-----------------------|
+|RPC Method         |Method the RPC hit.                                                                    |"/pkg.service/foo"     |
+|Principal          |Identity the RPC. Currently only available in certificate-based TLS authentication.    |"spiffe://foo/user1"   |
+|Policy Name        |The authorization policy name (or the xDS RBAC filter name).                           |"example-policy"       |
+|Matched Rule       |The matched rule (or the matched policy name in [RBAC][RBAC policy]. Empty if no match.|"admin-access"         |
+|Authorized         |Boolean indicating whether the RPC is authorized or not.                               |true                   |
 
 ### xDS API Changes
 
@@ -118,6 +119,14 @@ message HttpConnectionManager {
 The list of configured audit loggers will all be invoked by an RBAC filter when
 the audit condition is met. This is analogus to the semantics that all access
 loggers will be run after the response is sent.
+
+Some readers may immediately notice that since an HTTP filter chain can contain
+an arbitrary number of RBAC filters, more than one of them could meet its audit
+condition for the same RPC and multiple audit log entries occur. When this happens,
+it would be impossible to uniquely identify a specific RPC from a log entry so as
+to apply any sort of de-duplication. The design in this gRFC does not intend to
+address this issue as we argue it is a rare use case. This will be elaborated more
+in [one of the design alternatives](#audit-condition-in-the-http-connection-manager).
 
 ### gRPC Authorization Policy Changes
 
@@ -274,17 +283,31 @@ access log won't necessarily happen till hours later.
 
 ### Audit Condition in the HTTP Connection Manager
 
-As an HTTP filter chain can contain multiple RBAC filters in general. The typical
+As an HTTP filter chain can contain multiple RBAC filters in general, the typical
 behavior that users will expect if they want to audit on allow is audit should
-only happen once after the evaluation of the last RBAC filter. From this
-perspective, the audit condition could be considered as something on top of all
-RBAC filters and thus configured in the [HTTP Connection Manager][HttpConnectionManager proto].
+only happen once after the evaluation of the last RBAC filter. The gRPC
+authorization policy API assumes this expectation and handles the audit condition
+for the users.
 
-However, given that xDS users normally do not craft RBACs on their own but instead
-rely on the control plane APIs, such as Istio Authorization Policy, it is
-reasonable to let the control plane handle the translation properly.
-Meanwhile, configuring audit condition in individual RBACs offers the flexibility
-when users really want to audit events related to a particular RBAC.
+In the xDS cases, however, the audit condition could be considered as something
+on top of all RBAC filters and thus configured in the [HTTP Connection Manager][HttpConnectionManager proto].
+We decided not to take this approach because the component managing the filter
+chain would have to be aware of the last RBAC filter constantly and inform it
+if performing the audit logging. In other words, this would require some heavy
+lifting implementation-wise which does not make too much sense for such a
+specicialized case as audit logging.
+
+In practice, xDS users normally do not craft RBACs on their own but instead
+rely on the control plane APIs, such as Istio's Authorization Policy, to apply
+RBAC filters to the workloads. Whether the control plane explicitly sets the
+constraint or not, the common practice is to apply at most one authorization
+policy to a workload. So it generally suffices to leave the audit condition
+inside individual RBACs.
+
+To summarize, we acknowledge the possibility of multiple log entries for the
+same RPC and argue this to be an uncommon scenario. Our APIs will not disallow
+such configurations but also intentionally not provide any mechanism for log
+entry de-duplication.
 
 ### Audit Log Configured In gRPC Bootstrap
 
