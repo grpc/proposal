@@ -50,7 +50,6 @@ one from the server.
 |-------------------|-----------------------------------------------------------------------------------|-----------------------|
 |RPC Method         |Method the RPC hit.                                                                |"/pkg.service/foo"     |
 |Principal          |Identity the RPC. Currently only available in certificate-based TLS authentication.|"spiffe://foo/user1"   |
-|Timestamp          |Time when the server saw the RPC.                                                  |1649376211             |
 |Policy Name        |Name of the policy that invokes audit logging.                                     |"policy_name"          |
 |Authorized         |Boolean indicating whether the RPC is authorized or not.                           |true                   |
 
@@ -137,17 +136,17 @@ in [A43: gRPC authorization API][A43]:
   "title": "AuthorizationPolicy",
   "definitions": {
     ...
-    "audit_log": {
-      "description": "Configuration for the audit log.",
+    "audit_logger": {
+      "description": "Configuration for the audit logger.",
       "type": "object",
       "properties": {
         "name": {
-          "description": "The name of the audit_log configuration."
+          "description": "The name of the audit logger configuration."
             "It is mainly used for human purposes.",
           "type": "string",
         },
         "typed_config": {
-          "description": "The typed config for the audit_log."
+          "description": "The typed config for the audit logger."
             "This needs to be a json object mapped from google.protobuf.Struct"
             "proto message.",
           "type": "object",
@@ -163,8 +162,8 @@ in [A43: gRPC authorization API][A43]:
       "type": "string",
       "enum": ["NONE", "ON_DENY", "ON_ALLOW", "ON_DENY_AND_ALLOW"]
     },
-    "audit_log": {
-      "$ref": "#/definitions/audit_log"
+    "audit_logger": {
+      "$ref": "#/definitions/audit_logger"
     }
   },
   "required": ["name", "allow_rules"]
@@ -187,12 +186,12 @@ message AuthorizationPolicy {
 
   AuditCondition audit_condition = 1;
 
-  message AuditLog {
+  message AuditLogger {
     string name = 1;
     google.protobuf.Struct config = 2;  
   }
   
-  AuditLog audit_log = 2;
+  AuditLogger audit_logger = 2;
 }
 ```
 
