@@ -324,4 +324,5 @@ in xDS, albeit not currently supported by gRPC.
 
 ## Implementation
 
-The implementation order will be C++, Go, Java and then wrapped languages.
+Implementation will first be done for C++ and Go. Following that will be Java,
+and finally wrapped languages will be implemented.
