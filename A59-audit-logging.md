@@ -87,6 +87,11 @@ message RBAC {
   // If condition is met, all the audit loggers configured in the HCM will be invoked.
   //
   AuditCondition audit_condition = 3;
+
+  // Configuration for the audit loggers.
+  //
+  // [#extension-category: envoy.audit_loggers]
+  repeated xds.core.v3.TypedExtensionConfig audit_log = 53;
 }
 ```
 
@@ -98,25 +103,8 @@ with a `DENY` action. Likewise, it is an `ALLOW` decision when there are no
 matches to RBACs with a `DENY` action and at least one match to an RBAC with an
 `ALLOW` action.
 
-For the audit logger configuration, we will follow the existing `access_log`
-field in the [HTTP Connection Manager][HttpConnectionManager proto] by adding
-a typed extension category `audit_log`:
-
-```
-package envoy.extensions.filters.network.http_connection_manager.v3;
-
-message HttpConnectionManager {
-  ...
-  
-  // Configuration for the audit log.
-  // The audit_loggers instantiated from this will be used in all RBAC filters.
-  //
-  // [#extension-category: envoy.audit_loggers]
-  repeated xds.core.v3.TypedExtensionConfig audit_log = 53;
-}
-```
-
-The list of configured audit loggers will all be invoked by an RBAC filter when
+The audit logger configuration is also placed inside each individual RBACs. The
+list of configured audit loggers will all be invoked by an RBAC filter when
 the audit condition is met. This is analogus to the semantics that all access
 loggers will be run after the response is sent.
 
@@ -208,9 +196,10 @@ Note that the definition above is only for illustration purposes and does not
 actually exist anywhere as a `.proto` file. Nor does gRPC process the policy
 as protobuf by any means.
 
-Since the authorization policy is backed by two RBAC filters, it's necessary
-to clarify how this top-level audit condition is converted to two conditions
-in those RBACs.
+The authorization policy is backed by two RBAC filters, so the audit logger
+configurations will be duplicated in both generated RBAC filters. How the
+audit condition gets translated into two conditions in those RBACs is less
+straightforward and is explained below.
 
 First of all, note that the RBAC with `DENY` is placed before the RBAC with
 `ALLOW`. We assume users will want to audit one particular RPC once if the
