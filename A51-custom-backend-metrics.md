@@ -86,9 +86,6 @@ function recordCPUUtilizationMetric(double value);
 // Records the memory utilization metric measurement for the call.
 function recordMemoryUtilizationMetric(double value);
 
-// Records the memory utilization metric measurement for the call.
-function recordMemoryUtilizationMetric(double value);
-
 // Records the queries per second measurement.
 function recordQpsMetric(double value);
 
