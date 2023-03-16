@@ -46,18 +46,21 @@ It is worth noting that audit happens right after the authorization
 decision is made, so the status only reflects that, but not the eventual
 one from the server. 
 
-|Fields             |Additional Information                                                                 |Example                |
-|-------------------|---------------------------------------------------------------------------------------|-----------------------|
-|RPC Method         |Method the RPC hit.                                                                    |"/pkg.service/foo"     |
-|Principal          |Identity the RPC. Currently only available in certificate-based TLS authentication.    |"spiffe://foo/user1"   |
-|Policy Name        |The authorization policy name (or the xDS RBAC filter name).                           |"example-policy"       |
-|Matched Rule       |The matched rule (or the matched policy name in [RBAC][RBAC policy]. Empty if no match.|"admin-access"         |
-|Authorized         |Boolean indicating whether the RPC is authorized or not.                               |true                   |
+|Fields             |Additional Information                                                                |Example                |
+|-------------------|--------------------------------------------------------------------------------------|-----------------------|
+|RPC Method         |Method the RPC hit.                                                                   |"/pkg.service/foo"     |
+|Principal          |Identity the RPC. Currently only available in certificate-based TLS authentication.   |"spiffe://foo/user1"   |
+|Policy Name        |The authorization policy name (or the xDS RBAC filter name).                          |"example-policy"       |
+|Matched Rule       |The matched rule or the matched policy name in [RBAC][RBAC policy]. Empty if no match.|"admin-access"         |
+|Authorized         |Boolean indicating whether the RPC is authorized or not.                              |true                   |
 
 ### xDS API Changes
 
 xDS API changes are needed because gRPC authorization is entirely based on [xDS RBAC policy][RBAC policy].
-Moreoever, audit logging is a common feature that other xDS clients (namely Envoy) should benefit from as well.
+As a feature on top of authorization, audit logging should not be independent
+from xDS and cause any divergence between gRPC authorization API and its xDS
+RBAC filter support. Moreoever, audit logging is a common feature that other
+xDS clients (namely Envoy) should benefit from as well.
 
 We will add an audit condition enum (see [PR](https://github.com/envoyproxy/envoy/pull/26001))
 in the [xDS RBAC policy][RBAC policy] as below:
@@ -83,15 +86,15 @@ message RBAC {
     ON_DENY_AND_ALLOW = 3;
   }
 
-  // Condition for the audit logging to be happen, specific to HTTP filters.
+  // Condition for the audit logging to be happen.
   // If condition is met, all the audit loggers configured in the HCM will be invoked.
   //
   AuditCondition audit_condition = 3;
 
   // Configuration for the audit loggers.
   //
-  // [#extension-category: envoy.audit_loggers]
-  repeated xds.core.v3.TypedExtensionConfig audit_log = 53;
+  // [#extension-category: envoy.rbac.audit_loggers]
+  repeated xds.core.v3.TypedExtensionConfig audit_log = 4;
 }
 ```
 
@@ -113,8 +116,8 @@ an arbitrary number of RBAC filters, more than one of them could meet its audit
 condition for the same RPC and multiple audit log entries occur. When this happens,
 it would be impossible to uniquely identify a specific RPC from a log entry so as
 to apply any sort of de-duplication. The design in this gRFC does not intend to
-address this issue as we argue it is a rare use case. This will be elaborated more
-in [one of the design alternatives](#audit-condition-in-the-http-connection-manager).
+address this issue, the rationale of which will be elaborated more in
+[one of the design alternatives](#audit-condition-in-the-http-connection-manager).
 
 ### gRPC Authorization Policy Changes
 
@@ -199,11 +202,11 @@ as protobuf by any means.
 The authorization policy is backed by two RBAC filters, so the audit logger
 configurations will be duplicated in both generated RBAC filters. How the
 audit condition gets translated into two conditions in those RBACs is less
-straightforward and is explained below.
+straightforward and so is explained below.
 
 First of all, note that the RBAC with `DENY` is placed before the RBAC with
-`ALLOW`. We assume users will want to audit one particular RPC once if the
-condition is met.
+`ALLOW`. We assume users will want to audit one particular RPC exactly once
+if the condition is met.
 
 If users want to audit on deny, then both of the RBACs will have `ON_DENY` as
 the audit condition. The `ALLOW` RBAC will not be evaluated so audit logging
@@ -229,12 +232,19 @@ Again this is a subset of what users can technically do with xDS RBACs in the wa
 described in the earlier section. But we think this represents the most common
 use cases.
 
-### Language Specific APIs
+### Built-in logger types
+
+We plan to implement the stdout logger as a built-in logger type. More types of
+loggers may be designed and implemented in the future. For users that just need
+to use the built-in loggers, everything will be configured in either the xDS RBAC
+filter or gRPC authorization policy. No additional code is required.
+
+### Language Specific APIs for third-party logger implementation
+
+Some users may want to have their own audit logging logic which we will support
+by exposing APIs for users to implement their own types of audit loggers.
 
 _This section is to be done once the language-agnostic APIs are more finalized._
-
-_What is certain for now is we need to support third-party audit logger
-implementations registered by users._
 
 ## Rationale
 
@@ -270,6 +280,13 @@ fit the audit logging use case well. For example, for long-living RPCs, users
 would want to audit the event right after the authorization is enfoced but
 access log won't necessarily happen till hours later.
 
+Note that there has been ongoing effort in Envoy to support flushing access
+logs at different lifecycle points of a request (see [example](https://github.com/envoyproxy/envoy/pull/26094)).
+It would be a valid approach if the access log is generalized to support what
+is needed here. But gRPC does not and has no plan yet to support access log,
+due to the lack of such need. Therefore, we decided not to take this approach
+which would require more engineering effort.
+
 ### Audit Condition in the HTTP Connection Manager
 
 As an HTTP filter chain can contain multiple RBAC filters in general, the typical
@@ -282,21 +299,20 @@ In the xDS cases, however, the audit condition could be considered as something
 on top of all RBAC filters and thus configured in the [HTTP Connection Manager][HttpConnectionManager proto].
 We decided not to take this approach because the component managing the filter
 chain would have to be aware of the last RBAC filter constantly and inform it
-if performing the audit logging. In other words, this would require some heavy
-lifting implementation-wise which does not make too much sense for such a
-specicialized case as audit logging.
+if performing the audit logging. In other words, this would require more
+engineering effort which does not make too much sense for such a particular
+case as audit logging.
 
 In practice, xDS users normally do not craft RBACs on their own but instead
 rely on the control plane APIs, such as Istio's Authorization Policy, to apply
-RBAC filters to the workloads. Whether the control plane explicitly sets the
-constraint or not, the common practice is to apply at most one authorization
-policy to a workload. So it generally suffices to leave the audit condition
-inside individual RBACs.
+RBAC filters to the workloads. We hope that when these control plane APIs
+start to support audit logging, they will handle the logging behavior as what
+we do in the gRPC authorization policy case.
 
 To summarize, we acknowledge the possibility of multiple log entries for the
-same RPC and argue this to be an uncommon scenario. Our APIs will not disallow
-such configurations but also intentionally not provide any mechanism for log
-entry de-duplication.
+same RPC and argue it to be uncommon with carefully designed control plane APIs.
+At the xDS RBAC level, we will not disallow such configurations but also
+intentionally not provide any mechanism for log entry de-duplication.
 
 ### Audit Log Configured In gRPC Bootstrap
 
