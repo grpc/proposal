@@ -109,7 +109,10 @@ matches to RBACs with a `DENY` action and at least one match to an RBAC with an
 The audit logger configuration is also placed inside each individual RBACs. The
 list of configured audit loggers will all be invoked by an RBAC filter when
 the audit condition is met. This is analogus to the semantics that all access
-loggers will be run after the response is sent.
+loggers will be run after the response is sent. It's a repeated field here since
+allowing multiple audit loggers is useful when users plan to roll out a new
+logger. By also keeping the existing logger along for a period they will be able
+to prevent interruption.
 
 Some readers may immediately notice that since an HTTP filter chain can contain
 an arbitrary number of RBAC filters, more than one of them could meet its audit
@@ -123,10 +126,8 @@ address this issue, the rationale of which will be elaborated more in
 
 The gRPC authorization policy consists of `deny_rules` and `allow_rules`, which
 are mapped to two RBACs. Overall it's a subset of the RBAC as stated in [A43: gRPC authorization API][A43].
-We will keep this philosophy by adding just one `audit_condition` in the policy
-instead of having separate conditions for those two set of rules. Likewise, only
-one audit logger can be specified, the configuration of which is the json
-representation of the typed config used in xDS.
+We will keep this philosophy by adding just one `audit_logging_options` in the
+policy instead of having separate ones for those two sets of rules.
 
 Following are changes to the JSON schema of gRPC Authorization Policy introduced
 in [A43: gRPC authorization API][A43]:
@@ -156,15 +157,26 @@ in [A43: gRPC authorization API][A43]:
   },
   "properties": {
     ...
-    "audit_condition": {
-      "description": "Condition for the audit logging to be happen."
-        "Same as NONE if ommited.",
-      "type": "string",
-      "enum": ["NONE", "ON_DENY", "ON_ALLOW", "ON_DENY_AND_ALLOW"]
+    "audit_logging_options": {
+      "description": "Audit logging options that include the condition for audit"
+        "logging to happen and audit logger configurations.",
+      "type": "object",
+      "properties": {
+        "audit_condition": {
+          "description": "Condition for the audit logging to happen."
+            "Same as NONE if ommited.",
+          "type": "string",
+          "enum": ["NONE", "ON_DENY", "ON_ALLOW", "ON_DENY_AND_ALLOW"]
+        },
+        "audit_logger": {
+          "description": "Audit logger configurations",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/audit_logger"
+          }
+        }
+      }
     },
-    "audit_logger": {
-      "$ref": "#/definitions/audit_logger"
-    }
   },
   "required": ["name", "allow_rules"]
 }
@@ -177,21 +189,25 @@ to:
 message AuthorizationPolicy {
   …
 
-  enum AuditCondition {
-    NONE = 0;
-    ON_DENY = 1;
-    ON_ALLOW = 2;
-    ON_DENY_AND_ALLOW = 3;
+  message AuditLoggingOptions {
+    enum AuditCondition {
+      NONE = 0;
+      ON_DENY = 1;
+      ON_ALLOW = 2;
+      ON_DENY_AND_ALLOW = 3;
+    }
+
+    AuditCondition audit_condition = 1;
+
+    message AuditLogger {
+      string name = 1;
+      google.protobuf.Struct config = 2;  
+    }
+    
+    repeated AuditLogger audit_loggers = 2;
   }
 
-  AuditCondition audit_condition = 1;
-
-  message AuditLogger {
-    string name = 1;
-    google.protobuf.Struct config = 2;  
-  }
-  
-  AuditLogger audit_logger = 2;
+  AuditLoggingOptions audit_logging_options = 4;
 }
 ```
 
