@@ -237,7 +237,9 @@ In the xDS configuration for the client, `client_side_weighted_round_robin` is w
 }
 ```
 
-### Temporary environment variable protection
+### Experimental Status and Environment Variable Protection
+
+Currently `weighted_round_robin` policy is experimental and its name is suffixed so i.e. `weighted_round_robin_experimental`.
 
 Enabling `weighted_round_robin` as an endpoint picking policy of `WrrLocality` of [gRFC A52][A52] is currently protected by an environment variable `GRPC_EXPERIMENTAL_XDS_WRR_LB`.
 
