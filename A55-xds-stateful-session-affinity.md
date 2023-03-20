@@ -2,9 +2,9 @@ A55: xDS-Based Stateful Session Affinity for Proxyless gRPC
 ----
 * Author(s): Sanjay Pujare (@sanjaypujare)
 * Approver: markdroth
-* Status: In Review
-* Implemented in: <language, ...>
-* Last updated: 2022-08-17
+* Status: Implemented
+* Implemented in: C-core
+* Last updated: 2023-03-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/F84rRVNgml4
 
 ## Abstract
