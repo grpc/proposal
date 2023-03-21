@@ -77,6 +77,9 @@ function recordRequestCostMetric(String name, double value);
 // Records a utilization metric measurement for the call.
 function recordUtilizationMetric(String name, double value);
 
+// Records an opaque named metric measurement for the call.
+function recordNamedMetric(String name, double value);
+
 // Records the CPU utilization metric measurement for the call.
 function recordCPUUtilizationMetric(double value);
 
@@ -85,11 +88,15 @@ function recordMemoryUtilizationMetric(double value);
 
 // Records the queries per second measurement.
 function recordQpsMetric(double value);
+
+// Records the errors per second measurement.
+function recordEpsMetric(double value);
 ```
 
 Recording the same metric multiple times overrides the previously provided values.
 The methods can be called at any time during an RPC lifecycle, depending on the particular type of the cost or utilization measurement. For example, an RPC request size may
 be recorded at the beginning of the call, while a queue-size may be reported at any time during the call lifetime.
+`recordNamedMetric` is an API for opaque metrics whose type (i.e. per-request or per-server) is application specific.
 The data is translated to an `OrcaLoadReport` at the end of each RPC and sent out as the trailing metadata.
 
 
@@ -126,6 +133,12 @@ function setQpsMetric(double value);
 
 // Clear the queries-per-second metrics data.
 function deleteQpsMetric();
+
+// Update the errors-per-second metrics data.
+function setEpsMetric(double value);
+
+// Clear the errors-per-second metrics data.
+function deleteEpsMetric();
 ```
 
 All metrics are initially unset. Once set metrics stay in place until cleared. Recording the same metric overrides the previously provided values.
@@ -303,6 +316,9 @@ public final class CallMetricRecorder {
   // Records a utilization metric measurement for the call.
   public CallMetricRecorder recordUtilizationMetric(String name, double value);
 
+  // Records an opaque named metric measurement for the call.
+  public CallMetricRecorder recordNamedMetric(String name, double value);
+
   //Records the CPU utilization metric measurement for the call.
   public CallMetricRecorder recordCPUUtilizationMetric(double value);
 
@@ -311,6 +327,9 @@ public final class CallMetricRecorder {
 
   // Records the queries per second measurement.
   public CallMetricRecorder recordQpsMetric(double value);
+
+  // Records the errors per second measurement.
+  public CallMetricRecorder recordEpsMetric(double value);
 
   // Returns the call metric recorder attached to the current call.
   public static CallMetricRecorder getCurrent();
@@ -349,6 +368,12 @@ public class MetricRecorder {
 
   // Clear the queries-per-second metrics data.
   public void clearQpsMetric();
+
+  // Update the errors-per-second metrics data.
+  public void putEpsMetric(double value);
+
+  // Clear the errors-per-second metrics data.
+  public void clearEpsMetric();
 }
 ```
 
@@ -448,6 +473,11 @@ class CallMetricRecorder {
   // Values outside of the valid range [0, infy) are ignored.
   CallMetricRecorder& RecordQpsMetric(double value);
 
+  // Records a call metric measurement for errors per second.
+  // Multiple calls to this method will override the stored value.
+  // Values outside of the valid range [0, infy) are ignored.
+  CallMetricRecorder& RecordEpsMetric(double value);
+
   // Records a call metric measurement for utilization.
   // Multiple calls to this method with the same name will
   // override the corresponding stored value. The lifetime of the
@@ -467,6 +497,16 @@ class CallMetricRecorder {
   // finishes. It is assumed the strings are common names that
   // are global constants.
   CallMetricRecorder& RecordRequestCostMetric(string_ref name,
+                                                      double value);
+
+  /// Records an opaque named metric measurement.
+  /// Multiple calls to this method with the same name will
+  /// override the corresponding stored value. The lifetime of the
+  /// name string needs to be longer than the lifetime of the RPC
+  /// itself, since it's going to be sent as trailers after the RPC
+  /// finishes. It is assumed the strings are common names that
+  /// are global constants.
+  CallMetricRecorder& RecordNamedMetric(string_ref name,
                                                       double value);
 };
 
@@ -503,6 +543,10 @@ class ServerMetricRecorder {
   // Values outside of the valid range are rejected.
   // Overrides the stored value when called again with a valid value.
   void SetQps(double value);
+  // Records number of errors per second to the server in the range [0, infy).
+  // Values outside of the valid range are rejected.
+  // Overrides the stored value when called again with a valid value.
+  void SetEps(double value);
   // Records a named resource utilization value in the range [0, 1].
   // Values outside of the valid range are rejected.
   // Overrides the stored value when called again with the same name.
