@@ -71,30 +71,38 @@ package envoy.config.rbac.v3;
 message RBAC {
   ...
 
-  // Deny and allow here refer to RBAC decisions, not actions.
-  enum AuditCondition {
-    // Never audit.
-    NONE = 0;
+  message AuditLoggingOptions {
+    // Deny and allow here refer to RBAC decisions, not actions.
+    enum AuditCondition {
+      // Never audit.
+      NONE = 0;
 
-    // Audit when RBAC denies the request.
-    ON_DENY = 1;
+      // Audit when RBAC denies the request.
+      ON_DENY = 1;
 
-    // Audit when RBAC allows the request.
-    ON_ALLOW = 2;
+      // Audit when RBAC allows the request.
+      ON_ALLOW = 2;
 
-    // Audit whether RBAC allows or denies the request.
-    ON_DENY_AND_ALLOW = 3;
+      // Audit whether RBAC allows or denies the request.
+      ON_DENY_AND_ALLOW = 3;
+    }
+
+    // Condition for the audit logging to happen.
+    // If this condition is met, all the audit loggers configured here will be invoked.
+    //
+    AuditCondition audit_condition = 1 [(validate.rules).enum = {defined_only: true}];
+
+    // Configurations for RBAC-based authorization audit loggers.
+    //
+    // [#extension-category: envoy.rbac.audit_loggers]
+    repeated core.v3.TypedExtensionConfig audit_loggers = 2
+        [(validate.rules).repeated = {min_items: 1}];
   }
 
-  // Condition for the audit logging to be happen.
-  // If condition is met, all the audit loggers configured in the HCM will be invoked.
+  // Audit logging options that include the condition for audit logging to happen
+  // and audit logger configurations.
   //
-  AuditCondition audit_condition = 3;
-
-  // Configuration for the audit loggers.
-  //
-  // [#extension-category: envoy.rbac.audit_loggers]
-  repeated xds.core.v3.TypedExtensionConfig audit_log = 4;
+  AuditLoggingOptions audit_logging_options = 3;
 }
 ```
 
