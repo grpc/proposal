@@ -250,20 +250,25 @@ use cases.
 
 ### Built-in logger types
 
-We plan to implement the standard stream logger as a built-in logger type. The
-type is named `standard_stream_logger`. The logger by default logs in JSON format
-to stdout. Independently, it can be configured to log in text format and log to
-stderr. Following is the example configuration in JSON.
+We plan to implement the stdout logger as a built-in logger type. The type is
+named `stdout_logger`. This logger will not support any configuration and it
+outputs log entries to stdout in JSON format.
+
+Here is the example configuration in JSON.
 
 ```json
 {
   "name": "user-defined-logger-name",
   "typed_config": {
-    "@type": "standard_stream_logger",
-    "log_format": "json",
-    "stream": "stdout",
+    "@type": "stdout_logger",
   }
 }
+```
+
+Following is an example log entry.
+
+```json
+{"timestamp":"1649376211","rpc_method":"/pkg.Service/Foo","principal":"spiffe://foo/user1","policy_name":"example_policy","matched_rule":"admin_access","authorized":true}
 ```
 
 More types of loggers may be designed and implemented in the future. For users
