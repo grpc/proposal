@@ -65,7 +65,7 @@ xDS clients (namely Envoy) should benefit from as well.
 We will add an audit condition enum (see [PR](https://github.com/envoyproxy/envoy/pull/26001))
 in the [xDS RBAC policy][RBAC policy] as below:
 
-```
+```proto
 package envoy.config.rbac.v3;
 
 message RBAC {
