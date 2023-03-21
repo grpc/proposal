@@ -89,7 +89,6 @@ message RBAC {
 
     // Condition for the audit logging to happen.
     // If this condition is met, all the audit loggers configured here will be invoked.
-    //
     AuditCondition audit_condition = 1 [(validate.rules).enum = {defined_only: true}];
 
     // Configurations for RBAC-based authorization audit loggers.
@@ -101,7 +100,6 @@ message RBAC {
 
   // Audit logging options that include the condition for audit logging to happen
   // and audit logger configurations.
-  //
   AuditLoggingOptions audit_logging_options = 3;
 }
 ```
