@@ -49,10 +49,10 @@ one from the server.
 |Fields             |Additional Information                                                                |Example                |
 |-------------------|--------------------------------------------------------------------------------------|-----------------------|
 |RPC Method         |Method the RPC hit.                                                                   |"/pkg.service/foo"     |
-|Principal          |Identity the RPC. Currently only available in certificate-based TLS authentication.   |"spiffe://foo/user1"   |
+|Principal          |Identity of the RPC. Currently only available in certificate-based TLS authentication.|"spiffe://foo/user1"   |
 |Policy Name        |The authorization policy name (or the xDS RBAC filter name).                          |"example-policy"       |
 |Matched Rule       |The matched rule or the matched policy name in [RBAC][RBAC policy]. Empty if no match.|"admin-access"         |
-|Authorized         |Boolean indicating whether the RPC is authorized or not.                              |true                   |
+|Authorized         |A boolean indicating whether the RPC is authorized or not.                            |true                   |
 
 ### xDS API Changes
 
@@ -148,8 +148,7 @@ in [A43: gRPC authorization API][A43]:
       "type": "object",
       "properties": {
         "name": {
-          "description": "The name of the audit logger configuration."
-            "It is mainly used for human purposes.",
+          "description": "The name of the audit logger type.",
           "type": "string",
         },
         "typed_config": {
@@ -188,6 +187,8 @@ in [A43: gRPC authorization API][A43]:
 }
 ```
 
+Note that the `name` field in `audit_logger` is essentially the logger type.
+This is not to be confused with the `name` field in [TypedExtensionConfig](https://github.com/cncf/xds/blob/main/xds/core/v3/extension.proto).
 For readers that are more familiar with proto messages, the change translates
 to:
 
@@ -260,7 +261,7 @@ We plan to implement the stdout logger as a built-in logger type. The type is
 named `stdout_logger`. This logger will not support any configuration and it
 outputs log entries to stdout in JSON format.
 
-Here is the example configuration in JSON.
+Here is the example JSON configuration in the xDS case.
 
 ```json
 {
@@ -268,6 +269,14 @@ Here is the example configuration in JSON.
   "typed_config": {
     "@type": "stdout_logger",
   }
+}
+```
+
+Here is the example in the authorization policy case.
+
+```json
+{
+  "name": "stdout_logger"
 }
 ```
 
