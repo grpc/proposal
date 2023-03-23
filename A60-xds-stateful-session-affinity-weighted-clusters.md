@@ -1,4 +1,4 @@
-A58: xDS-Based Stateful Session Affinity for Weighted Clusters
+A60: xDS-Based Stateful Session Affinity for Weighted Clusters
 ----
 * Author(s): Sanjay Pujare (@sanjaypujare)
 * Approver: markdroth
@@ -22,7 +22,7 @@ limitation that it does not work in cases such as traffic splitting
 where RPCs of a session potentially get sent to different clusters as part of
 the traffic splitting policy as shown below.
 
-![Traffic Splitting Breaking Session Affinity](A58_graphics/broken-affinity.png)
+![Traffic Splitting Breaking Session Affinity](A60_graphics/broken-affinity.png)
 
 The diagram above shows the client app and the gRPC load balancer as 2 separate
 logical boxes to clealy show the interaction between them although they both are
@@ -77,7 +77,7 @@ This problem can be described as simply a race condition between the LB
 processing an RPC and xDS updates changing route configuration as seen in the
 following diagram.
 
-![Config Selector Race Condition](A58_graphics/race-condition.png)
+![Config Selector Race Condition](A60_graphics/race-condition.png)
 
 In the diagram above you see two timelines: on the RPC routing timeline the
 config selector picks cluster CL1 for the RPC and sometime later the LB attempts
@@ -175,7 +175,7 @@ cluster between when the config selector selects the cluster and when the
 The following diagram shows how the process works once this design is
 implemented:
 
-![Weighted Clusters Process](A58_graphics/final-diagram.png)
+![Weighted Clusters Process](A60_graphics/final-diagram.png)
 
  1. An RPC comes in and config selector picks cluster-A (shown in bold).
 
