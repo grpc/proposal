@@ -4,7 +4,7 @@ A59: gRPC Audit Logging
 * Approver: [Eric Anderson](https://github.com/ejona86)
 * Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in:
-* Last updated: 2023-03-09
+* Last updated: 2023-03-23
 * Discussion at: https://groups.google.com/g/grpc-io/c/LbnuqGqEwuM
 
 ## Abstract
@@ -120,6 +120,9 @@ allowing multiple audit loggers is useful when users plan to roll out a new
 logger. By also keeping the existing logger along for a period they will be able
 to prevent interruption.
 
+The RBAC filter will be NACKed if the configured logger types are not supported
+by gRPC, unless the filter it made optional. This is consistent with [A39: xDS HTTP Filter Support](https://github.com/grpc/proposal/blob/master/A39-xds-http-filters.md).
+
 Some readers may immediately notice that since an HTTP filter chain can contain
 an arbitrary number of RBAC filters, more than one of them could meet its audit
 condition for the same RPC and multiple audit log entries occur. When this happens,
@@ -194,7 +197,7 @@ to:
 
 ```proto
 message AuthorizationPolicy {
-  …
+  ...
 
   message AuditLoggingOptions {
     enum AuditCondition {
@@ -221,6 +224,9 @@ message AuthorizationPolicy {
 Note that the definition above is only for illustration purposes and does not
 actually exist anywhere as a `.proto` file. Nor does gRPC process the policy
 as protobuf by any means.
+
+Similar to the xDS case, unsupported logger types or any other misconfiguration
+will cause the server to fail to start.
 
 The authorization policy is backed by two RBAC filters, a DENY followed by an
 ALLOW. The audit logger configurations will be duplicated in both generated
