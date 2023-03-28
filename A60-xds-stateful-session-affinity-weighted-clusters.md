@@ -5,14 +5,14 @@ A60: xDS-Based Stateful Session Affinity for Weighted Clusters
 * Status: In Review
 * Implemented in: <language, ...>
 * Last updated: 2023-03-19
-* Discussion at: 
+* Discussion at: https://groups.google.com/g/grpc-io/c/X1ARt1ifcxE
 
 ## Abstract
 
 This design is an enhancement of
 [A55: xDS-Based Stateful Session Affinity for Proxyless gRPC][A55] which
 specified a mechanism to implement stateful session affinity. This enhancement
-enables the feature to work where multiple clusters are used for use-cases such
+enables the feature to work where multiple clusters are used in use-cases such
 as traffic splitting or canary deployment.
 
 ## Background
@@ -25,7 +25,7 @@ the traffic splitting policy as shown below.
 ![Traffic Splitting Breaking Session Affinity](A60_graphics/broken-affinity.png)
 
 The diagram above shows the client app and the gRPC load balancer as 2 separate
-logical boxes to clealy show the interaction between them although they both are
+logical boxes to clealy show the interaction between them although they are both
 part of a single process.
 
 Backends on the right are split into 2 clusters: `Cluster V1` and `Cluster V2`.
@@ -35,7 +35,7 @@ cookie that has the address of `v1s1`. But the next request REQ2 in the session
 is routed by the load balancer to `Cluster V2` because currently cluster
 selection takes place inside the config selector - before any of the http
 filters are run, including the [StatefulSessionFilter][]. After having selected
-`Cluster V2` gRPC cannot send the REQ2 to `v1s1` and session affinity is
+`Cluster V2` gRPC cannot send request REQ2 to `v1s1` and session affinity is
 broken.
 
 This proposal addresses the limitation.
@@ -43,6 +43,7 @@ This proposal addresses the limitation.
 ### Related Proposals: 
 
 * [A55: xDS-Based Stateful Session Affinity for Proxyless gRPC][A55]
+* [A31: gRPC xDS Config Selector Design][A31]
 
 
 ## Proposal
@@ -219,11 +220,10 @@ continue to use the same environment variable to also guard this feature.
 This environment variable protection will be removed once the feature has
 proven stable.
 
-These design proposes some structural or declarative changes in the source code
-which cannot be guarded by a runtime environmental variable so these will be
-present in the source code. These are:
+This design proposes some structural or declarative changes in the source code
+which cannot be guarded by a runtime environmental variable and these are:
 
-* an additional variable for the ref-counted cluster map in config selector
+* an additional variable for the ref-counted cluster map in the config selector
 
 * similarly an additinal field or variable for the ref-counted route-config
 
@@ -256,8 +256,8 @@ they will be unused/unreferenced.
 
 The [A55 Rationale section][A55_Rationale] explains the rationale for why
 stateful session affinity is important in certain use-cases. Users do not want
-to see session affinity broken when traffic splitting with multiple clusters is
-used. This feature enables the combination to work.
+to see session affinity broken when traffic splitting is used with multiple
+clusters. This feature enables the combination to work.
 
 ## Implementation
 
@@ -268,3 +268,4 @@ use the feature, since there are no API changes required with this design.
 [A55]: https://github.com/grpc/proposal/blob/master/A55-xds-stateful-session-affinity.md
 [A55_Rationale]: https://github.com/grpc/proposal/blob/master/A55-xds-stateful-session-affinity.md#rationale
 [StatefulSessionFilter]: https://github.com/grpc/proposal/blob/master/A55-xds-stateful-session-affinity.md#statefulsessionfilter-processing
+[A31]: https://github.com/grpc/proposal/blob/master/A31-xds-timeout-support-and-config-selector.md#new-functionality-in-grpc
