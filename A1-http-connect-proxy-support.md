@@ -199,6 +199,8 @@ would yield priviledged access on all internal servers).
 
 ## Implementation
 
+### C-Core
+
 In C-core, the HTTP CONNECT handshaker was already implemented. The following
 additional changes have also been made:
 
@@ -210,19 +212,31 @@ additional changes have also been made:
     hook for name rewriting)
 
 C-Core checks the following places to determine the HTTP proxy to use, stopping
-at the first one that is set: 1. `GRPC_ARG_HTTP_PROXY` channel arg 2.
-`grpc_proxy environment` variable 3. `https_proxy` environment variable 4.
-`http_proxy` environment variable If none of the above are set, then no HTTP
-proxy will be used.
+at the first one that is set:
 
-C-Core then checks the follows places to exclude traffic destined to listed
-hosts from going through the proxy determined above, again stopping at the first
-one that is set: 1. `no_grpc_proxy` environment variable 2. `no_proxy`
-environment variable
+1.  `GRPC_ARG_HTTP_PROXY` channel arg
+2.  `grpc_proxy environment` variable
+3.  `https_proxy` environment variable
+4.  `http_proxy` environment variable
+
+If none of the above are set, then no HTTP proxy will be used.
+
+If an HTTP proxy to be used is found, C-Core then checks the follows places to
+exclude traffic destined to listed hosts from going through the proxy determined
+above, again stopping at the first one that is set:
+
+1.  `no_grpc_proxy` environment variable
+2.  `no_proxy`environment variable
+
+If none of the above are set, then the previously found HTTP proxy is used.
+
+### Go
 
 In Go, this functionality is being provided via a custom dialer:
 
 -   [grpc/grpc-go#1098](https://github.com/grpc/grpc-go/pull/1098)
+
+### Java
 
 In Java for case 1, Java's `java.net.ProxySelector` is observed and usable
 starting in v1.11.0. `ProxySelector` is generally configured with the Java
