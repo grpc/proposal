@@ -212,7 +212,7 @@ additional changes have also been made:
     hook for name rewriting)
 
 This section details C-Core's implementation of the proxy mapper interface
-available by default.
+available by default (Case 1).
 
 C-Core checks the following places to determine the HTTP proxy to use, stopping
 at the first one that is set:
