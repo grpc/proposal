@@ -215,20 +215,40 @@ C-Core checks the following places to determine the HTTP proxy to use, stopping
 at the first one that is set:
 
 1.  `GRPC_ARG_HTTP_PROXY` channel arg
-2.  `grpc_proxy environment` variable
+2.  `grpc_proxy` environment variable
 3.  `https_proxy` environment variable
 4.  `http_proxy` environment variable
 
 If none of the above are set, then no HTTP proxy will be used.
 
-If an HTTP proxy to be used is found, C-Core then checks the follows places to
-exclude traffic destined to listed hosts from going through the proxy determined
-above, again stopping at the first one that is set:
+The allowed format is an RFC3986 URI string where the scheme is expected to be
+"http" and the authority portion is used to determine the proxy to be used. For
+example, for an HTTP proxy setting of
+"http://username:password@proxy.google.com:443", "username:password" would be
+used as user credentials for proxy authentication as per RFC 7617 and
+"proxy.google.com:443" would be the host:port HTTP proxy target. If the port
+part of the authority is omitted, a default port of 443 is used. Note that user
+credential can also be omitted if the proxy does not need authentication.
+
+If an HTTP proxy is set, C-Core then checks the following places to exclude
+traffic destined to listed hosts from going through the proxy determined above,
+again stopping at the first one that is set:
 
 1.  `no_grpc_proxy` environment variable
 2.  `no_proxy`environment variable
 
 If none of the above are set, then the previously found HTTP proxy is used.
+
+The format takes a comma-separated list of names, and if any of these names
+matches as a suffix of the server host (provided in the channel target), then
+the proxy will not be used for that target. For example, with a `grpc_proxy`
+setting of "proxy.google.com" and a `no_grpc_proxy` setting of "example.com,
+google.com", channel targets such as "dns:///foo.google.com:50051" and
+"bar.example.com:1234" will not use the proxy, but "baz.googleapis.com:443"
+would still use the configured proxy "proxy.google.com".
+
+The lookup and subsequent usage of an HTTP proxy for a specific channel can also
+be disabled by setting the channel arg `GRPC_ARG_ENABLE_HTTP_PROXY` to 0.
 
 ### Go
 
