@@ -211,6 +211,9 @@ additional changes have also been made:
 -   [grpc/grpc#9557](https://github.com/grpc/grpc/pull/9557) (adds proxy mapper
     hook for name rewriting)
 
+This section details C-Core's implementation of the proxy mapper interface
+available by default.
+
 C-Core checks the following places to determine the HTTP proxy to use, stopping
 at the first one that is set:
 
