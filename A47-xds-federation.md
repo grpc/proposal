@@ -706,9 +706,19 @@ in https://github.com/envoyproxy/envoy/issues/13951.
 ### Temporary environment variable protection
 
 While this feature is in development (until it has passed interop
-testing and is deemed production-ready), parsing of the new bootstrap
-config fields will be disabled unless the
-`GRPC_EXPERIMENTAL_XDS_FEDERATION` environment variable is set to true.
+testing and is deemed production-ready), the new functionality will be
+disabled unless the `GRPC_EXPERIMENTAL_XDS_FEDERATION` environment variable
+is set to true.
+
+This env var protection will be checked in the following places:
+- When parsing the new bootstrap config fields.  If disabled, the new
+  fields will be ignored and will behave as if the fields are not set.
+- When parsing resource names.  If disabled, new-style resource names
+  will be treated as old-style names (i.e., treated as a monolithic
+  string).  This happens in the following cases:
+  - When processing resource names in responses sent from the xDS server.
+  - When starting or stopping a resource watch of a resource name via the
+    XdsClient API.
 
 ## Rationale
 
