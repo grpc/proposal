@@ -62,7 +62,7 @@ from xDS and cause any divergence between gRPC authorization API and its xDS
 RBAC filter support. Moreoever, audit logging is a common feature that other
 xDS clients (namely Envoy) should benefit from as well.
 
-We will add an audit condition enum (see [PR](https://github.com/envoyproxy/envoy/pull/26001))
+We will add an audit condition enum (see [PR#1](https://github.com/envoyproxy/envoy/pull/26001) and [PR#2](https://github.com/envoyproxy/envoy/pull/26415))
 in the [xDS RBAC policy][RBAC policy] as below:
 
 ```proto
@@ -87,15 +87,22 @@ message RBAC {
       ON_DENY_AND_ALLOW = 3;
     }
 
+    message AuditLoggerConfig {
+      // Typed logger configuration.
+      //
+      // [#extension-category: envoy.rbac.audit_loggers]
+      core.v3.TypedExtensionConfig audit_logger = 1;
+
+      // If true, when the logger is not supported, the data plane will not NACK but simply ignore it.
+      bool is_optional = 2;
+    }
+
     // Condition for the audit logging to happen.
     // If this condition is met, all the audit loggers configured here will be invoked.
     AuditCondition audit_condition = 1 [(validate.rules).enum = {defined_only: true}];
 
     // Configurations for RBAC-based authorization audit loggers.
-    //
-    // [#extension-category: envoy.rbac.audit_loggers]
-    repeated core.v3.TypedExtensionConfig audit_loggers = 2
-        [(validate.rules).repeated = {min_items: 1}];
+    repeated AuditLoggerConfig logger_configs = 2;
   }
 
   // Audit logging options that include the condition for audit logging to happen
@@ -154,11 +161,16 @@ in [A43: gRPC authorization API][A43]:
           "description": "The name of the audit logger type.",
           "type": "string",
         },
-        "typed_config": {
+        "config": {
           "description": "The typed config for the audit logger."
             "This needs to be a json object mapped from google.protobuf.Struct"
             "proto message.",
           "type": "object",
+        },
+        "is_optional": {
+          "description": "Whether this logger config is optional."
+            "If so, gRPC will ignore invalid or unsupported configs instead of failing to start",
+          "type": "boolean"
         }
       },
     }
@@ -211,7 +223,8 @@ message AuthorizationPolicy {
 
     message AuditLogger {
       string name = 1;
-      google.protobuf.Struct config = 2;  
+      google.protobuf.Struct config = 2;
+      bool is_optional = 3;
     }
     
     repeated AuditLogger audit_loggers = 2;
@@ -267,13 +280,13 @@ We plan to implement the stdout logger as a built-in logger type. The type is
 named `stdout_logger`. This logger will not support any configuration and it
 outputs log entries to stdout in JSON format.
 
-Here is the example JSON configuration in the xDS case.
+Here is the example JSON configuration in the xDS case (see [PR](https://github.com/envoyproxy/envoy/pull/26453)).
 
 ```json
 {
   "name": "user-defined-logger-name",
   "typed_config": {
-    "@type": "stdout_logger",
+    "@type": "envoy.extensions.rbac.audit_loggers.stream.v3.StdoutAuditLog",
   }
 }
 ```
@@ -292,6 +305,9 @@ Following is an example log entry.
 {"timestamp":"1649376211","rpc_method":"/pkg.Service/Foo","principal":"spiffe://foo/user1","policy_name":"example_policy","matched_rule":"admin_access","authorized":true}
 ```
 
+The timestamp, as the number of seconds from the Unix Epoch, is generated from
+the current time when the logger is invoked.
+
 More types of loggers may be designed and implemented in the future. For users
 that just need to use the built-in loggers, everything will be configured in
 either the xDS RBAC filter or gRPC authorization policy. No additional code is
@@ -299,10 +315,182 @@ required.
 
 ### Language Specific APIs for third-party logger implementation
 
-Some users may want to have their own audit logging logic which we will support
-by exposing APIs for users to implement their own types of audit loggers.
+Some users may want to have their own audit logging logic which built-in
+loggers do not fullfil. This section is specifically about public APIs we
+will expose for users to implement their own types of audit loggers.
 
-_This section is to be done once the language-agnostic APIs are more finalized._
+#### C++ APIs
+
+A new header `audit_logging.h` declares all the classes users either need to
+consume or implement.
+
+```C++
+// include/grpcpp/security/audit_logging.h
+
+namespace grpc {
+namespace experimental {
+
+// This class contains useful information to be consumed in an audit logging
+// event.
+class AuditContext {
+ public:
+  grpc::string_ref rpc_method() const;
+  grpc::string_ref principal() const;
+  grpc::string_ref policy_name() const;
+  grpc::string_ref matched_rule() const;
+  bool authorized() const;
+};
+
+// The base class for audit logger implementations.
+// Users are expected to inherit this class and implement the Log() function.
+class AuditLogger {
+ public:
+  // This function will be invoked synchronously when applicable during the
+  // RBAC-based authorization process. It does not return anything and thus will
+  // not impact whether the RPC will be rejected or not.
+  virtual void Log(const AuditContext& audit_context) = 0;
+};
+
+// The base class for audit logger factory implementations.
+// Users should inherit this class and implement those declared virtual
+// funcitons.
+class AuditLoggerFactory {
+ public:
+  // The base class for the audit logger config that the factory parses.
+  // Users should inherit this class to define the configuration needed for
+  // their custom loggers.
+  class Config {
+   public:
+    virtual const char* name() const = 0;
+    virtual std::string ToString() = 0;
+  };
+  virtual const char* name() const = 0;
+
+  virtual absl::StatusOr<std::unique_ptr<Config>> ParseAuditLoggerConfig(
+      grpc::string_ref config_json) = 0;
+
+  virtual std::unique_ptr<AuditLogger> CreateAuditLogger(
+      std::unique_ptr<AuditLoggerFactory::Config>) = 0;
+};
+
+// Registers an audit logger factory. This should only be called during
+// initialization.
+void RegisterAuditLoggerFactory(std::unique_ptr<AuditLoggerFactory> factory);
+
+}  // namespace experimental
+}  // namespace grpc
+```
+
+#### Go APIs
+
+The APIs will be in the existing `authz` package.
+
+```Go
+package authz
+
+// RegisterAuditLoggerBuilder registers the builder in a global map
+// using b.Name() as the key.
+// This should only be called during initialization time (i.e. in an init() function).
+// If multiple builders are registered with the same name, the one registered last
+// will take effect.
+func RegisterAuditLoggerBuilder(b AuditLoggerBuilder)
+
+// AuditInfo contains information used by the audit logger during an audit logging event.
+type AuditInfo struct {
+	// RPCMethod is the method of the audited RPC, in the format of "/pkg.Service/Method".
+	// For example, "/helloworld.Greeter/SayHello".
+	RPCMethod string `json:"rpc_method,omitempty"`
+	// Principal is the identity of the RPC. Currently it will only be available in
+	// certificate-based TLS authentication.
+	Principal string `json:"principal,omitempty"`
+	// PolicyName is the authorization policy name (or the xDS RBAC filter name).
+	PolicyName string `json:"policy_name,omitempty"`
+	// MatchedRule is the matched rule (or policy name in the xDS RBAC filter). It will be
+	// empty if there is no match.
+	MatchedRule string `json:"matched_rule,omitempty"`
+	// Authorized indicates whether the audited RPC is authorized or not.
+	Authorized bool `json:"bool,omitempty"`
+}
+
+// AuditLoggerConfig defines the configuration for a particular implementation of audit logger.
+type AuditLoggerConfig interface {
+	// Name returns the same name as that returned by its supported builder.
+	Name() string
+	// auditLoggerConfig is a dummy interface requiring users to embed this
+	// interface to implement it.
+	auditLoggerConfig()
+}
+
+// AuditLogger is the interface for an audit logger.
+// An audit logger is a logger instance that can be configured to use via the authorization policy
+// or xDS HTTP RBAC filters. When the authorization decision meets the condition for audit, all the
+// configured audit loggers' Log() method will be invoked to log that event with the AuditInfo.
+// The method will be executed synchronously before the authorization is complete and the call is
+// denied or allowed.
+// Please refer to https://github.com/grpc/proposal/pull/346 for more details about audit logging.
+type AuditLogger interface {
+	// Log logs the auditing event with the given information.
+	Log(context.Context, *AuditInfo)
+}
+
+// AuditLoggerBuilder is the interface for an audit logger builder.
+// It parses and validates a config, and builds an audit logger from the parsed config. This enables
+// configuring and instantiating audit loggers in the runtime.
+// Users that want to implement their own audit logging logic should implement this along with
+// the AuditLogger interface and register this builder by calling RegisterAuditLoggerBuilder()
+// before they start the gRPC server.
+// Please refer to https://github.com/grpc/proposal/pull/346 for more details about audit logging.
+type AuditLoggerBuilder interface {
+	// ParseAuditLoggerConfig parses an implementation-specific config into a
+	// structured logger config this builder can use to build an audit logger.
+	// When users implement this method, its returned type must embed the
+	// AuditLoggerConfig interface.
+	ParseAuditLoggerConfig(config interface{}) (AuditLoggerConfig, error)
+	// Build builds an audit logger with the given logger config.
+	// This will only be called with valid configs returned from ParseAuditLoggerConfig()
+	// so implementers need to make sure it can return a logger without error
+	// at this stage.
+	Build(AuditLoggerConfig) AuditLogger
+	// Name returns the name of logger built by this builder.
+	// This is used to register and pick the builder.
+	Name() string
+}
+
+// GetAuditLoggerBuilder returns a builder with the given name.
+// It returns nil if the builder is not found in the registry.
+func GetAuditLoggerBuilder(name string) AuditLoggerBuilder
+```
+
+#### Java APIs
+
+```Java
+public class AuditContext {
+  public String getRpcMethod();
+  public String getPrincipal();
+  public String getPolicyName();
+  public String getMatchedRule();
+  public boolean isAuthorized();
+}
+
+public interface AuditLogger {
+  public abstract void audit(AuditContext context) throws Exception;
+}
+
+public interface AuditLoggerProvider {
+  ConfigOrError parseAuditLoggerConfig(
+      Map<String, ?> rawAuditLoggerConfig) {
+    return UNKNOWN_CONFIG;
+  }
+
+  AuditLogger newAuditLogger(Object config);
+  String getName();
+}
+
+public final class AuditLoggerRegistry {
+  public synchronized void register(AuditLoggerProvider provider) {}
+  public synchronized AuditLoggerProvider getProvider(String name) {}
+}
+```
 
 ## Rationale
 
