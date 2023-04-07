@@ -331,7 +331,8 @@ namespace grpc {
 namespace experimental {
 
 // This class contains useful information to be consumed in an audit logging
-// event.
+// event. It does not own any of the information so users should make copies
+// when they need to use them outside the scope of this object.
 class AuditContext {
  public:
   grpc::string_ref rpc_method() const;
@@ -348,6 +349,9 @@ class AuditLogger {
   // This function will be invoked synchronously when applicable during the
   // RBAC-based authorization process. It does not return anything and thus will
   // not impact whether the RPC will be rejected or not.
+  // Implementers should ensure this method does not block the RPC. Specifically,
+  // time-consuming processes should make a copy of the audit context and be fired
+  // asynchronously such that this function itself can return immediately. 
   virtual void Log(const AuditContext& audit_context) = 0;
 };
 
@@ -366,15 +370,22 @@ class AuditLoggerFactory {
   };
   virtual const char* name() const = 0;
 
+  // This is used to parse and validate the json format of the audit logger
+  // config.
   virtual absl::StatusOr<std::unique_ptr<Config>> ParseAuditLoggerConfig(
       grpc::string_ref config_json) = 0;
 
+  // This creates an audit logger instance given the logger config.
+  // The config will be guaranteed by the caller to have been validated, so
+  // implementers need to ensure this function always creates a valid instance.
+  // Any runtime issues such as failing to open a file should be handled by
+  // the logger implementation.
   virtual std::unique_ptr<AuditLogger> CreateAuditLogger(
       std::unique_ptr<AuditLoggerFactory::Config>) = 0;
 };
 
 // Registers an audit logger factory. This should only be called during
-// initialization.
+// initialization, i.e. before starting up the gRPC server.
 void RegisterAuditLoggerFactory(std::unique_ptr<AuditLoggerFactory> factory);
 
 }  // namespace experimental
@@ -431,6 +442,9 @@ type AuditLoggerConfig interface {
 // denied or allowed.
 type AuditLogger interface {
 	// Log logs the auditing event with the given information.
+  // This method will be executed synchronously by gRPC so implementers must keep in mind it should
+	// not block the RPC. Specifically, time-consuming processes should be fired asynchronously such
+	// that this method can return immediately.
 	Log(context.Context, *AuditInfo) error
 }
 
@@ -441,16 +455,17 @@ type AuditLogger interface {
 // the AuditLogger interface and register this builder by calling RegisterAuditLoggerBuilder()
 // before they start the gRPC server.
 type AuditLoggerBuilder interface {
-	// ParseAuditLoggerConfig parses an implementation-specific config into a
-	// structured logger config this builder can use to build an audit logger.
-	// When users implement this method, its returned type must embed the
+	// ParseAuditLoggerConfig parses the given JSON bytes into a structured
+	// logger config this builder can use to build an audit logger.
+	// When users implement this method, its return type must embed the
 	// AuditLoggerConfig interface.
-	ParseAuditLoggerConfig(config interface{}) (AuditLoggerConfig, error)
+	ParseAuditLoggerConfig(config json.RawMessage) (AuditLoggerConfig, error)
 	// Build builds an audit logger with the given logger config.
 	// This will only be called with valid configs returned from ParseAuditLoggerConfig()
-	// so implementers need to make sure it can return a logger without error
-	// at this stage.
-	Build(AuditLoggerConfig) AuditLogger // (AuditLogger, error) ?
+	// and any runtime issues such as failing to create a file should be handled by the
+	// logger implementation instead of failing the logger instantiation. So implementers
+	// need to make sure it can return a logger without error at this stage.
+	Build(AuditLoggerConfig) AuditLogger
 	// Name returns the name of logger built by this builder.
 	// This is used to register and pick the builder.
 	Name() string
