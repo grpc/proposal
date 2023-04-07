@@ -456,7 +456,7 @@ type AuditLoggerConfig interface {
 // denied or allowed.
 type AuditLogger interface {
 	// Log logs the auditing event with the given information.
-  // This method will be executed synchronously by gRPC so implementers must keep in mind it should
+	// This method will be executed synchronously by gRPC so implementers must keep in mind it should
 	// not block the RPC. Specifically, time-consuming processes should be fired asynchronously such
 	// that this method can return immediately.
 	Log(context.Context, *AuditInfo) error
