@@ -319,6 +319,12 @@ Some users may want to have their own audit logging logic which built-in
 loggers do not fullfil. This section is specifically about public APIs we
 will expose for users to implement their own types of audit loggers.
 
+As is also documented in all the languages below, the logging function is
+executed by gRPC syncrhonously during the authorization process. Therefore,
+it's implementation should not block the RPC. When needed, it should invoke any
+long running operations asyncrhonously so that the function itself returns
+promptly. For this reason, no error or status code will be returned from it.
+
 #### C++ APIs
 
 A new header `audit_logging.h` declares all the classes users either need to
