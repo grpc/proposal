@@ -317,13 +317,21 @@ required.
 
 Some users may want to have their own audit logging logic which built-in
 loggers do not fullfil. This section is specifically about public APIs we
-will expose for users to implement their own types of audit loggers.
+will expose for users to implement their own types of audit loggers. Below are
+two important features that apply to all the languages.
 
 As is also documented in all the languages below, the logging function is
 executed by gRPC syncrhonously during the authorization process. Therefore,
 it's implementation should not block the RPC. When needed, it should invoke any
 long running operations asyncrhonously so that the function itself returns
 promptly. For this reason, no error or status code will be returned from it.
+
+The logger factory (aka builder/provider) needs to implement a config parsing
+function for parsing and validation logger configs, and a build function to
+create loggers based on the parsed logger config. The former is needed to
+validate runtime configurations and reject them if needed before anything is
+acuated. The latter will be guaranteed to receive a validated config and must
+always succeed in creating a logger instance.
 
 #### C++ APIs
 
