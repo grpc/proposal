@@ -370,7 +370,7 @@ public class MetricRecorder {
   public void clearQpsMetric();
 
   // Update the errors-per-second metrics data.
-  public void putEpsMetric(double value);
+  public void setEpsMetric(double value);
 
   // Clear the errors-per-second metrics data.
   public void clearEpsMetric();
