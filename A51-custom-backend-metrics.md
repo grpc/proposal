@@ -148,7 +148,7 @@ but here are a couple of possible approaches:
 
 #### The Server API
 The server will add a channel filter (C/C++) or an interceptor (Java/Go) that
-adds recorded metrics to the trailing metadata of the response. It reads from both the per-request and per-server metrics recorder if they exist. When the same metric is recorded with both the per-request and the per-server recorder, metrics recorded with per-request recorder take a higher precedence.
+adds recorded metrics to the trailing metadata of the response. The metrics are read from the per-request recorder and optionally a per-server recorder. The application chooses to use a per-server recorder by providing the instance when configuring the API. When the same metric is recorded with both the per-request and the per-server recorder, metrics recorded with per-request recorder take a higher precedence.
 
 ### Out of Band Metrics Reporting
 To periodically receive metrics data from a backend server, the client opens a stream on the
@@ -319,8 +319,7 @@ public final class CallMetricRecorder {
 
 #### Per-Server Recording on Server
 Java will provide a per-server metrics recorder on the server as follows. The user
-creates an instance and records metrics to it. All the methods are thread safe.
-This is optional for per-request load reporting and required for OOB load reporting.
+creates an instance and records metrics to it. An instance is optional for per-request load reporting and required for OOB load reporting. All methods are thread safe.
 
 ```java
 public class MetricRecorder {
@@ -328,25 +327,25 @@ public class MetricRecorder {
   public void putUtilizationMetric(String key, double value);
 
   // Replace the whole metrics data using the specified map.
-  public void putAllUtilizationMetrics(Map<String, Double> metrics);
+  public void setAllUtilizationMetrics(Map<String, Double> metrics);
 
   // Remove the metrics data entry corresponding to the specified key.
   public void clearUtilizationMetric(String key);
 
   // Update the CPU utilization metrics data.
-  public void putCPUUtilizationMetric(double value);
+  public void setCPUUtilizationMetric(double value);
 
   // Clear the CPU utilization metrics data.
   public void clearCPUUtilizationMetric();
 
   // Update the memory utilization metrics data.
-  public void putMemoryUtilizationMetric(double value);
+  public void setMemoryUtilizationMetric(double value);
 
   // Clear the memory utilization metrics data.
   public void clearMemoryUtilizationMetric();
 
   // Update the queries-per-second metrics data.
-  public void putQpsMetric(double value);
+  public void setQpsMetric(double value);
 
   // Clear the queries-per-second metrics data.
   public void clearQpsMetric();
