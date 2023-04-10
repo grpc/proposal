@@ -101,7 +101,7 @@ We will expose set-style APIs for user's server applications to update the metri
 
 ```
 // Update the metrics value corresponding to the specified key.
-function setUtilizationMetric(String key, double value);
+function putUtilizationMetric(String key, double value);
 
 // Replace the whole metrics data using the specified map.
 function setAllUtilizationMetrics(Map<String, Double> metrics);
