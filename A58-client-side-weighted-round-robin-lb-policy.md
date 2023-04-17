@@ -127,7 +127,7 @@ To enforce `blackout_period` and `weight_expiration_period`, the LB policy track
 
 The weight of a backend is calculated using `qps` (queries per second), `eps` (errors per second) and `cpu_utilization` reported by the backend. `eps` is only used when `error_utilization_penalty` is set to non-zero and applies a penalty based on the error rate calculated as `eps/qps`. The formula used is as follows:
 
-$$weight = \dfrac{qps}{cpu\_utilization + \dfrac{eps}{qps} * error\_utilization\_penalty}$$
+$$weight = \dfrac{qps}{cpu\\_utilization + \dfrac{eps}{qps} * error\\_utilization\\_penalty}$$
 
 In Java and Go, the weight will be stored in a wrapped subchannel. However, in C++, that approach won't work, because we create a new subchannel object for each address whenever we get a new address list, and we don't want to lose existing weight information when that happens. So instead, we store the weights in a map keyed by address, and each subchannel list will take its own ref to the entry in the map for each subchannel in the list.
 
