@@ -388,9 +388,9 @@ If a gRPC client channel is created for `xds://xds.other.com/server.other.com`:
   that entry in the `authorities` map.
 - The authority entry's `client_listener_resource_name_template` field
   is unset but defaults to
-  `xdstp://xds.other.com/envoy.config.listener.v3.Listener/grpc/client/%s`,
+  `xdstp://xds.other.com/envoy.config.listener.v3.Listener/%s`,
   so we use
-  `xdstp://xds.other.com/envoy.config.listener.v3.Listener/grpc/client/server.other.com`
+  `xdstp://xds.other.com/envoy.config.listener.v3.Listener/server.other.com`
   as the resource name.
 - The `xds_servers` list is specified in the entry for the authority, so
   we use that (pointing to `xds-server.other.com`).
