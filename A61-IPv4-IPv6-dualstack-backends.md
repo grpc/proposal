@@ -44,13 +44,14 @@ added for that effort as well.  Note that this change has implications
 for session affinity behavior in xDS.
 
 ### Related Proposals: 
-* TODO: reference gRFC for [sticky-TF in PF][sticky-TF-in-PF]
 * TODO: reference to xDS design or Envoy GH issue
 * [gRFC A17: Client-Side Health Checking][A17]
 * [gRFC A58: Weighted Round Robin LB Policy][A58]
 * [gRFC A48: xDS Least Request LB Policy][A48]
 * [gRFC A42: Ring Hash LB Policy][A42]
 * [gRFC A55: xDS-Based Stateful Session Affinity][A55]
+* [gRFC A62: pick_first: Sticky TRANSIENT_FAILURE and address order
+  randomization][A62]
 
 ## Proposal
 
@@ -58,7 +59,9 @@ This proposal includes several parts:
 - Allow resolvers to return multiple addresses per endpoint.
 - Implement Happy Eyeballs.  This will be done in the pick_first LB policy,
   which will become the universal leaf policy.  It will also need to
-  support client-side health checking.
+  support client-side health checking.  In Java and Go, the pick_first
+  logic will be moved out of the subchannel and into the pick_first
+  policy itself.
 - In xDS, we will support the new fields in EDS to indicate multiple
   addresses per endpoint, and we will extend the session affinity
   mechanisms to support such endpoints.
@@ -80,7 +83,8 @@ address as a separate endpoint.
 
 The pick_first LB policy currently attempts to connect to each address
 serially, stopping at the first one that succeeds.  We will change it to
-instead use the Happy Eyeballs algorithm.  Specifically:
+instead use the Happy Eyeballs algorithm on the initial pass through the
+address list.  Specifically:
 
 - As per [RFC-8305 section
   5](https://www.rfc-editor.org/rfc/rfc8305#section-5)), the default
@@ -104,11 +108,19 @@ instead use the Happy Eyeballs algorithm.  Specifically:
   also cancel all other connection attempts that are still in flight
   (but see notes about C-core below).
 - We will wait for at least one connection attempt on every address to
-  fail before we report TRANSIENT_FAILURE.  As per [sticky-TF in
-  PF][sticky-TF-in-PF], we will wrap back around to the start of the
-  list and begin again with the first address, staying in state
-  TRANSIENT_FAILURE until either (a) we become connected or (b) the LB
-  policy is destroyed by the channel going IDLE.
+  fail before we consider the first pass to be complete.  As per [gRFC
+  A62][A62], we will report TRANSIENT_FAILURE state and will continue
+  trying to connect.  We will stay in TRANSIENT_FAILURE until either (a)
+  we become connected or (b) the LB policy is destroyed by the channel
+  shutting down or going IDLE.
+
+If the first pass completes without a successful connection attempt, we
+will switch to a mode where we keep trying to connect to all addresses at
+all times, with no regard for the order of the addresses.  Each
+individual subchannel will provide [backoff behavior][backoff-spec],
+reporting TRANSIENT_FAILURE while in backoff and then IDLE when backoff
+has finished.  The pick_first policy will therefore automatically
+request a connection whenever a subchannel reports IDLE.
 
 In C-core, there are some additional details to handle due to the
 existance of subchannel sharing between channels.  Any given subchannel
@@ -116,9 +128,9 @@ that pick_first is using may also be used other channel(s), and any
 of those other channels may request a connection on the subchannel
 at any time.  This means that pick_first needs to be prepared for the
 fact that any subchannel may report any connectivity state at any time
-(even at the moment that pick_first starts using it), even if it did
-not previously request a connection on the subchannel itself.  This has
-a number of implications:
+(even at the moment that pick_first starts using the subchannel), even
+if it did not previously request a connection on the subchannel itself.
+This has a number of implications:
 
 - pick_first needs to be prepared for any subchannel to report READY at
   any time, even if it did not previously request a connection on that
@@ -126,11 +138,11 @@ a number of implications:
   choose the first subchannel that reports READY.  That behavior seems
   consistent with the intent of Happy Eyeballs, so we will preserve it.
 - A subchannel must be in state IDLE in order for pick_first to request
-  a connection attempt on it.  However, when pick_first decides to start
-  a connection attempt on a given subchannel (whether because it is the
-  first subchannel in the list or because the timer fired before the
-  previous address' connection attempt completed), that subchannel
-  may not be in state IDLE.
+  a connection attempt on it.  However, during the first pass through
+  the address list, when pick_first decides to start a connection attempt
+  on a given subchannel (whether because it is the first subchannel in
+  the list or because the timer fired before the previous address'
+  connection attempt completed), that subchannel may not be in state IDLE.
   - If the subchannel is in state CONNECTING, we do not need to actually
     request a connection, but we will treat it as if we did.
     Specifically, we will start the timer and wait to see if the connection
@@ -138,22 +150,24 @@ a number of implications:
     on to the next subchannel.
   - If the subchannel is in state TRANSIENT_FAILURE, then we know that
     it is in backoff due to a recent connection attempt failure, so we
-    cannot start a new connection attempt on it yet.  In this case, we
-    will skip this subchannel for now and immediately move on to the next
-    subchannel.  However, we will not consider a full pass complete...
+    treat it as if we have already made a connection attempt on this
+    subchannel, and we will immediately move on to the next subchannel.
+- When we choose a subchannel that has become successfully connected,
+  we will unref all of the other subchannels.  For any subchannel on
+  which we were the only channel holding a ref, this will cause any
+  pending connection attempt to be cancelled, and the subchannel will
+  be destroyed.  However, if some other channel was holding a ref to the
+  subchannel, the connection attempt will continue, even if the other
+  channel did not want it.  This is slightly sub-optimal, but it does
+  not seem likely to be problematic enough to warrant the complexity of
+  fixing it.
 
-    --> TODO: maybe just say that we do Happy Eyeballs on the first pass
-        only, and after that we automatically trigger a new connection
-        attempt on each subchannel as soon as it reports IDLE?
+#### Move pick_first Logic Out of Subchannel (Java/Go)
 
-- When we choose a subchannel, we will unref all of the other subchannels.
-  For any subchannel on which we were the only channel holding a ref,
-  this will cause any pending connection attempt to be cancelled, and
-  the subchannel will be destroyed.  However, if some other channel was
-  holding a ref to the subchannel, the connection attempt will continue,
-  even if the other channel did not want it.  This is slightly
-  sub-optimal, but it does not seem likely to be problematic enough to
-  warrant the complexity of fixing it.
+In Java and Go, the pick_first logic is currently implemented in the
+subchannel.  We will pull this logic out of the subchannel and move it
+into the pick_first policy itself.  This will move us closer to having
+uniform architecture across all of our implementations.
 
 #### Use pick_first as the Universal Leaf Policy
 
@@ -272,8 +286,7 @@ uniform cross-language architecture.  Also, moving pick_first up
 to the LB policy layer in Java and Go will have the nice effect of
 making their backoff work per-address instead of across all addresses,
 which is what C-core does and what the (poorly specified) [connection
-backoff](https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md)
-spec seems to have originally envisioned.
+backoff spec][backoff-spec] seems to have originally envisioned.
 
 ## Implementation
 
@@ -285,17 +298,31 @@ spec seems to have originally envisioned.
   health checking support (https://github.com/grpc/grpc/pull/32692)
 - change address list to support multiple addresses per endpoint and
   change LB policies to handle this (including ring_hash)
+- change stateful session affinity to handle multiple addresses per endpoint
 - implement happy eyeballs in pick_first
-- support new xDS fields, and change stateful session affinity to handle
-  multiple addresses per endpoint
+- support new xDS fields
 
 ### Java
 
-TODO(ejona): Fill this in.
+TODO(ejona): Does this look right?
+- move pick_first logic out of subchannel and into pick_first policy
+- make pick_first the universal leaf policy, including client-side
+  health checking support
+- implement happy eyeballs in pick_first
+- fix ring_hash to support endpoints with multiple addresses
+- support new xDS fields
 
 ### Go
 
-TODO(dfawley): Fill this in.
+TODO(dfawley): Does this look right?
+- move pick_first logic out of subchannel and into pick_first policy
+- make pick_first the universal leaf policy, including client-side
+  health checking support (includes moving health checking logic out of
+  the subchannel)
+- change address list to support multiple addresses per endpoint and
+  change LB policies to handle this (including ring_hash)
+- implement happy eyeballs in pick_first
+- support new xDS fields
 
 ## Open issues (if applicable)
 
@@ -307,4 +334,5 @@ N/A
 [A55]: A55-xds-stateful-session-affinity.md
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
 [RFC-8305]: https://www.rfc-editor.org/rfc/rfc8305
-[sticky-TF-in-PF]: (placeholder)
+[A62]: https://github.com/grpc/proposal/pull/357
+[backoff-spec]: https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md
