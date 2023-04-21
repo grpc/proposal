@@ -103,10 +103,11 @@ address list.  Specifically:
   multiple addresses at once.  Also note that, as per the previous
   bullet, we will once again start a timer if this new address is not
   the last address in the list.
-- The first time any connection attempt succeeds, we choose that
-  connection.  If there is a timer running, we cancel the timer.  We
-  also cancel all other connection attempts that are still in flight
-  (but see notes about C-core below).
+- The first time any connection attempt succeeds (i.e., the subchannel
+  reports READY, which happens after all handshakes are complete),
+  we choose that connection.  If there is a timer running, we cancel
+  the timer.  We also cancel all other connection attempts that are
+  still in flight (but see notes about C-core below).
 - We will wait for at least one connection attempt on every address to
   fail before we consider the first pass to be complete.  As per [gRFC
   A62][A62], we will report TRANSIENT_FAILURE state and will continue
@@ -166,14 +167,16 @@ This has a number of implications:
 
 [gRFC A62][A62] introduces an option to have pick_first randomly shuffle
 the address list.  This code will need to be changed to randomly
-interleave the IPv4 and IPv6 addresses independently and then interleave
+shuffle the IPv4 and IPv6 addresses independently and then interleave
 them, as per [RFC-8305][RFC-8305].
 
 #### Move pick_first Logic Out of Subchannel (Java/Go)
 
 In Java and Go, the pick_first logic is currently implemented in the
 subchannel.  We will pull this logic out of the subchannel and move it
-into the pick_first policy itself.  This will move us closer to having
+into the pick_first policy itself.  This means that subchannels will
+have only one address, and that address does not change over the
+lifetime of the subchannel.  This will move us closer to having
 uniform architecture across all of our implementations.
 
 #### Use pick_first as the Universal Leaf Policy
@@ -312,6 +315,7 @@ backoff spec][backoff-spec] seems to have originally envisioned.
 ### Java
 
 TODO(ejona): Does this look right?
+- change grpclb to delegate to RR or PF
 - move pick_first logic out of subchannel and into pick_first policy
 - make pick_first the universal leaf policy, including client-side
   health checking support
@@ -322,6 +326,8 @@ TODO(ejona): Does this look right?
 ### Go
 
 TODO(dfawley): Does this look right?
+- change subchannel connectivity state API (maybe)
+- change grpclb to delegate to RR or PF
 - move pick_first logic out of subchannel and into pick_first policy
 - make pick_first the universal leaf policy, including client-side
   health checking support (includes moving health checking logic out of
