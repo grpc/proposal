@@ -162,6 +162,13 @@ This has a number of implications:
   not seem likely to be problematic enough to warrant the complexity of
   fixing it.
 
+#### Randomly Shuffling the Address List
+
+[gRFC A62][A62] introduces an option to have pick_first randomly shuffle
+the address list.  This code will need to be changed to randomly
+interleave the IPv4 and IPv6 addresses independently and then interleave
+them, as per [RFC-8305][RFC-8305].
+
 #### Move pick_first Logic Out of Subchannel (Java/Go)
 
 In Java and Go, the pick_first logic is currently implemented in the
