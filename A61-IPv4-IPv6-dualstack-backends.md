@@ -163,13 +163,6 @@ This has a number of implications:
   not seem likely to be problematic enough to warrant the complexity of
   fixing it.
 
-#### Randomly Shuffling the Address List
-
-[gRFC A62][A62] introduces an option to have pick_first randomly shuffle
-the address list.  This code will need to be changed to randomly
-shuffle the IPv4 and IPv6 addresses independently and then interleave
-them, as per [RFC-8305][RFC-8305].
-
 #### Move pick_first Logic Out of Subchannel (Java/Go)
 
 In Java and Go, the pick_first logic is currently implemented in the
@@ -202,14 +195,6 @@ may contain multiple addresses.  They will create a pick_first child
 policy for each endpoint, to which they will pass a list containing a
 single endpoint with all of its addresses.
 
-The pick_first policy may be used either under a petiole policy or as
-the top-level policy in the channel.  When used under a petiole policy,
-it will expect to see a single endpoint with one or more addresses; when
-used as the top-level policy in the channel, it may see more than one
-endpoint, each of which has one or more addresses.  To address both
-cases, pick_first will simply flatten the list it receives into a single
-list, which it will use as input to the Happy Eyeballs algorithm.
-
 Note that implementations should be careful to ensure that this
 change does not make error messages less useful when a pick fails.
 For example, today, when round_robin has all of its subchannels in state
@@ -225,6 +210,58 @@ along with the connectivity state.  In those implementations, it may be
 necessary for round_robin to return a picker that delegates to one of
 the pick_first children's pickers, possibly modifying the error message
 from the child picker before returning it to the channel.
+
+#### Address List Handling in pick_first
+
+As mentioned above, we are changing the LB policy API to take an address
+list that contains a list of endpoints, each of which can contain one
+or more addresses.  However, the Happy Eyeballs algorithm assumes a flat
+list of addresses, not this two-dimensional list.  To address that, we
+need to define how pick_first will flatten the list.  We also need to
+define how that flattening interacts with both the sorting described in
+[RFC-8304 section 4](https://www.rfc-editor.org/rfc/rfc8305#section-4)
+and with the optional shuffling described in [gRFC A62][A62].
+
+There are three cases to consider here:
+
+A. If pick_first is used under a petiole policy, it will see a single
+   endpoint with one or more addresses.
+
+B. If pick_first is used as the top-level policy in the channel with the
+   DNS resolver, it will see one or more endpoints, each of which have
+   exactly one address.  It should be noted that the DNS resolver does
+   not actually know which addresses might or might not be associated
+   with the same endpoint, so it assumes that each address is a separate
+   endpoint.
+
+C. If pick_first is used as the top-level policy in the channel with a
+   custom resolver implementation, it may see more than one endpoint,
+   each of which has one or more addresses.
+
+[RFC-8304 section 4](https://www.rfc-editor.org/rfc/rfc8305#section-4)
+says to perform RFC-6724 sorting first.  In gRPC, that sorting happens
+in the DNS resolver before the address list is passed to the LB policy,
+so it will already be done by the time pick_first sees the address list.
+
+When the pick_first policy sees an address list, it will perform these
+steps in the following order:
+
+1. Perform the optional shuffling described in [gRFC A62][A62].  The
+   shuffling will change the order of the endpoints but will not touch
+   the order of the addresses within each endpoint.  This means that the
+   shuffling will work for cases B and C above, but it will not work for
+   case A; this is expected to be the right behavior, because we do not
+   have or anticipate any use cases where a petiole policy will need to
+   enable shuffling.
+
+2. Flatten the list by concatenating the ordered list of addresses for
+   each of the endpoints, in order.
+
+3. In the flattened list, interleave addresses from the two address
+   families, as per [RFC-8304 section
+   4](https://www.rfc-editor.org/rfc/rfc8305#section-4).  Doing this on
+   the flattened address list ensures the best behavior if only one of
+   the two address families is working.
 
 #### Client-Side Health Checking in pick_first
 
