@@ -220,13 +220,6 @@ continue to use the same environment variable to also guard this feature.
 This environment variable protection will be removed once the feature has
 proven stable.
 
-This design proposes some structural or declarative changes in the source code
-which cannot be guarded by a runtime environmental variable and these are:
-
-* an additional variable for the ref-counted cluster map in the config selector
-
-* similarly an additinal field or variable for the ref-counted route-config
-
 The environment variable protection will specifically achieve the following
 run-time behavior changes:
 
