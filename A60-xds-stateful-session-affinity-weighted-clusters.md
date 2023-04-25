@@ -223,27 +223,14 @@ proven stable.
 The environment variable protection will specifically achieve the following
 run-time behavior changes:
 
-* only when enabled, the variables for ref-counted cluster map and route-config
-  will be set. When not enabled the old variables will be used.
-
-* only when enabled, the config selector will set the new call-attributes for
-  the cluster-map, current route entry and the route config.
-
 * only when enabled, the `StatefulSessionFilter` will add the cluster name to
   the cookie in the response side processing.
 
 * only when enabled, the `StatefulSessionFilter` will look for the cluster name
   in the cookie and set the cluster call-attribute in the request side processing.
 
-* only when enabled, the new `ClusterSelectionFilter` will be added to the
-  filter registry and added as the second-last filter in the filter chain.
-
 If the environment variable is unset or not true, none of the above will be
 enabled.
-
-Once we decide to remove the environment variable protection completely i.e.
-remove all code for the old behavior, we will remove the old declarations since
-they will be unused/unreferenced.
 
 ## Rationale
 
