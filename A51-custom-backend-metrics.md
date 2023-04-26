@@ -460,7 +460,7 @@ class CallMetricRecorder {
 
   // Records a call metric measurement for CPU utilization.
   // Multiple calls to this method will override the stored value.
-  // The value may be larger than 1.0 when the usage exceeds the soft limit.
+  // Values may be larger than 1.0 when the usage exceeds the soft limit.
   // Values outside of the valid range [0, infy) are ignored.
   CallMetricRecorder& RecordCpuUtilizationMetric(double value);
 
@@ -533,7 +533,7 @@ class ServerMetricRecorder {
   // Factory method. Use this to create.
   static std::unique_ptr<ServerMetricRecorder> Create();
   // Records the server CPU utilization in the range [0, infy).
-  // The value may be larger than 1.0 when the usage exceeds the soft limit.
+  // Values may be larger than 1.0 when the usage exceeds the soft limit.
   // Values outside of the valid range are rejected.
   // Overrides the stored value when called again with a valid value.
   void SetCpuUtilization(double value);
