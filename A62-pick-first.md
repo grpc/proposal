@@ -43,7 +43,7 @@ Differences show up after the backoff period ends:
 - C-core moves to `READY` only when a connection attempt succeeds.
 
 This behavior of staying in `TRANSIENT_FAILURE` until it can report `READY` is
-called sticky-TransientFailure, or sticky-TF.
+called sticky TRANSIENT_FAILURE, or sticky-TF.
 
 [wfr]: https://github.com/grpc/grpc/blob/master/doc/wait-for-ready.md
 
@@ -58,20 +58,20 @@ called sticky-TransientFailure, or sticky-TF.
 
 Specific changes are described in their own subsections below.
 
-### Support Sticky-TF
+### Use sticky-TF by default
 
-`pick_first` implementations that don't support sticky-TF have the following
-shortcomings:
+Current `pick_first` implementations that don't provide sticky-TF have the
+following shortcomings:
 - When none of the received addresses are reachable, client applications
   experience long delays before their RPCs fail. This is because the channel
   does not spend enough time in `TRANSIENT_FAILURE` and goes back to
   `CONNECTING` state while attempting to reconnect.
-- [priority][2] LB policy maintains an ordered list of child policies, and sends
+- `priority` LB policy maintains an ordered list of child policies, and sends
   picks to the highest priority child reporting `READY` or `IDLE`. It expects
   child policies to support sticky-TF, and if not, it can result in picks being
   sent to a higher priority child with no reachable backends, instead of a lower
-  priority child that is reporting `READY`. See [gRFC A56][2] for more details
-
+  priority child that is reporting `READY`. See [gRFC A56][A56] for more
+  details.
 
 One scenario where this comes up is when a `LOGICAL_DNS` cluster is used under
 an aggregate cluster, and where the `LOGICAL_DNS` cluster is not the last
@@ -81,20 +81,22 @@ is `pick_first`. Without sticky-TF support in `pick_first`, it can lead to a
 situation where the `priority` LB policy continues to send picks to a higher
 priority `LOGICAL_DNS` cluster when none of the addresses behind it are
 reachable, because `pick_first` doesn't report `TRANSIENT_FAILURE` as it's
-connectivity state. See [gRFC A37][3] for more details on aggregate clusters.
+connectivity state. See [gRFC A37][A37] for more details on aggregate clusters.
 
-Supporting sticky-TF in all `pick_first` implementations would enable us to
+Providing sticky-TF in all `pick_first` implementations would enable us to
 overcome these shortcomings. This would involve making the following changes to
 `pick_first` implementations, once connections to all addresses fail:
 - Report `TRANSIENT_FAILURE` as the connectivity state.
 - Attempt to reconnect to the addresses indefinitely until a connection succeeds
-  (at which point, they should report `READY`), or the channel becomes idle (see
-  [gRPC Connectivity Semantics][1] for more details about idleness).
+  (at which point, they should report `READY`), or there is no RPC activity on
+  the channel for the specified `IDLE_TIMEOUT`.
 
 
-[1]: https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
-[2]: A56-priority-lb-policy.md
-[3]: A37-xds-aggregate-and-logical-dns-clusters.md
+All gRPC implementations should implement `IDLE_TIMEOUT` and have it enabled by
+default. A default value of 30 minutes is recommended.
+
+[A56]: A56-priority-lb-policy.md
+[A37]: A37-xds-aggregate-and-logical-dns-clusters.md
 
 ### Enable random shuffling of address list
 
@@ -123,7 +125,8 @@ addresses it receives before it starts to attempt to connect.
 
 gRPC clients that receive `pick_first` configuration with this field set, but do
 not support this configuration should continue to work and their behavior should
-remain unchanged. Implementations that support the new field should shuffle the
+remain unchanged. Implementations that support the new field and receive
+configuration with `shuffleAddressList` set to `true`, should shuffle the
 received address list at random before attempting to connect to them.
 
 ### Temporary environment variable protection
