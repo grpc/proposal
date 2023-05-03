@@ -5,7 +5,7 @@ A62: `pick_first`: sticky TRANSIENT_FAILURE and address order randomization
 * Status: Draft
 * Implemented in:
 * Last updated: 2023-04-20
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/uUf0V5zZvQc
 
 ## Abstract
 
@@ -119,7 +119,7 @@ Specific changes are described in their own subsections below.
 ### Use sticky-TF by default
 
 Using sticky-TF by default in all `pick_first` implementations would enable us
-to overcome the shortcomings described [here](#sticky-transient-failure). This
+to overcome the shortcomings described [above](#sticky-transient-failure). This
 would involve making the following changes to `pick_first` implementations, once
 connections to all addresses fail:
 - Report `TRANSIENT_FAILURE` as the connectivity state.
@@ -146,12 +146,12 @@ addresses it receives before it starts to attempt to connect.
 }
 ```
 
-gRPC clients that receive `pick_first` configuration with this field set, should
-behave as follows:
-- If they do not support this configuration, they should continue to work as
-  before and their behavior should remain unchanged.
-- If they support this configuration, they should shuffle the received address
-  list at random before attempting to connect to them.
+In a gRPC implementation that supports this feature, when the
+`shuffleAddressList` option is enabled, the `pick_first` Lb policy will randomly
+shuffle the order of the addresses before attempting to connect to them.
+
+Note that existing gRPC implementations that do not support this feature will
+ignore this field, so their behavior will remain unchanged.
 
 ### `pick_first` via xDS
 
