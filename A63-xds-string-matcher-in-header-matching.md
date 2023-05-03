@@ -5,7 +5,7 @@ A63: xDS StringMatcher in Header Matching
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2023-05-03
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/dJFBiMzs6C0
 
 ## Abstract
 
