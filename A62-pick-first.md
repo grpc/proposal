@@ -28,6 +28,11 @@ All gRPC implementations contain a simple load balancing policy named
 - If none of the addresses are reachable, it applies an exponential backoff
   before attempting to reconnect.
 
+There are a few problems with the existing `pick_first` functionality, which
+will be described in the following subsections.
+
+### Sticky Transient Failure
+
 When connections to all addresses fail, there are some similarities and some
 differences between the Java/Go implementations and the C-core implementation.
 
@@ -45,9 +50,60 @@ Differences show up after the backoff period ends:
 This behavior of staying in `TRANSIENT_FAILURE` until it can report `READY` is
 called sticky TRANSIENT_FAILURE, or sticky-TF.
 
+Current `pick_first` implementations that don't provide sticky-TF have the
+following shortcomings:
+- When none of the received addresses are reachable, client applications
+  experience long delays before their RPCs fail. This is because the channel
+  does not spend enough time in `TRANSIENT_FAILURE` and goes back to
+  `CONNECTING` state while attempting to reconnect.
+- [priority LB policy][A56] maintains an ordered list of child policies, and
+  sends picks to the highest priority child reporting `READY` or `IDLE`. It
+  expects child policies to support sticky-TF, and if not, it can result in
+  picks being sent to a higher priority child with no reachable backends,
+  instead of a lower priority child that is reporting `READY`. This comes up is
+  in xDS in the following scenario:
+    - A `LOGICAL_DNS` cluster is used under an aggregate cluster, and the
+      `LOGICAL_DNS` cluster is not the last cluster in the list.
+    - Each cluster under the aggregate cluster is represented as a child policy
+      under `priority`, and the leaf policy for a `LOGICAL_DNS` cluster is
+      `pick_first`.
+    - Without sticky-TF support in `pick_first`, it can lead to a situation
+      where the `priority` LB policy continues to send picks to a higher
+      priority `LOGICAL_DNS` cluster when none of the addresses behind it are
+      reachable, because `pick_first` doesn't report `TRANSIENT_FAILURE` as its
+      connectivity state. See [gRFC A37][A37] for more details on aggregate
+      clusters.
+
 [wfr]: https://github.com/grpc/grpc/blob/master/doc/wait-for-ready.md
 
+### L4 Load Balancing
+
+Because `pick_first` sends all requests to the same address, it is often used
+for L4 load balancing by randomizing the order of the addresses used by each
+client.  In general, gRPC expects address ordering to be determined as part of
+name resolution, not by the LB policy. For example, DNS servers may randomize
+the order of addresses when there are multiple A/AAAA records, and the DNS
+resolver in gRPC is expected to perform [RFC-6724][6724] address sorting.
+However, there are some cases where DNS cannot randomize the address order,
+either because the DNS server does not support that functionality or because it
+is defeated by client-side DNS caching. To address such cases, it is desirable
+to add a client-side mechanism for randomly shuffling the order of the
+addresses.
+
+[6274]: https://www.rfc-editor.org/rfc/rfc6724.html
+
+### `pick_first` via xDS
+
+There are cases where it is desirable to perform L4 load balancing using
+`pick_first` when getting addresses via xDS instead of DNS. As a result, we need
+a way to configure use of this LB policy via xDS.
+
+Note that client-side address shuffling may be equally desirable in this case,
+since the xDS server may send the same EDS resource (with the same endpoints in
+the same order) to all clients.
+
 ### Related Proposals:
+
 * [gRFC A37: xDS Aggregate and Logical DNS Clusters][A37]
 * [gRFC A52: gRPC xDS Custom Load Balancer Configuration][A52]
 * [gRFC A56: `priority_experimental` LB policy][A56]
@@ -62,32 +118,10 @@ Specific changes are described in their own subsections below.
 
 ### Use sticky-TF by default
 
-Current `pick_first` implementations that don't provide sticky-TF have the
-following shortcomings:
-- When none of the received addresses are reachable, client applications
-  experience long delays before their RPCs fail. This is because the channel
-  does not spend enough time in `TRANSIENT_FAILURE` and goes back to
-  `CONNECTING` state while attempting to reconnect.
-- `priority` LB policy maintains an ordered list of child policies, and sends
-  picks to the highest priority child reporting `READY` or `IDLE`. It expects
-  child policies to support sticky-TF, and if not, it can result in picks being
-  sent to a higher priority child with no reachable backends, instead of a lower
-  priority child that is reporting `READY`. See [gRFC A56][A56] for more
-  details.
-  - One scenario where this comes up is in xDS when a `LOGICAL_DNS` cluster is
-    used under an aggregate cluster, and where the `LOGICAL_DNS` cluster is not
-    the last cluster in the list. Each cluster under the aggregate cluster is
-    represented as a child policy under `priority`, and the leaf policy for a
-    `LOGICAL_DNS` cluster is `pick_first`. Without sticky-TF support in
-    `pick_first`, it can lead to a situation where the `priority` LB policy
-    continues to send picks to a higher priority `LOGICAL_DNS` cluster when none
-    of the addresses behind it are reachable, because `pick_first` doesn't
-    report `TRANSIENT_FAILURE` as its connectivity state. See [gRFC A37][A37]
-    for more details on aggregate clusters.
-
-Providing sticky-TF in all `pick_first` implementations would enable us to
-overcome these shortcomings. This would involve making the following changes to
-`pick_first` implementations, once connections to all addresses fail:
+Using sticky-TF by default in all `pick_first` implementations would enable us
+to overcome the shortcomings described [here](#sticky-transient-failure). This
+would involve making the following changes to `pick_first` implementations, once
+connections to all addresses fail:
 - Report `TRANSIENT_FAILURE` as the connectivity state.
 - Attempt to reconnect to the addresses indefinitely until a connection succeeds
   (at which point, they should report `READY`), or there is no RPC activity on
@@ -97,14 +131,6 @@ All gRPC implementations should implement `IDLE_TIMEOUT` and have it enabled by
 default. A default value of 30 minutes is recommended.
 
 ### Enable random shuffling of address list
-
-Our general philosophy is that the address order is to be determined by the name
-resolver server, or by the name resolver client performing sorting as described
-in [RFC-6724](https://www.rfc-editor.org/rfc/rfc6724.html). In some DNS
-configurations though, all clients get the addresses in the same order, either
-because the authoritative server does that or because of caching. In these
-scenarios, it is desirable for `pick_first` to support random shuffling of
-received addresses to provide better load balancing.
 
 At the time of this writing, `pick_first` implementations do not expect any
 configuration to be passed to it. As part of this design, we will add a field to
@@ -120,11 +146,25 @@ addresses it receives before it starts to attempt to connect.
 }
 ```
 
-gRPC clients that receive `pick_first` configuration with this field set, but do
-not support this configuration should continue to work and their behavior should
-remain unchanged. Implementations that support the new field and receive
-configuration with `shuffleAddressList` set to `true`, should shuffle the
-received address list at random before attempting to connect to them.
+gRPC clients that receive `pick_first` configuration with this field set, should
+behave as follows:
+- If they do not support this configuration, they should continue to work as
+  before and their behavior should remain unchanged.
+- If they support this configuration, they should shuffle the received address
+  list at random before attempting to connect to them.
+
+### `pick_first` via xDS
+
+gRPC recently added support for custom load balancer configuration to be
+specified by the xDS server. See [gRFC A52][A52] for more details.
+
+To enable the xDS server to specify `pick_first` using this mechanism, an
+extension configuration message was added as part of [Envoy PR
+#26952](https://github.com/envoyproxy/envoy/pull/26952).
+
+gRPC's Custom LB policy functionality will be enhanced to support this new
+extension and will result in the `pick_first` LB policy being used as the
+locality and endpoint picking policy.
 
 ### Temporary environment variable protection
 
@@ -139,7 +179,6 @@ environment variable will guard the following:
 ## Rationale
 
 N/A
-
 
 ## Implementation
 
