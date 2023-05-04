@@ -44,7 +44,7 @@ added for that effort as well.  Note that this change has implications
 for session affinity behavior in xDS.
 
 ### Related Proposals: 
-* TODO: reference to xDS design or Envoy GH issue
+* [Support for dual stack EDS endpoints in Envoy][envoy-design]
 * [gRFC A17: Client-Side Health Checking][A17]
 * [gRFC A58: Weighted Round Robin LB Policy][A58]
 * [gRFC A48: xDS Least Request LB Policy][A48]
@@ -378,6 +378,7 @@ TODO(dfawley): Does this look right?
 
 N/A
 
+[envoy-design]: https://docs.google.com/document/d/1AjmTcMWwb7nia4rAgqE-iqIbSbfiXCI4h1vk-FONFdM/edit
 [A17]: A17-client-side-health-checking.md
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A48]: A48-xds-least-request-lb-policy.md
