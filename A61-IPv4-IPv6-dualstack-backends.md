@@ -52,6 +52,7 @@ for session affinity behavior in xDS.
 * [gRFC A55: xDS-Based Stateful Session Affinity][A55]
 * [gRFC A62: pick_first: Sticky TRANSIENT_FAILURE and address order
   randomization][A62]
+* [gRFC A51: Custom Backend Metrics][A51]
 
 ## Proposal
 
@@ -169,8 +170,10 @@ In Java and Go, the pick_first logic is currently implemented in the
 subchannel.  We will pull this logic out of the subchannel and move it
 into the pick_first policy itself.  This means that subchannels will
 have only one address, and that address does not change over the
-lifetime of the subchannel.  This will move us closer to having
-uniform architecture across all of our implementations.
+lifetime of the subchannel.  It will also mean that connection backoff
+will be done on a per-address basis rather than a per-endpoint basis.
+This will move us closer to having uniform architecture across all of
+our implementations.
 
 #### Use pick_first as the Universal Leaf Policy
 
@@ -193,7 +196,8 @@ includes the following:
 The petiole policies will receive a list of endpoints, each of which
 may contain multiple addresses.  They will create a pick_first child
 policy for each endpoint, to which they will pass a list containing a
-single endpoint with all of its addresses.
+single endpoint with all of its addresses.  (See below for more details
+on individual petiole policies.)
 
 Note that implementations should be careful to ensure that this
 change does not make error messages less useful when a pick fails.
@@ -267,19 +271,19 @@ steps in the following order:
 
 Note that, as described in [gRFC
 A17](A17-client-side-health-checking.md#pick_first), pick_first does not
-support client-side health checking, but the other policies described
-above do.  To support this, it will be necessary for pick_first to
-optionally support client-side health checking so that it can be
-enabled when pick_first is used as a child policy underneath a policy
-like round_robin.
+support client-side health checking, but the petiole policies do.  To
+support this, it will be necessary for pick_first to optionally support
+client-side health checking so that it can be enabled when pick_first is
+used as a child policy underneath a petiole policy.
 
 When client-side health checking is enabled in pick_first, it will be
 necessary for pick_first to see both the "raw" connectivity state of
 each subchannel and the state reflected by health checking.  The
-connectivity state behavior will continue to use the "raw" connectivity
+connection management behavior will continue to use the "raw" connectivity
 state, just as it does today.  Only once pick_first chooses a subchannel
 will it start health checking, and the connectivity state reported by
-the health checking code is the state that PF will report to its parent.
+the health checking code is the state that pick_first will report to its
+parent.
 
 Note that, as described in gRFC A17, we still do not want users enabling
 client-side health checking when they directly use pick_first as the LB
@@ -287,6 +291,128 @@ policy, because there is no sensible behavior for pick_first when the
 chosen subchannel reports unhealthy.  As a result, we will implement
 this functionality in a way that it can be triggered by a parent policy
 such as round_robin but cannot be triggered by an external application.
+(For example, in C-core, this will be triggered via an internal-only
+channel arg that will be set by the petiole policies.)
+
+#### Address List Updates in Petiole Policies
+
+The algorithm used by petiole policies to handle address list updates
+will need to be updated to reflect the new two-level nature of address
+lists.
+
+Currently, there are differences between C-core and Java/Go in terms of
+how address list works are handled, so we need to specify how each
+approach works and how it is going to be changed.
+
+##### Address List Updates in C-core
+
+In C-core, the channel provides a subchannel pool, which means that if
+an LB policy creates multiple subchannels with the same address and
+channel args, both of the returned subchannel objects will actually be
+refs to the same underlying real subchannel.
+
+As a result, the normal way to handle an address list update today is to
+create a whole new list of subchannels, ignoring the fact that some of
+them may be duplicates of subchannels in the previous list; for those
+duplicates, the new list will just wind up getting a new ref to the
+existing subchannel, so there will not be any connection churn.  Also, to
+avoid adding unnecessary latency to RPCs being sent on the channel, we
+wait to actually start using the new list until we have seen the initial
+connectivity state update on all of those subchannels and they have been
+given the chance to get connected, if necessary.
+
+With the changes described in this proposal, we will continue to take
+the same basic approach, except that for each endpoint, we will create a
+pick_first child policy instead of creating a subchannel.  Note that the
+subchannel pool will still be used by all pick_first child policies, so
+creating a new pick_first child in the new list for the same address that
+is already in use by a pick_first child in the old list will wind up
+reusing the existing connection.
+
+##### Address List Updates in Java/Go
+
+In Java and Go, there is no subchannel pool, so when an LB policy gets
+an updated address list, it needs to explicitly check whether any of
+those addresses were already present on its previous list.  It
+effectively does a set comparison: for any address on the new list that
+is not on the old list, it will create a new subchannel; for any address
+that was on the old list but is not on the new list, it will remove the
+subchannel; and for any address on both lists, it will retain the
+existing subchannel.
+
+This algorithm will continue to be used, with the difference that each
+entry in the list will now be a set of one or more addresses rather than
+a single address.  Note that the order of the addresses will not matter
+when determining whether an endpoint is present on the list; if the old
+list had an endpoint with address list `[A, B]` and the new list has an
+endpoint with address list `[B, A]`, that endpoint will be considered to
+be present on both lists.  However, because the order of the addresses
+will matter to the pick_first child when establishing a new connection,
+the petiole policy will need to send an updated address list to the
+pick_first child to ensure that it has the updated order.
+
+Note that in this algorithm, the unordered set of addresses must be the
+same on both the old and new list for an endpoint to be considered the
+same.  This means that if an address is added or removed from an
+existing endpoint, it will be considered a completely new endpoint,
+which may cause some unnecessary connection churn.  For this design, we
+are accepting this limitation, but we may consider optimizing this in
+the future if it becomes a problem.
+
+#### Weighted Round Robin
+
+In the `weighted_round_robin` policy described in [gRFC A58][A58], some
+additional state is needed to track the weight of each endpoint.
+
+##### WRR in C-core
+
+In C-core, WRR currently has a map of address weights, keyed by the
+associated address.  The weight objects are ref-counted and remove
+themselves from the map when their ref-count reaches zero.  When a
+subchannel is created for a given address, it takes a new ref to the
+weight object for its address.  This structure allows the weight
+information to be retained when we create a new subchannel list in
+response to an updated address list.
+
+With the changes in this proposal, this map will instead be keyed by the
+unordered set of addresses for each endpoint.  This will use the same
+semantics as address list updates in Java/Go, described above: an
+endpoint on the old list with addresses `[A, B]` will be considered
+identical to an endpoint on the new list with addresses `[B, A]`.
+
+Note that in order to start the ORCA OOB watcher for backend metrics
+on the subchannel (see [gRFC A51][A51]), WRR will need to intercept
+subchannel creation via the helper that it passes down into the pick_first
+policy.  It will unconditionally start the watch for each subchannel
+as it is created, all of which will update the same subchannel weight.
+However, once pick_first chooses a subchannel, it will unref the other
+subchannels, so only one OOB watcher will remain in steady state.
+
+##### WRR in Java/Go
+
+In Java and Go, WRR stores the subchannel weight in the individual
+subchannel.  We will continue to use this same structure, except that
+instead of using a map from a single address to a subchannel, we will
+store a map from an unordered set of addresses to a pick_first child,
+and the endpoint weight will be stored alongside that pick_first child.
+
+Just like in C-core, in order to start the ORCA OOB watcher for backend
+metrics on the subchannel, WRR will need to intercept subchannel creation
+via the helper that it passes down into the pick_first policy.  However,
+unlike C-core, Java and Go will need to wrap the subchannels and store
+them, so that they can start or stop the ORCA OOB watcher as needed by a
+subsequent config change.
+
+#### Least Request
+
+The least-request LB policy will (Java-only) will work essentially the
+same way as WRR.  The only difference is that the data it is storing on
+a per-endpoint basis is outstanding request counts rather than weights.
+
+#### Outlier Detection
+
+TODO: details (probably continue to set map based on endpoints in the
+address list on the way down)
 
 ### Support Multiple Addresses Per Endpoint in xDS
 
@@ -341,6 +467,8 @@ backoff spec][backoff-spec] seems to have originally envisioned.
 
 - move client-side health checking out of subchannel so that it can be
   controlled by pick_first (https://github.com/grpc/grpc/pull/32709)
+- assume LB policies start in CONNECTING state
+  (https://github.com/grpc/grpc/pull/33009)
 - make pick_first the universal leaf policy, including client-side
   health checking support (https://github.com/grpc/grpc/pull/32692)
 - change address list to support multiple addresses per endpoint and
@@ -351,7 +479,6 @@ backoff spec][backoff-spec] seems to have originally envisioned.
 
 ### Java
 
-TODO(ejona): Does this look right?
 - change grpclb to delegate to RR or PF
 - move pick_first logic out of subchannel and into pick_first policy
 - make pick_first the universal leaf policy, including client-side
@@ -362,7 +489,6 @@ TODO(ejona): Does this look right?
 
 ### Go
 
-TODO(dfawley): Does this look right?
 - change subchannel connectivity state API (maybe)
 - change grpclb to delegate to RR or PF
 - move pick_first logic out of subchannel and into pick_first policy
@@ -382,6 +508,7 @@ N/A
 [A17]: A17-client-side-health-checking.md
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A48]: A48-xds-least-request-lb-policy.md
+[A51]: A51-custom-backend-metrics.md
 [A55]: A55-xds-stateful-session-affinity.md
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
 [RFC-8305]: https://www.rfc-editor.org/rfc/rfc8305
