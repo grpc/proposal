@@ -2,9 +2,9 @@ A58: `weighted_round_robin` LB policy
 ----
 * Author(s): @yousukseung
 * Approver: @markdroth
-* Status: Ready for Implementation
+* Status: Implemented
 * Implemented in: C-core, Java
-* Last updated: 2023-05-09
+* Last updated: 2023-04-17
 * Discussion at: https://groups.google.com/g/grpc-io/c/p18GXTlDapM
 
 ## Abstract
