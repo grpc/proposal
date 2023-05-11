@@ -4,7 +4,7 @@ A51: Custom Backend Metrics Support
 * Approver: Eric Anderson
 * Status: Ready for Implementation
 * Implemented in: C-core, Java
-* Last updated: 2023-05-09
+* Last updated: 2023-04-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/mieHKzTigzg
 
 ## Abstract
