@@ -4,7 +4,7 @@ A59: gRPC Audit Logging
 * Approver: [Eric Anderson](https://github.com/ejona86)
 * Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in:
-* Last updated: 2023-03-23
+* Last updated: 2023-05-12
 * Discussion at: https://groups.google.com/g/grpc-io/c/LbnuqGqEwuM
 
 ## Abstract
@@ -238,8 +238,15 @@ Note that the definition above is only for illustration purposes and does not
 actually exist anywhere as a `.proto` file. Nor does gRPC process the policy
 as protobuf by any means.
 
-Similar to the xDS case, unsupported logger types or any other misconfiguration
-will cause the server to fail to start.
+When the policy explicitly sets the audit condition with no audit loggers, or
+vice versa, no audit logging will ever happen. However, this is considered as
+valid configurations and will be accepted by the server.
+
+`config` needs to be a valid json object and it defaults to an empty json
+object if omitted. Similar to the xDS case, unsupported logger types or any
+other misconfiguration will cause the server to fail to start by default. If
+`is_optional` is set to true, unsupported logger types will be ignored but any
+other config parsing errors will still be enforced.
 
 The authorization policy is backed by two RBAC filters, a DENY followed by an
 ALLOW. The audit logger configurations will be duplicated in both generated
@@ -295,14 +302,14 @@ Here is the example in the authorization policy case.
 
 ```json
 {
-  "name": "stdout_logger"
+  "name": "stdout_logger",
 }
 ```
 
 Following is an example log entry.
 
 ```json
-{"timestamp":"1649376211","rpc_method":"/pkg.Service/Foo","principal":"spiffe://foo/user1","policy_name":"example_policy","matched_rule":"admin_access","authorized":true}
+{"grpc_audit_log":{"timestamp":"1649376211","rpc_method":"/pkg.Service/Foo","principal":"spiffe://foo/user1","policy_name":"example_policy","matched_rule":"admin_access","authorized":true}}
 ```
 
 The timestamp, as the number of seconds from the Unix Epoch, is generated from
@@ -339,7 +346,7 @@ A new header `audit_logging.h` declares all the classes users either need to
 consume or implement.
 
 ```C++
-// include/grpcpp/security/audit_logging.h
+// include/grpc/security/audit_logging.h
 
 namespace grpc {
 namespace experimental {
@@ -349,10 +356,10 @@ namespace experimental {
 // when they need to use them outside the scope of this object.
 class AuditContext {
  public:
-  grpc::string_ref rpc_method() const;
-  grpc::string_ref principal() const;
-  grpc::string_ref policy_name() const;
-  grpc::string_ref matched_rule() const;
+  absl::string_view rpc_method() const;
+  absl::string_view principal() const;
+  absl::string_view policy_name() const;
+  absl::string_view matched_rule() const;
   bool authorized() const;
 };
 
@@ -379,15 +386,15 @@ class AuditLoggerFactory {
   // their custom loggers.
   class Config {
    public:
-    virtual const char* name() const = 0;
-    virtual std::string ToString() = 0;
+    virtual absl::string_view name() const = 0;
+    virtual std::string ToString() const = 0;
   };
-  virtual const char* name() const = 0;
+  virtual absl::string_view name() const = 0;
 
   // This is used to parse and validate the json format of the audit logger
   // config.
   virtual absl::StatusOr<std::unique_ptr<Config>> ParseAuditLoggerConfig(
-      grpc::string_ref config_json) = 0;
+      const Json& json) = 0;
 
   // This creates an audit logger instance given the logger config.
   // The config will be guaranteed by the caller to have been validated, so
@@ -408,78 +415,79 @@ void RegisterAuditLoggerFactory(std::unique_ptr<AuditLoggerFactory> factory);
 
 #### Go APIs
 
-The APIs will be in the existing `authz` package.
+The APIs will be in `audit` package under the `authz` directory.
 
 ```Go
-package authz
+package audit
 
-// RegisterAuditLoggerBuilder registers the builder in a global map
+// RegisterLoggerBuilder registers the builder in a global map
 // using b.Name() as the key.
-// This should only be called during initialization time (i.e. in an init() function).
-// If multiple builders are registered with the same name, the one registered last
-// will take effect.
-func RegisterAuditLoggerBuilder(b AuditLoggerBuilder)
+//
+// This should only be called during initialization time (i.e. in an init()
+// function). If multiple builders are registered with the same name,
+// the one registered last will take effect.
+func RegisterLoggerBuilder(b LoggerBuilder)
 
-// GetAuditLoggerBuilder returns a builder with the given name.
+// GetLoggerBuilder returns a builder with the given name.
 // It returns nil if the builder is not found in the registry.
-func GetAuditLoggerBuilder(name string) AuditLoggerBuilder
+func GetLoggerBuilder(name string) LoggerBuilder
 
-// AuditInfo contains information used by the audit logger during an audit logging event.
-type AuditInfo struct {
-	// RPCMethod is the method of the audited RPC, in the format of "/pkg.Service/Method".
-	// For example, "/helloworld.Greeter/SayHello".
-	RPCMethod string
-	// Principal is the identity of the RPC. Currently it will only be available in
-	// certificate-based TLS authentication.
+// Event contains information passed to the audit logger as part of an
+// audit logging event.
+type Event struct {
+	// FullMethodName is the full method name of the audited RPC, in the format
+	// of "/pkg.Service/Method". For example, "/helloworld.Greeter/SayHello".
+	FullMethodName string
+	// Principal is the identity of the caller. Currently it will only be
+	// available in certificate-based TLS authentication.
 	Principal string
-	// PolicyName is the authorization policy name (or the xDS RBAC filter name).
+	// PolicyName is the authorization policy name or the xDS RBAC filter name.
 	PolicyName string
-	// MatchedRule is the matched rule (or policy name in the xDS RBAC filter). It will be
-	// empty if there is no match.
+	// MatchedRule is the matched rule or policy name in the xDS RBAC filter.
+	// It will be empty if there is no match.
 	MatchedRule string
 	// Authorized indicates whether the audited RPC is authorized or not.
 	Authorized bool
 }
 
-// AuditLoggerConfig defines the configuration for a particular implementation of audit logger.
-type AuditLoggerConfig interface {
-	// auditLoggerConfig is a dummy interface requiring users to embed this
-	// interface to implement it.
-	auditLoggerConfig()
+// LoggerConfig represents an opaque data structure holding an audit
+// logger configuration. Concrete types representing configuration of specific
+// audit loggers must embed this interface to implement it.
+type LoggerConfig interface {
+	loggerConfig()
 }
 
-// AuditLogger is the interface for an audit logger.
-// An audit logger is a logger instance that can be configured to use via the authorization policy
-// or xDS HTTP RBAC filters. When the authorization decision meets the condition for audit, all the
-// configured audit loggers' Log() method will be invoked to log that event with the AuditInfo.
-// The method will be executed synchronously before the authorization is complete and the call is
-// denied or allowed.
-type AuditLogger interface {
-	// Log logs the auditing event with the given information.
-	// This method will be executed synchronously by gRPC so implementers must keep in mind it should
-	// not block the RPC. Specifically, time-consuming processes should be fired asynchronously such
-	// that this method can return immediately.
-	Log(context.Context, *AuditInfo) error
+// Logger is the interface to be implemented by audit loggers.
+//
+// An audit logger is a logger instance that can be configured via the
+// authorization policy API or xDS HTTP RBAC filters. When the authorization
+// decision meets the condition for audit, all the configured audit loggers'
+// Log() method will be invoked to log that event.
+type Logger interface {
+	// Log performs audit logging for the provided audit event.
+	//
+	// This method is invoked in the RPC path and therefore implementations
+	// must not block.
+	Log(*Event)
 }
 
-// AuditLoggerBuilder is the interface for an audit logger builder.
-// It parses and validates a config, and builds an audit logger from the parsed config. This enables
-// configuring and instantiating audit loggers in the runtime.
-// Users that want to implement their own audit logging logic should implement this along with
-// the AuditLogger interface and register this builder by calling RegisterAuditLoggerBuilder()
-// before they start the gRPC server.
-type AuditLoggerBuilder interface {
-	// ParseAuditLoggerConfig parses the given JSON bytes into a structured
+// LoggerBuilder is the interface to be implemented by audit logger
+// builders that are used at runtime to configure and instantiate audit loggers.
+//
+// Users who want to implement their own audit logging logic should
+// implement this interface, along with the Logger interface, and register
+// it by calling RegisterLoggerBuilder() at init time.
+type LoggerBuilder interface {
+	// ParseLoggerConfig parses the given JSON bytes into a structured
 	// logger config this builder can use to build an audit logger.
-	// When users implement this method, its return type must embed the
-	// AuditLoggerConfig interface.
-	ParseAuditLoggerConfig(config json.RawMessage) (AuditLoggerConfig, error)
+	ParseLoggerConfig(config json.RawMessage) (LoggerConfig, error)
 	// Build builds an audit logger with the given logger config.
-	// This will only be called with valid configs returned from ParseAuditLoggerConfig()
-	// and any runtime issues such as failing to create a file should be handled by the
-	// logger implementation instead of failing the logger instantiation. So implementers
-	// need to make sure it can return a logger without error at this stage.
-	Build(AuditLoggerConfig) AuditLogger
+	// This will only be called with valid configs returned from
+	// ParseLoggerConfig() and any runtime issues such as failing to
+	// create a file should be handled by the logger implementation instead of
+	// failing the logger instantiation. So implementers need to make sure it
+	// can return a logger without error at this stage.
+	Build(LoggerConfig) Logger
 	// Name returns the name of logger built by this builder.
 	// This is used to register and pick the builder.
 	Name() string
