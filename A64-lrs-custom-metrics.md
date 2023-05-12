@@ -2,10 +2,10 @@ A64: xDS LRS Custom Metrics Support
 ----
 * Author: yousukseung
 * Approver(s): markdroth
-* Status: Ready for Implementation
+* Status: Implemented
 * Implemented in: C-core
 * Last updated: 2023-05-10
-* Discussion at: TBA
+* Discussion at: https://groups.google.com/g/grpc-io/c/Cs7ffkO1wUA
 
 ## Abstract
 
@@ -36,15 +36,13 @@ Each per-request ORCA load report will be associated with one request for the ag
 For example, following ORCA load reports
 ```textproto
 // report 1/3
-rps_fractional: 10.0
 named_metrics { key: "key1" value: 1.0 }
 named_metrics { key: "key2" value: 2.0 }
 // report 2/3
-rps_fractional: 20.0
 named_metrics { key: "key2" value: 3.0 }
 named_metrics { key: "key3" value: 4.0 }
 // report 3/3
-rps_fractional: 30.0
+// (no named_metrics)
 ```
 will be aggreated to as follows.
 |field|value|number of requests|
@@ -63,19 +61,20 @@ An example LRS load report with custom metrics is as follows.
 cluster_stats {
   // …
   upstream_locality_stats {
-     total_successful_requests: 10
-     total_requests_in_progress: 2
-     total_error_requests: 4
-     total_issued_requests = 13
      load_metric_stats {
         metric_name: "key1"
-        num_requests_finished_with_metric: 10
-        total_metric_value: 12.3
-     } 
+        num_requests_finished_with_metric: 1
+        total_metric_value: 1.0
+     }
      load_metric_stats {
         metric_name: "key2"
-        num_requests_finished_with_metric: 10
-        total_metric_value: 23.4
+        num_requests_finished_with_metric: 2
+        total_metric_value: 5.0
+     }
+     load_metric_stats {
+        metric_name: "key3"
+        num_requests_finished_with_metric: 3
+        total_metric_value: 4.0
      }
   }
 }
