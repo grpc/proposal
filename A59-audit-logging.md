@@ -309,7 +309,7 @@ Here is the example in the authorization policy case.
 Following is an example log entry.
 
 ```json
-{"grpc_audit_log":{"timestamp":"1649376211","rpc_method":"/pkg.Service/Foo","principal":"spiffe://foo/user1","policy_name":"example_policy","matched_rule":"admin_access","authorized":true}}
+{"grpc_audit_log":{"timestamp":1649376211,"rpc_method":"/pkg.Service/Foo","principal":"spiffe://foo/user1","policy_name":"example_policy","matched_rule":"admin_access","authorized":true}}
 ```
 
 The timestamp, as the number of seconds from the Unix Epoch, is generated from
@@ -329,7 +329,7 @@ two important features that apply to all the languages.
 
 As is also documented in all the languages below, the logging function is
 executed by gRPC syncrhonously during the authorization process. Therefore,
-it's implementation should not block the RPC. When needed, it should invoke any
+its implementation should not block the RPC. When needed, it should invoke any
 long running operations asyncrhonously so that the function itself returns
 promptly. For this reason, no error or status code will be returned from it.
 
