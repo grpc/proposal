@@ -55,7 +55,7 @@ will be aggreated to as follows.
 
 The gRPC xDS client will include custom metrics in the `load_metric_stats` field in the locality stats. Each LRS report will include aggregated custom metrics with keys reported since the last report. Locally aggregated stats will be cleared and the associated total request counts will be reset to zero after each LRS load report is generated.
 
-An example LRS load report with custom metrics is as follows.
+Continuing the example from the previous section, here is how the custom metric data will appear in the LRS load report:
 ```textproto
 // LRS report (envoy.service.load_stats.v3.LoadStatsRequest)
 cluster_stats {
@@ -73,7 +73,7 @@ cluster_stats {
      }
      load_metric_stats {
         metric_name: "key3"
-        num_requests_finished_with_metric: 3
+        num_requests_finished_with_metric: 1
         total_metric_value: 4.0
      }
   }
