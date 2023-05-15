@@ -309,11 +309,10 @@ Here is the example in the authorization policy case.
 Following is an example log entry.
 
 ```json
-{"grpc_audit_log":{"timestamp":1649376211,"rpc_method":"/pkg.Service/Foo","principal":"spiffe://foo/user1","policy_name":"example_policy","matched_rule":"admin_access","authorized":true}}
+{"grpc_audit_log":{"timestamp":"2006-01-02T15:04:05Z07:00","rpc_method":"/pkg.Service/Foo","principal":"spiffe://foo/user1","policy_name":"example_policy","matched_rule":"admin_access","authorized":true}}
 ```
 
-The timestamp, as the number of seconds from the Unix Epoch, is generated from
-the current time when the logger is invoked.
+The timestamp in RFC3339 format represents the time when the logger is invoked.
 
 More types of loggers may be designed and implemented in the future. For users
 that just need to use the built-in loggers, everything will be configured in
