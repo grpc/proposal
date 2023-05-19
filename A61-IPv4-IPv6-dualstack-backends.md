@@ -304,6 +304,8 @@ Currently, there are differences between C-core and Java/Go in terms of
 how address list works are handled, so we need to specify how each
 approach works and how it is going to be changed.
 
+TODO: ignore updates from PF children while processing an updated address list?
+
 ##### Address List Updates in C-core
 
 In C-core, the channel provides a subchannel pool, which means that if
@@ -409,6 +411,82 @@ The least-request LB policy will (Java-only) will work essentially the
 same way as WRR.  The only difference is that the data it is storing on
 a per-endpoint basis is outstanding request counts rather than weights.
 
+#### Ring Hash
+
+Currently, as described in [gRFC A42][A42], each entry in the ring is a
+single address, positioned based on the hash of that address.  With this
+design, that will change such that each entry in the ring is an endpoint,
+positioned based on the hash of the endpoint's first address.  However,
+once an entry in the ring is selected, we may wind up connecting to the
+endpoint on a different address than the one that we hashed to.
+
+Note that this means that if the order of the addresses for a given
+endpoint change, that will change the position of the endpoint in
+the ring.  This is considered acceptable, since ring_hash is already
+subject to churn in the ring whenever the address list changes.
+
+Because ring_hash establishes connections lazily, but pick_first will
+attempt to connect as soon as it receives its initial address list, the
+ring_hash policy will lazily create the pick_first child when it wants
+to connect.
+
+Note that as of [gRFC A62][A62], pick_first has sticky-TF behavior in
+all languages: when a connection attempt fails, it continues retrying
+indefinitely with appropriate [backoff][backoff-spec], staying in
+TRANSIENT_FAILURE state until either it establishes a connection or the
+pick_first policy is destroyed.  This means that the ring_hash picker no
+longer needs to explicitly trigger connection attempts on subchannels in
+state TRANSIENT_FAILURE, which makes the logic much simpler.  The picker
+pseudo-code now becomes:
+
+```
+first_index = ring.FindIndexForHash(request.hash);
+for (i = 0; i < ring.size(); ++i) {
+  index = (first_index + i) % ring.size();
+  if (ring[index].state == READY) {
+    return ring[index].picker->Pick(...);
+  }
+  if (ring[index].state == IDLE) {
+    ring[index].endpoint.TriggerConnectionAttemptInControlPlane();
+    return PICK_QUEUE;
+  }
+  if (ring[index].state == CONNECTING) {
+    return PICK_QUEUE;
+  }
+}
+```
+
+As per [gRFC A42][A42], the ring_hash policy normally requires pick
+requests to trigger subchannel connection attempts, but if it is
+being used as a child of the priority policy, it will not be getting
+any picks once it reports TRANSIENT_FAILURE.  To work around this, it
+currently makes sure that it is attempting to connect (after applicable
+backoff period) to at least one subchannel at any given time.  After
+a given subchannel fails a connection attempt, it moves on to the
+next subchannel in the ring.  This approach allows the policy to recover
+if any one endpoint becomes reachable, while also minimizing the number
+of endpoints it is trying to connect to simultaneously, so that it does
+not wind up with a lot of unnecessary connections when connectivity is
+restored.  However, with the sticky-TF behavior, it will not be possible
+to attempt to connect to only one endpoint at a time, because when a
+given pick_first child reports TRANSIENT_FAILURE, it will automatically
+try reconnecting after the backoff period without waiting for a connection
+to be requested.  This means that after an extended connectivity outage,
+ring_hash will now often wind up with many unnecessary connections.
+However, this situation is also possible via the picker if ring_hash is
+the last child under the priority policy, so we are willing to live with
+this behavior for now.  If it becomes a problem in the future, we can
+consider ways to ameliorate it at that time.
+
+Note that in C-core, the normal approach for handling address list
+updates described [above](#address-list-updates-in-c-core) won't work,
+because if we are creating the pick_first children lazily, then we will
+wind up not creating the children in the new endpoint list and thus
+never swapping over to it.  As a result, ring_hash in C-core will use an
+approach more like that of [Java and Go](#address-list-updates-in-javago):
+it will maintain a map of endpoints by the set of addresses, and it will
+update that set in place when it receives an updated address list.
+
 #### Outlier Detection
 
 TODO: details (probably continue to set map based on endpoints in the
@@ -419,10 +497,6 @@ address list on the way down)
 TODO: details
 
 #### New EDS Fields
-
-TODO: details (including health state per address)
-
-#### Changes to Ring Hash LB Policy
 
 TODO: details
 
@@ -512,5 +586,5 @@ N/A
 [A55]: A55-xds-stateful-session-affinity.md
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
 [RFC-8305]: https://www.rfc-editor.org/rfc/rfc8305
-[A62]: https://github.com/grpc/proposal/pull/357
+[A62]: A62-pick-first.md
 [backoff-spec]: https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md
