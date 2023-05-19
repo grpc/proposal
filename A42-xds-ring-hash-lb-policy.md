@@ -355,10 +355,8 @@ ring will be stored within the picker, so any time a new ring is
 generated, a new picker will be returned.
 
 The picker will contain not just the ring but also the current state of
-every subchannel in the ring.  Implementations may either generate a new
-picker every time a subchannel's state changes, or they may provide a
-mechanism to synchronize subchannel state data between the LB policy
-itself and the picker.
+every subchannel in the ring.  Implementations must generate a new
+picker every time a subchannel's state changes.
 
 ##### LB Policy Config
 
