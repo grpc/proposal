@@ -5,7 +5,7 @@ A65: mTLS Credentials in xDS Bootstrap File
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2023-05-24
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/h_LQnTimyt4
 
 ## Abstract
 
