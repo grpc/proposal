@@ -36,7 +36,7 @@ functionality of the file-watcher certificate provider.
 ## Proposal
 
 We will define a new credential type in the bootstrap file called `tls`.
-Its configuration will be the same as that of the file-watcher
+Its configuration will be essentially the same as that of the file-watcher
 certificate provider described in [gRFC A29][A29].  Specifically, the
 config will look like this:
 
@@ -59,6 +59,12 @@ config will look like this:
   "refresh_interval": <string>
 }
 ```
+
+The only difference between the file-watcher certificate provider config
+and this one is that in the file-watcher certificate provider, at least
+one of the "certificate_file" or "ca_certificate_file" fields must be
+specified, whereas in this configuration, it is acceptable to specify
+neither one.
 
 Implementations should be able to internally configure the use of the
 file-watcher certificate provider for the certificate-reloading
