@@ -42,20 +42,20 @@ config will look like this:
 
 ```json
 {
-  // Path to identity certificate file.
+  // Path to CA certificate file.
+  // If unset, system-wide root certs are used.
+  "ca_certificate_file": <string>,
+
+  // Paths to identity certificate file and private key file.
+  // If either of these fields are set, both must be set.
   // If set, mTLS will be used; if unset, normal TLS will be used.
   "certificate_file": <string>,
-
-  // Paths to private key and CA certificate files.
-  // If either of these fields are set, both must be set.
-  // If neither is set, system-wide root certs are used.
   "private_key_file": <string>,
-  "ca_certificate_file": <string>,
 
   // How often to re-read the certificate files.
   // Value is the JSON format described for a google.protobuf.Duration
   // message in https://protobuf.dev/programming-guides/proto3/#json.
-  // If unset, defaults to 10 minutes.
+  // If unset, defaults to "600s".
   "refresh_interval": <string>
 }
 ```
@@ -72,7 +72,10 @@ functionality.
 
 ### Temporary environment variable protection
 
-This feature is not enabled via I/O, so no env var protection is needed.
+This feature is not enabled via remote I/O, and we don't have a good way
+to interop test it, so we will not use env var protection for this feature.
+Unit tests in individual languages should be sufficient to verify the
+functionality.
 
 ## Rationale
 
