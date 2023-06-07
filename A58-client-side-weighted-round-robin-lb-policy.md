@@ -124,21 +124,19 @@ In Go, `baseBalancer` handles the address update as in `round_robin`. When the a
 In all languages, when a subchannel state is updated to `IDLE`, the LB policy immediately requests a connection and treats it as if it is in `CONNECTING` for the aggregation purpose.
 
 ### Subchannel Weights
+The weight of a backend is calculated using utilization, QPS (queries per second), and EPS (errors per second) reported by the backend. The utilization value will come from the `application_utilization` field, if set; otherwise, the `cpu_utilization` field will be used instead. The QPS and EPS values come from the `qps` and `eps` fields, respectively. The `eps` is only used when `error_utilization_penalty` is set to non-zero and applies a penalty based on the error rate calculated as `eps/qps`. The formula used is as follows:
 
-To enforce `blackout_period` and `weight_expiration_period`, the LB policy tracks two timestamps along with the weight. `last_updated` tracks the last time a report with non-zero `cpu_utilization` and `qps` was received. `non_empty_since` tracks when the first non-zero load report was received, and it is reset when a subchannel comes back to `READY` or the weight expires so that it can be updated with the next non-zero load report. The blackout and expiration are enforced when the weight value is looked up.
+$$weight = \dfrac{qps}{utilization + \dfrac{eps}{qps} * error\\_utilization\\_penalty}$$
 
-The weight of a backend is calculated using `qps` (queries per second), `eps` (errors per second) and `cpu_utilization` reported by the backend. `eps` is only used when `error_utilization_penalty` is set to non-zero and applies a penalty based on the error rate calculated as `eps/qps`. The formula used is as follows:
-
-$$weight = \dfrac{qps}{cpu\\_utilization + \dfrac{eps}{qps} * error\\_utilization\\_penalty}$$
+To enforce `blackout_period` and `weight_expiration_period`, the LB policy tracks two timestamps along with the weight. `last_updated` tracks the last time a report with non-zero utilization and QPS was received. `non_empty_since` tracks when the first non-zero load report was received, and it is reset when a subchannel comes back to `READY` or the weight expires so that it can be updated with the next non-zero load report. The blackout and expiration are enforced when the weight value is looked up.
 
 In Java and Go, the weight will be stored in a wrapped subchannel. However, in C++, that approach won't work, because we create a new subchannel object for each address whenever we get a new address list, and we don't want to lose existing weight information when that happens. So instead, we store the weights in a map keyed by address, and each subchannel list will take its own ref to the entry in the map for each subchannel in the list.
 
 ```
-function UpdateWeight(qps, eps, cpu_utilization) {
-  if (cpu_utilization > 0 && qps > 0)
-    cpu_utilization += eps / qps * config.error_utilization_penalty;
-  var new_weight =
-     cpu_utilization == 0 ? 0 : qps / cpu_utilization;
+function UpdateWeight(qps, eps, utilization) {
+  if (utilization > 0 && qps > 0)
+    utilization += eps / qps * config.error_utilization_penalty;
+  var new_weight = utilization == 0 ? 0 : qps / utilization;
   if (new_weight == 0) return;
   if (non_empty_since_ == infy) non_empty_since_ = now();
   last_updated_ = now();
