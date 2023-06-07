@@ -215,6 +215,9 @@ necessary for round_robin to return a picker that delegates to one of
 the pick_first children's pickers, possibly modifying the error message
 from the child picker before returning it to the channel.
 
+TODO: are there issues with losing backoff state within the individual
+subchannels when PF picks a subchannel and unrefs the others?
+
 #### Address List Handling in pick_first
 
 As mentioned above, we are changing the LB policy API to take an address
@@ -491,6 +494,35 @@ update that set in place when it receives an updated address list.
 
 TODO: details (probably continue to set map based on endpoints in the
 address list on the way down)
+
+subchannels will have an API to register health providers
+- health checking and OD will both be registered providers
+- when a health watch is started, the watcher will provide some
+  parameters indicating what signals it is interested in
+- each provider can look at the watcher to determine if it needs to
+  provide a signal
+- the subchannel will take all signals and use them to report the right
+  connectivity state.  inverse of LB policy aggregation rules:
+    1. if any TF, report TF
+    2. if any CONNECTING, report CONNECTING
+    3. report real connectivity state
+
+PF:
+- always start generic health watch on subchannel
+  - provide health check service name -- will be set only if:
+    - HCSN set in service config
+    - inhibit channel arg not set
+    - running under petiole policy
+
+problem: existing users that use OD with PF (e.g.,
+https://github.com/grpc/grpc/issues/32967).  options:
+1. add config option to PF to use health state instead of raw
+   connectivity state for connection management (i.e., would cause PF to
+   drop existing connection if unhealthy).  note that this still breaks
+   existing behavior, but it does allow a way back.  but it would also
+   enable it for health checking.  and it would still technically be a
+   breaking change.
+2. ???
 
 ### Support Multiple Addresses Per Endpoint in xDS
 
