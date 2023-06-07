@@ -86,6 +86,9 @@ function recordCPUUtilizationMetric(double value);
 // Records the memory utilization metric measurement for the call.
 function recordMemoryUtilizationMetric(double value);
 
+// Records the application specific utilization metric measurement for the call.
+function recordApplicationUtilizationMetric(double value);
+
 // Records the queries per second measurement.
 function recordQpsMetric(double value);
 
@@ -127,6 +130,12 @@ function setMemoryUtilizationMetric(double value);
 
 // Clear the memory utilization metrics data.
 function deleteMemoryUtilizationMetric();
+
+// Update the application specific utilization metrics data.
+function setApplicationUtilizationMetric(double value);
+
+// Clear the application specific utilization metrics data.
+function deleteApplicationUtilizationMetric();
 
 // Update the queries-per-second metrics data.
 function setQpsMetric(double value);
@@ -325,6 +334,10 @@ public final class CallMetricRecorder {
   // Records the memory utilization metric measurement for the call.
   public CallMetricRecorder recordMemoryUtilizationMetric(double value);
 
+  // Records the application specific utilization metric measurement for the
+  // call.
+  public CallMetricRecorder recordApplicationUtilizationMetric(double value);
+
   // Records the queries per second measurement.
   public CallMetricRecorder recordQpsMetric(double value);
 
@@ -362,6 +375,12 @@ public class MetricRecorder {
 
   // Clear the memory utilization metrics data.
   public void clearMemoryUtilizationMetric();
+
+  // Update the application specific utilization metrics data.
+  public void setApplicationUtilizationMetric(double value);
+
+  // Clear the application specific utilization metrics data.
+  public void clearApplicationUtilizationMetric();
 
   // Update the queries-per-second metrics data.
   public void setQpsMetric(double value);
@@ -470,6 +489,13 @@ class CallMetricRecorder {
   // Values outside of the valid range [0, 1] are ignored.
   CallMetricRecorder& RecordMemoryUtilizationMetric(double value);
 
+  // Records a call metric measurement for the application specific utilization.
+  // Multiple calls to this method will override the stored value.
+  // Values may be larger than 1.0 when the usage exceeds the reporter
+  // dependent notion of soft limits.
+  // Values outside of the valid range [0, infy) are ignored.
+  CallMetricRecorder& RecordApplicationUtilizationMetric(double value);
+
   // Records a call metric measurement for queries per second.
   // Multiple calls to this method will override the stored value.
   // Values outside of the valid range [0, infy) are ignored.
@@ -534,7 +560,7 @@ class ServerMetricRecorder {
   // Factory method. Use this to create.
   static std::unique_ptr<ServerMetricRecorder> Create();
   // Records the server CPU utilization in the range [0, infy).
-  // Values may be larger than 1.0 when the usage exceeds the the reporter
+  // Values may be larger than 1.0 when the usage exceeds the reporter
   // dependent notion of soft limits.
   // Values outside of the valid range are rejected.
   // Overrides the stored value when called again with a valid value.
@@ -543,6 +569,12 @@ class ServerMetricRecorder {
   // Values outside of the valid range are rejected.
   // Overrides the stored value when called again with a valid value.
   void SetMemoryUtilization(double value);
+  // Records the application specific utilization in the range [0, infy).
+  // Values may be larger than 1.0 when the usage exceeds the reporter
+  // dependent notion of soft limits.
+  // Values outside of the valid range are rejected.
+  // Overrides the stored value when called again with a valid value.
+  void SetApplicationUtilization(double value);
   // Records number of queries per second to the server in the range [0, infy).
   // Values outside of the valid range are rejected.
   // Overrides the stored value when called again with a valid value.
@@ -568,6 +600,8 @@ class ServerMetricRecorder {
   void ClearCpuUtilization();
   // Clears the server memory utilization if recorded.
   void ClearMemoryUtilization();
+  // Clears the application specific utilization if recorded.
+  void ClearApplicationUtilization();
   // Clears number of queries per second to the server if recorded.
   void ClearQps();
   // Clears a named utilization value if exists.
