@@ -135,7 +135,7 @@ default. A default value of 30 minutes is recommended.
 At the time of this writing, `pick_first` implementations do not expect any
 configuration to be passed to it. As part of this design, we will add a field to
 its configuration that would enable it to randomly shuffle the order of the
-addresses it receives before it starts to attempt to connect.
+addresses it receives.
 
 ```
 {
@@ -148,7 +148,8 @@ addresses it receives before it starts to attempt to connect.
 
 In a gRPC implementation that supports this feature, when the
 `shuffleAddressList` option is enabled, the `pick_first` Lb policy will randomly
-shuffle the order of the addresses before attempting to connect to them.
+shuffle the order of the addresses. This shuffling will be done when the LB
+policy receives an updated address list from its parent.
 
 Note that existing gRPC implementations that do not support this feature will
 ignore this field, so their behavior will remain unchanged.
