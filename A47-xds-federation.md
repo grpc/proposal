@@ -555,6 +555,22 @@ resource is not already present in the cache, it will send a message
 subscribing to the resource, using the appropriate xDS server from the
 authority.
 
+##### CDS Resource Validation
+
+For an EDS cluster, the CDS resource currently specifies the name of the
+EDS resource in its `eds_cluster_config.service_name` field.  Currently,
+the expected behavior is that if that field is unset, the EDS resource
+name will be the same as the CDS resource name.  However, with
+new-style resource names, the resource type is part of the resource
+name, which means that this default will no longer work, because it
+would result in an EDS resource name that specifies the CDS resource
+type in its name.
+
+To address this, when the `XdsClient` validates a CDS resource, if the CDS
+resource's name starts with `xdstp:`, then the CDS resource for an EDS
+cluster will be considered invalid if the `eds_cluster_config.service_name`
+field is unset.
+
 #### LRS Server Representation
 
 We currently represent the LRS server name in several places:
