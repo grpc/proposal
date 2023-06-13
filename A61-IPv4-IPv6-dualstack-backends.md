@@ -125,6 +125,21 @@ reporting TRANSIENT_FAILURE while in backoff and then IDLE when backoff
 has finished.  The pick_first policy will therefore automatically
 request a connection whenever a subchannel reports IDLE.
 
+Once a subchannel does become READY, pick_first will unref all other
+subchannels.  Note that the [connection backoff][backoff-spec] state is
+stored in the subchannel, so this means that we will lose backoff state
+for those subchannels.  In general, this is expected to be okay, because
+once we see a READY subchannel, we generally expect to maintain that
+connection for a while, after which the backoff state for the other
+subchannels will no longer be relevant.  However, there could be
+pathalogical cases where a connection does not last very long and we
+wind up making subsequent connection attempts to the other addresses
+sooner than we ideally should.  This should be fairly rare, so we're
+willing to accept this; if it becomes a problem, we can find ways to
+address it at that point.
+
+#### Implications of Subchannel Sharing in C-core
+
 In C-core, there are some additional details to handle due to the
 existance of subchannel sharing between channels.  Any given subchannel
 that pick_first is using may also be used other channel(s), and any
@@ -161,9 +176,11 @@ This has a number of implications:
   pending connection attempt to be cancelled, and the subchannel will
   be destroyed.  However, if some other channel was holding a ref to the
   subchannel, the connection attempt will continue, even if the other
-  channel did not want it.  This is slightly sub-optimal, but it does
-  not seem likely to be problematic enough to warrant the complexity of
-  fixing it.
+  channel did not want it.  This is slightly sub-optimal, but it's not
+  really a new problem; the same thing can occur today if there are two
+  channels both using pick_first with overlapping sets of addresses.
+  We can find ways to address this in the future if and when it becomes
+  a problem.
 
 #### Move pick_first Logic Out of Subchannel (Java/Go)
 
@@ -215,9 +232,6 @@ along with the connectivity state.  In those implementations, it may be
 necessary for round_robin to return a picker that delegates to one of
 the pick_first children's pickers, possibly modifying the error message
 from the child picker before returning it to the channel.
-
-TODO: are there issues with losing backoff state within the individual
-subchannels when PF picks a subchannel and unrefs the others?
 
 #### Address List Handling in pick_first
 
@@ -310,8 +324,6 @@ lists.
 Currently, there are differences between C-core and Java/Go in terms of
 how address list works are handled, so we need to specify how each
 approach works and how it is going to be changed.
-
-TODO: ignore updates from PF children while processing an updated address list?
 
 ##### Address List Updates in C-core
 
