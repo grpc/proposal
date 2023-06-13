@@ -474,7 +474,27 @@ restored.  However, with the sticky-TF behavior, it will not be possible
 to attempt to connect to only one endpoint at a time, because when a
 given pick_first child reports TRANSIENT_FAILURE, it will automatically
 try reconnecting after the backoff period without waiting for a connection
-to be requested.  This means that after an extended connectivity outage,
+to be requested.  Proposed psuedo-code for this logic is:
+
+```
+if (in_transient_failure && endpoint_entered_transient_failure) {
+  first_idle_index = -1;
+  for (i = 0; i < endpoints.size(); ++i) {
+    if (endpoints[i].connectivity_state() == CONNECTING) {
+      first_idle_index = -1;
+      break;
+    }
+    if (endpoints[i].connectivity_state() == IDLE) {
+      first_idle_index = i;
+    }
+  }
+  if (first_idle_index != -1) {
+    endpoints[first_idle_index].RequestConnection();
+  }
+}
+```
+
+Note that this means that after an extended connectivity outage,
 ring_hash will now often wind up with many unnecessary connections.
 However, this situation is also possible via the picker if ring_hash is
 the last child under the priority policy, so we are willing to live with
