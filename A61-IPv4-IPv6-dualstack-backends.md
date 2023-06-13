@@ -52,6 +52,7 @@ for session affinity behavior in xDS.
 * [gRFC A55: xDS-Based Stateful Session Affinity][A55]
 * [gRFC A62: pick_first: Sticky TRANSIENT_FAILURE and address order
   randomization][A62]
+* [gRFC A50: Outlier Detection Support][A50]
 * [gRFC A51: Custom Backend Metrics][A51]
 
 ## Proposal
@@ -297,6 +298,9 @@ such as round_robin but cannot be triggered by an external application.
 (For example, in C-core, this will be triggered via an internal-only
 channel arg that will be set by the petiole policies.)
 
+For more information on how health checking is changing, see the
+[Outlier Detection section below](#outlier-detection).
+
 #### Address List Updates in Petiole Policies
 
 The algorithm used by petiole policies to handle address list updates
@@ -512,37 +516,49 @@ update that set in place when it receives an updated address list.
 
 #### Outlier Detection
 
-TODO: details (probably continue to set map based on endpoints in the
-address list on the way down)
+As described in [gRFC A50][A50], outlier detection currently tracks the
+state of each individual address, and ejection decisions are made on a
+per-address basis.  With this design, the outlier detection policy will be
+changed to instead track the state and make ejection decisions on a
+per-endpoint basis.
 
-subchannels will have an API to register health providers
-- health checking and OD will both be registered providers
-- when a health watch is started, the watcher will provide some
-  parameters indicating what signals it is interested in
-- each provider can look at the watcher to determine if it needs to
-  provide a signal
-- the subchannel will take all signals and use them to report the right
-  connectivity state.  inverse of LB policy aggregation rules:
-    1. if any TF, report TF
-    2. if any CONNECTING, report CONNECTING
-    3. report real connectivity state
+The outlier detection policy currently maintains a map keyed by
+individual address.  This map will be changed to instead be keyed by the
+unordered set of addresses in each endpoint.  All subchannels for any of
+the addresses for the endpoint will be stored in the map value, and
+calls made to any of those addresses will count as activity on the
+endpoint.  The set of entries in the map will continue to be set based
+on the address list that the outlier detection policy receives from its
+parent.
 
-PF:
-- always start generic health watch on subchannel
-  - provide health check service name -- will be set only if:
-    - HCSN set in service config
-    - inhibit channel arg not set
-    - running under petiole policy
+Currently, the outlier detection policy wraps the subchannels and ejects
+them by reporting their connectivity state as TRANSIENT_FAILURE.
+However, in this design, this existing approach is undesirable, because
+it would cause the pick_first leaf policy to go IDLE and drop the
+existing connection.  This would cause unnecessary connection churn, but
+it would also cause pick_first to report IDLE instead of
+TRANSIENT_FAILURE to its parent, which would affect the logic in tree
+above it (e.g., if all endpoints go IDLE in round_robin, then
+round_robin would report IDLE up to the priority policy, which would
+prevent it from failing over to the next priority).
 
-problem: existing users that use OD with PF (e.g.,
-https://github.com/grpc/grpc/issues/32967).  options:
-1. add config option to PF to use health state instead of raw
-   connectivity state for connection management (i.e., would cause PF to
-   drop existing connection if unhealthy).  note that this still breaks
-   existing behavior, but it does allow a way back.  but it would also
-   enable it for health checking.  and it would still technically be a
-   breaking change.
-2. ???
+To fix this, we will change the outlier detection policy to instead
+eject endpoints by wrapping the subchannel's client-side health checking
+signal.  As described [above](#client-side-health-checking-in-pick_first),
+pick_first will see both the subchannel's raw connectivity state and the
+state reflected by health checking; only the raw connectivity state
+dictates connection-management behavior, but the state reflected by
+health checking is reported up to the parent.  This ensures that
+pick_first will not unnecessarily drop the connection and that it will
+report TRANSIENT_FAILURE instead of IDLE.
+
+Note that we need outlier detection to work even if client-side health
+checking is not enabled.  To make that work, when pick_first is used
+underneath a petiole policy, it must *always* start a health watch on the
+subchannel, even if client-side health checking is not enabled; in the
+client-side health checking code, we will report the raw connectivity
+state to this watcher if client-side health checking is disabled on
+the channel.
 
 ### Support Multiple Addresses Per Endpoint in xDS
 
@@ -634,6 +650,7 @@ N/A
 [A17]: A17-client-side-health-checking.md
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A48]: A48-xds-least-request-lb-policy.md
+[A50]: A50-xds-outlier-detection.md
 [A51]: A51-custom-backend-metrics.md
 [A55]: A55-xds-stateful-session-affinity.md
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
