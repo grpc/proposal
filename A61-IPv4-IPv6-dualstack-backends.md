@@ -4,7 +4,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-04-20
+* Last updated: 2023-06-22
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -646,8 +646,16 @@ backoff spec][backoff-spec] seems to have originally envisioned.
   controlled by pick_first (https://github.com/grpc/grpc/pull/32709)
 - assume LB policies start in CONNECTING state
   (https://github.com/grpc/grpc/pull/33009)
-- make pick_first the universal leaf policy, including client-side
-  health checking support (https://github.com/grpc/grpc/pull/32692)
+- prep for outlier detection ejecting via health watch
+  (https://github.com/grpc/grpc/pull/33340)
+- add generic health watch support to pick_first, build infrastructure
+  for petiole policies, and change round_robin to delegate to pick-first
+  (https://github.com/grpc/grpc/pull/32692)
+- change WRR to delegate to pick_first (https://github.com/grpc/grpc/pull/33087)
+- change ring_hash to delegate to pick_first
+  (https://github.com/grpc/grpc/pull/33093)
+- change outlier detection to eject only via health watch
+  (https://github.com/grpc/grpc/pull/33427)
 - change address list to support multiple addresses per endpoint and
   change LB policies to handle this (including ring_hash)
 - change stateful session affinity to handle multiple addresses per endpoint
