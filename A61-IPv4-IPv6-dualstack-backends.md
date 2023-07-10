@@ -546,7 +546,7 @@ if (in_transient_failure && endpoint_entered_transient_failure) {
       first_idle_index = -1;
       break;
     }
-    if (endpoints[i].connectivity_state() == IDLE) {
+    if (first_idle_index == -1 && endpoints[i].connectivity_state() == IDLE) {
       first_idle_index = i;
     }
   }
