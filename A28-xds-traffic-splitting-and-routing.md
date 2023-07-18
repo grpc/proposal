@@ -254,8 +254,14 @@ tricky.
 Note that only [custom
 metadata](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests)
 is considered during header matching, unlike in Envoy, where all headers
-(including HTTP/2 pseudo-headers) are included. This is because pick happens
-above gRPC’s transport (HTTP/2) layer, so transport headers are not accessible.
+(including HTTP/2 pseudo-headers) are included. This is because the pick
+happens above gRPC’s transport (HTTP/2) layer, so transport headers are
+not accessible. However, we will support matching against the
+`Content-type` header; if a gRPC implementation does not add that header
+until after xDS route selection is done, then xDS route selection will
+assume a hard-coded value of `application/grpc`. Also, we will explicitly
+exclude headers with a `-bin` suffix from matching (i.e., we will behave as
+if the header is not present, even if it actually is).
 
 The pick will consider the child policies that are not reporting READY (unlike
 in most gRPC LB policies, e.g. weighted_target, where only the READY child
