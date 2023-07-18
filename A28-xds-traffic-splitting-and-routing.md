@@ -257,7 +257,7 @@ is considered during header matching, unlike in Envoy, where all headers
 (including HTTP/2 pseudo-headers) are included. This is because the pick
 happens above gRPC’s transport (HTTP/2) layer, so transport headers are
 not accessible. However, we will support matching against the
-`Content-type` header; if a gRPC implementation does not add that header
+`content-type` header; if a gRPC implementation does not add that header
 until after xDS route selection is done, then xDS route selection will
 assume a hard-coded value of `application/grpc`. Also, we will explicitly
 exclude headers with a `-bin` suffix from matching (i.e., we will behave as
