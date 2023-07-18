@@ -126,6 +126,10 @@ reporting TRANSIENT_FAILURE while in backoff and then IDLE when backoff
 has finished.  The pick_first policy will therefore automatically
 request a connection whenever a subchannel reports IDLE.
 
+TODO: When do we request re-resolution after the first pass is complete?
+note: due to sticky-TF change, PF should stay in TF even when it is
+given a new address list, or else it would break sticky-TF
+
 Once a subchannel does become READY, pick_first will unref all other
 subchannels.  Note that the [connection backoff][backoff-spec] state is
 stored in the subchannel, so this means that we will lose backoff state
