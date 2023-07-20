@@ -353,6 +353,9 @@ The `Cluster` proto validation rules are modified as follows:
           - The `socket_address` field must be set. Inside of it:
             - The `address` field must be non-empty.
             - The `port_value` field must be set.
+          - The "host:port" string constructed from the `socket_address`
+            must form a valid target string that can be passed to a gRPC
+            channel.
 - If the `cluster_type` field is set, inside of it:
   - The `typed_config` field must be set. Inside of it:
     - The `type_url` field must have the value `type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig`
