@@ -351,11 +351,10 @@ The `Cluster` proto validation rules are modified as follows:
       - The `endpoint` field must be set. Inside of it:
         - The `address` field must be set. Inside of it:
           - The `socket_address` field must be set. Inside of it:
-            - The `address` field must be non-empty.
+            - The `address` field must be non-empty and must contain a
+              DNS domain of the form specified in [RFC 1035 section
+              2.3.1](https://datatracker.ietf.org/doc/html/rfc1035#section-2.3.1).
             - The `port_value` field must be set.
-          - The "host:port" string constructed from the `socket_address`
-            must form a valid target string that can be passed to a gRPC
-            channel.
 - If the `cluster_type` field is set, inside of it:
   - The `typed_config` field must be set. Inside of it:
     - The `type_url` field must have the value `type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig`
