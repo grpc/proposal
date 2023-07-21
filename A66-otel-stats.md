@@ -2,10 +2,10 @@
 
 *   Author: Yash Tibrewal (@yashykt)
 *   Approver: Mark Roth (@markdroth)
-*   Status: Draft
+*   Status: In Review
 *   Implemented in: <language, ...>
 *   Last updated: Jul 20, 2023
-*   Discussion at: <google group thread> (filled after thread exists)
+*   Discussion at: https://groups.google.com/g/grpc-io/c/po-deqYEQzE
 
 ## Abstract
 
@@ -16,8 +16,9 @@ Propose a metrics data model for gRPC OpenTelemetry metrics.
 There are a collection of
 [metrics](https://github.com/census-instrumentation/opencensus-specs/blob/master/stats/gRPC.md)
 proposed by OpenCensus for gRPC. OpenCensus is no longer being actively
-maintained and is being [deprecated](https://opentelemetry.io/blog/2023/sunsetting-opencensus/#:~:text=Compatibility%20specification%204.-,What%20to%20Expect%20After%20July%2031st%2C%202023,found%20will%20not%20be%20patched.), with OpenTelemetry suggested as the
-successor framework.
+maintained and is being
+[deprecated](https://opentelemetry.io/blog/2023/sunsetting-opencensus/#:~:text=Compatibility%20specification%204.-,What%20to%20Expect%20After%20July%2031st%2C%202023,found%20will%20not%20be%20patched.),
+with OpenTelemetry suggested as the successor framework.
 
 ### Related Proposals:
 
