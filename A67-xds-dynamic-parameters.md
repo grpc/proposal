@@ -237,4 +237,4 @@ want this parameter for the xdstp case.
 
 ## Implementation
 
-Allan Boll (allanrbo@google.com) plans to implement this in C++ in 2023 Q3.
+Allan Boll (@allanrbo) plans to implement this in C++ in 2023 Q3.
