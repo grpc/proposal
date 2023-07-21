@@ -50,7 +50,7 @@ one from the server.
 |-------------------|--------------------------------------------------------------------------------------|-----------------------|
 |RPC Method         |Method the RPC hit.                                                                   |"/pkg.service/foo"     |
 |Principal          |Identity of the RPC. Currently only available in certificate-based TLS authentication.|"spiffe://foo/user1"   |
-|Policy Name        |The authorization policy name (or the xDS RBAC filter name).                          |"example-policy"       |
+|Policy Name        |The authorization policy name (not applicable in xDS case).                           |"example-policy"       |
 |Matched Rule       |The matched rule or the matched policy name in [RBAC][RBAC policy]. Empty if no match.|"admin-access"         |
 |Authorized         |A boolean indicating whether the RPC is authorized or not.                            |true                   |
 
@@ -494,7 +494,7 @@ type LoggerBuilder interface {
 }
 ```
 
-#### Java APIs
+#### Java APIs (Subject to change)
 
 ```Java
 public class AuditContext {
