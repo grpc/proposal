@@ -22,11 +22,13 @@ with OpenTelemetry suggested as the successor framework.
 
 ### Related Proposals:
 
-*   [gRPC Retry Stats](A45-retry-stats.md)
+*   [A45: Exposing OpenCensus Metrics and Tracing for gRPC retry](A45-retry-stats.md)
 
 ## Proposal
 
-### Units
+### Metrics Schema
+
+#### Units
 
 Following the
 [OpenTelemetry Metrics Semantic Conventions](https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/),
@@ -48,7 +50,7 @@ Buckets for histograms in default views should be as follows -
 *   Count : 0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
     16384, 32768, 65536
 
-### Attributes
+#### Attributes
 
 *   `grpc.method` : Full gRPC method name, including package, service and
     method, e.g. "google.bigtable.v2.Bigtable/CheckAndMutateRow"
@@ -59,7 +61,7 @@ Buckets for histograms in default views should be as follows -
 *   `grpc.authority` : Authority used by the call/attempt, e.g.
     "pubsub.googleapis.com", "helloworld-gke"
 
-### Client Per-Attempt Instruments
+#### Client Per-Attempt Instruments
 
 *   **grpc.client.attempt.started** <br>
     The total number of RPC attempts started, including those that have not completed. <br>
@@ -79,7 +81,7 @@ Buckets for histograms in default views should be as follows -
     *Attributes*: grpc.method, grpc.target, grpc.status <br>
     *Type*: Histogram (Size Buckets) <br>
 
-### Client Per-Call Instruments
+#### Client Per-Call Instruments
 
 *   **grpc.client.call.duration** <br>
     This metric aims to measure the end-to-end time the gRPC library takes to complete an RPC from the application’s perspective. <br>
@@ -89,7 +91,7 @@ Buckets for histograms in default views should be as follows -
     *Attributes*: grpc.method, grpc.target, grpc.status <br>
     *Type*: Histogram (Latency Buckets) <br>
 
-### Server Instruments
+#### Server Instruments
 
 *   **grpc.server.call.started** <br>
     The total number of RPCs started, including those that have not completed. <br>
@@ -111,7 +113,21 @@ Buckets for histograms in default views should be as follows -
     *Attributes*: grpc.method, grpc.authority, grpc.status <br>
     *Type*: Histogram (Latency Buckets) <br>
 
-## Language Specifics
+## OpenTelemetry Plugin Architecture
+
+To-be-filled
+
+This section describes a CallTracer approach to collect the client and server
+per-attempt/call metrics. A CallTracer is a class that is instantiated for every
+call. This class has various methods that are invoked during the lifetime of the
+call. On the client side, the CallTracer knows about multiple attempts on the
+same call. Needs to support more than one CallTracer per call.
+
+The OT plugin will basically be a way of configuring a CallTracer factory on
+gRPC clients and servers. On the client side, the CallTracer will be created by
+an interceptor; on the server side, it will be a ServerCallTracerFactory.
+
+## Language-Specific Details
 
 Each language implementation will provide an API for registering an
 OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
@@ -176,7 +192,9 @@ in the OpenTelemetry spec at present. Two migration strategies are also proposed
 for customers who are satisfied with the stats coverage provided by the current
 OpenTelemetry spec.
 
-### Differences from gRPC OpenCensus Spec
+### Metric Schema Comparison
+
+#### Differences from gRPC OpenCensus Spec
 
 *   OpenTelemetry instrument names don’t allow ‘/’ so we use ‘.’ as the
     separator. We also get rid of the “.io” suffix in “grpc.io” as it doesn’t
@@ -186,7 +204,7 @@ OpenTelemetry spec.
     spec (detailed below).
 *   OpenTelemetry has attributes similar to tags in OpenCensus, and the
     OpenCensus tag names already seem to match the OpenTelemetry spec - except
-    for ‘_’ vs ‘.’ for namespaces. So we just replace the ‘_’ with ‘.’. Note
+    for ‘\_’ vs ‘.’ for namespaces. So we just replace the ‘\_’ with ‘.’. Note
     that the 'client' and 'server' distinction has also been removed since it
     does not add any benefit.
     *   grpc_client_method -> grpc.method
@@ -199,7 +217,7 @@ OpenTelemetry spec.
 *   Latency metrics in the OpenTelemetry spec use the recommended `s` unit
     instead of `ms`.
 
-### Metrics with Corresponding Equivalent
+#### Metrics with Corresponding Equivalent
 
 The following OpenCensus metrics have an equivalent in the OpenTelemetry spec
 (with the above noted differences) allowing for receivers of the telemetry data
@@ -214,7 +232,7 @@ grpc.io/server/started_rpcs      | grpc.server.call.started
 grpc.io/server/completed_rpcs    | (Derivable from grpc.server.call.duration)
 grpc.io/server/server_latency    | grpc.server.call.duration
 
-### Metrics with Nuanced Differences
+#### Metrics with Nuanced Differences
 
 Unfortunately, the implementations of the gRPC OpenCensus spec in the various
 languages do not agree on the definition of the following size metrics. Go
@@ -230,7 +248,7 @@ grpc.io/client/received_bytes_per_rpc | grpc.client.attempt.rcvd_total_compresse
 grpc.io/server/sent_bytes_per_rpc     | grpc.server.call.sent_total_compressed_message_size
 grpc.io/server/received_bytes_per_rpc | grpc.server.call.rcvd_total_compressed_message_size
 
-### Additional gRPC OpenCensus Metrics not supported in first iteration
+#### OpenCensus Metrics not Initially Supported in OpenTelemetry
 
 There are some additional metrics defined in the gRPC OpenCensus spec and retry
 stats which we will not be supporting in the first iteration of the
@@ -259,7 +277,9 @@ OpenTelemetry spec with the appropriate changes.
     *   grpc.io/client/transparent_retries
     *   grpc.io/client/retry_delay_per_call
 
-### Migration Strategy 1
+## Migration Strategies
+
+### Migrate on a Per-Client Basis
 
 *   Update telemetry dashboards and alerts to join the results from the
     OpenCensus metrics and the OpenTelemetry metrics.
@@ -268,7 +288,7 @@ OpenTelemetry spec with the appropriate changes.
 *   After 100% rollout and some duration (to maintain previous history), update
     telemetry dashboards and alerts to not query OpenCensus metrics.
 
-### Migration Strategy 2 - Supporting multiple stats plugins
+### Duplicate Metrics During Migration
 
 For this strategy, gRPC stacks need to support registration of both the
 OpenCensus and the OpenTelemetry plugins at the same time and allow both metrics
