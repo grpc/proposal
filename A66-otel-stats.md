@@ -76,6 +76,8 @@ Buckets for histograms in default views should be as follows -
     Type: Histogram (Size Buckets) <br>
 *   **grpc.client.attempt.rcvd_total_compressed_message_size** <br>
     Total bytes (compressed but not encrypted) received across all response messages (metadata excluded) per RPC attempt; does not include grpc or transport framing bytes. <br>
+    *Attributes*: grpc.method, grpc.target, grpc.status <br>
+    *Type*: Histogram (Size Buckets) <br>
 
 ### Client Per-Call Instruments
 
@@ -83,7 +85,7 @@ Buckets for histograms in default views should be as follows -
     This metric aims to measure the end-to-end time the gRPC library takes to complete an RPC from the application’s perspective. <br>
     Start timestamp - After the client application starts the RPC. <br>
     End timestamp - Before the status of the RPC is delivered to the application. <br>
-    If the implementation uses an interceptor then the exact start and end timestamps would depend on the ordering of the interceptors. Non-interceptor implementations should record the timestamps as close as possible to the top of the gRPC stack, i.e., payload serialization would be included in the measurement. <br>
+    If the implementation uses an interceptor then the exact start and end timestamps would depend on the ordering of the interceptors. Non-interceptor implementations should record the timestamps as close as possible to the top of the gRPC stack, i.e., payload serialization should be included in the measurement. <br>
     *Attributes*: grpc.method, grpc.target, grpc.status <br>
     *Type*: Histogram (Latency Buckets) <br>
 
@@ -99,11 +101,15 @@ Buckets for histograms in default views should be as follows -
     *Attributes*: grpc.method, grpc.authority, grpc.status <br>
     *Type*: Histogram (Size Buckets) <br>
 *   **grpc.server.call.rcvd_total_compressed_message_size** <br>
+    Total bytes (compressed but not encrypted) received across all request messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
+    *Attributes*: grpc.method, grpc.authority, grpc.status <br>
+    *Type*: Histogram (Size Buckets) <br>
+*   **grpc.server.call.duration** <br>
     This metric aims to measure the end2end time an RPC takes from the server transport’s (HTTP2/ inproc / cronet) perspective. <br>
     Start timestamp - After the transport knows that it's got a new stream. For HTTP2, this would be after the first header frame for the stream has been received and decoded. Whether the timestamp is recorded before or after HPACK is left to the implementation. <br>
     End timestamp - Ends at the first point where the transport considers the stream done. For HTTP2, this would be when scheduling a trailing header with END_STREAM to be written, or RST_STREAM, or a connection abort. Note that this wouldn’t necessarily mean that the bytes have also been immediately scheduled to be written by TCP. <br>
-    *Attributes*: grpc.method, grpc.authority, grpc.status
-    *Type*: Histogram (Latency Buckets)
+    *Attributes*: grpc.method, grpc.authority, grpc.status <br>
+    *Type*: Histogram (Latency Buckets) <br>
 
 ## Language Specifics
 
@@ -117,14 +123,15 @@ OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
 *   Optionally allow enabling/disabling metrics. This would allow optimizations
     to avoid computation and collection of expensive stats within the gRPC
     library. Note that even without this capability, users of OpenTelemetry
-    would be able to customize the
+    would be able to customize
     [views](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view) through
     the MeterProvider.
 *   Optionally allow setting of a OpenTelemetry plugin for a specific channel or
     server, instead of setting it globally.
 
-Note that implementations of the gRPC OpenTelemetry plugin should take care to
-only depend on the OpenTelemetry API and not the OpenTelemetry SDK.
+Note that implementations of the gRPC OpenTelemetry plugin
+[should prefer](https://opentelemetry.io/docs/specs/otel/overview/) to only
+depend on the OpenTelemetry API and not the OpenTelemetry SDK.
 
 ### C++
 
@@ -164,10 +171,10 @@ To be filled
 
 The following sections show the differences between the gRPC OpenCensus spec and
 the proposed gRPC OpenTelemetry spec and the mapping of metrics between the two.
-It also presents metrics present in OpenCensus spec that do not have a mapping
-in the OpenTelemetry spec at present. Following the mapping, two migration
-strategies are proposed for customers who are satisfied with the coverage
-provided by the current OpenTelemetry spec.
+It also presents metrics present in OpenCensus spec that do not map to a metric
+in the OpenTelemetry spec at present. Two migration strategies are also proposed
+for customers who are satisfied with the stats coverage provided by the current
+OpenTelemetry spec.
 
 ### Differences from gRPC OpenCensus Spec
 
