@@ -205,9 +205,13 @@ function ConstructADSRequest(authority_resource_names)
 
 ### Temporary environment variable protection
 
-An environment variable to enable/disable this feature should not be necessary,
-as this feature is only activated if the new `dynamic_parameters` field is
-present in the bootstrap JSON.
+During initial development, the GRPC_EXPERIMENTAL_XDS_DYNAMIC_PARAMETERS
+environment variable will control whether ADS requests will use the
+`resource_locators` field with dynamic parameters populated, instead of the
+`resource_names` field. This will help guard against if an xDS server does not
+yet support dynamic parameters, but the
+[bootstrap generator](https://github.com/GoogleCloudPlatform/traffic-director-grpc-bootstrap)
+already sets the `dynamic_parameters` fields.
 
 ## Rationale
 
@@ -222,8 +226,10 @@ changing the parameters.
 ### No metadata reuse
 
 An idea in TP2 is to reuse the node metadata field as dynamic parameters. I
-propose we do not do this, as there is no way of knowing whether a given control
-plane supports dynamic parameters.
+propose we do not do this. Clients already have node metadata configured in
+their bootstrap. If we reuse node metadata as dynamic parameters, clients will
+begin sending dynamic parameters without knowing whether a given control plane
+supports dynamic parameters.
 
 ### No merging of top-level and per-authority dynamic parmeters
 
