@@ -4,7 +4,7 @@ AXX: Certificate Revocation List Enhancements
 * Approver: TODO 
 * Status: TODO
 * Implemented in: C, Go
-* Last updated: TODO
+* Last updated: 2023-07-25
 * Discussion at: TODO
 
 ## Abstract
