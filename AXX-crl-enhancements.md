@@ -9,30 +9,32 @@ AXX: Certificate Revocation List Enhancements
 
 ## Abstract
 
-gRPC has an MVP implementation for CRLs (Certificate Revocation Lists). We wish to provide a more generic interface. In addition, we will provide two concrete implementations of this interface similar to Credential Reloading - a static provider and a directory reloader.
+gRPC has an MVP implementation for CRLs (Certificate Revocation Lists). We wish to provide a more generic and flexible interface to enable developers to implement the desired functionality for their landscape. In addition, we will provide two concrete implementations of this interface similar to Credential Reloading - a static provider and a directory reloader.
 
 
 ## Background
 
-[RFC 5280](https://datatracker.ietf.org/doc/html/rfc5280) defines the desired behavior for Certificate Revocation Lists (CRLs). gRPC has an MVP implementation of this RFC for CRL handling in several languages, each with their own flavors - for example, C++ uses OpenSSL, whereas Go uses an implementation written in Go (and the stack in Java is significatly different). There are mismatches and deficiencies between the current Go and C++ implementations. Providing CRL reloading as a feature allows for more internal cohesion with the ideas behind credential reloading.
+[RFC 5280](https://datatracker.ietf.org/doc/html/rfc5280) defines the desired behavior for Certificate Revocation Lists (CRLs). gRPC has an MVP implementation of this RFC for CRL handling in several languages, each with their own flavors - for example, C++ uses OpenSSL, whereas Go uses an implementation written in Go (and the stack in Java is significatly different). Providing CRL reloading as a feature allows for more internal cohesion with the ideas behind credential reloading.
 
 ### Related Proposals:
 
 * [L46: New TLS Credentials API](https://github.com/grpc/proposal/pull/205)
+* [A43: gRPC authorization API](https://github.com/grpc/proposal/blob/master/A43-grpc-authorization-api.md)
 
 ## Proposal
 We seek to provide an alternate option for users to customize CRL handling. In a similar way that `CredentialReloading` is implemented, we will add a `CrlProvider`` interface through which gRPC fetches CRLs. In gRPC we will implement two providers (these match what we provide for certificates as well):
 
 1. A `StaticCrlProvider` that takes a list of strings that represent CRL file content
-1. A `CrlReloaderProvider` that periodically and asynchronously reloads a directory of CRLs.
+1. A `CrlReloaderProvider` that periodically and asynchronously reloads a local directory of CRLs.
 
 Users can also implement the interface with whatever behaviors they specifically desire.
 
-Per RFC5280, during revocation checking one of three status should be returned - `RevocationUnrevoked`, `RevocationRevoked`, and `RevocationUndetermined`. The user must specify whether `RevocationUndetermined` should be treated as `RevocationRevoked` or `RevocationUnrevoked` (failing open vs. failing closed).
+Following [RFC5280](https://datatracker.ietf.org/doc/html/rfc5280), during revocation checking one of three status should be returned - `RevocationUnrevoked`, `RevocationRevoked`, and `RevocationUndetermined` ([RFC5280 defines `Undetermined` in the CRL Processing section](https://datatracker.ietf.org/doc/html/rfc5280#section-6.3.3). We ). There are many reasons a certificate can be revoked, but in the end gRPC cares about a certificate being revoked or not, thus we differentiate between `RevocationUnrevoked` and `RevocationRevoked`. The user must specify whether `RevocationUndetermined` should be treated as `RevocationRevoked` or `RevocationUnrevoked` (failing open vs. failing closed).
 
 Assumptions:
 1. There should be no direct linkage between this interface and the creation/distribution of CRLs. gRPC is a user of CRLs and credentials, not a PKI itself.
 1. The CRL Providers simply provide CRLs. The actual verification will be done by other pieces of the code (these are already written).
+1. We cannot know users' PKI details, so our implementations should not enforce non-X509 metadata mattering (for example, file names). A user could certainly implement their own provider that cares about filenames.
 1. We will not support OSCP-style checking (OSCP is an alternative to CRLs, not another form of CRLs).
 
 ![Basic Flow Diagram](AXX-graphics/basic_diagram.png)
@@ -87,11 +89,11 @@ This is a simple provider that takes in all CRLs to be used as raw strings durin
 This provider will periodically read CRL files in a given directory and update gRPCs internal representation of those CRLs. We expect this will be heavily used, as a directory of CRLs is very common for X509 CRL files. The CRLs will be stored in a mapping of a hash of the issuer to the CRL content - `map<issuer_hash, crl_object>`.
 In the case that the directory and all files within are read completely during an update, we will treat the directory as the exact truth. This means if a CRL was in-memory and is no longer in the directory after the update, it will be removed in-memory.
 In the case that there is an issue reading a file, we cannot be certain what exactly is happening. In particular, we enforce no naming convention on the CRL files, so if it cannot be read, we cannot know what it contains or what issuer it belongs to. We will do a best-effort safe update - for files which are read correctly, we can update those individual entries. Since we can't know the issuer if a file can't be read, it is unsafe to do deletion in this case. An overridable error callback will be called so the user can receive a signal that something has gone wrong with CRLs.
-We will also require that users perform safe and atomic file/directory operations with their CRL files using filesystem primitives (for example, the copy-rename pattern). If users do not exercise good file management hygiene, we cannot guarantee any exact behavior. For example, if a user creates a directory and writes files one-by-one, there is a chance the directory reloader would update when only 1 file was present and this would be seen as a success (so this would overall be unspecified behavior because of bad file hygiene).
+We will also require that users perform safe and atomic file/directory operations with their CRL files using filesystem primitives (for example, the copy-rename pattern). If users do not exercise good file management hygiene, we cannot guarantee any exact behavior. For example, if a user creates a directory and writes files one-by-one, there is a chance the directory reloader would update when only 1 file was present and this would be seen as a success (so this would overall be unspecified behavior because of bad file hygiene). If a user has needs that don't match this, they can implement the interface per their needs.
 If a CRL is not found for an issuer this is fine - the verification code will return RevocationUndetermined per RFC5280, then the user will have a setting to fail-open or fail-closed indicating whether RevocationUndetermined should be treated as Unrevoked or Revoked respectively.
 
 #### API Outcomes and Error Handling
-Because CRLs involve reading/writing from the filesystem, we will have to deal with potential edge cases of bad files, bad updates, etc. From a high-level perspective, we are going to follow the Authz Policy design patterns - use existing information in case an update contains bad data. Startup behavior is not different from updates. Particularly in the case of updating CRLs, we don't want to error and crash the server if there is a bad update. However, we still want this error to be known, so we will have an optional and overridable error callback when CRLs fail to be read. This will let users tie in whatever alerting/monitoring they may want in these failure cases. This callback will be for notifications/alerting, it will not be a decision-making callback (it is expected the IO for CRLs will already be done in the background, so these errors would not be on the main path by design anyways). Users should use `RevocationUndertermined` combined with the FailOpen/FailClosed knob for decision making on uncertain CRLs.
+Because CRLs involve reading/writing from the filesystem, we will have to deal with potential edge cases of bad files, bad updates, etc. From a high-level perspective, we are going to follow the [Authz Policy design patterns](https://github.com/grpc/proposal/blob/master/A43-grpc-authorization-api.md) - use existing information in case an update contains bad data. Startup behavior is not different from updates. Particularly in the case of updating CRLs, we don't want to error and crash the server if there is a bad update. However, we still want this error to be known, so we will have an optional and overridable error callback when CRLs fail to be read. This will let users tie in whatever alerting/monitoring they may want in these failure cases. This callback will be for notifications/alerting, it will not be a decision-making callback (it is expected the IO for CRLs will already be done in the background, so these errors would not be on the main path by design anyways). Users should use `RevocationUndertermined` combined with the FailOpen/FailClosed knob for decision making on uncertain CRLs.
 
 These cases are all on a per-CRL level - a given CRL having an issue will not keep other good CRLs in an update batch to fail. The opposite behavior - failing the whole batch or dropping all the handshakes in the case of a bad CRL - might enable a DDOS-type attack vector.
 
@@ -110,7 +112,7 @@ The overall alternate approach to this proposal is to continue using the x509_ha
 
 This approach adds complexity to the user facing API, and a user overriding the provider interface poorly could result in undefined or inefficient behaviors. To counteract this, we will provide generally useful implementations and good documentation on requirements if a user is writing their own implementation.
 
-We explicitly will not be supporting OSCP-style revocation . We want to stay inside the realm of RFC5280 and X509-style CRLs, and OSCP represents a departure from that standard. Notably, the API surface for OSCP is different - for OSCP one makes a call to an external service that returns the revocation status. Rather, we expect to be given CRLs and will check the revocation status in gRPC. In addition, OSCP requires external calls during the handshake, whereas with X509 CRL files everything can done locally.
+We explicitly will not be supporting OSCP-style revocation . We want to stay inside the realm of RFC5280 and X509-style CRLs, and OSCP represents a departure from that standard. Notably, the API surface for OSCP is different - for OSCP one makes a call to an external service that returns the revocation status. Rather, we expect to be given CRLs and will check the revocation status in gRPC. In addition, OSCP requires external calls during the handshake, whereas with X509 CRL files everything can done locally. Handshakes are on a path for which performance in critical, so making external calls during them is an approach to avoid.
 
 
 ## Implementation 
