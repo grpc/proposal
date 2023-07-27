@@ -1,9 +1,9 @@
-A58: `deterministic_subsetting` LB policy.
+A66: `deterministic_subsetting` LB policy.
 ----
-* Author(s): @s-matyukevich
+* Author(s): @s-matyukevich, @joybestourous
 * Approver: 
 * Status: Draft
-* Implemented in: 
+* Implemented in: Go, Java
 * Last updated: [Date]
 * Discussion at:
 
@@ -71,7 +71,7 @@ message DeterministicSubsettingLbConfig {
     // The config for the child policy.
     repeated LoadBalancingConfig child_policy = 4;
 }
-
+```
 
 ### Handling Parent/Resolver Updates
 
@@ -83,9 +83,9 @@ Deterministic subsetting LB will simply redirect all requests to the child LB wi
 
 ### xDS Integration
 
-Deterministic subsetting LB won't depend on xDS in any way. People may choose to initialize it by directly providing service config. If they do this, they will have to figure out how to correctly initialize and keep updating client_index. There are ways to do that, but describing them is out of scope for this gRPC. The main point is that the LB itself will be xDS agnostic.
+Deterministic subsetting LB won't depend on xDS in any way. People may choose to initialize it by directly providing service config. If they do this, they will have to figure out how to correctly initialize and keep updating client\_index. There are ways to do that, but describing them is out of scope for this gRPC. The main point is that the LB itself will be xDS agnostic.
 
-However, the main intended usage of this LB is via xDS. The xDS control plane is a natural place to aggregate information about all available clients and backends and assign client_index.
+However, the main intended usage of this LB is via xDS. The xDS control plane is a natural place to aggregate information about all available clients and backends and assign client\_index.
 
 #### Changes to xDS API
 
@@ -108,7 +108,14 @@ As you can see, the fields in this policy match exactly the fields in the determ
 As described in [gRFC A52][A52], gRPC has an LB policy registry, which maintains a list of converters. Every converter translates xDS LB policy to the corresponding service config. In order to allow using the Deterministic subsetting LB policy via xDS, the only thing that needs to be done is providing a corresponding converter function. The function implementation will be trivial as the fields in the xDS LB policy will match exactly the fields in the service config.
 
 ## Rationale
-[A discussion of alternate approaches and theThe proposal will be revised when implementation experience is obtained.]
+### Alternatives Considered: Deterministic Aperture
+Apart from Google's Deterministic Subsetting algorithm, we also considered [Twitter's Deterministic Aperture](https://patentimages.storage.googleapis.com/1a/09/5a/14392e76e5d8c5/US11119827.pdf) algorithm to handle subsetting. A critical difference in Twitter's algorithm is that it "splits" endpoints into multiple subsets. This is well demonstrated in their [ring diagrams](https://twitter.github.io/finagle/guide/ApertureLoadBalancers.html#deterministic-subsetting), where you can see a single service split into multiple subsets proportionately (i.e. 1/3 in one subset and 2/3 in the other). This ensures that even with simple child policies like `p2c`, the proportion of traffic sent to each backend across all subsets is balanced. 
+
+Though this balancing is valuable, we opted for Google's algorithm for several reasons:
+* Both algorithms are sufficient in reducing connection count, which is the primary drawback of `round_robin`. 
+* Both algorithms provide better load distribution guarantees than `pick_first`. 
+* When the client to backend ratio requires overlapping subsets, deterministic subsetting provides the additional guarantee of unique subsets. Because the aperture algorithm is built around a fixed ring, when clients \* aperture exceeds the number of servers, aperture takes "laps" over the ring, producing similar subsets for several clients. Deterministic subsetting strives to reduce the risk of misbehaving endpoints by distributing them more randomly across client subsets.  
+* In order to take advantage of the partial weighting of backends, Twitter's algorithm would require passing weight information from parent balancer to child balancer. The appropriate balancer to handle this sort of weighting would be weighted\_round\_robin, but weighted\_round\_robin currently calculates weights based on server load alone, and it is not designed to consider this additional weighting information. We opted for the solution that allowed us to keep this existing balancer as is. Though deterministic subsetting does not guarantee even load distribution across subsets, its diverse subset paired with weighted\_round\_robin as the child policy within subsets should be sufficient for most use cases.  
 
 ## Implementation
 DataDog will provide Go and Java implementations.
