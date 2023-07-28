@@ -22,7 +22,7 @@ Currently, gRPC is lacking a way to select a subset of endpoints available from 
 Introduce a new LB policy, `deterministic_subsetting`. This policy selects a subset of addresses and passes them to the child LB policy in such a way that:
 * Every client is connected to exactly N backends. If there are not enough backends, the policy falls back to its child policy.
 * The number of resulting connections per backend is as balanced as possible.
-* Every client is connected to a different subset of backends. 
+* For any 2 given clients the probability of them connecting on the same or very similar subset of backends is as low as possible. 
 
 ### Subsetting algorithm
 
@@ -32,11 +32,67 @@ The LB policy will implement the algorithm described in [Site Reliability Engine
 This is the algorithm as previously described in Site Reliability Engineering: How Google Runs Production Systems, Chapter 20 but one improvement remains that can be made by balancing the leftover tasks in each group. The simplest way to achieve this is by choosing (before shuffling) which tasks will be leftovers in a round-robin fashion. For example, the first group of frontend tasks would choose {0, 1} to be leftovers and then shuffle the remaining tasks to get subsets {8, 3, 9, 2} and {4, 6, 5, 7}, and then the second group of frontend tasks would choose {2, 3} to be leftovers and shuffle the remaining tasks to get subsets {9, 7, 1, 6} and {0, 5, 4, 8}. This additional balancing ensures that all backend tasks are evenly excluded from consideration, producing a better distribution.
 ```
 
+Here is the implementation of this algorithm in pseudocode with detailed comments. 
+
+```
+func filter_addresses(addresses, subset_size, client_index, sort_addresses)
+    backend_count = addresses.length()
+    if backend_count > subset_size {
+        // if we don't have enough addresses to cover the desired subset size, just return the whole list
+        return addresses
+    }
+
+    if sort_addresses {
+        // sort address list because the algorithm assumes that the initial
+        // order of the addresses is the same for every client
+        addresses.sort()
+    }
+
+    // subset_count indicates how much clients we can have so that every cleint is connected to exactly 
+    // subset_size distinct backends and no 2 clients connect to the same backend.
+    subset_count = backend_count / subset_size
+    
+    // Given subset_count we not cat divide clients by rounds. Every round have exactly subset_count clients.
+    // round indicates the index of the round for the current client based on its index.
+    round = client_index / subset_count
+
+    // There might be some lefover backends withing every round in cases when backend_count % subset_size != 0
+    // excluded_count indicates how mumanych leftover backends we have on every round.
+    excluded_count = backend_count % subset_size
+
+    // We want to choose what backends are excluded in a round robin fashion before shufling the backends.
+    // This way we make sure that for any 2 backends the difference of how many times they are excluded is at most 1.
+    // excluded_start indicates the index of the first excluded backend
+    excluded_start := (round * excluded_count) % backend_count
+    // excluded_start indicates the index after the last excluded backend.
+    // It could wrap around the end of the addresses list.
+    excluded_end := (excluded_start + excluded_count) % backend_count
+
+    if excluded_start < excluded_end {
+        // excluded_end doesn't wrap, exclude addresses from the interval [excluded_start, excluded_end)
+    } else {
+        // excluded_end wraps around the end of the addresses list, exclude intervals [0:excluded_start] and [excluded_end, end_of_the_array)
+    }
+
+    // randomly shuffle the addresses to increase subset diversity. Use round as seed to make sure
+    // that clients within the same round shuffle addresses identically. 
+    addresses.shuffle(seed: round)
+
+    // subset_id is the index for the current client withing the round
+    subset_id := client_index % subset_count
+
+    // calculate start start and end of the resulting subset 
+    start = subsetId * subset_size
+    end = start + subset_size
+    return addresses[start: end]
+}
+```
+
 
 ### Characteristics of the selected algorithm
 
 * Every client connects to exactly `subset_size` backends.
-* Clients are evenly distributed between backends. The most connected backend receives at most 2 more connections than the least connected one.
+* Clients are evenly distributed between backends. The most connected backend receives at most 2 more connections than the least connected one. One comes from the fact that a backend can be excluded one more time than some other backend. And another one comes from the fact that there might be not enough client to completely fill the last round. 
 * Backends are randomly shuffled between clients. If a small subset of backends loses connectivity, the algorithm maximizes the chances that the backends from this subset will be evenly distributed between clients. 
 * The algorithm generates some, potentially significant, connection churn during backend scaling or redeployment. This might be a problem for very small subset sizes.
 
