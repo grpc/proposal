@@ -13,7 +13,7 @@ Add support for the `deterministic_subsetting` load balancing policy configured 
 
 ## Background
 
-Currently, gRPC is lacking a way to select a subset of backend endpoints and load-balance requests between them. Mostly people are using two extremes: `pick_first` and `round_robin`. With `pick_first`, the resulting load distribution on the backend servers ends up being very uneven, especially during server rollouts. With `round_robin`, gRPC generates a lot of unnecessary connections, which consume resources on both clients and servers. The proposed LB policy provides a middle ground between these two extremes.
+Currently, gRPC is lacking a way to select a subset of endpoints available from the resolver and load-balance requests between them. Out of the box, users have the choice between two extremes: `pick_first` which sends all requests to one random backend, and `round_robin` which sends requests to all available backends. `pick_first` has poor connection balancing when the number of client is not much higher than the number of servers because of the birthday paradox. The problem is exacerbated during rollouts because `pick_first` does not change endpoint on resolver updates if the current subchannel remains `READY`. `round_robin` results in every servers having as many connections open as there are clients, which is unnecessarily costly when there are many clients, and makes local decisions load balancing (such as outlier detection) less precise.
 
 ### Related Proposals: 
 
