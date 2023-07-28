@@ -20,7 +20,7 @@ Currently, gRPC is lacking a way to select a subset of endpoints available from 
 ## Proposal
 
 Introduce a new LB policy, `deterministic_subsetting`. This policy selects a subset of addresses and passes them to the child LB policy in such a way that:
-* Every client is connected to at most N backends. If there are not enough backends, the policy falls back to its child policy.
+* Every client is connected to exactly N backends. If there are not enough backends, the policy falls back to its child policy.
 * The number of resulting connections per backend is as balanced as possible.
 * Every client is connected to a different subset of backends. 
 
