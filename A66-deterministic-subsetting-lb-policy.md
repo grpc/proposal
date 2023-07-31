@@ -48,7 +48,7 @@ func filter_addresses(addresses, subset_size, client_index, sort_addresses)
         addresses.sort()
     }
 
-    // subset_count indicates how much clients we can have so that every cleint is connected to exactly 
+    // subset_count indicates how many clients we can have so that every client is connected to exactly 
     // subset_size distinct backends and no 2 clients connect to the same backend.
     subset_count = backend_count / subset_size
     
