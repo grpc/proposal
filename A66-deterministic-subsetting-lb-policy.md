@@ -139,7 +139,7 @@ Deterministic subsetting LB will simply redirect all requests to the child LB wi
 
 ### xDS Integration
 
-Deterministic subsetting LB won't depend on xDS in any way. People may choose to initialize it by directly providing service config. If they do this, they will have to figure out how to correctly initialize and keep updating client\_index. There are ways to do that, but describing them is out of scope for this gRPC. The main point is that the LB itself will be xDS agnostic.
+Deterministic subsetting LB won't depend on xDS in any way. People may choose to initialize it by directly providing service config. If they do this, they will have to figure out how to correctly initialize and keep updating client\_index. There are ways to do that, but describing them is out of scope for this gRFC. The main point is that the LB itself will be xDS agnostic.
 
 However, the main intended usage of this LB is via xDS. The xDS control plane is a natural place to aggregate information about all available clients and backends and assign client\_index.
 
