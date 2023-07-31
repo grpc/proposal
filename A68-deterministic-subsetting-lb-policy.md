@@ -48,7 +48,7 @@ func filter_addresses(addresses, subset_size, client_index, sort_addresses)
         addresses.sort()
     }
 
-    // subset_count indicates how much clients we can have so that every cleint is connected to exactly 
+    // subset_count indicates how many clients we can have so that every client is connected to exactly 
     // subset_size distinct backends and no 2 clients connect to the same backend.
     subset_count = backend_count / subset_size
     
@@ -56,7 +56,7 @@ func filter_addresses(addresses, subset_size, client_index, sort_addresses)
     // round indicates the index of the round for the current client based on its index.
     round = client_index / subset_count
 
-    // There might be some lefover backends withing every round in cases when backend_count % subset_size != 0
+    // There might be some lefover backends withing every round in cases when backend_count % subset_size != 0.
     // excluded_count indicates how many leftover backends we have on every round.
     excluded_count = backend_count % subset_size
 
@@ -139,9 +139,9 @@ Deterministic subsetting LB will simply redirect all requests to the child LB wi
 
 ### xDS Integration
 
-Deterministic subsetting LB won't depend on xDS in any way. People may choose to initialize it by directly providing service config. If they do this, they will have to figure out how to correctly initialize and keep updating client\_index. There are ways to do that, but describing them is out of scope for this gRPC. The main point is that the LB itself will be xDS agnostic.
+Deterministic subsetting LB won't depend on xDS in any way. People may choose to initialize it by directly providing service config. If they do this, they will have to figure out how to correctly initialize and keep updating client_index. There are ways to do that, but describing them is out of scope for this gRFC. The main point is that the LB itself will be xDS agnostic.
 
-However, the main intended usage of this LB is via xDS. The xDS control plane is a natural place to aggregate information about all available clients and backends and assign client\_index.
+However, the main intended usage of this LB is via xDS. The xDS control plane is a natural place to aggregate information about all available clients and backends and assign client_index.
 
 #### Changes to xDS API
 
