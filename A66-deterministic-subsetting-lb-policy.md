@@ -56,7 +56,7 @@ func filter_addresses(addresses, subset_size, client_index, sort_addresses)
     // round indicates the index of the round for the current client based on its index.
     round = client_index / subset_count
 
-    // There might be some lefover backends withing every round in cases when backend_count % subset_size != 0
+    // There might be some lefover backends withing every round in cases when backend_count % subset_size != 0.
     // excluded_count indicates how mumanych leftover backends we have on every round.
     excluded_count = backend_count % subset_size
 
