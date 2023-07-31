@@ -52,12 +52,12 @@ func filter_addresses(addresses, subset_size, client_index, sort_addresses)
     // subset_size distinct backends and no 2 clients connect to the same backend.
     subset_count = backend_count / subset_size
     
-    // Given subset_count we not cat divide clients by rounds. Every round have exactly subset_count clients.
+    // Given subset_count we now can divide clients by rounds. Every round have exactly subset_count clients.
     // round indicates the index of the round for the current client based on its index.
     round = client_index / subset_count
 
     // There might be some lefover backends withing every round in cases when backend_count % subset_size != 0
-    // excluded_count indicates how mumanych leftover backends we have on every round.
+    // excluded_count indicates how many leftover backends we have on every round.
     excluded_count = backend_count % subset_size
 
     // We want to choose what backends are excluded in a round robin fashion before shufling the backends.
