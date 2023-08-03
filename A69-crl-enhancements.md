@@ -1,11 +1,11 @@
-AXX: Certificate Revocation List Enhancements
+A69: Certificate Revocation List Enhancements
 ----
-* Author(s): Gregory Cooke (@gtcooke94, @gregorycooke)
-* Approver: TODO 
-* Status: TODO
+* Author(s): Gregory Cooke (@gtcooke94)
+* Approver: ejona86
+* Status: Draft
 * Implemented in: C, Go
-* Last updated: 2023-07-25
-* Discussion at: TODO
+* Last updated: 2023-08-03
+* Discussion at: https://groups.google.com/g/grpc-io/c/3o__5GhGxeg
 
 ## Abstract
 
@@ -37,7 +37,7 @@ Assumptions:
 1. We cannot know users' PKI details, so our implementations should not enforce non-X509 metadata mattering (for example, file names). A user could certainly implement their own provider that cares about filenames.
 1. We will not support OSCP-style checking (OSCP is an alternative to CRLs, not another form of CRLs).
 
-![Basic Flow Diagram](AXX-graphics/basic_diagram.png)
+![Basic Flow Diagram](A69_graphics/basic_diagram.png)
 
 CrlProvider Interface Pseudocode:
 ```
@@ -65,7 +65,7 @@ server = Server(opts)
 ### Map Content and API Outcomes
 
 The diagram below describes the behavior of the API and why this or that outcome is produced. Here, "Map" is a generic way to represent some in-memory representation of the CRLs in a key-value store. “CRL Provider API Return” refers to the CRL return of the `CrlProvider` in the Pseudocode above.
-![Basic API Outcomes](AXX-graphics/basic_table.png)
+![Basic API Outcomes](A69_graphics/basic_table.png)
 
 The pseudo code snippet below illustrates the same idea:
 ```
@@ -105,7 +105,7 @@ To further expand the scenario, if the update were to also include a new issuer'
 
 The following diagram visually represents the expected values for the async update of a directory, the provider return values, and the revocation status from checking CRL D:
 
-![Directory Reloader API Outcomes Table](AXX-graphics/reloader_table.png)
+![Directory Reloader API Outcomes Table](A69_graphics/reloader_table.png)
 
 ## Rationale
 The overall alternate approach to this proposal is to continue using the x509_hash_dir style CRLs that are already implemented. The existing approach is very strict on PKI design. gRPC is not a PKI, and we should be able to support CRLs in a more generic way without prescribing an exact structure to users' PKI. The new API design here is consistent with credential reloading and should be clear to users. It provides secure, useful defaults as well as an interface for more advanced users to implement for their specific needs.
@@ -151,7 +151,7 @@ type CRLProvider interface {
 Regarding sharing between connections - since the providers are in a high-level configuration, the same provider should be used across many individual connections and handshakes. [Here is an example of how the credential reloading provider is configured](https://github.com/grpc/grpc-go/blob/master/security/advancedtls/examples/credential_reloading_from_files/server/main.go#L63). In this example, the server would use this provider for all connections.
 
 #### Directory Reloader Specifics
-![Directory Reloader Flow](AXX-graphics/golang_reloader.png)
+![Directory Reloader Flow](A69_graphics/golang_reloader.png)
 ```go
 type CrlDirectoryReloadingProvider struct {
 	ReloadInterval time.Duration
