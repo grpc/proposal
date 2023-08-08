@@ -24,7 +24,7 @@ weights or not. In the "*all weights equal*" case, Envoy samples N random availa
 fewest outstanding requests. In the "*all weights not equal*" case, Envoy switches to a weighted round robin schedule
 where weights are dynamically adjusted based on the outstanding requests.
 
-### Related Proposals: 
+### Related Proposals:
 
 This proposal builds on earlier work described in the following gRFCs:
 * [gRFC A27: xDS-based Global Load Balancing](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)
@@ -96,7 +96,8 @@ for each pick by the picker.
 Envoy currently supports any `choice_count` value greater than or equal to two.
 In the `least_request_experimental` policy however, only an effective `choice_count` in the
 range `[2, 10]` will be supported. If a `LeastRequestLoadBalancingConfig` with a `choice_count > 10`
-is received, the `least_request_experimental` policy will set `choice_count = 10`.
+is received, the `least_request_experimental` policy will set `choice_count = 10`. If `choice_count < 2`, the
+config will be rejected.
 
 ##### Subchannel connectivity management
 
