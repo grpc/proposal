@@ -10,8 +10,8 @@ L105: Python Add New Error Types
 ## Abstract
 
 Add two new errors in grpc public API:
-  * SyncBaseError
-  * SyncAbortError
+  * BaseError
+  * AbortError
 
 ## Background
 
@@ -19,11 +19,11 @@ In case of abort, currently we don't log anything, exposing those error types al
 
 ## Proposal
 
-Add SyncAbortError and SyncBaseError in public API.
+Add AbortError and BaseError in public API.
 
 ## Rationale
 
-The Async API [has similar errors](https://github.com/grpc/grpc/blob/v1.57.x/src/python/grpcio/grpc/aio/__init__.py#L23,L24). Adding them to the Sync API will help us keep the two stacks in sync and allow users of the Sync implementation to catch and handle aborts.
+The Async API [has similar errors](https://github.com/grpc/grpc/blob/v1.57.x/src/python/grpcio/grpc/aio/__init__.py#L23,L24). We're refactoring code so those errors will also be used in Sync API. Adding them to the Sync API will help us keep the two stacks in sync and allow users of the Sync implementation to catch and handle aborts.
 
 ## Implementation
 
