@@ -50,16 +50,36 @@ Buckets for histograms in default views should be as follows -
 *   Count : 0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
     16384, 32768, 65536
 
+These buckets were chosen to maintain compatibility with the gRPC OpenCensus
+spec. The OpenTelemetry API has added an experimental feature for
+[advice](https://opentelemetry.io/docs/specs/otel/metrics/api/#instrument-advice)
+that would allow the gRPC library to provide these buckets as a hint. Since this
+is still an experimental feature and not yet implemented in all languages, it is
+upto the user to choose the right bucket boundaries.
+
+Also note that, as per an
+[OpenTelemetry proposal on stability](https://docs.google.com/document/d/1Nvcf1wio7nDUVcrXxVUN_f8MNmcs0OzVAZLvlth1lYY/edit#heading=h.dy1cg9doaq26)
+though, changes to bucket boundaries might not be considered a breaking change.
+Depending on the proposal, this recommendation would change to use
+`ExponentialHistogram`s instead, which would allow for automatic adjustments of
+the scale to better fit the data.
+
 #### Attributes
 
 *   `grpc.method` : Full gRPC method name, including package, service and
-    method, e.g. "google.bigtable.v2.Bigtable/CheckAndMutateRow"
+    method, e.g. "google.bigtable.v2.Bigtable/CheckAndMutateRow". Note that some
+    gRPC implementations allow server to handle generic method names, i.e., not
+    registering method names in advance with the server. This allows clients to
+    send arbitrary method names that could potentially open up the server to
+    malicious attacks that result in metrics being stored with a high
+    cardinality. To prevent this, unregistered/generic method names should by
+    default be reported with "generic" value instead. Implementations can
+    provide the option to override this behavior to allow recording generic
+    method names as well.
 *   `grpc.status` : gRPC server status code received, e.g. "OK", "CANCELLED",
     "DEADLINE_EXCEEDED"
 *   `grpc.target` : Target URI used when creating gRPC Channel, e.g.
     "dns:///pubsub.googleapis.com:443", "xds:///helloworld-gke:8000"
-*   `grpc.authority` : Authority used by the call/attempt, e.g.
-    "pubsub.googleapis.com", "helloworld-gke"
 
 #### Client Per-Attempt Instruments
 
@@ -115,17 +135,21 @@ Buckets for histograms in default views should be as follows -
 
 ## OpenTelemetry Plugin Architecture
 
-To-be-filled
-
-This section describes a CallTracer approach to collect the client and server
+This section describes a `CallTracer` approach to collect the client and server
 per-attempt/call metrics. A CallTracer is a class that is instantiated for every
 call. This class has various methods that are invoked during the lifetime of the
 call. On the client side, the CallTracer knows about multiple attempts on the
-same call. Needs to support more than one CallTracer per call.
+same call, and creates a `CallAttemptTracer` object for each attempt, and the
+`CallAttemptTracer` gets invoked during the lifetime of the attempt.
 
-The OT plugin will basically be a way of configuring a CallTracer factory on
-gRPC clients and servers. On the client side, the CallTracer will be created by
-an interceptor; on the server side, it will be a ServerCallTracerFactory.
+The OTel plugin will basically be a way of configuring CallTracer factories on
+gRPC clients and servers.
+
+Implementations should allow multiple call/attempt tracers to be registered to a
+single call since there could be multiple plugins registered. For example, there
+could be an OpenCensus and an OpenTelemetry stats plugin registered together. It
+should also allow multiple OpenTelemetry plugins to be registered providing the
+ability to configure the different plugins with different MeterProviders.
 
 ## Language-Specific Details
 
@@ -135,7 +159,11 @@ OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
 *   Allow installing multiple OpenTelemetry plugins.
 *   Allow setting a
     [MeterProvider](https://opentelemetry.io/docs/specs/otel/metrics/api/#meterprovider)
-    on individual plugins.
+    on individual plugins. Implementations should require a MeterProvider being
+    set. A MeterProvider not being set should either not be allowed, fail
+    registering of the plugin or result in a no-op. Some OpenTelemetry language
+    APIs have a global MeterProvider. gRPC implementations should *NOT* fallback
+    on this global.
 *   Optionally allow enabling/disabling metrics. This would allow optimizations
     to avoid computation and collection of expensive stats within the gRPC
     library. Note that even without this capability, users of OpenTelemetry
@@ -149,19 +177,24 @@ Note that implementations of the gRPC OpenTelemetry plugin
 [should prefer](https://opentelemetry.io/docs/specs/otel/overview/) to only
 depend on the OpenTelemetry API and not the OpenTelemetry SDK.
 
+The [Meter](https://opentelemetry.io/docs/specs/otel/metrics/api/#get-a-meter)
+creation should use a `name` that identifies the library, for example,
+"grpc-c++", "grpc-java", "grpc-go". The `version` should be the same as the
+release version of the gRPC library, for example, "1.57.1".
+
 ### C++
 
 ```c++
 Class OpenTelemetryPluginBuilder {
  public:
   // Enables base set of metrics by default
-  OpenTelemetryPluginBuilder() = default;
-  // If `SetMeterProvider` is called, \a meter_provider will be used instead of the global default.
-  OpenTelemetryPluginBuilder& SetMeterProvider(shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
+  OpenTelemetryPluginBuilder(shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider) = default;
   // Enable metric \a metric_name.
   OpenTelemetryPluginBuilder&  EnableMetric(absl::string_view metric_name);
   // Disable metric \a metric_name
   OpenTelemetryPluginBuilder&  DisableMetric(absl::string_view metric_name);
+  // If set, is invoked by gRPC when a generic method type RPC is seen. \a generic_method_filter should return true if the generic method name should be recorded. Returning false results in the method name being replaced with "generic" in the recorded metrics.
+  OpenTelemetryPluginBuilder&  SetGenericMethodFilter(absl::AnyInvocable<bool(absl::string_view /*method_name*/)> generic_method_filter);
   // Builds and registers a OpenTelemetry Plugin
   void BuildAndRegisterGlobal();
 };
@@ -306,9 +339,25 @@ disabling the OpenCensus plugin.
 ## Rationale
 
 OpenCensus is no longer being actively maintained and is being deprecated, with
-OpenTelemetry suggested as the successor framework. The OpenTelemetry spec aim
+OpenTelemetry suggested as the successor framework. The OpenTelemetry spec aims
 to maintain compatibility with the gRPC OpenCensus spec wherever reasonable to
 allow for an easy migration path.
+
+There is a
+[General RPC conventions](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/semantic_conventions/rpc-metrics.md)
+doc that is currently in `experimental` status. Given the different nuances that
+each RPC system has, it seems difficult to adopt one convention that would make
+sense for all systems. For gRPC specifically, the following differences are
+immediately obvious -
+
+*   gRPC differentiates between the concept of a `call` and an `attempt`. Each
+    `call` can have multiple `attempts` with retries/hedging.
+*   The various gRPC implementations can record the compressed message lengths,
+    but not all implementations can get the uncompressed message length (as
+    recommended by OTel RPC conventions.)
+
+This gRFC, hence, intends to override the [General RPC conventions] for gRPC's
+purposes.
 
 ## Implementation
 
