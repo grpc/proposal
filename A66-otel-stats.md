@@ -151,6 +151,9 @@ could be an OpenCensus and an OpenTelemetry stats plugin registered together. It
 should also allow multiple OpenTelemetry plugins to be registered providing the
 ability to configure the different plugins with different MeterProviders.
 
+A sample implementation of this approach is available in
+[gRPC Core](https://github.com/grpc/grpc/blob/v1.57.x/src/core/lib/channel/call_tracer.h).
+
 ## Language-Specific Details
 
 Each language implementation will provide an API for registering an
