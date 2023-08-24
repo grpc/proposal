@@ -157,7 +157,7 @@ Since an xDS configuration can place a given locality under multiple priorities,
 
 ### CDS Load Balancer
 
-In the `xds_cluster_resolver` config, the `xds_lb_policy` field comes directly from the field of the same name in the CDS update struct. If the `xds_cluster_resolver` config is generated from an aggregate cluster tree, the value of the `xds_lb_policy` field will be determined from the CDS update for the root cluster.
+In the `xds_cluster_resolver` config, the `xds_lb_policy` field comes directly from the field of the same name in the CDS update struct. As in gRFC A42, if the `xds_cluster_resolver` config is generated from an aggregate cluster tree, the value of the `xds_lb_policy` field will be determined from the CDS update for the aggregate cluster, not the underlying clusters.
 
 ### Configuration Example
 

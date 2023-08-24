@@ -257,9 +257,9 @@ hard-coded LB policy config fields in the CDS response:
 - For `RING_HASH`, the policy name will be `"RING_HASH"`, and the config will
   be the one for the `ring_hash_experimental` LB Policy described below.
 
-If the `xds_cluster_resolver` config is generated from an aggregate cluster
-tree, the value of this field will be determined from the CDS update for
-the root cluster.
+As mentioned in gRFC A37, if the `xds_cluster_resolver` config is generated
+from an aggregate cluster tree, the value of this field will be determined from
+the CDS update for the aggregate cluster, not the underlying clusters.
 
 Despite this new config field being structured as a `LoadBalancingConfig`
 message, it will not actually indicate a child policy; instead, the
