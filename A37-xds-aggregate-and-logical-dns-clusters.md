@@ -127,6 +127,16 @@ policy should report that it is in TRANSIENT_FAILURE. If any of the watchers
 reports a transient ADS stream error, the policy should report that it is in
 TRANSIENT_FAILURE if it has never passed a config to its child.
 
+In an aggregate cluster, the `locality_picking_policy` and
+`endpoint_picking_policy` fields of the `xds_cluster_resolver_experimental`
+policy config (see below) come from the aggregate cluster, not the underlying
+clusters. Currently, we do not support any LB policy except ROUND_ROBIN, so
+this decision is moot. The CDS policy can either hardcode those fields with
+their default values, or leave them empty and let the
+`xds_cluster_resolver_experimental` policy apply those defaults. In the future,
+when other LB policies are supported, these fields will be derived from the
+aggregate cluster.
+
 ### Splitting up EDS LB Policy
 
 We will split up the EDS LB policy into two pieces:
@@ -238,15 +248,6 @@ it has not previously reported any results, it should report a result that is
 a single priority with no endpoints. An EDS discovery mechanism should do the
 same if its watcher reports that the resource does not exist (whether or not
 it has previously reported a result).
-
-In an aggregate cluster, the `locality_picking_policy` and
-`endpoint_picking_policy` fields come from the aggregate cluster, not the
-underlying clusters. Currently, we do not support any LB policy except
-ROUND_ROBIN, so this decision is moot. The CDS policy can either hardcode
-those fields with their default values, or leave them empty and let the
-`xds_cluster_resolver_experimental` policy apply those defaults. In the future,
-when other LB policies are supported, these fields will be derived from the
-aggregate cluster.
 
 #### `xds_cluster_impl_experimental` LB Policy
 
