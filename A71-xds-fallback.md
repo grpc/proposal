@@ -5,7 +5,7 @@ A71: xDS Fallback
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2023-07-27
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/07M6Ua7q4Hc
 
 ## Abstract
 
@@ -21,27 +21,9 @@ obtained.
 ## Background
 
 xDS (also known as xDS Discovery Service) is a suite of APIs for discovering
-and subscribing to the configuration of a server mesh. Orignially created by
-for the [Envoy Proxy](http://envoyproxy.io) project, the xDS protocol is
-evolving into an industry standard. gRPC introduced a number of features that
-can be configured using this protocol.
-
-Components of the server mesh communicate with xDS server(s) (also known as
-a "control plane") to obtain the initial configuration and to receive updates
-to the configuration.
-
-An xDS configuration consists of a number of "resources" that can be queried
-separately and may change independently from one another.
-
-Even a brief downtime of the xDS control plane may cause significant disruption
-in the service mesh inter-component connectivity and result in wider outages.
-Examples include:
-
-* Services becoming unavailable as they fail to access downstream dependencies.
-* Traffic being routed incorrectly failing to properly balance the load between
-the endpoints.
-* Security risks may be introduced as outdated credentials are used for
-communications between the servers.
+and subscribing to the configuration of a server mesh. Even a brief downtime
+of the xDS control plane may cause significant disruption in the service mesh
+inter-component connectivity and result in wider outages.
 
 Current xDS implementation in gRPC uses a single global instance of
 the XdsClient class to communicate with the xDS control plane. This instance
@@ -49,12 +31,14 @@ is shared across all channels to reduce overhead by providing a shared cache
 for xDS resources as well as reducing a number of connections to xDS servers.
 
 ### Related Proposals: 
-* [A27: xDS-Based Global Load Balancing](A27)
-* [A36: xDS-Enabled Servers](A36)
-* [A57: XdsClient Failure Mode Behavior](A57)
+* [A27: xDS-Based Global Load Balancing][A27]
+* [A36: xDS-Enabled Servers][A36]
+* [A47: xDS Federation][A47]
+* [A57: XdsClient Failure Mode Behavior][A57]
 
 [A27]: A27-xds-global-load-balancing.md
 [A36]: A36-xds-for-servers.md
+[A47]: A47-xds-federation.md
 [A57]: A57-xds-client-failure-mode-behavior.md
 
 ## Proposal
