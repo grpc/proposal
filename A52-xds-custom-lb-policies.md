@@ -2,7 +2,7 @@ A52: gRPC xDS Custom Load Balancer Configuration
 ----
 * Author(s): temawi
 * Approver: markdroth
-* Implemented in: 
+* Implemented in:
 * Last updated: 2022-04-22
 * Discussion at: https://groups.google.com/g/grpc-io/c/BoRazEVUEz0
 
@@ -50,7 +50,7 @@ The XdsClient will transfer the responsibility of converting the xDS configurati
 
 The CDS resource is rejected and a NACK returned to the control plane in either of the following cases:
 
-- xDS LB policy registry cannot convert the configuration and returns an error 
+- xDS LB policy registry cannot convert the configuration and returns an error
 - gRPC LB policy registry cannot parse the converted configuration.
 
 ### xDS LB Policy Registry
@@ -67,7 +67,7 @@ The registry will provide the following function:
 //
 // An error/exception will be returned if the message type
 // is not recognized, or if policy configuration is invalid in a way that
-// can't be determined by looking at the PolicyConfig output. 
+// can't be determined by looking at the PolicyConfig output.
 string convertToServiceConfig(envoy.config.cluster.v3.LoadBalancingPolicy loadBalancingPolicy)
 ```
 
@@ -89,6 +89,7 @@ This function will iterate over the list of `Policy` messages in `LoadBalancingP
 - `xds.type.v3.TypedStruct` or `udpa.type.v1.TypedStruct`
   - This type represents a custom policy, deployed with the gRPC client by a user
   - The gRPC policy name will be the "type name" part of the value of the `type_url` field in the `TypedStruct`. We get this by using the part after the last `/` character.
+  - If the type name derived in the above bullet point does not correspond to a registered policy in the gRPC LB policy registry, this policy is unsupported and should be skipped.
   - The `Struct` contained in the `TypedStruct` will be returned as-is as the configuration JSON object.
   - Note that when registering custom policy implementations in the gRPC load balancer registry, the name should follow valid protobuf message naming conventions and use a custom package, e.g. "`myorg.MyCustomLb`".
 
@@ -144,7 +145,7 @@ The cluster resolver configuration documentation in service_config.proto is upda
 ```protobuf
 // Configuration for xds_cluster_resolver LB policy.
 message XdsClusterResolverLoadBalancingPolicyConfig {
-  // xDS LB policy. Will be used as the child config of the xds_cluster_impl LB policy. 
+  // xDS LB policy. Will be used as the child config of the xds_cluster_impl LB policy.
   repeated LoadBalancingConfig xds_lb_policy = 2;
 
 }
@@ -153,6 +154,10 @@ message XdsClusterResolverLoadBalancingPolicyConfig {
 To provide the `xds_wrr_locality` load balancer information about locality weights received from EDS, the cluster resolver will populate a new locality weight attribute for each address. The attribute will have the weight (as an integer) of the locality the address is part of. This alongside the already existing locality attribute will be used to generate the `weighted_target` configuration by `xds_wrr_locality`. Note that a change in this attribute would still allow associated subchannels to be reused - it will not affect their uniqueness.
 
 Since an xDS configuration can place a given locality under multiple priorities, it is possible to see locality weight attributes with different values for the same locality. We do not support this kind of an edge case and just use the weight in the first attribute we encounter. A warning should be logged about any locality weights being discarded.
+
+### CDS Load Balancer
+
+In the `xds_cluster_resolver` config, the `xds_lb_policy` field comes directly from the field of the same name in the CDS update struct. As in gRFC A42, if the `xds_cluster_resolver` config is generated from an aggregate cluster tree, the value of the `xds_lb_policy` field will be determined from the CDS update for the aggregate cluster, not the underlying clusters.
 
 ### Configuration Example
 
@@ -167,23 +172,23 @@ This is a step-by-step example of how an example xDS configuration gets converte
         typed_config: {
           "@type": "type.googleapis.com/envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality"
           endpoint_picking_policy: {
-            policies: [                
-              typed_extension_config: { 
-                name: "<<backend-id>>-1"                              
-                typed_config: {                                                 
-                  "@type": "type.googleapis.com/xds.type.v3.TypedStruct"          
+            policies: [
+              typed_extension_config: {
+                name: "<<backend-id>>-1"
+                typed_config: {
+                  "@type": "type.googleapis.com/xds.type.v3.TypedStruct"
                   type_url: "type.googleapis.com/myorg.MyCustomLeastRequestPolicy"
-                  fields: [           
-                    {                   
+                  fields: [
+                    {
                       key: "choiceCount"
                       value: "2"
                     }
                   ]
                 }
-              } 
-              typed_extension_config: { 
+              }
+              typed_extension_config: {
                 name: "<<backend-id>>-2"
-                typed_config: {                                                            
+                typed_config: {
                   "@type": "type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin"
                 }
               }
@@ -227,7 +232,7 @@ This output is produced by following these steps:
 6. The xDS client calls the gRPC LB policy registry to parse the config converted by the xDS LB policy registry.
 7. The configuration parses, validating its correctness and the config is added to CDS update.
 
-#### 2. CDS load balancer builds the configuration for `xds_cluster_resolver`, including the configuration it received from xDS client. 
+#### 2. CDS load balancer builds the configuration for `xds_cluster_resolver`, including the configuration it received from xDS client.
 
 ```json
 {
