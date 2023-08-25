@@ -5,7 +5,7 @@ Node Heath Check Library 2.0
 * Status: In Review
 * Implemented in: Node.js
 * Last updated: 2023-08-25
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/6y632NLeUTw
 
 ## Abstract
 
