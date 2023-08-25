@@ -45,9 +45,16 @@ for xDS resources as well as reducing a number of connections to xDS servers.
 
 gRPC code should use fallback iff both:
 
-* primary server not reachable
-* at least one watcher exists for a resource that is not cached (where
-   "does not exist" counts as cached).
+* There had been a failure during resource retrieval, as described in [A57]:
+    - Connection to the data plane fails. 
+    - The ADS stream being closed before the first server response had been
+      received.
+* At least one watcher exists for a resource that is not cached. Resources are
+    considered cached if:
+    - A resource had been successfully retried from the xDS server.
+    - Server reported the resource had been found.
+    - An error was reported retrieving the resource over a connection that had
+      been successfully established beforehand (as described above)
 
 Instead of using a global XdsClient instance, gRPC will use a shared XdsClient
 instance for each data plane target.  In other words, if two channels are
