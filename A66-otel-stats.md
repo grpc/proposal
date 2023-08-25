@@ -78,8 +78,10 @@ the scale to better fit the data.
     method names as well.
 *   `grpc.status` : gRPC server status code received, e.g. "OK", "CANCELLED",
     "DEADLINE_EXCEEDED"
-*   `grpc.target` : Target URI used when creating gRPC Channel, e.g.
-    "dns:///pubsub.googleapis.com:443", "xds:///helloworld-gke:8000"
+*   `grpc.target` : Canonicalized target URI used when creating gRPC Channel,
+    e.g. "dns:///pubsub.googleapis.com:443", "xds:///helloworld-gke:8000".
+    Canonicalized target URI is its form with the scheme if the user didn't
+    mention the scheme.
 
 #### Client Per-Attempt Instruments
 
@@ -115,22 +117,22 @@ the scale to better fit the data.
 
 *   **grpc.server.call.started** <br>
     The total number of RPCs started, including those that have not completed. <br>
-    *Attributes*: grpc.method, grpc.authority <br>
+    *Attributes*: grpc.method <br>
     *Type*: counter <br>
     *Unit*: {call} <br>
 *   **grpc.server.call.sent_total_compressed_message_size** <br>
     Total bytes (compressed but not encrypted) sent across all response messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
-    *Attributes*: grpc.method, grpc.authority, grpc.status <br>
+    *Attributes*: grpc.method, grpc.status <br>
     *Type*: Histogram (Size Buckets) <br>
 *   **grpc.server.call.rcvd_total_compressed_message_size** <br>
     Total bytes (compressed but not encrypted) received across all request messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
-    *Attributes*: grpc.method, grpc.authority, grpc.status <br>
+    *Attributes*: grpc.method, grpc.status <br>
     *Type*: Histogram (Size Buckets) <br>
 *   **grpc.server.call.duration** <br>
     This metric aims to measure the end2end time an RPC takes from the server transport’s (HTTP2/ inproc / cronet) perspective. <br>
     Start timestamp - After the transport knows that it's got a new stream. For HTTP2, this would be after the first header frame for the stream has been received and decoded. Whether the timestamp is recorded before or after HPACK is left to the implementation. <br>
     End timestamp - Ends at the first point where the transport considers the stream done. For HTTP2, this would be when scheduling a trailing header with END_STREAM to be written, or RST_STREAM, or a connection abort. Note that this wouldn’t necessarily mean that the bytes have also been immediately scheduled to be written by TCP. <br>
-    *Attributes*: grpc.method, grpc.authority, grpc.status <br>
+    *Attributes*: grpc.method, grpc.status <br>
     *Type*: Histogram (Latency Buckets) <br>
 
 ## OpenTelemetry Plugin Architecture
@@ -163,10 +165,9 @@ OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
 *   Allow setting a
     [MeterProvider](https://opentelemetry.io/docs/specs/otel/metrics/api/#meterprovider)
     on individual plugins. Implementations should require a MeterProvider being
-    set. A MeterProvider not being set should either not be allowed, fail
-    registering of the plugin or result in a no-op. Some OpenTelemetry language
-    APIs have a global MeterProvider. gRPC implementations should *NOT* fallback
-    on this global.
+    set. A MeterProvider not being set should result in a no-op. Some
+    OpenTelemetry language APIs have a global MeterProvider. gRPC
+    implementations should *NOT* fallback on this global.
 *   Optionally allow enabling/disabling metrics. This would allow optimizations
     to avoid computation and collection of expensive stats within the gRPC
     library. Note that even without this capability, users of OpenTelemetry
@@ -190,13 +191,24 @@ release version of the gRPC library, for example, "1.57.1".
 ```c++
 Class OpenTelemetryPluginBuilder {
  public:
-  // Enables base set of metrics by default
-  OpenTelemetryPluginBuilder(shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider) = default;
-  // Enable metric \a metric_name.
-  OpenTelemetryPluginBuilder&  EnableMetric(absl::string_view metric_name);
-  // Disable metric \a metric_name
-  OpenTelemetryPluginBuilder&  DisableMetric(absl::string_view metric_name);
-  // If set, is invoked by gRPC when a generic method type RPC is seen. \a generic_method_filter should return true if the generic method name should be recorded. Returning false results in the method name being replaced with "generic" in the recorded metrics.
+  // If `SetMeterProvider()` is not called, the stats plugin is a no-op.
+  OpenTelemetryPluginBuilder& SetMeterProvider(
+      std::shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
+  // Enable metrics in \a metric_names. Only these metrics are recorded by gRPC.
+  // Sample -
+  // OpenTelemetryPluginBuilder().EnableMetrics(BaseMetrics()).SetMeterProvider(mp).BuildAndRegisterGlobal();
+  OpenTelemetryPluginBuilder& EnableMetrics(
+      const absl::flat_hash_set<absl::string_view>& metric_names);
+  // The base set of metrics -
+  // grpc.client.attempt.started
+  // grpc.client.attempt.duration
+  // grpc.client.attempt.sent_total_compressed_message_size
+  // grpc.client.attempt.rcvd_total_compressed_message_size
+  // grpc.server.call.started
+  // grpc.server.call.duration
+  // grpc.server.call.sent_total_compressed_message_size
+  // grpc.server.call.rcvd_total_compressed_message_size
+  static absl::flat_hash_set<std::string> BaseMetrics();
   OpenTelemetryPluginBuilder&  SetGenericMethodFilter(absl::AnyInvocable<bool(absl::string_view /*method_name*/)> generic_method_filter);
   // Builds and registers a OpenTelemetry Plugin
   void BuildAndRegisterGlobal();
@@ -247,9 +259,8 @@ OpenTelemetry spec.
     *   grpc_client_status -> grpc.status
     *   grpc_server_method -> grpc.method
     *   grpc_server_status -> grpc.status
-*   Two new attributes have been added.
+*   One new attribute has been added.
     *   grpc.target - Added on client metrics
-    *   grpc.authority - Added on server metrics
 *   Latency metrics in the OpenTelemetry spec use the recommended `s` unit
     instead of `ms`.
 
