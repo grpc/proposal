@@ -28,7 +28,7 @@ inter-component connectivity and result in wider outages.
 Current xDS implementation in gRPC uses a single global instance of
 the XdsClient class to communicate with the xDS control plane. This instance
 is shared across all channels to reduce overhead by providing a shared cache
-for xDS resources as well as reducing a number of connections to xDS servers.
+for xDS resources as well as reducing the number of connections to xDS servers.
 
 ### Related Proposals: 
 * [A27: xDS-Based Global Load Balancing][A27]
@@ -43,7 +43,7 @@ for xDS resources as well as reducing a number of connections to xDS servers.
 
 ## Proposal
 
-gRPC code should use fallback iff both:
+gRPC code should use fallback if the following conditions hold:
 
 * There had been a failure during resource retrieval, as described in [A57]:
     - Connection to the data plane fails. 
@@ -118,7 +118,8 @@ of this approach is that this would put fallback server availability at risk
 due to spike in demand once the primary server goes down and all the clients
 try to refetch the resources.
 
-#### Always switch to a fallback server if the primary is not available but only if there's a need to fetch the resources that are missing from the cache.
+#### Always switch to a fallback server if the primary is not available but
+    only if there's a need to fetch the resources that are missing from the cache.
 
 This is similar to an option above but should decrease the load on the fallback
 servers.
