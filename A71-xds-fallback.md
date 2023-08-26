@@ -62,16 +62,26 @@ created for the target "xds:foo", they will share one XdsClient instance, but
 if another channel is created for "xds:bar", it will use a different XdsClient
 instance.
 
-Attempt to fetch a resource for a cached target will result in a failure.
+This way if some resource for "xds:bar" is missing, only that XdsClient will
+switch to a fallback server and refetch the resources or resubscribe
+to resource change notifications. "xds:foo" will still be using cached resources
+obtained from the primary server.
 
 The following changes will be made to the codebase:
 
-1. Add support for multiple xDS servers in the `bootstrap.json`.
-2. Update implemention to support configuration with multiple xDS servers.
-3. Refactor XdsClient to support multiple instances.
-4. Update code relying on XdsClient to work with multiple instances
-    * xDS resource fetching and tracking.
-    * xDS stats *[???] (do we want to collect them cross-XdsClients?)*
+1. Refactor XdsClient to support multiple instances. This will introduce
+    a map of "sub-XdsClient" instances keyed by the data plane target.
+1. Add support for multiple xDS servers in the `bootstrap.json`. Current
+    implementation only returns the first entry and ignores the rest.
+1. Implement additional changes to XdsClient:
+    - For each authority, we need to store an ordered list of channels instead
+        of just one channel.
+    - Whenever we lose contact with a given server and there is at least one
+        resource requested but not cached, if the current server is not the
+        last server in the list, then we create a channel/stream for the next
+        server in the list.
+    - Whenever we get back in contact with a given server, if we have
+        a channel/stream for the next server in the list, close it.
 
 #### bootstrap.json
 
@@ -79,14 +89,10 @@ Currently `bootstrap.json` supports multiple xDS servers but semantics are
 not explicitely specified.
 
 1. xDS servers will be attempted in the order they are specified in
-the bootstrap.json. Server will only be attempted if the previous entry in
-the list is not available.
+    the bootstrap.json. Server will only be attempted if the previous entry in
+    the list is not available.
 1. xDS client will report a failure if the last entry in the list is not
-available.
-1. `channel-creds` or any other server attributes are not shared and need
-to be defined independently for every server.
-
-*[???] Are there any cases when we revert to a primary server?*
+    available.
 
 #### Internal xDS bootstrap representation
 
@@ -103,7 +109,7 @@ lifetime.
 ### Temporary environment variable protection
 
 This option will be behind `GRPC_EXPERIMENTAL_XDS_FALLBACK`. If this variable
-is unset or is falsy, only one xDS server will be read from the bootstrap
+is unset or is false, only one xDS server will be read from the bootstrap
 file. 
 
 ## Rationale
@@ -118,10 +124,12 @@ of this approach is that this would put fallback server availability at risk
 due to spike in demand once the primary server goes down and all the clients
 try to refetch the resources.
 
-#### Always switch to a fallback server if the primary is not available but
-    only if there's a need to fetch the resources that are missing from the cache.
+#### Always switch to a fallback server if the primary is not available but only if there's a need to fetch the resources that are missing from the cache.
 
-This is similar to an option above but should decrease the load on the fallback
-servers.
+A single XdsClient instance is used for all clients. Cached resources
+(including cached values for missing resources or NACKed resources) are used
+even after connection to the xDS server is lost. All cached resources for all
+data plane targets are refetched from the fallback server if there is a request
+for a resource that was not cached.
 
 This may still result in unnecessary refetch in some cases.
