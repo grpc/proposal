@@ -54,7 +54,8 @@ gRPC code should use fallback if the following conditions hold:
     - A resource had been successfully retried from the xDS server.
     - Server reported the resource had been found.
     - An error was reported retrieving the resource over a connection that had
-      been successfully established beforehand (as described above)
+      been successfully established beforehand (as described above). In C-core
+      such resource will have a `REQUESTED` state.
 
 Instead of using a global XdsClient instance, gRPC will use a shared XdsClient
 instance for each data plane target.  In other words, if two channels are
