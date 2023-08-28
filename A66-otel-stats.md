@@ -73,7 +73,7 @@ the scale to better fit the data.
     send arbitrary method names that could potentially open up the server to
     malicious attacks that result in metrics being stored with a high
     cardinality. To prevent this, unregistered/generic method names should by
-    default be reported with "generic" value instead. Implementations can
+    default be reported with "other" value instead. Implementations should
     provide the option to override this behavior to allow recording generic
     method names as well.
 *   `grpc.status` : gRPC server status code received, e.g. "OK", "CANCELLED",
@@ -81,7 +81,11 @@ the scale to better fit the data.
 *   `grpc.target` : Canonicalized target URI used when creating gRPC Channel,
     e.g. "dns:///pubsub.googleapis.com:443", "xds:///helloworld-gke:8000".
     Canonicalized target URI is its form with the scheme if the user didn't
-    mention the scheme.
+    mention the scheme. For channels such as inprocess channels where a target
+    URI is not available, implementations can synthesize a target URI. It is
+    possible for some channels to use IP addresses as target strings and this
+    might again blow up the cardinality. Implementations should provide the
+    option to override recorded target names with "other".
 
 #### Client Per-Attempt Instruments
 
@@ -209,7 +213,10 @@ Class OpenTelemetryPluginBuilder {
   // grpc.server.call.sent_total_compressed_message_size
   // grpc.server.call.rcvd_total_compressed_message_size
   static absl::flat_hash_set<std::string> BaseMetrics();
+  // If \a generic_method_filter returns true for a method_name, that method_name is recorded as is, otherwise it is recorded as "other".
   OpenTelemetryPluginBuilder&  SetGenericMethodFilter(absl::AnyInvocable<bool(absl::string_view /*method_name*/)> generic_method_filter);
+  // If \a target_filter returns true for a target, that target is recorded as is, otherwise it is recorded as "other".
+  OpenTelemetryPluginBuilder&  SetTargetFilter(absl::AnyInvocable<bool(absl::string_view /*target*/)> target_filter);
   // Builds and registers a OpenTelemetry Plugin
   void BuildAndRegisterGlobal();
 };
