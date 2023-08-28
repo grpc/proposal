@@ -33,29 +33,42 @@ for xDS resources as well as reducing the number of connections to xDS servers.
 ### Related Proposals: 
 * [A27: xDS-Based Global Load Balancing][A27]
 * [A36: xDS-Enabled Servers][A36]
+* [A40: xDS Configuration Dump via Client Status Discovery Service in gRPC][A40]
 * [A47: xDS Federation][A47]
 * [A57: XdsClient Failure Mode Behavior][A57]
 
 [A27]: A27-xds-global-load-balancing.md
 [A36]: A36-xds-for-servers.md
+[A40]: A40-csds-support.md
 [A47]: A47-xds-federation.md
 [A57]: A57-xds-client-failure-mode-behavior.md
 
 ## Proposal
 
+### Note on xDS resources caching
+
+The xDS client code caches any responses received from the xDS server. This
+includes:
+- Resources that have been successfully received and can be used.
+- Resources that were recieved but did not pass the validation.
+- Resources that are considered as not existing according
+    to [xDS Protocol Specification][resource-does-not-exist].
+
+Resources that have not been recieved by the time xDS server fallback was
+initiated are not considered cached.
+
+[resource-does-not-exist]: https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist
+
+### Fallback initiated
+
 gRPC code should use fallback if the following conditions hold:
 
 * There had been a failure during resource retrieval, as described in [A57]:
-    - Connection to the data plane fails. 
+    - Channel reports TRANSIENT_FAILURE.
     - The ADS stream being closed before the first server response had been
       received.
-* At least one watcher exists for a resource that is not cached. Resources are
-    considered cached if:
-    - A resource had been successfully retried from the xDS server.
-    - Server reported the resource had been found.
-    - An error was reported retrieving the resource over a connection that had
-      been successfully established beforehand (as described above). In C-core
-      such resource will have a `REQUESTED` state.
+* At least one watcher exists for a resource that is not cached. See above
+    for details on resource caching.
 
 Instead of using a global XdsClient instance, gRPC will use a shared XdsClient
 instance for each data plane target.  In other words, if two channels are
