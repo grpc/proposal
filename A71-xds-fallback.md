@@ -37,13 +37,41 @@ for xDS resources as well as reducing the number of connections to xDS servers.
 * [A47: xDS Federation][A47]
 * [A57: XdsClient Failure Mode Behavior][A57]
 
-[A27]: A27-xds-global-load-balancing.md
-[A36]: A36-xds-for-servers.md
-[A40]: A40-csds-support.md
-[A47]: A47-xds-federation.md
-[A57]: A57-xds-client-failure-mode-behavior.md
-
 ## Proposal
+
+Instead of using a global XdsClient instance, gRPC will use a shared XdsClient
+instance for each data plane target. In other words, if there are two channels
+created for the target "xds:foo", they will share one XdsClient instance, but
+if another channel is created for "xds:bar", it will use a different XdsClient
+instance.
+
+This way if some resource for "xds:bar" is missing, only that XdsClient will
+switch to a fallback server and refetch the resources or resubscribe
+to resource change notifications. "xds:foo" will still be using cached resources
+obtained from the primary server.
+
+### Reservations about using the fallback server data
+
+We are expecting to use this in an environment where the data provided by
+the secondary xDS server is better than nothing but is less desirable than
+the data in the primary server. This means that while we definitely want to use
+the fallback data in preference to the client simply failing, we will always
+prefer to use the data from the primary server over the data from the fallback
+server. In principle, this means that whenever we have a resource already
+cached from the primary server, we want to use that instead of falling back.
+
+We have no guarantee that a combination of resources from the primary and
+secondary server forms a valid cohesive configuration, so we cannot make this
+determination on a per-resource basis. We need any given gRPC channel to either
+use all resources from the primary server or all resources from the secondary
+server.
+
+The ideal behavior is for each individual gRPC channel to fall back
+independently of any other, but the global XdsClient instance makes that
+challenging, because we need to make the fallback decision independently for
+each authority, and that is handles inside the XdsClient. (And we do still want
+to share XdsClient instances across channels, both to reduce load on
+the control plane from duplicate channels and to make CSDS work.)
 
 ### xDS resources caching
 
@@ -57,8 +85,6 @@ includes:
 Resources that have not been recieved by the time xDS server fallback was
 initiated are not considered cached.
 
-[resource-does-not-exist]: https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist
-
 ### Initiating xDS Fallback
 
 The fallback process is initiated if the following conditions hold:
@@ -66,20 +92,9 @@ The fallback process is initiated if the following conditions hold:
 * There had been a failure during resource retrieval, as described in [A57]:
     - Channel reports TRANSIENT_FAILURE.
     - The ADS stream being closed before the first server response had been
-      received.
+        received.
 * At least one watcher exists for a resource that is not cached. See above
     for details on resource caching.
-
-Instead of using a global XdsClient instance, gRPC will use a shared XdsClient
-instance for each data plane target.  In other words, if two channels are
-created for the target "xds:foo", they will share one XdsClient instance, but
-if another channel is created for "xds:bar", it will use a different XdsClient
-instance.
-
-This way if some resource for "xds:bar" is missing, only that XdsClient will
-switch to a fallback server and refetch the resources or resubscribe
-to resource change notifications. "xds:foo" will still be using cached resources
-obtained from the primary server.
 
 ### Changes to the code base
 
@@ -133,20 +148,38 @@ file.
 
 Other approaches considered:
 
-#### Always switch to a fallback server if the primary is not available
+### Using a single XdsClient instance for all data plane targets
 
-A single XdsClient is used for all targets. All cached resources are purged and
-refetched as soon as primary xDS server becomes unavailable. Major shortcoming
-of this approach is that this would put fallback server availability at risk
-due to spike in demand once the primary server goes down and all the clients
-try to refetch the resources.
+Using a singleton XdsClient instance would cause individual channels that
+already have all of their resources cached from the primary server to switch
+to fallback resources in the following cases:
 
-#### Always switch to a fallback server if the primary is not available but only if there's a need to fetch the resources that are missing from the cache.
+- If the primary server goes down and a gRPC client then creates a new
+    xDS-enabled channel for a target for which the resources are not already
+    cached, that will trigger the client to fall back, not just for the new
+    channel but for all channels.
+- Cases where the primary server goes down while the client is in the middle
+    of processing an update (referred to as the "mid-update" case).
+    For example, let's say that the XdsClient gets an updated RouteConfig that
+    includes a new cluster that it was not previously using, thus triggering
+    the client to subscribe to the new Cluster resource, but then TD goes down
+    before sending the new Cluster resource. At this point, the XdsClient will
+    fall back to the secondary server, and it will use the fallback resources
+    instead of the cached resources that it already had from the primary server.
 
-A single XdsClient instance is used for all clients. Cached resources
-(including cached values for missing resources or NACKed resources) are used
-even after connection to the xDS server is lost. All cached resources for all
-data plane targets are refetched from the fallback server if there is a request
-for a resource that was not cached.
+The best compromise that we can find is to use a different XdsClient instance
+for each target, but still share those XdsClient instances between channels for
+the same target. This is not exactly the same as having each individual channel
+fall back independently, but it's close enough in practice: if there are
+multiple channels for the same target, they will all use the same decision
+about whether or not to fall back, but that should be fine, since they are also
+using the same set of xDS resources.
 
-This may still result in unnecessary refetch in some cases.
+
+[A27]: A27-xds-global-load-balancing.md
+[A36]: A36-xds-for-servers.md
+[A40]: A40-csds-support.md
+[A47]: A47-xds-federation.md
+[A57]: A57-xds-client-failure-mode-behavior.md
+
+[resource-does-not-exist]: https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist
