@@ -39,16 +39,16 @@ for xDS resources as well as reducing the number of connections to xDS servers.
 
 ## Proposal
 
-Instead of using a global XdsClient instance, gRPC will use a shared XdsClient
-instance for each data plane target. In other words, if there are two channels
-created for the target "xds:foo", they will share one XdsClient instance, but
-if another channel is created for "xds:bar", it will use a different XdsClient
-instance.
+Modify gRPC to use a shared XdsClient instance for each data plane target
+instead of using ai single global XdsClient instance. In other words, if there
+are two channels created for the target "xds:foo", they will share one
+XdsClient instance, but if another channel is created for "xds:bar", it will
+use a different XdsClient instance.
 
-This way if some resource for "xds:bar" is missing, only that XdsClient will
-switch to a fallback server and refetch the resources or resubscribe
-to resource change notifications. "xds:foo" will still be using cached resources
-obtained from the primary server.
+This way if some resource for "xds:bar" is not available in cache, only that
+XdsClient will switch to a fallback server and refetch the resources or
+resubscribe to resource change notifications. "xds:foo" will still be using
+cached resources obtained from the primary server.
 
 ### Reservations about using the fallback server data
 
