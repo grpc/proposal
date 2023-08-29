@@ -175,6 +175,11 @@ multiple channels for the same target, they will all use the same decision
 about whether or not to fall back, but that should be fine, since they are also
 using the same set of xDS resources.
 
+### Using a single XdsClient but only refetched cached resource if a request was made for a non-cached resource.
+
+This is similar to the option above but causes less refetches. It will still
+result in many more fetches than the proposed solution with per-target
+XdsClients.
 
 [A27]: A27-xds-global-load-balancing.md
 [A36]: A36-xds-for-servers.md
