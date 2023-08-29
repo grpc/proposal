@@ -81,47 +81,47 @@ switch to a fallback server and refetch the resources or resubscribe
 to resource change notifications. "xds:foo" will still be using cached resources
 obtained from the primary server.
 
-### Proposed Changes to the Code Base
+### Changes to the code base
 
-1. Refactor XdsClient to support multiple instances. This will introduce
-    a map of "sub-XdsClient" instances keyed by the data plane target.
-1. Add support for multiple xDS servers in the `bootstrap.json`. Current
+1. Refactor code using XdsClient to support multiple instances. 
+1. Add support for multiple xDS servers in the bootstrap JSON. Current
     implementation only returns the first entry and ignores the rest.
-1. Implement additional changes to XdsClient:
-    - For each authority, we need to store an ordered list of channels instead
-        of just one channel.
-    - Whenever we lose contact with a given server and there is at least one
-        resource requested but not cached, if the current server is not the
-        last server in the list, then we create a channel/stream for the next
-        server in the list.
-    - Whenever we get back in contact with a given server, if we have
-        a channel/stream for the next server in the list, close it.
-1. Add multi-client support to CSDS (see [A40] for details).
-    - Add add a field to the ClientConfig message in the CSDS response
-        to indicate which channel target the data is associated with.
+1. Add multi-client support to CSDS
 
-#### Changes to bootstrap.json
+#### Refactor code using XdsClient to support multiple instances.
 
-Currently `bootstrap.json` supports multiple xDS servers but semantics are
-not explicitely specified.
+1. Introduce a map of "sub-XdsClient" instances keyed by the data plane
+    target.
+1. For each authority, we need to store an ordered list of channels instead
+    of just one channel.
+1. Whenever we lose contact with a given server and there is at least one
+    resource requested but not cached, if the current server is not the
+    last server in the list, then we create a channel/stream for the next
+    server in the list.
+1. Whenever we get back in contact with a given server, if we have
+    a channel/stream for the next server in the list, close it.
+
+#### Add support for multiple xDS servers in the bootstrap JSON
+
+Currently bootstrap JSON supports multiple xDS servers but semantics are not
+explicitely specified.
 
 1. xDS servers will be attempted in the order they are specified in
-    the bootstrap.json. Server will only be attempted if the previous entry in
+    the bootstrap JSON. Server will only be attempted if the previous entry in
     the list is not available.
 1. xDS client will report a failure if the last entry in the list is not
     available.
-
-#### Internal xDS bootstrap representation
 
 Currently internal data structures do not allow for more then a single xDS
 server. The implementation needs to be updated to handle multiple servers,
 maintainig their fallback order.
 
-#### XdsClient class changes
+#### Add multi-client support to CSDS
 
-Each language implementation will need to ensure that multiple XdsClient
-instances may be created and torn down as needed during the application
-lifetime.
+Ses [A40] for details on CSDS.
+
+Add add a field to the ClientConfig message in the CSDS response to indicate
+which channel target the data is associated with.
 
 ### Temporary environment variable protection
 
