@@ -45,7 +45,7 @@ for xDS resources as well as reducing the number of connections to xDS servers.
 
 ## Proposal
 
-### Note on xDS resources caching
+### xDS resources caching
 
 The xDS client code caches any responses received from the xDS server. This
 includes:
@@ -59,9 +59,9 @@ initiated are not considered cached.
 
 [resource-does-not-exist]: https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist
 
-### Fallback initiated
+### Initiating xDS Fallback
 
-gRPC code should use fallback if the following conditions hold:
+The fallback process is initiated if the following conditions hold:
 
 * There had been a failure during resource retrieval, as described in [A57]:
     - Channel reports TRANSIENT_FAILURE.
@@ -81,7 +81,7 @@ switch to a fallback server and refetch the resources or resubscribe
 to resource change notifications. "xds:foo" will still be using cached resources
 obtained from the primary server.
 
-The following changes will be made to the codebase:
+### Proposed Changes to the Code Base
 
 1. Refactor XdsClient to support multiple instances. This will introduce
     a map of "sub-XdsClient" instances keyed by the data plane target.
@@ -96,8 +96,11 @@ The following changes will be made to the codebase:
         server in the list.
     - Whenever we get back in contact with a given server, if we have
         a channel/stream for the next server in the list, close it.
+1. Add multi-client support to CSDS (see [A40] for details).
+    - Add add a field to the ClientConfig message in the CSDS response
+        to indicate which channel target the data is associated with.
 
-#### bootstrap.json
+#### Changes to bootstrap.json
 
 Currently `bootstrap.json` supports multiple xDS servers but semantics are
 not explicitely specified.
