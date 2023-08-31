@@ -4,8 +4,8 @@ L105: Python Add New Error Types
 * Approver: gnossen
 * Status: In Review
 * Implemented in: Python
-* Last updated: 08/21/2023
-* Discussion at: TODO
+* Last updated: 08/31/2023
+* Discussion at: https://groups.google.com/g/grpc-io/c/pG34X9nAa3c
 
 ## Abstract
 
