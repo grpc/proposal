@@ -39,11 +39,11 @@ for xDS resources as well as reducing the number of connections to xDS servers.
 
 ## Proposal
 
-Modify gRPC to use a shared XdsClient instance for each data plane target
-instead of using ai single global XdsClient instance. In other words, if there
-are two channels created for the target "xds:foo", they will share one
-XdsClient instance, but if another channel is created for "xds:bar", it will
-use a different XdsClient instance.
+Switch gRPC from using a single global XdsClient instance for all data plane
+targets to have an XdsClient instance per each data plane target shared among
+channels. In other words, if there are two channels created for the 
+target "xds:foo", they will share one XdsClient instance, but if another
+channel is created for "xds:bar", it will use a different XdsClient instance.
 
 This way if some resource for "xds:bar" is not available in cache, only that
 XdsClient will switch to a fallback server and refetch the resources or
@@ -69,7 +69,7 @@ server.
 The ideal behavior is for each individual gRPC channel to fall back
 independently of any other, but the global XdsClient instance makes that
 challenging, because we need to make the fallback decision independently for
-each authority, and that is handles inside the XdsClient. (And we do still want
+each authority, and that is handled inside the XdsClient. (And we do still want
 to share XdsClient instances across channels, both to reduce load on
 the control plane from duplicate channels and to make CSDS work.)
 
@@ -78,16 +78,16 @@ the control plane from duplicate channels and to make CSDS work.)
 The xDS client code caches any responses received from the xDS server. This
 includes:
 - Resources that have been successfully received and can be used.
-- Resources that were recieved but did not pass the validation.
+- Resources that were received but did not pass the validation.
 - Resources that are considered as not existing according
     to [xDS Protocol Specification][resource-does-not-exist].
 
-Resources that have not been recieved by the time xDS server fallback was
+Resources that have not been received by the time xDS server fallback was
 initiated are not considered cached.
 
 ### Initiating xDS Fallback
 
-The fallback process is initiated if the following conditions hold:
+The fallback process is initiated if both of the following conditions hold:
 
 * There had been a failure during resource retrieval, as described in [A57]:
     - Channel reports TRANSIENT_FAILURE.
@@ -119,7 +119,7 @@ The fallback process is initiated if the following conditions hold:
 #### Add support for multiple xDS servers in the bootstrap JSON
 
 Currently bootstrap JSON supports multiple xDS servers but semantics are not
-explicitely specified.
+explicitly specified.
 
 1. xDS servers will be attempted in the order they are specified in
     the bootstrap JSON. Server will only be attempted if the previous entry in
@@ -127,13 +127,13 @@ explicitely specified.
 1. xDS client will report a failure if the last entry in the list is not
     available.
 
-Currently internal data structures do not allow for more then a single xDS
-server. The implementation needs to be updated to handle multiple servers,
-maintainig their fallback order.
+In some gRPC implementations, the internal data structures do not allow for
+more then a single xDS server. The implementation needs to be updated to handle
+multiple servers, maintainig their fallback order.
 
 #### Add multi-client support to CSDS
 
-Ses [A40] for details on CSDS.
+See [A40] for details on CSDS.
 
 Add add a field to the ClientConfig message in the CSDS response to indicate
 which channel target the data is associated with.
@@ -177,9 +177,9 @@ using the same set of xDS resources.
 
 ### Using a single XdsClient but only refetched cached resource if a request was made for a non-cached resource.
 
-This is similar to the option above but causes less refetches. It will still
-result in many more fetches than the proposed solution with per-target
-XdsClients.
+This is similar to the option above but also reduce a number of requests to
+the control plane in the event of fallback. This option still results in many
+more fetches than the proposed solution with per-target XdsClients.
 
 [A27]: A27-xds-global-load-balancing.md
 [A36]: A36-xds-for-servers.md
