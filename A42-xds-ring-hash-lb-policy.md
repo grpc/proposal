@@ -72,7 +72,11 @@ Here is how gRPC will handle each type of hash policy:
 
 - [`header`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/route/v3/route_components.proto#L710):
   gRPC will support this type of hash policy.  This allows hashing on a
-  request header.
+  request header.  The header matching logic will behave the same way as
+  specified for route matching, as per [gRFC
+  A28](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md#picking)
+  (i.e., it will ignore headers with a `-bin` suffix and may need
+  special handling for `content-type`).
 - [`cookie`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/route/v3/route_components.proto#L713):
   gRPC does not support HTTP cookies, so we will not support this hash
   policy.  If specified, this policy will not return any result.
