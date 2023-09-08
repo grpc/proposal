@@ -53,13 +53,27 @@ uses the route.  This is a `repeated` field, so it specifies a list of
 hash policies.  Each hash policy is evaluated individually, and the
 combined result is used to determine the request's hash.  The method of
 combination is deterministic, such that identical lists of hash policies
-will produce the same hash.  Since a hash policy examines specific parts of
+will produce the same hash. Any deterministic method of combination can be used
+here; the algorithm Envoy uses looks like this in pseudocode:
+
+```
+hash = Null
+for each policy:
+  policy_hash = calculate_hash(policy)
+  if policy_hash is not Null:
+    if hash is Null:
+      hash = policy_hash
+    else:
+      hash = rotate_left_shift(hash, 1) ^ policy_hash
+```
+
+Since a hash policy examines specific parts of
 a request, it can fail to produce a hash (e.g., if the hashed header is not
 present).  If (and only if) all configured hash policies fail to generate a
 hash, a random hash will be used for the request, which (assuming a
 hash-based LB policy is used) will result in picking a random endpoint
 for the request.  If a hash policy has the `terminal` attribute set to true,
-and the policy does generate a result, then all subsequent hash policies
+and there is already a hash generated, then all subsequent hash policies
 are skipped.
 
 These semantics allow gRPC to support only a subset of xDS hash policy
@@ -385,8 +399,8 @@ as they are in the Envoy implementation.  However, in order to limit the
 possibility of a control plane causing a client to OOM by creating a lot
 of large rings, we want to limit the ring size to a much smaller value
 than Envoy does.  The `max_ring_size` field will default to 4096 instead
-of 8M as in Envoy, although it will still accept values up to 8M for
-compatibility with Envoy (values above 8M will be NACKed).  In addition,
+of 8M (8,388,608) as in Envoy, although it will still accept values up to 8M
+for compatibility with Envoy (values above 8M will be NACKed).  In addition,
 the client will have a local option (either per-channel or global) to set
 a cap for the ring size, which will also default to 4096; if either the
 `min_ring_size` or `max_ring_size` values in the LB policy config are greater
@@ -411,6 +425,17 @@ request via the same mechanism that we use to pass the cluster name to
 the `xds_cluster_manager` policy in the `RouteAction` design, as
 described above.  The picker will use that hash to determine which endpoint
 to choose from the ring.
+
+##### Ring Construction
+
+The ring is a list of addresses associated with hashes, sorted by the hash.
+Subchannels will often appear more than once in the ring, and each appearance
+should have a different hash. For example, when populating the ring, this can
+be accomplished by combining the subchannel's address with the number of
+previous appearances of that subchannel in the hash algorithm's input. The
+number of entries in the ring is equal to the smallest number greater than
+`min_ring_size` such that the subchannel with the smallest weight has a whole
+number of entries, clamped to `max_ring_size`.
 
 ##### Subchannel State Handling
 
