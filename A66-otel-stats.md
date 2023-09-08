@@ -144,12 +144,53 @@ the scale to better fit the data.
 This section describes a `CallTracer` approach to collect the client and server
 per-attempt/call metrics. A CallTracer is a class that is instantiated for every
 call. This class has various methods that are invoked during the lifetime of the
-call. On the client side, the CallTracer knows about multiple attempts on the
+call. On the client-side, the CallTracer knows about multiple attempts on the
 same call, and creates a `CallAttemptTracer` object for each attempt, and the
-`CallAttemptTracer` gets invoked during the lifetime of the attempt.
+`CallAttemptTracer` gets invoked during the lifetime of the attempt. On the
+server-side, we have an equivalent `ServerCallTracer`. (There is no concept of
+an attempt on the server-side.)
 
 The OTel plugin will basically be a way of configuring CallTracer factories on
-gRPC clients and servers.
+gRPC channels and servers.
+
+A CallTracer needs to know the channel's target in the canonical form, and the
+full qualified method name for filling in the attributes needed on the metrics.
+Similarly on the server-side, the `ServerCallTracer` needs to know the method of
+the incoming call. Depending on the implementation details, the method may be
+propagated as part of the initial metadata.
+
+The following call-outs are needed on the `CallTracer` -
+
+*   When the call has been created. This call-out should be before payload
+    serialization.
+*   When new attempts are created on the call along with information on whether
+    the attempt was a transparent retry or not. (Attempts are created after name
+    resolution but before the pick.) This is also when it's expected for the
+    `CallAttemptTracer` to be created.
+*   When an attempt ends. This will be needed future stats around retries and
+    hedging. This information can also be propagated through the
+    `CallAttemptTracer` if the `CallAttemptTracer` keeps a reference to the
+    parent `CallTracer` object.
+*   When the call ends. This along with the call creation call-out allows the
+    `CallTracer` to calculate the call duration.
+
+The following call-outs are needed on the `CallAttemptTracer` -
+
+*   When a new message is sent/received. The message should be in its compressed
+    form.
+*   When the trailing metadata/status is received for the attempt. Receipt of
+    this indicates that the attempt has ended. Implementations may choose to
+    delegate the responsibility of notifying the `CallTracer` about the attempt
+    end to the `CallAttemptTracer`.
+
+The following call-outs are needed on the `ServerCallTracer` -
+
+*   When initial metadata is received by the transport for a call. This
+    indicates the start time of a new call.
+*   When a new message is sent/received. The message should be in its compressed
+    form.
+*   When trailing metadata/status is sent. This call-out should be as close to
+    the transport as possible to be able to capture the total time of the call.
 
 Implementations should allow multiple call/attempt tracers to be registered to a
 single call since there could be multiple plugins registered. For example, there
@@ -180,6 +221,8 @@ OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
     the MeterProvider.
 *   Optionally allow setting of a OpenTelemetry plugin for a specific channel or
     server, instead of setting it globally.
+*   Optionally allowing setting of a map of constant attributes that are
+    recorded on all metrics associated with that plugin.
 
 Note that implementations of the gRPC OpenTelemetry plugin
 [should prefer](https://opentelemetry.io/docs/specs/otel/overview/) to only
