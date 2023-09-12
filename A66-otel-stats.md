@@ -271,7 +271,37 @@ for a particular channel or server builder.
 
 ### Java
 
-To be filled
+```
+public static class OpenTelemetryModuleBuilder {
+    /**
+     * OpenTelemetry instance is used to configure metrics settings.
+     *
+     * Sample
+     *    SdkMeterProvider sdkMeterProvider = SdkMeterProvider.builder()
+     *         .registerMetricReader(
+     *             PeriodicMetricReader.builder(
+     *                OtlpGrpcMetricExporter.builder().build()).build())
+     *         .build();
+     *
+     *     OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+     *         .setMeterProvider(sdkMeterProvider)
+     *         .build();
+     *
+     * If MeterProvider is not configured, no-op meterProvider will be used by default.
+     * It provides meters which do not record or emit.
+     */
+    public OpenTelemetryModuleBuilder openTelemetry(OpenTelemetry openTelemetry);
+
+    /* Enable metrics for listed metrics. */
+    public OpenTelmetryBuilder enableMetrics(Set<String> metricNames);
+
+    /* If targetFilter returns true for a target, target is recorded as is.
+     * Otherwise it will be recorded as "other". */
+    public OpenTelemetryBuilder targetFilter(Predicate<String> targetFilter);
+
+    public OpenTelemetryModule build();
+}
+```
 
 ### Go
 
