@@ -52,6 +52,7 @@ for session affinity behavior in xDS.
 * [gRFC A42: Ring Hash LB Policy][A42]
 * [gRFC A56: Priority LB Policy][A56]
 * [gRFC A55: xDS-Based Stateful Session Affinity][A55]
+* [gRFC A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
 * [gRFC A62: pick_first: Sticky TRANSIENT_FAILURE and address order
   randomization][A62]
 * [gRFC A50: Outlier Detection Support][A50]
@@ -127,14 +128,13 @@ address list.  Specifically:
 - The first time any connection attempt succeeds (i.e., the subchannel
   reports READY, which happens after all handshakes are complete),
   we choose that connection.  If there is a timer running, we cancel
-  the timer.  We also cancel all other connection attempts that are
-  still in flight (but see notes about C-core below).
+  the timer.
 - We will wait for at least one connection attempt on every address to
-  fail before we consider the first pass to be complete.  As per [gRFC
-  A62][A62], we will report TRANSIENT_FAILURE state and will continue
-  trying to connect.  We will stay in TRANSIENT_FAILURE until either (a)
-  we become connected or (b) the LB policy is destroyed by the channel
-  shutting down or going IDLE.
+  fail before we consider the first pass to be complete.  At that point,
+  we will request re-resolution.  As per [gRFC A62][A62], we will report
+  TRANSIENT_FAILURE state and will continue trying to connect.  We will
+  stay in TRANSIENT_FAILURE until either (a) we become connected or (b)
+  the LB policy is destroyed by the channel shutting down or going IDLE.
 
 If the first pass completes without a successful connection attempt, we
 will switch to a mode where we keep trying to connect to all addresses at
@@ -142,24 +142,54 @@ all times, with no regard for the order of the addresses.  Each
 individual subchannel will provide [backoff behavior][backoff-spec],
 reporting TRANSIENT_FAILURE while in backoff and then IDLE when backoff
 has finished.  The pick_first policy will therefore automatically
-request a connection whenever a subchannel reports IDLE.
+request a connection whenever a subchannel reports IDLE.  We will count
+the number of connection failures, and when that number reaches the
+number of subchannels, we will request re-resolution; note that because
+the backoff state will differ across the subchannels, this may mean that
+we have seen multiple failures of a single subchannel and no failures
+from another subchannel, but this is a close enough approximation and
+very simple to implement.
 
-TODO: When do we request re-resolution after the first pass is complete?
-note: due to sticky-TF change, PF should stay in TF even when it is
-given a new address list, or else it would break sticky-TF
+Note that every time the LB policy receives a new address list, it will
+start an initial Happy Eyeballs pass over the new list, even if some of
+the subchannels are not actually new due to their addresses having been
+present on both the old and new lists.  This means that on the initial
+pass through the address list for a subsequent address list update, when
+pick_first decides to start a connection attempt on a given subchannel
+(whether because it is the first subchannel in the list or because the
+timer fired before the previous address' connection attempt completed),
+that subchannel may not be in state IDLE, which is the only state in
+which a connection attempt may be requested.  (Note: This same problem
+may occur in C-core even on the first address list update, due to
+subchannels being shared with other channels.)  Therefore, when we are
+ready to start a connection attempt on a given subchannel:
+
+- If the subchannel is in state IDLE, we request a connection attempt
+  immediately.  If it is not the last subchannel in the list, we will
+  start the timer; if it is the last subchannel in the list, we will
+  wait for the attempt to complete.
+- If the subchannel is in state CONNECTING, we do not need to actually
+  request a connection, but we will treat it as if we did.  If it is not
+  the last subchannel in the list, we will start the timer; if it is the
+  last subchannel in the list, we will wait for the attempt to complete.
+- If the subchannel is in state TRANSIENT_FAILURE, then we know that
+  it is in backoff due to a recent connection attempt failure, so we
+  treat it as if we have already made a connection attempt on this
+  subchannel, and we will immediately move on to the next subchannel.
 
 Once a subchannel does become READY, pick_first will unref all other
-subchannels.  Note that the [connection backoff][backoff-spec] state is
+subchannels, thus cancelling any connection attempts that were already
+in flight.  Note that the [connection backoff][backoff-spec] state is
 stored in the subchannel, so this means that we will lose backoff state
-for those subchannels.  In general, this is expected to be okay, because
-once we see a READY subchannel, we generally expect to maintain that
-connection for a while, after which the backoff state for the other
-subchannels will no longer be relevant.  However, there could be
-pathalogical cases where a connection does not last very long and we
-wind up making subsequent connection attempts to the other addresses
-sooner than we ideally should.  This should be fairly rare, so we're
-willing to accept this; if it becomes a problem, we can find ways to
-address it at that point.
+for those subchannels (but see note for C-core below).  In general,
+this is expected to be okay, because once we see a READY subchannel,
+we generally expect to maintain that connection for a while, after which
+the backoff state for the other subchannels will no longer be relevant.
+However, there could be pathalogical cases where a connection does not
+last very long and we wind up making subsequent connection attempts
+to the other addresses sooner than we ideally should.  This should be
+fairly rare, so we're willing to accept this; if it becomes a problem,
+we can find ways to address it at that point.
 
 #### Implications of Subchannel Sharing in C-core
 
@@ -171,28 +201,13 @@ at any time.  This means that pick_first needs to be prepared for the
 fact that any subchannel may report any connectivity state at any time
 (even at the moment that pick_first starts using the subchannel), even
 if it did not previously request a connection on the subchannel itself.
-This has a number of implications:
+This has a couple of implications:
 
 - pick_first needs to be prepared for any subchannel to report READY at
   any time, even if it did not previously request a connection on that
-  subchannel.  Currently (prior to this design), pick_first will immediately
-  choose the first subchannel that reports READY.  That behavior seems
-  consistent with the intent of Happy Eyeballs, so we will preserve it.
-- A subchannel must be in state IDLE in order for pick_first to request
-  a connection attempt on it.  However, during the first pass through
-  the address list, when pick_first decides to start a connection attempt
-  on a given subchannel (whether because it is the first subchannel in
-  the list or because the timer fired before the previous address'
-  connection attempt completed), that subchannel may not be in state IDLE.
-  - If the subchannel is in state CONNECTING, we do not need to actually
-    request a connection, but we will treat it as if we did.
-    Specifically, we will start the timer and wait to see if the connection
-    attempt completes within the Connection Attempt Delay before moving
-    on to the next subchannel.
-  - If the subchannel is in state TRANSIENT_FAILURE, then we know that
-    it is in backoff due to a recent connection attempt failure, so we
-    treat it as if we have already made a connection attempt on this
-    subchannel, and we will immediately move on to the next subchannel.
+  subchannel.  Currently (prior to this design), pick_first immediately
+  chooses the first subchannel that reports READY.  That behavior seems
+  consistent with the intent of Happy Eyeballs, so we will retain it.
 - When we choose a subchannel that has become successfully connected,
   we will unref all of the other subchannels.  For any subchannel on
   which we were the only channel holding a ref, this will cause any
@@ -494,9 +509,10 @@ subsequent config change.
 
 #### Least Request
 
-The least-request LB policy will (Java-only) will work essentially the
-same way as WRR.  The only difference is that the data it is storing on
-a per-endpoint basis is outstanding request counts rather than weights.
+The least-request LB policy (Java-only, described in [gRFC A48][A48])
+will work essentially the same way as WRR.  The only difference is that
+the data it is storing on a per-endpoint basis is outstanding request
+counts rather than weights.
 
 #### Ring Hash
 
@@ -627,6 +643,11 @@ TODO: details
 
 #### Changes to Stateful Session Affinity
 
+For stateful session affinity (see gRFCs [A55][A55] and [A60][A60]), we do
+not want affinity to break if an endpoint has multiple addresses and then
+one of those addresses is removed in an EDS update.  Some changes are
+needed to ensure this property.
+
 TODO: details
 
 ### Temporary environment variable protection
@@ -719,6 +740,7 @@ N/A
 [A50]: A50-xds-outlier-detection.md
 [A51]: A51-custom-backend-metrics.md
 [A55]: A55-xds-stateful-session-affinity.md
+[A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
 [A56]: A56-priority-lb-policy.md
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
 [RFC-8305]: https://www.rfc-editor.org/rfc/rfc8305
