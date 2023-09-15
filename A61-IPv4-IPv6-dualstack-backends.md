@@ -46,6 +46,7 @@ for session affinity behavior in xDS.
 ### Related Proposals: 
 * [Support for dual stack EDS endpoints in Envoy][envoy-design]
 * [gRFC A17: Client-Side Health Checking][A17]
+* [gRFC A27: xDS-Based Global Load Balancing][A27]
 * [gRFC A58: Weighted Round Robin LB Policy][A58]
 * [gRFC A48: xDS Least Request LB Policy][A48]
 * [gRFC A42: Ring Hash LB Policy][A42]
@@ -74,13 +75,30 @@ This proposal includes several parts:
 Instead of returning a flat list of addresses, the resolver will be able
 to return a list of endpoints, each of which can have multiple addresses.
 
-TODO: details of how attributes work
-
-TODO: changes in resolver and LB policy APIs
-
 Because DNS does not have a way to indicate which addresses are
 associated with the same endpoint, the DNS resolver will return each
 address as a separate endpoint.
+
+#### Attributes Returned by the Resolver
+
+All gRPC implementations have a mechanism for the resolver to return
+arbitrary attributes to be passed to the LB policies.  Attributes can
+be set at the top level, which is used for things like passing the
+XdsClient instance from the resolver to the LB policies (as described in
+[gRFC A27][A27], or per-address, which is used for things like passing
+hierarchical address information down through the LB policy tree (as
+described in [gRFC A56][A56]).
+
+The exact semantics for these attributes currently vary across languages.
+This proposal does not attempt to define unified semantics for these
+attributes, although another proposal may attempt that in the future.
+For now, this proposal only defines the required changes of this
+interface in the wake of supporting multiple addresses per endpoint.
+
+Specifically, the resolver API must provide a mechanism for passing
+attributes on a per-endpoint basis.  Most of the attributes that are
+currently per-address will now be per-endpoint instead.  Implementations
+may also support per-address attributes, but this is not required.
 
 ### Happy Eyeballs in the pick_first LB Policy
 
@@ -695,6 +713,7 @@ N/A
 
 [envoy-design]: https://docs.google.com/document/d/1AjmTcMWwb7nia4rAgqE-iqIbSbfiXCI4h1vk-FONFdM/edit
 [A17]: A17-client-side-health-checking.md
+[A27]: A27-xds-global-load-balancing.md
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A48]: A48-xds-least-request-lb-policy.md
 [A50]: A50-xds-outlier-detection.md
