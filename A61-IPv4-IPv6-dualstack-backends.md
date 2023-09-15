@@ -85,7 +85,7 @@ All gRPC implementations have a mechanism for the resolver to return
 arbitrary attributes to be passed to the LB policies.  Attributes can
 be set at the top level, which is used for things like passing the
 XdsClient instance from the resolver to the LB policies (as described in
-[gRFC A27][A27], or per-address, which is used for things like passing
+[gRFC A27][A27]), or per-address, which is used for things like passing
 hierarchical address information down through the LB policy tree (as
 described in [gRFC A56][A56]).
 
