@@ -4,7 +4,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-06-22
+* Last updated: 2023-09-15
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -643,12 +643,73 @@ TODO: details
 
 #### Changes to Stateful Session Affinity
 
-For stateful session affinity (see gRFCs [A55][A55] and [A60][A60]), we do
-not want affinity to break if an endpoint has multiple addresses and then
-one of those addresses is removed in an EDS update.  Some changes are
-needed to ensure this property.
+We need to support endpoints with multiple addresses in stateful
+session affinity (see gRFCs [A55][A55] and [A60][A60]).  Note that the
+original design already described how we would represent endpoints
+with multiple addresses in the `xds_override_host` LB policy's map,
+since that was already possible in Java (see the description in A55 of
+handling EquivalentAddressGroups when constructing the map).  However,
+we want to add one additional property here, which is that we do not
+want affinity to break if an endpoint has multiple addresses and then
+one of those addresses is removed in an EDS update.
 
-TODO: details
+To accomplish this, the session cookie, which currently contains a single
+endpoint address, will be changed to contain a list of endpoint addresses.
+As per gRFC A60, the cookie's format is a base64-encoded string of the
+form `<address>;<cluster>`.  This design changes that format such that
+the address part will be a comma-delimited list of addresses.
+
+Supporting this new cookie format will require a few changes.  First,
+in the `xds_override_host` LB policy, we need to account for all
+of the addresses of a given endpoint in the subchannel state map.
+[gRFC A55][A55] already described how to represent multiple addresses per
+endpoint in the map, since that was already supported in Java (see where
+it discussed "equivalent address groups").  However, now that the cookie
+will contain a list of addresses, the picker logic will prefer to use
+that list of addresses instead of looking at the equivalent addresses
+in our map when doing the pick.  The picker logic will therefore now
+look like this:
+
+```
+def Pick(pick_args):
+  if pick_args.override_addresses is set:
+    idle_subchannel = None
+    found_connecting = False
+    for address in pick_args.override_addresses:
+      entry = lb_policy.address_map[address]
+      if entry found:
+        if (entry.subchannel is set AND
+            entry.health_status is in policy_config.override_host_status):
+          if entry.subchannel.connectivity_state == READY:
+            return entry.subchannel as pick result
+          elif entry.subchannel.connectivity_state == IDLE:
+            if idle_subchannel is None:
+              idle_subchannel = entry.subchannel
+          elif entry.subchannel.connectivity_state == CONNECTING:
+            found_connecting = True
+    # No READY subchannel found.  If we found an IDLE subchannel,
+    # trigger a connection attempt and queue the pick until that attempt
+    # completes.
+    if idle_subchannel is not None:
+      hop into control plane to trigger connection attempt for idle_subchannel
+      return queue as pick result
+    # No READY or IDLE subchannels.  If we found a CONNECTING
+    # subchannel, queue the pick and wait for the connection attempt
+    # to complete.
+    if found_connecting:
+      return queue as pick result
+  # pick_args.override_addresses not set or did not find a matching subchannel,
+  # so delegate to the child picker.
+  return child_picker.Pick(pick_args)
+```
+
+When sending the server initial metadata to the client application, the
+`StatefulSession` filter will check which subchannel was chosen for the
+RPC.  It will then populate the cookie with the chosen address first,
+followed by the other addresses for the endpoint.
+
+TODO: How does the SSA filter get this info from the xds_override_host
+LB policy?
 
 ### Temporary environment variable protection
 
