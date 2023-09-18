@@ -79,7 +79,8 @@ the scale to better fit the data.
     provide the option to override this behavior to allow recording generic
     method names as well.
 *   `grpc.status` : gRPC server status code received, e.g. "OK", "CANCELLED",
-    "DEADLINE_EXCEEDED"
+    "DEADLINE_EXCEEDED".
+    [(Full list)](https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
 *   `grpc.target` : Canonicalized target URI used when creating gRPC Channel,
     e.g. "dns:///pubsub.googleapis.com:443", "xds:///helloworld-gke:8000".
     Canonicalized target URI is its form with the scheme if the user didn't
@@ -227,8 +228,8 @@ OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
     the MeterProvider.
 *   Optionally allow setting of a OpenTelemetry plugin for a specific channel or
     server, instead of setting it globally.
-*   Optionally allowing setting of a map of constant attributes that are
-    recorded on all metrics associated with that plugin.
+*   Optionally allow setting of a map of constant attributes that are recorded
+    on all metrics associated with that plugin.
 
 Note that implementations of the gRPC OpenTelemetry plugin
 [should prefer](https://opentelemetry.io/docs/specs/otel/overview/) to only
@@ -277,6 +278,8 @@ class OpenTelemetryPluginBuilder {
   OpenTelemetryPluginBuilder& SetGenericMethodAttributeFilter(
       absl::AnyInvocable<bool(absl::string_view /*generic_method*/) const>
           generic_method_attribute_filter);
+  // Registers a global plugin that acts on all channels and servers running on
+  // the process.
   void BuildAndRegisterGlobal();
 };
 
@@ -388,8 +391,7 @@ The following sections show the differences between the gRPC OpenCensus spec and
 the proposed gRPC OpenTelemetry spec and the mapping of metrics between the two.
 It also presents metrics present in OpenCensus spec that do not map to a metric
 in the OpenTelemetry spec at present. Two migration strategies are also proposed
-for customers who are satisfied with the stats coverage provided by the current
-OpenTelemetry spec.
+for customers who are satisfied with the stats coverage provided by this spec.
 
 #### Metric Schema Comparison
 
