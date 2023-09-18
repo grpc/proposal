@@ -23,6 +23,7 @@ with OpenTelemetry suggested as the successor framework.
 ### Related Proposals:
 
 *   [A6: gRPC Retry Design](A6-client-retries.md)
+*   [A39: xDS HTTP Filter Support](A39-xds-http-filters.md)
 *   [A45: Exposing OpenCensus Metrics and Tracing for gRPC retry](A45-retry-stats.md)
 
 ## Proposal
@@ -144,9 +145,8 @@ the scale to better fit the data.
 
 This section describes a `CallTracer` approach to collect the client and server
 per-attempt/call metrics. Implementations are free to choose different ways of
-representing/naming the classes and methods described here. The implementation
-can choose to not create a class either as long as the overall capabilities
-remain equivalent.
+representing/naming the classes and methods described here as long as the
+overall capabilities remain equivalent.
 
 A CallTracer is a class that is instantiated for every call. This class has
 various methods that are invoked during the lifetime of the call. On the
@@ -171,7 +171,7 @@ The following call-outs are needed on the `CallTracer` -
     serialization.
 *   When new attempts are created on the call along with information on whether
     the attempt was a transparent retry or not. (Attempts are created after name
-    resolution but before the LB pick.) This is also when it's expected for the
+    resolution and after any xDS HTTP filters but before the LB pick.) This is also when it's expected for the
     `CallAttemptTracer` to be created.
 *   When an attempt ends. This will be needed for future stats around retries
     and hedging. This information can also be propagated through the
