@@ -22,6 +22,7 @@ with OpenTelemetry suggested as the successor framework.
 
 ### Related Proposals:
 
+*   [A6: gRPC Retry Design](A6-client-retries.md)
 *   [A45: Exposing OpenCensus Metrics and Tracing for gRPC retry](A45-retry-stats.md)
 
 ## Proposal
@@ -139,13 +140,18 @@ the scale to better fit the data.
     *Attributes*: grpc.method, grpc.status <br>
     *Type*: Histogram (Latency Buckets) <br>
 
-## OpenTelemetry Plugin Architecture
+### OpenTelemetry Plugin Architecture
 
 This section describes a `CallTracer` approach to collect the client and server
-per-attempt/call metrics. A CallTracer is a class that is instantiated for every
-call. This class has various methods that are invoked during the lifetime of the
-call. On the client-side, the CallTracer knows about multiple attempts on the
-same call, and creates a `CallAttemptTracer` object for each attempt, and the
+per-attempt/call metrics. Implementations are free to choose different ways of
+representing/naming the classes and methods described here. The implementation
+can choose to not create a class either as long as the overall capabilities
+remain equivalent.
+
+A CallTracer is a class that is instantiated for every call. This class has
+various methods that are invoked during the lifetime of the call. On the
+client-side, the CallTracer knows about multiple attempts on the same call, and
+creates a `CallAttemptTracer` object for each attempt, and the
 `CallAttemptTracer` gets invoked during the lifetime of the attempt. On the
 server-side, we have an equivalent `ServerCallTracer`. (There is no concept of
 an attempt on the server-side.)
@@ -165,10 +171,10 @@ The following call-outs are needed on the `CallTracer` -
     serialization.
 *   When new attempts are created on the call along with information on whether
     the attempt was a transparent retry or not. (Attempts are created after name
-    resolution but before the pick.) This is also when it's expected for the
+    resolution but before the LB pick.) This is also when it's expected for the
     `CallAttemptTracer` to be created.
-*   When an attempt ends. This will be needed future stats around retries and
-    hedging. This information can also be propagated through the
+*   When an attempt ends. This will be needed for future stats around retries
+    and hedging. This information can also be propagated through the
     `CallAttemptTracer` if the `CallAttemptTracer` keeps a reference to the
     parent `CallTracer` object.
 *   When the call ends. This along with the call creation call-out allows the
@@ -201,7 +207,7 @@ ability to configure the different plugins with different MeterProviders.
 A sample implementation of this approach is available in
 [gRPC Core](https://github.com/grpc/grpc/blob/v1.57.x/src/core/lib/channel/call_tracer.h).
 
-## Language-Specific Details
+### Language-Specific Details
 
 Each language implementation will provide an API for registering an
 OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
@@ -233,20 +239,16 @@ creation should use a `name` that identifies the library, for example,
 "grpc-c++", "grpc-java", "grpc-go". The `version` should be the same as the
 release version of the gRPC library, for example, "1.57.1".
 
-### C++
+#### C++
 
 ```c++
 Class OpenTelemetryPluginBuilder {
  public:
-  // If `SetMeterProvider()` is not called, the stats plugin is a no-op.
+  // If `SetMeterProvider()` is not called, no metrics are collected.
   OpenTelemetryPluginBuilder& SetMeterProvider(
       std::shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
-  // Enable metrics in \a metric_names. Only these metrics are recorded by gRPC.
-  // Sample -
-  // OpenTelemetryPluginBuilder().EnableMetrics(BaseMetrics()).SetMeterProvider(mp).BuildAndRegisterGlobal();
-  OpenTelemetryPluginBuilder& EnableMetrics(
-      const absl::flat_hash_set<absl::string_view>& metric_names);
-  // The base set of metrics -
+  // Methods to manipulate which instruments are enabled in the OTel Stats
+  // Plugin. The default set of instruments are -
   // grpc.client.attempt.started
   // grpc.client.attempt.duration
   // grpc.client.attempt.sent_total_compressed_message_size
@@ -255,12 +257,28 @@ Class OpenTelemetryPluginBuilder {
   // grpc.server.call.duration
   // grpc.server.call.sent_total_compressed_message_size
   // grpc.server.call.rcvd_total_compressed_message_size
-  static absl::flat_hash_set<std::string> BaseMetrics();
-  // If \a generic_method_filter returns true for a method_name, that method_name is recorded as is, otherwise it is recorded as "other".
-  OpenTelemetryPluginBuilder&  SetGenericMethodFilter(absl::AnyInvocable<bool(absl::string_view /*method_name*/)> generic_method_filter);
-  // If \a target_filter returns true for a target, that target is recorded as is, otherwise it is recorded as "other".
-  OpenTelemetryPluginBuilder&  SetTargetFilter(absl::AnyInvocable<bool(absl::string_view /*target*/)> target_filter);
-  // Builds and registers a OpenTelemetry Plugin
+  OpenTelemetryPluginBuilder& EnableMetric(absl::string_view metric_name);
+  OpenTelemetryPluginBuilder& DisableMetric(absl::string_view metric_name);
+  OpenTelemetryPluginBuilder& DisableAllMetrics();
+  // Allows setting a labels injector on calls traced through this plugin.
+  OpenTelemetryPluginBuilder& SetLabelsInjector(
+      std::unique_ptr<LabelsInjector> labels_injector);
+  // If set, \a target_selector is called per channel to decide whether to
+  // collect metrics on that target or not.
+  OpenTelemetryPluginBuilder& SetTargetSelector(
+      absl::AnyInvocable<bool(absl::string_view /*target*/) const>
+          target_selector);
+  // If set, \a target_attribute_filter is called per channel to decide whether
+  // to record the target attribute on client or to replace it with "other".
+  OpenTelemetryPluginBuilder& SetTargetAttributeFilter(
+      absl::AnyInvocable<bool(absl::string_view /*target*/) const>
+          target_attribute_filter);
+  // If set, \a generic_method_attribute_filter is called per call with a
+  // generic method name. If it returns true for \a generic_method_name, that
+  // method name is recorded as is, otherwise it is recorded as "other"
+  OpenTelemetryPluginBuilder& SetGenericMethodAttributeFilter(
+      absl::AnyInvocable<bool(absl::string_view /*generic_method_name*/) const>
+          generic_method_attribute_filter);
   void BuildAndRegisterGlobal();
 };
 
@@ -269,7 +287,7 @@ Class OpenTelemetryPluginBuilder {
 In the future, additional API might be provided to allow registering the plugin
 for a particular channel or server builder.
 
-### Java
+#### Java
 
 ```
 public static class OpenTelemetryModuleBuilder {
@@ -303,15 +321,15 @@ public static class OpenTelemetryModuleBuilder {
 }
 ```
 
-### Go
+#### Go
 
 To be filled
 
-### Python
+#### Python
 
 To be filled
 
-## Migration from OpenCensus
+### Migration from OpenCensus
 
 The following sections show the differences between the gRPC OpenCensus spec and
 the proposed gRPC OpenTelemetry spec and the mapping of metrics between the two.
@@ -320,9 +338,9 @@ in the OpenTelemetry spec at present. Two migration strategies are also proposed
 for customers who are satisfied with the stats coverage provided by the current
 OpenTelemetry spec.
 
-### Metric Schema Comparison
+#### Metric Schema Comparison
 
-#### Differences from gRPC OpenCensus Spec
+##### Differences from gRPC OpenCensus Spec
 
 *   OpenTelemetry instrument names don’t allow ‘/’ so we use ‘.’ as the
     separator. We also get rid of the “.io” suffix in “grpc.io” as it doesn’t
@@ -344,7 +362,7 @@ OpenTelemetry spec.
 *   Latency metrics in the OpenTelemetry spec use the recommended `s` unit
     instead of `ms`.
 
-#### Metrics with Corresponding Equivalent
+##### Metrics with Corresponding Equivalent
 
 The following OpenCensus metrics have an equivalent in the OpenTelemetry spec
 (with the above noted differences) allowing for receivers of the telemetry data
@@ -359,7 +377,7 @@ grpc.io/server/started_rpcs      | grpc.server.call.started
 grpc.io/server/completed_rpcs    | (Derivable from grpc.server.call.duration)
 grpc.io/server/server_latency    | grpc.server.call.duration
 
-#### Metrics with Nuanced Differences
+##### Metrics with Nuanced Differences
 
 Unfortunately, the implementations of the gRPC OpenCensus spec in the various
 languages do not agree on the definition of the following size metrics. Go
@@ -375,7 +393,7 @@ grpc.io/client/received_bytes_per_rpc | grpc.client.attempt.rcvd_total_compresse
 grpc.io/server/sent_bytes_per_rpc     | grpc.server.call.sent_total_compressed_message_size
 grpc.io/server/received_bytes_per_rpc | grpc.server.call.rcvd_total_compressed_message_size
 
-#### OpenCensus Metrics not Initially Supported in OpenTelemetry
+##### OpenCensus Metrics not Initially Supported in OpenTelemetry
 
 There are some additional metrics defined in the gRPC OpenCensus spec and retry
 stats which we will not be supporting in the first iteration of the
@@ -404,9 +422,9 @@ OpenTelemetry spec with the appropriate changes.
     *   grpc.io/client/transparent_retries
     *   grpc.io/client/retry_delay_per_call
 
-## Migration Strategies
+#### Migration Strategies
 
-### Migrate on a Per-Client Basis
+##### Migrate on a Per-Client Basis
 
 *   Update telemetry dashboards and alerts to join the results from the
     OpenCensus metrics and the OpenTelemetry metrics.
@@ -415,7 +433,7 @@ OpenTelemetry spec with the appropriate changes.
 *   After 100% rollout and some duration (to maintain previous history), update
     telemetry dashboards and alerts to not query OpenCensus metrics.
 
-### Duplicate Metrics During Migration
+##### Duplicate Metrics During Migration
 
 For this strategy, gRPC stacks need to support registration of both the
 OpenCensus and the OpenTelemetry plugins at the same time and allow both metrics
