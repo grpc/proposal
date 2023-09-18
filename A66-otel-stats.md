@@ -242,8 +242,9 @@ release version of the gRPC library, for example, "1.57.1".
 #### C++
 
 ```c++
-Class OpenTelemetryPluginBuilder {
+class OpenTelemetryPluginBuilder {
  public:
+  OpenTelemetryPluginBuilder();
   // If `SetMeterProvider()` is not called, no metrics are collected.
   OpenTelemetryPluginBuilder& SetMeterProvider(
       std::shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
@@ -260,24 +261,21 @@ Class OpenTelemetryPluginBuilder {
   OpenTelemetryPluginBuilder& EnableMetric(absl::string_view metric_name);
   OpenTelemetryPluginBuilder& DisableMetric(absl::string_view metric_name);
   OpenTelemetryPluginBuilder& DisableAllMetrics();
-  // Allows setting a labels injector on calls traced through this plugin.
-  OpenTelemetryPluginBuilder& SetLabelsInjector(
-      std::unique_ptr<LabelsInjector> labels_injector);
-  // If set, \a target_selector is called per channel to decide whether to
-  // collect metrics on that target or not.
-  OpenTelemetryPluginBuilder& SetTargetSelector(
-      absl::AnyInvocable<bool(absl::string_view /*target*/) const>
-          target_selector);
   // If set, \a target_attribute_filter is called per channel to decide whether
   // to record the target attribute on client or to replace it with "other".
+  // This helps reduce the cardinality on metrics in cases where many channels
+  // are created with different targets in the same binary (which might happen
+  // for example, if the channel target string uses IP addresses directly).
   OpenTelemetryPluginBuilder& SetTargetAttributeFilter(
       absl::AnyInvocable<bool(absl::string_view /*target*/) const>
           target_attribute_filter);
   // If set, \a generic_method_attribute_filter is called per call with a
-  // generic method name. If it returns true for \a generic_method_name, that
-  // method name is recorded as is, otherwise it is recorded as "other"
+  // generic method type to decide whether to record the method name or to
+  // replace it with "other". Non-generic or pre-registered methods remain
+  // unaffected. If not set, by default, generic method names are replaced with
+  // "other" when recording metrics.
   OpenTelemetryPluginBuilder& SetGenericMethodAttributeFilter(
-      absl::AnyInvocable<bool(absl::string_view /*generic_method_name*/) const>
+      absl::AnyInvocable<bool(absl::string_view /*generic_method*/) const>
           generic_method_attribute_filter);
   void BuildAndRegisterGlobal();
 };
@@ -323,7 +321,62 @@ public static class OpenTelemetryModuleBuilder {
 
 #### Go
 
-To be filled
+```
+import (
+  "go.opentelemetry.io/otel/attribute"
+  "go.opentelemetry.io/otel/metric"
+)
+
+
+package opentelemetry
+
+// MetricsOptions are the metrics options for OpenTelemetry instrumentation.
+type MetricsOptions struct {
+  // MeterProvider is the MeterProvider instance that will be used for access
+  // to Named Meter instances to instrument an application. To enable metrics
+  // collection, set a meter provider. If unset, no metrics will be recorded.
+  // Any implementation knobs (i.e. views, bounds) set in the passed in object
+  // take precedence over the API calls from the interface in this component
+  // (i.e. it will create default views for unset views).
+  MeterProvider metric.MeterProvider
+
+  // Metrics are the metrics to instrument. Will turn on the corresponding
+  // metric supported by the client and server instrumentation components if
+  // applicable.
+  Metrics []string
+
+  // Attributes are constant attributes applied to every recorded metric.
+  Attributes []attribute.KeyValue
+}
+
+// DialOption returns a dial option which enables OpenTelemetry instrumentation
+// code for a grpc.ClientConn.
+//
+// Client applications interested in instrumenting their grpc.ClientConn should
+// pass the dial option returned from this function as a dial option to
+// grpc.Dial().
+//
+// For the metrics supported by this instrumentation code, a user needs to
+// specify the client metrics to record in metrics options. A user also needs to
+// provide an implementation of a MeterProvider. If the passed in Meter Provider
+// does not have the view configured for an individual metric turned on, the API
+// call in this component will create a default view for that metric.
+func DialOption(mo MetricsOptions) grpc.DialOption {}
+
+// ServerOption returns a server option which enables OpenTelemetry
+// instrumentation code for a grpc.Server.
+//
+// Server applications interested in instrumenting their grpc.Server should pass
+// the server option returned from this function as an argument to
+// grpc.NewServer().
+//
+// For the metrics supported by this instrumentation code, a user needs to
+// specify the client metrics to record in metrics options. A user also needs to
+// provide an implementation of a MeterProvider. If the passed in Meter Provider
+// does not have the view configured for an individual metric turned on, the API
+// call in this component will create a default view for that metric.
+func ServerOption(mo MetricsOptions) grpc.ServerOption {}
+```
 
 #### Python
 
@@ -468,8 +521,9 @@ immediately obvious -
     but not all implementations can get the uncompressed message length (as
     recommended by OTel RPC conventions.)
 
-This gRFC, hence, intends to override the [General RPC conventions] for gRPC's
-purposes.
+This gRFC, hence, intends to override the
+[General RPC conventions](https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/rpc-metrics/)
+for gRPC's purposes.
 
 ## Implementation
 
