@@ -150,11 +150,11 @@ overall capabilities remain equivalent.
 
 A CallTracer is a class that is instantiated for every call. This class has
 various methods that are invoked during the lifetime of the call. On the
-client-side, the CallTracer knows about multiple attempts on the same call, and
-creates a `CallAttemptTracer` object for each attempt, and the
-`CallAttemptTracer` gets invoked during the lifetime of the attempt. On the
-server-side, we have an equivalent `ServerCallTracer`. (There is no concept of
-an attempt on the server-side.)
+client-side, the CallTracer knows about multiple attempts on the same call (due
+to retries or hedging), and creates a `CallAttemptTracer` object for each
+attempt, and the `CallAttemptTracer` gets invoked during the lifetime of the
+attempt. On the server-side, we have an equivalent `ServerCallTracer`. (There is
+no concept of an attempt on the server-side.)
 
 The OTel plugin will basically be a way of configuring CallTracer factories on
 gRPC channels and servers.
@@ -171,8 +171,8 @@ The following call-outs are needed on the `CallTracer` -
     serialization.
 *   When new attempts are created on the call along with information on whether
     the attempt was a transparent retry or not. (Attempts are created after name
-    resolution and after any xDS HTTP filters but before the LB pick.) This is also when it's expected for the
-    `CallAttemptTracer` to be created.
+    resolution and after any xDS HTTP filters but before the LB pick.) This is
+    also when it's expected for the `CallAttemptTracer` to be created.
 *   When an attempt ends. This will be needed for future stats around retries
     and hedging. This information can also be propagated through the
     `CallAttemptTracer` if the `CallAttemptTracer` keeps a reference to the
