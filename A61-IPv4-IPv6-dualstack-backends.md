@@ -752,16 +752,22 @@ backoff spec][backoff-spec] seems to have originally envisioned.
   (https://github.com/grpc/grpc/pull/33009)
 - prep for outlier detection ejecting via health watch
   (https://github.com/grpc/grpc/pull/33340)
-- add generic health watch support to pick_first, build infrastructure
-  for petiole policies, and change round_robin to delegate to pick-first
-  (https://github.com/grpc/grpc/pull/32692)
-- change WRR to delegate to pick_first (https://github.com/grpc/grpc/pull/33087)
+- move pick_first off of the subchannel_list library that it previously
+  shared with petiole policies, and add generic health watch support
+  (https://github.com/grpc/grpc/pull/34218)
+- change petiole policies to use generic health watch, and change outlier
+  detection to eject via health state instead of raw connectivity state
+  (https://github.com/grpc/grpc/pull/34222)
 - change ring_hash to delegate to pick_first
-  (https://github.com/grpc/grpc/pull/33093)
-- change outlier detection to eject only via health watch
-  (https://github.com/grpc/grpc/pull/33427)
-- change address list to support multiple addresses per endpoint and
-  change LB policies to handle this (including ring_hash)
+  (https://github.com/grpc/grpc/pull/34244)
+- add endpoint_list library for petiole policies, and use it to change
+  round_robin to delegate to pick_first
+  (https://github.com/grpc/grpc/pull/34337)
+- change WRR to delegate to pick_first
+  (https://github.com/grpc/grpc/pull/34245)
+- change resolver and LB policy APIs to support multiple addresses per
+  endpoint, and update most LB policies
+  (https://github.com/grpc/grpc/pull/33567)
 - change stateful session affinity to handle multiple addresses per endpoint
 - implement happy eyeballs in pick_first
 - support new xDS fields
