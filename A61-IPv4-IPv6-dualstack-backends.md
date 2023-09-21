@@ -770,6 +770,7 @@ backoff spec][backoff-spec] seems to have originally envisioned.
   (https://github.com/grpc/grpc/pull/33567)
 - change stateful session affinity to handle multiple addresses per endpoint
 - implement happy eyeballs in pick_first
+  (https://github.com/grpc/grpc/pull/34426)
 - support new xDS fields
 
 ### Java
