@@ -627,6 +627,10 @@ endpoint.  The set of entries in the map will continue to be set based
 on the address list that the outlier detection policy receives from its
 parent.
 
+TODO: when updating map, need to retain subchannels for existing addresses
+-- maybe instead key map by individual address and point to other
+equivalent addresses, just like in xds_override_host?
+
 Currently, the outlier detection policy wraps the subchannels and ejects
 them by reporting their connectivity state as TRANSIENT_FAILURE.
 As described [above](#generic-health-reporting-mechanism), we will
