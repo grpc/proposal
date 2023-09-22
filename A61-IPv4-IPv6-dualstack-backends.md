@@ -4,7 +4,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-09-15
+* Last updated: 2023-09-22
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -708,8 +708,20 @@ When sending the server initial metadata to the client application, the
 RPC.  It will then populate the cookie with the chosen address first,
 followed by the other addresses for the endpoint.
 
-TODO: How does the SSA filter get this info from the xds_override_host
-LB policy?
+As per the original design, when returning the server's initial metadata to
+the application, the `StatefulSession` filter may need to set a cookie
+indicating which endpoint was chosen for the RPC.  However, now that the
+cookie needs to include all of the endpoint's addresses and not just the
+specific one that is used, we need to communicate that information from
+the `xds_override_host` LB policy back to the `StatefulSession` filter.
+To do this, the `StatefulSession` filter will pass a callback to the
+`xds_override_host` LB policy via a call attribute (the same mechanism
+used to pass the addresses from the cookie), and the `xds_override_host`
+picker will invoke that callback to pass back the list of addresses for
+the chosen endpoint.  Note that when encoding the cookie, the
+`StatefulSession` filter must ensure that the address that is actually
+used is the first address in the list; if the order is different in the
+existing cookie, it must reset the cookie.
 
 ### Temporary environment variable protection
 
