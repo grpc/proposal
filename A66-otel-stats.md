@@ -57,7 +57,8 @@ spec. The OpenTelemetry API has added an experimental feature for
 [advice](https://opentelemetry.io/docs/specs/otel/metrics/api/#instrument-advice)
 that would allow the gRPC library to provide these buckets as a hint. Since this
 is still an experimental feature and not yet implemented in all languages, it is
-upto the user to choose the right bucket boundaries.
+upto the user to choose the right bucket boundaries and set it through the
+[OTel SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
 
 Also note that, as per an
 [OpenTelemetry proposal on stability](https://docs.google.com/document/d/1Nvcf1wio7nDUVcrXxVUN_f8MNmcs0OzVAZLvlth1lYY/edit#heading=h.dy1cg9doaq26)
@@ -69,10 +70,12 @@ the scale to better fit the data.
 #### Attributes
 
 *   `grpc.method` : Full gRPC method name, including package, service and
-    method, e.g. "google.bigtable.v2.Bigtable/CheckAndMutateRow". Note that some
-    gRPC implementations allow server to handle generic method names, i.e., not
-    registering method names in advance with the server. This allows clients to
-    send arbitrary method names that could potentially open up the server to
+    method, e.g. "google.bigtable.v2.Bigtable/CheckAndMutateRow". Note that gRPC
+    servers can receive arbitrary method names, i.e., method names that have not
+    been registered in advance with the server. This normally results in those
+    RPCs being rejected with an UNIMPLEMENTED status. Some gRPC implementations
+    allow servers to handle such generic method names. Since the stats plugin
+    would be recording all of these RPCs, this could open up the server to
     malicious attacks that result in metrics being stored with a high
     cardinality. To prevent this, unregistered/generic method names should by
     default be reported with "other" value instead. Implementations should
@@ -96,19 +99,22 @@ the scale to better fit the data.
     The total number of RPC attempts started, including those that have not completed. <br>
     *Attributes*: grpc.method, grpc.target <br>
     *Type*: Counter <br>
-    *Unit*: {attempt} <br>
+    *Unit*: `{attempt}` <br>
 *   **grpc.client.attempt.duration** <br>
     End-to-end time taken to complete an RPC attempt including the time it takes to pick a subchannel. <br>
     *Attributes*: grpc.method, grpc.target, grpc.status <br>
     *Type*: Histogram (Latency Buckets) <br>
+    *Unit*: `s` <br>
 *   **grpc.client.attempt.sent_total_compressed_message_size** <br>
     Total bytes (compressed but not encrypted) sent across all request messages (metadata excluded) per RPC attempt; does not include grpc or transport framing bytes. <br>
     Attributes: grpc.method, grpc.target, grpc.status <br>
     Type: Histogram (Size Buckets) <br>
+    *Unit*: `By` <br>
 *   **grpc.client.attempt.rcvd_total_compressed_message_size** <br>
     Total bytes (compressed but not encrypted) received across all response messages (metadata excluded) per RPC attempt; does not include grpc or transport framing bytes. <br>
     *Attributes*: grpc.method, grpc.target, grpc.status <br>
     *Type*: Histogram (Size Buckets) <br>
+    *Unit*: `By` <br>
 
 #### Client Per-Call Instruments
 
@@ -119,6 +125,7 @@ the scale to better fit the data.
     If the implementation uses an interceptor then the exact start and end timestamps would depend on the ordering of the interceptors. Non-interceptor implementations should record the timestamps as close as possible to the top of the gRPC stack, i.e., payload serialization should be included in the measurement. <br>
     *Attributes*: grpc.method, grpc.target, grpc.status <br>
     *Type*: Histogram (Latency Buckets) <br>
+    *Unit*: `s` <br>
 
 #### Server Instruments
 
@@ -131,16 +138,19 @@ the scale to better fit the data.
     Total bytes (compressed but not encrypted) sent across all response messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
     *Attributes*: grpc.method, grpc.status <br>
     *Type*: Histogram (Size Buckets) <br>
+    *Unit*: `By` <br>
 *   **grpc.server.call.rcvd_total_compressed_message_size** <br>
     Total bytes (compressed but not encrypted) received across all request messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
     *Attributes*: grpc.method, grpc.status <br>
     *Type*: Histogram (Size Buckets) <br>
+    *Unit*: `By` <br>
 *   **grpc.server.call.duration** <br>
     This metric aims to measure the end2end time an RPC takes from the server transport’s (HTTP2/ inproc / cronet) perspective. <br>
     Start timestamp - After the transport knows that it's got a new stream. For HTTP2, this would be after the first header frame for the stream has been received and decoded. Whether the timestamp is recorded before or after HPACK is left to the implementation. <br>
     End timestamp - Ends at the first point where the transport considers the stream done. For HTTP2, this would be when scheduling a trailing header with END_STREAM to be written, or RST_STREAM, or a connection abort. Note that this wouldn’t necessarily mean that the bytes have also been immediately scheduled to be written by TCP. <br>
     *Attributes*: grpc.method, grpc.status <br>
     *Type*: Histogram (Latency Buckets) <br>
+    *Unit*: `s` <br>
 
 ### OpenTelemetry Plugin Architecture
 
@@ -157,8 +167,8 @@ attempt, and the `CallAttemptTracer` gets invoked during the lifetime of the
 attempt. On the server-side, we have an equivalent `ServerCallTracer`. (There is
 no concept of an attempt on the server-side.)
 
-The OTel plugin will basically be a way of configuring CallTracer factories on
-gRPC channels and servers.
+The OTel plugin will configure CallTracer factories on gRPC channels and
+servers.
 
 A CallTracer needs to know the channel's target in the canonical form, and the
 full qualified method name for filling in the attributes needed on the metrics.
