@@ -57,7 +57,8 @@ spec. The OpenTelemetry API has added an experimental feature for
 [advice](https://opentelemetry.io/docs/specs/otel/metrics/api/#instrument-advice)
 that would allow the gRPC library to provide these buckets as a hint. Since this
 is still an experimental feature and not yet implemented in all languages, it is
-up to the user to choose the right bucket boundaries and set it through the
+up to the user of the gRPC OpenTelemetry plugin to choose the right bucket
+boundaries and set it through the
 [OTel SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
 
 Also note that, as per an
@@ -296,7 +297,7 @@ for a particular channel or server builder.
 
 #### Java
 
-```
+```java
 public static class OpenTelemetryModuleBuilder {
     /**
      * OpenTelemetry instance is used to configure metrics settings.
@@ -327,7 +328,7 @@ public static class OpenTelemetryModuleBuilder {
 
 #### Go
 
-```
+```go
 import (
   "go.opentelemetry.io/otel/attribute"
   "go.opentelemetry.io/otel/metric"
@@ -366,7 +367,25 @@ func ServerOption(mo MetricsOptions) grpc.ServerOption {}
 
 #### Python
 
-To be filled
+```python
+
+ # This class is part of an EXPERIMENTAL API and subject to major changes.
+class OpenTelemetryObservability:
+    def set_meter_provider(meter_provider: MeterProvider) -> None:
+        # If `set_meter_provider()` is not called, no metrics are collected.
+        pass
+
+    def set_target_attribute_filter(filter: Callable[str, bool]) -> None:
+        # If set, this filter will be called per channel to decide whether to
+        # record the target attribute on client or to replace it with "other".
+        pass
+
+    def set_generic_method_attribute_filter(filter: Callable[str, bool]) -> None:
+        # If set, this filter will be called per call with a generic method type
+        # to decide whether record the target attribute on client or to replace
+        # it with "other".
+        pass
+```
 
 ### Migration from OpenCensus
 
