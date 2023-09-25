@@ -62,8 +62,8 @@ boundaries and set it through the
 [OTel SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
 
 Also note that, as per an
-[OpenTelemetry proposal on stability](https://docs.google.com/document/d/1Nvcf1wio7nDUVcrXxVUN_f8MNmcs0OzVAZLvlth1lYY/edit#heading=h.dy1cg9doaq26)
-though, changes to bucket boundaries might not be considered a breaking change.
+[OpenTelemetry proposal on stability](https://docs.google.com/document/d/1Nvcf1wio7nDUVcrXxVUN_f8MNmcs0OzVAZLvlth1lYY/edit#heading=h.dy1cg9doaq26),
+changes to bucket boundaries might not be considered a breaking change.
 Depending on the proposal, this recommendation would change to use
 `ExponentialHistogram`s instead, which would allow for automatic adjustments of
 the scale to better fit the data.
@@ -92,7 +92,8 @@ the scale to better fit the data.
     URI is not available, implementations can synthesize a target URI. It is
     possible for some channels to use IP addresses as target strings and this
     might again blow up the cardinality. Implementations should provide the
-    option to override recorded target names with "other".
+    option to override recorded target names with "other". If no such override
+    is provided, the default behavior will be to record the target as is.
 
 #### Client Per-Attempt Instruments
 
@@ -325,6 +326,13 @@ public static class OpenTelemetryModuleBuilder {
     public OpenTelemetryModule build();
 }
 ```
+
+Note: For non-generated methods, method names are recorded as "other" for
+`grpc.method` attribute. If you are interested in recording the method names for
+these methods, set
+[`isSampledToLocalTracing`](https://grpc.github.io/grpc-java/javadoc/io/grpc/MethodDescriptor.html#isSampledToLocalTracing\(\))
+to `true` while defining your methods in
+[`HandlerRegistry`](https://grpc.github.io/grpc-java/javadoc/io/grpc/HandlerRegistry.html).
 
 #### Go
 
