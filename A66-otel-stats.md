@@ -57,7 +57,7 @@ spec. The OpenTelemetry API has added an experimental feature for
 [advice](https://opentelemetry.io/docs/specs/otel/metrics/api/#instrument-advice)
 that would allow the gRPC library to provide these buckets as a hint. Since this
 is still an experimental feature and not yet implemented in all languages, it is
-upto the user to choose the right bucket boundaries and set it through the
+up to the user to choose the right bucket boundaries and set it through the
 [OTel SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
 
 Also note that, as per an
@@ -230,16 +230,6 @@ OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
     set. A MeterProvider not being set should result in a no-op. Some
     OpenTelemetry language APIs have a global MeterProvider. gRPC
     implementations should *NOT* fallback on this global.
-*   Optionally allow enabling/disabling metrics. This would allow optimizations
-    to avoid computation and collection of expensive stats within the gRPC
-    library. Note that even without this capability, users of OpenTelemetry
-    would be able to customize
-    [views](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view) through
-    the MeterProvider.
-*   Optionally allow setting of a OpenTelemetry plugin for a specific channel or
-    server, instead of setting it globally.
-*   Optionally allow setting of a map of constant attributes that are recorded
-    on all metrics associated with that plugin.
 
 Note that implementations of the gRPC OpenTelemetry plugin
 [should prefer](https://opentelemetry.io/docs/specs/otel/overview/) to only
@@ -248,7 +238,12 @@ depend on the OpenTelemetry API and not the OpenTelemetry SDK.
 The [Meter](https://opentelemetry.io/docs/specs/otel/metrics/api/#get-a-meter)
 creation should use a `name` that identifies the library, for example,
 "grpc-c++", "grpc-java", "grpc-go". The `version` should be the same as the
-release version of the gRPC library, for example, "1.57.1".
+release version of the gRPC library, for example, "1.57.1". The instruments
+described above will be created from this meter.
+
+Users of the gRPC OpenTelemetry plugin will use the OTel SDK's MeterProvider to
+[control the views](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view)
+and customize the metrics that will be exported.
 
 #### C++
 
@@ -259,19 +254,6 @@ class OpenTelemetryPluginBuilder {
   // If `SetMeterProvider()` is not called, no metrics are collected.
   OpenTelemetryPluginBuilder& SetMeterProvider(
       std::shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
-  // Methods to manipulate which instruments are enabled in the OTel Stats
-  // Plugin. The default set of instruments are -
-  // grpc.client.attempt.started
-  // grpc.client.attempt.duration
-  // grpc.client.attempt.sent_total_compressed_message_size
-  // grpc.client.attempt.rcvd_total_compressed_message_size
-  // grpc.server.call.started
-  // grpc.server.call.duration
-  // grpc.server.call.sent_total_compressed_message_size
-  // grpc.server.call.rcvd_total_compressed_message_size
-  OpenTelemetryPluginBuilder& EnableMetric(absl::string_view metric_name);
-  OpenTelemetryPluginBuilder& DisableMetric(absl::string_view metric_name);
-  OpenTelemetryPluginBuilder& DisableAllMetrics();
   // If set, \a target_attribute_filter is called per channel to decide whether
   // to record the target attribute on client or to replace it with "other".
   // This helps reduce the cardinality on metrics in cases where many channels
@@ -290,6 +272,20 @@ class OpenTelemetryPluginBuilder {
           generic_method_attribute_filter);
   // Registers a global plugin that acts on all channels and servers running on
   // the process.
+  // The most common way to use this API is -
+  //
+  // OpenTelemetryPluginBuilder().SetMeterProvider(provider)
+  //    .BuildAndRegisterGlobal();
+  //
+  // The set of instruments available are -
+  // grpc.client.attempt.started
+  // grpc.client.attempt.duration
+  // grpc.client.attempt.sent_total_compressed_message_size
+  // grpc.client.attempt.rcvd_total_compressed_message_size
+  // grpc.server.call.started
+  // grpc.server.call.duration
+  // grpc.server.call.sent_total_compressed_message_size
+  // grpc.server.call.rcvd_total_compressed_message_size
   void BuildAndRegisterGlobal();
 };
 
@@ -321,9 +317,6 @@ public static class OpenTelemetryModuleBuilder {
      */
     public OpenTelemetryModuleBuilder openTelemetry(OpenTelemetry openTelemetry);
 
-    /* Enable metrics for listed metrics. */
-    public OpenTelmetryBuilder enableMetrics(Set<String> metricNames);
-
     /* If targetFilter returns true for a target, target is recorded as is.
      * Otherwise it will be recorded as "other". */
     public OpenTelemetryBuilder targetFilter(Predicate<String> targetFilter);
@@ -352,14 +345,6 @@ type MetricsOptions struct {
   // take precedence over the API calls from the interface in this component
   // (i.e. it will create default views for unset views).
   MeterProvider metric.MeterProvider
-
-  // Metrics are the metrics to instrument. Will turn on the corresponding
-  // metric supported by the client and server instrumentation components if
-  // applicable.
-  Metrics []string
-
-  // Attributes are constant attributes applied to every recorded metric.
-  Attributes []attribute.KeyValue
 }
 
 // DialOption returns a dial option which enables OpenTelemetry instrumentation
@@ -368,12 +353,6 @@ type MetricsOptions struct {
 // Client applications interested in instrumenting their grpc.ClientConn should
 // pass the dial option returned from this function as a dial option to
 // grpc.Dial().
-//
-// For the metrics supported by this instrumentation code, a user needs to
-// specify the client metrics to record in metrics options. A user also needs to
-// provide an implementation of a MeterProvider. If the passed in Meter Provider
-// does not have the view configured for an individual metric turned on, the API
-// call in this component will create a default view for that metric.
 func DialOption(mo MetricsOptions) grpc.DialOption {}
 
 // ServerOption returns a server option which enables OpenTelemetry
@@ -382,12 +361,6 @@ func DialOption(mo MetricsOptions) grpc.DialOption {}
 // Server applications interested in instrumenting their grpc.Server should pass
 // the server option returned from this function as an argument to
 // grpc.NewServer().
-//
-// For the metrics supported by this instrumentation code, a user needs to
-// specify the client metrics to record in metrics options. A user also needs to
-// provide an implementation of a MeterProvider. If the passed in Meter Provider
-// does not have the view configured for an individual metric turned on, the API
-// call in this component will create a default view for that metric.
 func ServerOption(mo MetricsOptions) grpc.ServerOption {}
 ```
 
