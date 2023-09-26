@@ -647,44 +647,70 @@ TODO: details
 
 #### Changes to Stateful Session Affinity
 
-We need to support endpoints with multiple addresses in stateful
-session affinity (see gRFCs [A55][A55] and [A60][A60]).  Note that the
-original design already described how we would represent endpoints
-with multiple addresses in the `xds_override_host` LB policy's map,
+We need to support endpoints with multiple addresses in stateful session
+affinity (see gRFCs [A55][A55] and [A60][A60]).  We want to add one
+additional property here, which is that we do not want affinity to break
+if an endpoint has multiple addresses and then one of those addresses
+is removed in an EDS update.  This will require some changes to the
+original design.
+
+First, the session cookie, which currently contains a single endpoint
+address, will be changed to contain a list of endpoint addresses.  As per
+gRFC A60, the cookie's format is a base64-encoded string of the form
+`<address>;<cluster>`.  This design changes that format such that the
+address part will be a comma-delimited list of addresses.  The
+`StatefulSession` filter currently sets a call attribute that
+communicates the address from the cookie to the `xds_override_host` LB
+policy; that call attribute will now contain the list of addresses from
+the cookie.
+
+Next, the entries in the address map in the `xds_override_host` LB policy
+need to contain the actual address list to be used in the cookie when
+a given address is picked.  Note that the original design already described
+how we would represent endpoints with multiple addresses in this map,
 since that was already possible in Java (see the description in A55 of
 handling EquivalentAddressGroups when constructing the map).  However,
-we want to add one additional property here, which is that we do not
-want affinity to break if an endpoint has multiple addresses and then
-one of those addresses is removed in an EDS update.
+the original design envisioned that we would store a list of addresses
+that would be looked up as keys in the map when finding alternative
+addresses to use, which we no longer need now that we will be encoding
+the list of addresses in the cookie itself.  Instead, what we need from
+the map entry is the information necessary to construct the list of
+addresses to be encoded in the cookie when the address for that map
+entry is picked.  Implementations will likely want to store this as a
+single string instead of a list, since that will avoid the need to
+construct the string on a per-RPC basis.
 
-To accomplish this, the session cookie, which currently contains a single
-endpoint address, will be changed to contain a list of endpoint addresses.
-As per gRFC A60, the cookie's format is a base64-encoded string of the
-form `<address>;<cluster>`.  This design changes that format such that
-the address part will be a comma-delimited list of addresses.
+As per the original design, when returning the server's initial metadata
+to the application, the `StatefulSession` filter may need to set a cookie
+indicating which endpoint was chosen for the RPC.  However, now that the
+cookie needs to include all of the endpoint's addresses and not just the
+specific one that is used, we need to communicate that information from
+the `xds_override_host` LB policy back to the `StatefulSession` filter.
+This will be done via the same call attribute that the `StatefulSession`
+filter creates to communicate the list of addresses from the cookie to
+the `xds_override_host` policy.  That attribute will be given a new
+method to allow the `xds_override_host` policy to set the list of
+addresses to be encoded in the cookie, based on the address chosen by
+the picker.  The `StatefulSession` filter will then update the cookie if
+the address list in the cookie does not match the address list reported
+by the `xds_override_host` policy.  Note that when encoding the cookie,
+the address that is actually used must be the first address in the list.
 
-Supporting this new cookie format will require a few changes.  First,
-in the `xds_override_host` LB policy, we need to account for all
-of the addresses of a given endpoint in the subchannel state map.
-[gRFC A55][A55] already described how to represent multiple addresses per
-endpoint in the map, since that was already supported in Java (see where
-it discussed "equivalent address groups").  However, now that the cookie
-will contain a list of addresses, the picker logic will prefer to use
-that list of addresses instead of looking at the equivalent addresses
-in our map when doing the pick.  The picker logic will therefore now
-look like this:
+In accordance with those changes, the picker logic will now look like this:
 
 ```
 def Pick(pick_args):
-  if pick_args.override_addresses is set:
+  override_host_attribute = pick_args.call_attributes.get(attribute_key)
+  if override_host_attribute is not None:
     idle_subchannel = None
     found_connecting = False
-    for address in pick_args.override_addresses:
+    for address in override_host_attribute.cookie_address_list:
       entry = lb_policy.address_map[address]
       if entry found:
         if (entry.subchannel is set AND
             entry.health_status is in policy_config.override_host_status):
           if entry.subchannel.connectivity_state == READY:
+            override_host_attribute.set_actual_address_list(entry.address_list)
             return entry.subchannel as pick result
           elif entry.subchannel.connectivity_state == IDLE:
             if idle_subchannel is None:
@@ -704,28 +730,13 @@ def Pick(pick_args):
       return queue as pick result
   # pick_args.override_addresses not set or did not find a matching subchannel,
   # so delegate to the child picker.
-  return child_picker.Pick(pick_args)
+  result = child_picker.Pick(pick_args)
+  if result.type == PICK_COMPLETE:
+    entry = lb_policy.address_map[result.subchannel.address()]
+    if entry found:
+      override_host_attribute.set_actual_address_list(entry.address_list)
+  return result
 ```
-
-When sending the server initial metadata to the client application, the
-`StatefulSession` filter will check which subchannel was chosen for the
-RPC.  It will then populate the cookie with the chosen address first,
-followed by the other addresses for the endpoint.
-
-As per the original design, when returning the server's initial metadata to
-the application, the `StatefulSession` filter may need to set a cookie
-indicating which endpoint was chosen for the RPC.  However, now that the
-cookie needs to include all of the endpoint's addresses and not just the
-specific one that is used, we need to communicate that information from
-the `xds_override_host` LB policy back to the `StatefulSession` filter.
-To do this, the `StatefulSession` filter will pass a callback to the
-`xds_override_host` LB policy via a call attribute (the same mechanism
-used to pass the addresses from the cookie), and the `xds_override_host`
-picker will invoke that callback to pass back the list of addresses for
-the chosen endpoint.  Note that when encoding the cookie, the
-`StatefulSession` filter must ensure that the address that is actually
-used is the first address in the list; if the order is different in the
-existing cookie, it must reset the cookie.
 
 ### Temporary environment variable protection
 
