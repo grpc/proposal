@@ -220,6 +220,23 @@ ability to configure the different plugins with different MeterProviders.
 A sample implementation of this approach is available in
 [gRPC Core](https://github.com/grpc/grpc/blob/v1.57.x/src/core/lib/channel/call_tracer.h).
 
+In grpc-java, a client interceptor is provided by the gRPC OTel plugin. This
+interceptor adds a `CallAttemptTracerFactory` to the client call. This factory
+is equivalent to the `CallTracer`. For each attempt, this factory is invoked to
+create a `ClientStreamTracer` analogous to `CallAttemptTracer` for each attempt.
+On the server-side, a `ServerStreamTracer.Factory` is used to create tracers
+analogous to `ServerCallTracer` for each incoming call.
+
+In grpc-go, similar to grpc-java, an interceptor is invoked per call. This
+interceptor is registered when the OTel Dial Option is passed in to the channel,
+and has access to a context scoped to the call. `StatsHandler` object owned by
+the channel gets call-outs for each event that happens on the lifetime of an
+attempt. Along with each call-out gets, a context object scoped to the attempt
+is passed in, making it equivalent to the functionality of the
+`CallAttemptTracer`. On the server side, a `StatsHandler` object gets call-outs
+similarly along with a server call scoped context object, to get
+`ServerCallTracer` equivalent functionality.
+
 ### Language-Specific Details
 
 Each language implementation will provide an API for registering an
