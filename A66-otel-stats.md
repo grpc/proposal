@@ -17,8 +17,8 @@ There are a collection of
 [metrics](https://github.com/census-instrumentation/opencensus-specs/blob/master/stats/gRPC.md)
 proposed by OpenCensus for gRPC. OpenCensus is no longer being actively
 maintained and is being
-[deprecated](https://opentelemetry.io/blog/2023/sunsetting-opencensus/#:~:text=Compatibility%20specification%204.-,What%20to%20Expect%20After%20July%2031st%2C%202023,found%20will%20not%20be%20patched.),
-with OpenTelemetry suggested as the successor framework.
+[deprecated](https://opentelemetry.io/blog/2023/sunsetting-opencensus/), with
+OpenTelemetry suggested as the successor framework.
 
 ### Related Proposals:
 
