@@ -61,12 +61,12 @@ up to the user of the gRPC OpenTelemetry plugin to choose the right bucket
 boundaries and set it through the
 [OTel SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
 
-Also note that, as per an
+Note that, according to an
 [OpenTelemetry proposal on stability](https://docs.google.com/document/d/1Nvcf1wio7nDUVcrXxVUN_f8MNmcs0OzVAZLvlth1lYY/edit#heading=h.dy1cg9doaq26),
-changes to bucket boundaries might not be considered a breaking change.
-Depending on the proposal, this recommendation would change to use
-`ExponentialHistogram`s instead, which would allow for automatic adjustments of
-the scale to better fit the data.
+changes to bucket boundaries may not be considered as breaking. Depending on the
+proposal, this recommendation would change to use `ExponentialHistogram`s
+instead, which would allow for automatic adjustments of the scale to better fit
+the data.
 
 #### Attributes
 
@@ -87,13 +87,14 @@ the scale to better fit the data.
     [(Full list)](https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
 *   `grpc.target` : Canonicalized target URI used when creating gRPC Channel,
     e.g. "dns:///pubsub.googleapis.com:443", "xds:///helloworld-gke:8000".
-    Canonicalized target URI is its form with the scheme if the user didn't
-    mention the scheme. For channels such as inprocess channels where a target
-    URI is not available, implementations can synthesize a target URI. It is
-    possible for some channels to use IP addresses as target strings and this
-    might again blow up the cardinality. Implementations should provide the
-    option to override recorded target names with "other". If no such override
-    is provided, the default behavior will be to record the target as is.
+    Canonicalized target URI is the form with the scheme included if the user
+    didn't mention the scheme ([scheme]:///[target]). For channels such as
+    inprocess channels where a target URI is not available, implementations can
+    synthesize a target URI. It is possible for some channels to use IP
+    addresses as target strings and this might again blow up the cardinality.
+    Implementations should provide the option to override recorded target names
+    with "other" instead of the actual target. If no such override is provided,
+    the default behavior will be to record the target as is.
 
 #### Client Per-Attempt Instruments
 
@@ -173,7 +174,7 @@ The OTel plugin will configure CallTracer factories on gRPC channels and
 servers.
 
 A CallTracer needs to know the channel's target in the canonical form, and the
-full qualified method name for filling in the attributes needed on the metrics.
+fully qualified method name for filling in the attributes needed on the metrics.
 Similarly on the server-side, the `ServerCallTracer` needs to know the method of
 the incoming call. Depending on the implementation details, the method may be
 propagated as part of the initial metadata.
@@ -243,11 +244,10 @@ Each language implementation will provide an API for registering an
 OpenTelemetry plugin. Overall, the APIs should have the following capabilities -
 
 *   Allow installing multiple OpenTelemetry plugins.
-*   Allow setting a
+*   Implementations must provide an option to set
     [MeterProvider](https://opentelemetry.io/docs/specs/otel/metrics/api/#meterprovider)
-    on individual plugins. Implementations should require a MeterProvider being
-    set. A MeterProvider not being set should result in a no-op. Some
-    OpenTelemetry language APIs have a global MeterProvider. gRPC
+    on individual plugins. A MeterProvider not being set should result in a
+    no-op. Some OpenTelemetry language APIs have a global MeterProvider. gRPC
     implementations should *NOT* fallback on this global.
 
 Note that implementations of the gRPC OpenTelemetry plugin
@@ -462,11 +462,11 @@ grpc.io/server/server_latency    | grpc.server.call.duration
 ##### Metrics with Nuanced Differences
 
 Unfortunately, the implementations of the gRPC OpenCensus spec in the various
-languages do not agree on the definition of the following size metrics. Go
-records uncompressed message bytes for the OpenCensus metric, while C++ and Java
-record the compressed message bytes. The OpenTelemetry spec proposed here calls
-for recording the compressed message bytes, resulting in an equivalence between
-the metrics definitions for C++ and Java, but not for Go.
+languages do not agree on the definition of the following message size metrics.
+Go records uncompressed message bytes for the OpenCensus metric, while C++ and
+Java record the compressed message bytes. The OpenTelemetry spec proposed here
+calls for recording the compressed message bytes, resulting in an equivalence
+between the metrics definitions for C++ and Java, but not for Go.
 
 gRPC OpenCensus                       | gRPC OpenTelemetry
 ------------------------------------- | ------------------
