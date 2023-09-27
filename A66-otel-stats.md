@@ -15,10 +15,9 @@ Propose a metrics data model for gRPC OpenTelemetry metrics.
 
 There are a collection of
 [metrics](https://github.com/census-instrumentation/opencensus-specs/blob/master/stats/gRPC.md)
-proposed by OpenCensus for gRPC. OpenCensus is no longer being actively
-maintained and is being
-[deprecated](https://opentelemetry.io/blog/2023/sunsetting-opencensus/), with
-OpenTelemetry suggested as the successor framework.
+proposed by OpenCensus for gRPC. OpenCensus is
+[no longer being actively maintained](https://opentelemetry.io/blog/2023/sunsetting-opencensus/),
+with OpenTelemetry suggested as the successor framework.
 
 ### Related Proposals:
 
@@ -148,7 +147,7 @@ the data.
     *Type*: Histogram (Size Buckets) <br>
     *Unit*: `By` <br>
 *   **grpc.server.call.duration** <br>
-    This metric aims to measure the end2end time an RPC takes from the server transport’s (HTTP2/ inproc / cronet) perspective. <br>
+    This metric aims to measure the end2end time an RPC takes from the server transport’s (HTTP2/ inproc) perspective. <br>
     Start timestamp - After the transport knows that it's got a new stream. For HTTP2, this would be after the first header frame for the stream has been received and decoded. Whether the timestamp is recorded before or after HPACK is left to the implementation. <br>
     End timestamp - Ends at the first point where the transport considers the stream done. For HTTP2, this would be when scheduling a trailing header with END_STREAM to be written, or RST_STREAM, or a connection abort. Note that this wouldn’t necessarily mean that the bytes have also been immediately scheduled to be written by TCP. <br>
     *Attributes*: grpc.method, grpc.status <br>
@@ -529,10 +528,10 @@ disabling the OpenCensus plugin.
 
 ## Rationale
 
-OpenCensus is no longer being actively maintained and is being deprecated, with
-OpenTelemetry suggested as the successor framework. The OpenTelemetry spec aims
-to maintain compatibility with the gRPC OpenCensus spec wherever reasonable to
-allow for an easy migration path.
+OpenCensus is no longer being actively maintained, with OpenTelemetry suggested
+as the successor framework. The OpenTelemetry spec aims to maintain
+compatibility with the gRPC OpenCensus spec wherever reasonable to allow for an
+easy migration path.
 
 There is a
 [General RPC conventions](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/metrics/semantic_conventions/rpc-metrics.md)
