@@ -367,9 +367,6 @@ type MetricsOptions struct {
   // MeterProvider is the MeterProvider instance that will be used for access
   // to Named Meter instances to instrument an application. To enable metrics
   // collection, set a meter provider. If unset, no metrics will be recorded.
-  // Any implementation knobs (i.e. views, bounds) set in the passed in object
-  // take precedence over the API calls from the interface in this component
-  // (i.e. it will create default views for unset views).
   MeterProvider metric.MeterProvider
 }
 
