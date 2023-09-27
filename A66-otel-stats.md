@@ -336,8 +336,8 @@ public static class OpenTelemetryModuleBuilder {
      */
     public OpenTelemetryModuleBuilder openTelemetry(OpenTelemetry openTelemetry);
 
-    /* If targetFilter returns true for a target, target is recorded as is.
-     * Otherwise it will be recorded as "other". */
+    /* If targetFilter is set, and returns true for a target, target is recorded as is. Records "other" on false.
+    If targetFilter is not set, target is recorded as is. */
     public OpenTelemetryBuilder targetFilter(Predicate<String> targetFilter);
 
     public OpenTelemetryModule build();
