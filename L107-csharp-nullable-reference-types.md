@@ -35,9 +35,12 @@ Currently the code that is generated is compatible with C# 7.3 and is not in a
 
 No nullable checks are made and no compiler warnings are generated for this code,
 even when the code is compiled in a project with nullable checks enabled.
-This  means that some nullable checks that could be useful in user code are not done.
+This means that some nullable checks that could be useful in user code are not done.
 
-**Note:** here we are *not* proposing any changes to the API or semantics to support protobuf optional fields as nullable, as sometimes requested (e.g. - [C#: Consider exposing protobuf optional fields as nullable properties](https://github.com/protocolbuffers/protobuf/issues/9083)). That has already been addressed in the above issue.
+**Note:** here we are *not* proposing any changes to the API or semantics to support
+protobuf optional fields as nullable, as sometimes requested (e.g. - 
+[C#: Consider exposing protobuf optional fields as nullable properties](https://github.com/protocolbuffers/protobuf/issues/9083)).
+That has already been addressed in the above issue.
 
 ## Proposal
 
@@ -156,3 +159,11 @@ There are already implementations of the above with varying degrees of completen
 - protobuf PR 13218 [Add option to enable csharp nullable reference types](https://github.com/protocolbuffers/protobuf/pull/13218)
 - gprc/grpc PR 33878 [Add null reference types support to gRPC C# plugin](https://github.com/grpc/grpc/pull/33878)
 - grpc/grpc PR 33879 [Grpc.Tools changes to support nullable reference types](https://github.com/grpc/grpc/pull/33879)
+
+## Related work
+There is separate and ongoing work to implement nullable annotations in the
+[Google.Protobuf](https://github.com/protocolbuffers/protobuf/tree/main/csharp/src/Google.Protobuf)
+runtime. This is not part of this proposal which is focused on the code generation.
+
+See:
+- [#10170 Set all but main project to nullable ](https://github.com/protocolbuffers/protobuf/pull/10170)
