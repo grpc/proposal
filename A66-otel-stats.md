@@ -58,7 +58,7 @@ that would allow the gRPC library to provide these buckets as a hint. Since this
 is still an experimental feature and not yet implemented in all languages, it is
 up to the user of the gRPC OpenTelemetry plugin to choose the right bucket
 boundaries and set it through the
-[OTel SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
+[OpenTelemetry SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
 
 Note that, according to an
 [OpenTelemetry proposal on stability](https://docs.google.com/document/d/1Nvcf1wio7nDUVcrXxVUN_f8MNmcs0OzVAZLvlth1lYY/edit#heading=h.dy1cg9doaq26),
@@ -169,8 +169,8 @@ attempt, and the `CallAttemptTracer` gets invoked during the lifetime of the
 attempt. On the server-side, we have an equivalent `ServerCallTracer`. (There is
 no concept of an attempt on the server-side.)
 
-The OTel plugin will configure CallTracer factories on gRPC channels and
-servers.
+The OpenTelemetry plugin will configure CallTracer factories on gRPC channels
+and servers.
 
 A CallTracer needs to know the channel's target in the canonical form, and the
 fully qualified method name for filling in the attributes needed on the metrics.
@@ -220,19 +220,19 @@ ability to configure the different plugins with different MeterProviders.
 A sample implementation of this approach is available in
 [gRPC Core](https://github.com/grpc/grpc/blob/v1.57.x/src/core/lib/channel/call_tracer.h).
 
-In grpc-java, a client interceptor is provided by the gRPC OTel plugin. This
-interceptor adds a `CallAttemptTracerFactory` to the client call. This factory
-is equivalent to the `CallTracer`. For each attempt, this factory is invoked to
-create a `ClientStreamTracer` analogous to `CallAttemptTracer` for each attempt.
-On the server-side, a `ServerStreamTracer.Factory` is used to create tracers
-analogous to `ServerCallTracer` for each incoming call.
+In grpc-java, a client interceptor is provided by the gRPC OpenTelemetry plugin.
+This interceptor adds a `CallAttemptTracerFactory` to the client call. This
+factory is equivalent to the `CallTracer`. For each attempt, this factory is
+invoked to create a `ClientStreamTracer` analogous to `CallAttemptTracer` for
+each attempt. On the server-side, a `ServerStreamTracer.Factory` is used to
+create tracers analogous to `ServerCallTracer` for each incoming call.
 
 In grpc-go, similar to grpc-java, an interceptor is invoked per call. This
-interceptor is registered when the OTel Dial Option is passed in to the channel,
-and has access to a context scoped to the call. `StatsHandler` object owned by
-the channel gets call-outs for each event that happens on the lifetime of an
-attempt. Along with each call-out gets, a context object scoped to the attempt
-is passed in, making it equivalent to the functionality of the
+interceptor is registered when the OpenTelemetry Dial Option is passed in to the
+channel, and has access to a context scoped to the call. `StatsHandler` object
+owned by the channel gets call-outs for each event that happens on the lifetime
+of an attempt. Along with each call-out gets, a context object scoped to the
+attempt is passed in, making it equivalent to the functionality of the
 `CallAttemptTracer`. On the server side, a `StatsHandler` object gets call-outs
 similarly along with a server call scoped context object, to get
 `ServerCallTracer` equivalent functionality.
@@ -259,7 +259,8 @@ creation should use a `name` that identifies the library, for example,
 release version of the gRPC library, for example, "1.57.1". The instruments
 described above will be created from this meter.
 
-Users of the gRPC OpenTelemetry plugin will use the OTel SDK's MeterProvider to
+Users of the gRPC OpenTelemetry plugin will use the OpenTelemetry SDK's
+MeterProvider to
 [control the views](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view)
 and customize the metrics that will be exported.
 
@@ -544,7 +545,7 @@ immediately obvious -
     `call` can have multiple `attempts` with retries/hedging.
 *   The various gRPC implementations can record the compressed message lengths,
     but not all implementations can get the uncompressed message length (as
-    recommended by OTel RPC conventions.)
+    recommended by OpenTelemetry RPC conventions.)
 
 This gRFC, hence, intends to override the
 [General RPC conventions](https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/rpc-metrics/)
