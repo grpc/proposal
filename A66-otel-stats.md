@@ -2,7 +2,7 @@
 
 *   Author: Yash Tibrewal (@yashykt)
 *   Approver: Mark Roth (@markdroth)
-*   Status: In Review
+*   Status: Final
 *   Implemented in: <language, ...>
 *   Last updated: Sep 28, 2023
 *   Discussion at: https://groups.google.com/g/grpc-io/c/po-deqYEQzE
