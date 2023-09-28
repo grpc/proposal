@@ -4,12 +4,14 @@
 *   Approver: Mark Roth (@markdroth)
 *   Status: In Review
 *   Implemented in: <language, ...>
-*   Last updated: Jul 20, 2023
+*   Last updated: Sep 28, 2023
 *   Discussion at: https://groups.google.com/g/grpc-io/c/po-deqYEQzE
 
 ## Abstract
 
-Propose a metrics data model for gRPC OpenTelemetry metrics.
+Describe a cross-language plugin architecture for collecting OpenTelemetry
+metrics in the various gRPC implementations and propose a data model for gRPC
+OpenTelemetry metrics.
 
 ## Background
 
@@ -26,133 +28,6 @@ with OpenTelemetry suggested as the successor framework.
 *   [A45: Exposing OpenCensus Metrics and Tracing for gRPC retry](A45-retry-stats.md)
 
 ## Proposal
-
-### Metrics Schema
-
-#### Units
-
-Following the
-[OpenTelemetry Metrics Semantic Conventions](https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/),
-the following units are used -
-
-*   Latencies are measured in float64 seconds, `s`
-*   Sizes are measured in bytes, `By`
-*   Counts for number of calls are measured in `{call}`
-*   Counts for number of attempts are measured in `{attempt}`
-
-Buckets for histograms in default views should be as follows -
-
-*   Latency : 0, 0.00001, 0.00005, 0.0001, 0.0003, 0.0006, 0.0008, 0.001, 0.002,
-    0.003, 0.004, 0.005, 0.006, 0.008, 0.01, 0.013, 0.016, 0.02, 0.025, 0.03,
-    0.04, 0.05, 0.065, 0.08, 0.1, 0.13, 0.16, 0.2, 0.25, 0.3, 0.4, 0.5, 0.65,
-    0.8, 1, 2, 5, 10, 20, 50, 100
-*   Size : 0, 1024, 2048, 4096, 16384, 65536, 262144, 1048576, 4194304,
-    16777216, 67108864, 268435456, 1073741824, 4294967296
-*   Count : 0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
-    16384, 32768, 65536
-
-These buckets were chosen to maintain compatibility with the gRPC OpenCensus
-spec. The OpenTelemetry API has added an experimental feature for
-[advice](https://opentelemetry.io/docs/specs/otel/metrics/api/#instrument-advice)
-that would allow the gRPC library to provide these buckets as a hint. Since this
-is still an experimental feature and not yet implemented in all languages, it is
-up to the user of the gRPC OpenTelemetry plugin to choose the right bucket
-boundaries and set it through the
-[OpenTelemetry SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
-
-Note that, according to an
-[OpenTelemetry proposal on stability](https://docs.google.com/document/d/1Nvcf1wio7nDUVcrXxVUN_f8MNmcs0OzVAZLvlth1lYY/edit#heading=h.dy1cg9doaq26),
-changes to bucket boundaries may not be considered as breaking. Depending on the
-proposal, this recommendation would change to use `ExponentialHistogram`s
-instead, which would allow for automatic adjustments of the scale to better fit
-the data.
-
-#### Attributes
-
-*   `grpc.method` : Full gRPC method name, including package, service and
-    method, e.g. "google.bigtable.v2.Bigtable/CheckAndMutateRow". Note that gRPC
-    servers can receive arbitrary method names, i.e., method names that have not
-    been registered in advance with the server. This normally results in those
-    RPCs being rejected with an UNIMPLEMENTED status. Some gRPC implementations
-    allow servers to handle such generic method names. Since the stats plugin
-    would be recording all of these RPCs, this could open up the server to
-    malicious attacks that result in metrics being stored with a high
-    cardinality. To prevent this, unregistered/generic method names should by
-    default be reported with "other" value instead. Implementations should
-    provide the option to override this behavior to allow recording generic
-    method names as well.
-*   `grpc.status` : gRPC server status code received, e.g. "OK", "CANCELLED",
-    "DEADLINE_EXCEEDED".
-    [(Full list)](https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
-*   `grpc.target` : Canonicalized target URI used when creating gRPC Channel,
-    e.g. "dns:///pubsub.googleapis.com:443", "xds:///helloworld-gke:8000".
-    Canonicalized target URI is the form with the scheme included if the user
-    didn't mention the scheme ([scheme]:///[target]). For channels such as
-    inprocess channels where a target URI is not available, implementations can
-    synthesize a target URI. It is possible for some channels to use IP
-    addresses as target strings and this might again blow up the cardinality.
-    Implementations should provide the option to override recorded target names
-    with "other" instead of the actual target. If no such override is provided,
-    the default behavior will be to record the target as is.
-
-#### Client Per-Attempt Instruments
-
-*   **grpc.client.attempt.started** <br>
-    The total number of RPC attempts started, including those that have not completed. <br>
-    *Attributes*: grpc.method, grpc.target <br>
-    *Type*: Counter <br>
-    *Unit*: `{attempt}` <br>
-*   **grpc.client.attempt.duration** <br>
-    End-to-end time taken to complete an RPC attempt including the time it takes to pick a subchannel. <br>
-    *Attributes*: grpc.method, grpc.target, grpc.status <br>
-    *Type*: Histogram (Latency Buckets) <br>
-    *Unit*: `s` <br>
-*   **grpc.client.attempt.sent_total_compressed_message_size** <br>
-    Total bytes (compressed but not encrypted) sent across all request messages (metadata excluded) per RPC attempt; does not include grpc or transport framing bytes. <br>
-    Attributes: grpc.method, grpc.target, grpc.status <br>
-    Type: Histogram (Size Buckets) <br>
-    *Unit*: `By` <br>
-*   **grpc.client.attempt.rcvd_total_compressed_message_size** <br>
-    Total bytes (compressed but not encrypted) received across all response messages (metadata excluded) per RPC attempt; does not include grpc or transport framing bytes. <br>
-    *Attributes*: grpc.method, grpc.target, grpc.status <br>
-    *Type*: Histogram (Size Buckets) <br>
-    *Unit*: `By` <br>
-
-#### Client Per-Call Instruments
-
-*   **grpc.client.call.duration** <br>
-    This metric aims to measure the end-to-end time the gRPC library takes to complete an RPC from the application’s perspective. <br>
-    Start timestamp - After the client application starts the RPC. <br>
-    End timestamp - Before the status of the RPC is delivered to the application. <br>
-    If the implementation uses an interceptor then the exact start and end timestamps would depend on the ordering of the interceptors. Non-interceptor implementations should record the timestamps as close as possible to the top of the gRPC stack, i.e., payload serialization should be included in the measurement. <br>
-    *Attributes*: grpc.method, grpc.target, grpc.status <br>
-    *Type*: Histogram (Latency Buckets) <br>
-    *Unit*: `s` <br>
-
-#### Server Instruments
-
-*   **grpc.server.call.started** <br>
-    The total number of RPCs started, including those that have not completed. <br>
-    *Attributes*: grpc.method <br>
-    *Type*: counter <br>
-    *Unit*: {call} <br>
-*   **grpc.server.call.sent_total_compressed_message_size** <br>
-    Total bytes (compressed but not encrypted) sent across all response messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
-    *Attributes*: grpc.method, grpc.status <br>
-    *Type*: Histogram (Size Buckets) <br>
-    *Unit*: `By` <br>
-*   **grpc.server.call.rcvd_total_compressed_message_size** <br>
-    Total bytes (compressed but not encrypted) received across all request messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
-    *Attributes*: grpc.method, grpc.status <br>
-    *Type*: Histogram (Size Buckets) <br>
-    *Unit*: `By` <br>
-*   **grpc.server.call.duration** <br>
-    This metric aims to measure the end2end time an RPC takes from the server transport’s (HTTP2/ inproc) perspective. <br>
-    Start timestamp - After the transport knows that it's got a new stream. For HTTP2, this would be after the first header frame for the stream has been received and decoded. Whether the timestamp is recorded before or after HPACK is left to the implementation. <br>
-    End timestamp - Ends at the first point where the transport considers the stream done. For HTTP2, this would be when scheduling a trailing header with END_STREAM to be written, or RST_STREAM, or a connection abort. Note that this wouldn’t necessarily mean that the bytes have also been immediately scheduled to be written by TCP. <br>
-    *Attributes*: grpc.method, grpc.status <br>
-    *Type*: Histogram (Latency Buckets) <br>
-    *Unit*: `s` <br>
 
 ### OpenTelemetry Plugin Architecture
 
@@ -408,6 +283,133 @@ class OpenTelemetryObservability:
         # it with "other".
         pass
 ```
+
+### Metrics Schema
+
+#### Units
+
+Following the
+[OpenTelemetry Metrics Semantic Conventions](https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/),
+the following units are used -
+
+*   Latencies are measured in float64 seconds, `s`
+*   Sizes are measured in bytes, `By`
+*   Counts for number of calls are measured in `{call}`
+*   Counts for number of attempts are measured in `{attempt}`
+
+Buckets for histograms in default views should be as follows -
+
+*   Latency : 0, 0.00001, 0.00005, 0.0001, 0.0003, 0.0006, 0.0008, 0.001, 0.002,
+    0.003, 0.004, 0.005, 0.006, 0.008, 0.01, 0.013, 0.016, 0.02, 0.025, 0.03,
+    0.04, 0.05, 0.065, 0.08, 0.1, 0.13, 0.16, 0.2, 0.25, 0.3, 0.4, 0.5, 0.65,
+    0.8, 1, 2, 5, 10, 20, 50, 100
+*   Size : 0, 1024, 2048, 4096, 16384, 65536, 262144, 1048576, 4194304,
+    16777216, 67108864, 268435456, 1073741824, 4294967296
+*   Count : 0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
+    16384, 32768, 65536
+
+These buckets were chosen to maintain compatibility with the gRPC OpenCensus
+spec. The OpenTelemetry API has added an experimental feature for
+[advice](https://opentelemetry.io/docs/specs/otel/metrics/api/#instrument-advice)
+that would allow the gRPC library to provide these buckets as a hint. Since this
+is still an experimental feature and not yet implemented in all languages, it is
+up to the user of the gRPC OpenTelemetry plugin to choose the right bucket
+boundaries and set it through the
+[OpenTelemetry SDK](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view).
+
+Note that, according to an
+[OpenTelemetry proposal on stability](https://docs.google.com/document/d/1Nvcf1wio7nDUVcrXxVUN_f8MNmcs0OzVAZLvlth1lYY/edit#heading=h.dy1cg9doaq26),
+changes to bucket boundaries may not be considered as breaking. Depending on the
+proposal, this recommendation would change to use `ExponentialHistogram`s
+instead, which would allow for automatic adjustments of the scale to better fit
+the data.
+
+#### Attributes
+
+*   `grpc.method` : Full gRPC method name, including package, service and
+    method, e.g. "google.bigtable.v2.Bigtable/CheckAndMutateRow". Note that gRPC
+    servers can receive arbitrary method names, i.e., method names that have not
+    been registered in advance with the server. This normally results in those
+    RPCs being rejected with an UNIMPLEMENTED status. Some gRPC implementations
+    allow servers to handle such generic method names. Since the stats plugin
+    would be recording all of these RPCs, this could open up the server to
+    malicious attacks that result in metrics being stored with a high
+    cardinality. To prevent this, unregistered/generic method names should by
+    default be reported with "other" value instead. Implementations should
+    provide the option to override this behavior to allow recording generic
+    method names as well.
+*   `grpc.status` : gRPC server status code received, e.g. "OK", "CANCELLED",
+    "DEADLINE_EXCEEDED".
+    [(Full list)](https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
+*   `grpc.target` : Canonicalized target URI used when creating gRPC Channel,
+    e.g. "dns:///pubsub.googleapis.com:443", "xds:///helloworld-gke:8000".
+    Canonicalized target URI is the form with the scheme included if the user
+    didn't mention the scheme (`scheme://[authority]/path`). For channels such
+    as inprocess channels where a target URI is not available, implementations
+    can synthesize a target URI. It is possible for some channels to use IP
+    addresses as target strings and this might again blow up the cardinality.
+    Implementations should provide the option to override recorded target names
+    with "other" instead of the actual target. If no such override is provided,
+    the default behavior will be to record the target as is.
+
+#### Client Per-Attempt Instruments
+
+*   **grpc.client.attempt.started** <br>
+    The total number of RPC attempts started, including those that have not completed. <br>
+    *Attributes*: grpc.method, grpc.target <br>
+    *Type*: Counter <br>
+    *Unit*: `{attempt}` <br>
+*   **grpc.client.attempt.duration** <br>
+    End-to-end time taken to complete an RPC attempt including the time it takes to pick a subchannel. <br>
+    *Attributes*: grpc.method, grpc.target, grpc.status <br>
+    *Type*: Histogram (Latency Buckets) <br>
+    *Unit*: `s` <br>
+*   **grpc.client.attempt.sent_total_compressed_message_size** <br>
+    Total bytes (compressed but not encrypted) sent across all request messages (metadata excluded) per RPC attempt; does not include grpc or transport framing bytes. <br>
+    Attributes: grpc.method, grpc.target, grpc.status <br>
+    Type: Histogram (Size Buckets) <br>
+    *Unit*: `By` <br>
+*   **grpc.client.attempt.rcvd_total_compressed_message_size** <br>
+    Total bytes (compressed but not encrypted) received across all response messages (metadata excluded) per RPC attempt; does not include grpc or transport framing bytes. <br>
+    *Attributes*: grpc.method, grpc.target, grpc.status <br>
+    *Type*: Histogram (Size Buckets) <br>
+    *Unit*: `By` <br>
+
+#### Client Per-Call Instruments
+
+*   **grpc.client.call.duration** <br>
+    This metric aims to measure the end-to-end time the gRPC library takes to complete an RPC from the application’s perspective. <br>
+    Start timestamp - After the client application starts the RPC. <br>
+    End timestamp - Before the status of the RPC is delivered to the application. <br>
+    If the implementation uses an interceptor then the exact start and end timestamps would depend on the ordering of the interceptors. Non-interceptor implementations should record the timestamps as close as possible to the top of the gRPC stack, i.e., payload serialization should be included in the measurement. <br>
+    *Attributes*: grpc.method, grpc.target, grpc.status <br>
+    *Type*: Histogram (Latency Buckets) <br>
+    *Unit*: `s` <br>
+
+#### Server Instruments
+
+*   **grpc.server.call.started** <br>
+    The total number of RPCs started, including those that have not completed. <br>
+    *Attributes*: grpc.method <br>
+    *Type*: counter <br>
+    *Unit*: {call} <br>
+*   **grpc.server.call.sent_total_compressed_message_size** <br>
+    Total bytes (compressed but not encrypted) sent across all response messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
+    *Attributes*: grpc.method, grpc.status <br>
+    *Type*: Histogram (Size Buckets) <br>
+    *Unit*: `By` <br>
+*   **grpc.server.call.rcvd_total_compressed_message_size** <br>
+    Total bytes (compressed but not encrypted) received across all request messages (metadata excluded) per RPC; does not include grpc or transport framing bytes. <br>
+    *Attributes*: grpc.method, grpc.status <br>
+    *Type*: Histogram (Size Buckets) <br>
+    *Unit*: `By` <br>
+*   **grpc.server.call.duration** <br>
+    This metric aims to measure the end2end time an RPC takes from the server transport’s (HTTP2/ inproc) perspective. <br>
+    Start timestamp - After the transport knows that it's got a new stream. For HTTP2, this would be after the first header frame for the stream has been received and decoded. Whether the timestamp is recorded before or after HPACK is left to the implementation. <br>
+    End timestamp - Ends at the first point where the transport considers the stream done. For HTTP2, this would be when scheduling a trailing header with END_STREAM to be written, or RST_STREAM, or a connection abort. Note that this wouldn’t necessarily mean that the bytes have also been immediately scheduled to be written by TCP. <br>
+    *Attributes*: grpc.method, grpc.status <br>
+    *Type*: Histogram (Latency Buckets) <br>
+    *Unit*: `s` <br>
 
 ### Migration from OpenCensus
 
