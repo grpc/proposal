@@ -284,8 +284,8 @@ use cases.
 ### Built-in logger types
 
 We plan to implement the stdout logger as a built-in logger type. The type is
-named `stdout_logger`. This logger will not support any configuration and it
-outputs log entries to stdout in JSON format.
+named `stdout_logger`. No configuration fields are currently defined for this
+logger and it outputs log entries to stdout in JSON format.
 
 Here is the example JSON configuration in the xDS case (see [PR](https://github.com/envoyproxy/envoy/pull/26453)).
 
@@ -328,9 +328,9 @@ will expose for users to implement their own types of audit loggers. Below are
 two important features that apply to all the languages.
 
 As is also documented in all the languages below, the logging function is
-executed by gRPC syncrhonously during the authorization process. Therefore,
+executed by gRPC synchronously during the authorization process. Therefore,
 its implementation should not block the RPC. When needed, it should invoke any
-long running operations asyncrhonously so that the function itself returns
+long running operations asynchronously so that the function itself returns
 promptly. For this reason, no error or status code will be returned from it.
 
 The logger factory (aka builder/provider) needs to implement a config parsing
@@ -577,14 +577,14 @@ for the users.
 In the xDS cases, however, the audit condition could be considered as something
 on top of all RBAC filters and thus configured in the [HTTP Connection Manager][HttpConnectionManager proto].
 We decided not to take this approach because the component managing the filter
-chain would have to be aware of the last RBAC filte and inform it if performing
+chain would have to be aware of the last RBAC filter and inform it if performing
 the audit logging. In other words, this would require more engineering effort
 which does not make too much sense for such a particular case as audit logging.
 
 In practice, xDS users normally do not craft RBACs on their own but instead
 rely on the control plane APIs, such as Istio's Authorization Policy, to apply
 RBAC filters to the workloads. We hope that when these control plane APIs
-start to support audit logging, they will only have a single RBAC policy o
+start to support audit logging, they will only have a single RBAC policy or
 will handle the logging behavior as what we do in the gRPC authorization policy
 case.
 
