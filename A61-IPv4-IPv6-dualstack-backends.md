@@ -4,7 +4,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-09-22
+* Last updated: 2023-10-02
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -68,8 +68,8 @@ This proposal includes several parts:
   logic will be moved out of the subchannel and into the pick_first
   policy itself.
 - In xDS, we will support the new fields in EDS to indicate multiple
-  addresses per endpoint, and we will extend the session affinity
-  mechanisms to support such endpoints.
+  addresses per endpoint, and we will extend the stateful session
+  affinity mechanism to support such endpoints.
 
 ### Allow Resolvers to Return Multiple Addresses Per Endpoint
 
@@ -660,11 +660,18 @@ wrapping the subchannel's generic health reporting mechanism.
 
 ### Support Multiple Addresses Per Endpoint in xDS
 
-TODO: details
+The EDS resource has been updated to support multiple addresses per
+endpoint in
+[envoyproxy/envoy#27881](https://github.com/envoyproxy/envoy/pull/27881).
+Specifically, that PR adds a new `AdditionalAddresses` message, which
+contains a single `address` field, and it adds a repeated
+`additional_addresses` field of that type to the `Endpoint` proto.
 
-#### New EDS Fields
-
-TODO: details
+When validating the EDS resource, when processing the `Endpoint` proto,
+we validate each entry of `additional_addresses` as follows:
+- If the `address` field is unset, we reject the resource.
+- If the `address` field *is* set, then we validate it exactly the same
+  way that we already validate the `Endpoint.address` field.
 
 #### Changes to Stateful Session Affinity
 
