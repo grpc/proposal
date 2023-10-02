@@ -1,7 +1,7 @@
 Handling of null reference types in C# code generation
 ----
 * Author(s): Tony Newell
-* Approver: 
+* Approver: apolcyn
 * Status: Draft
 * Implemented in: csharp
 * Last updated: 2023-10-26
@@ -10,8 +10,9 @@ Handling of null reference types in C# code generation
 ## Abstract
 
 The protocol buffers compiler (`protoc`) and the gRPC C# compiler plugin 
-(`grpc_csharp_plugin`) generate C# code that does not use the nullable reference 
-types language features introduced in C# 8.0.
+(`grpc_csharp_plugin`) generate C# code that does not use the
+[nullable reference types](https://learn.microsoft.com/en-us/dotnet/csharp/nullable-references)
+language features introduced in C# 8.0.
 
 This document discusses the changes to be made to the code generation, the support 
 in `Grpc.Tools`, and any impact on existing projects.
@@ -56,7 +57,7 @@ Options will be added to `protoc` and `grpc_csharp_plugin` to enable generating 
 that supports nullable reference types. By default (without the new option) the code
 generated will be the same as today.
 
-Proposed name of option: *enable_nrt*
+Proposed name of option: `enable_nrt`
 
 e.g. 
 
@@ -115,8 +116,8 @@ public override Task<Empty> AddUser(User user, ServerCallContext context)
 }
 ```
 
-Right now this will happily compile without warnings. If the generatad code had 
-added the annotations for nullable refernece types then the user would get a warning
+Right now this will happily compile without warnings. If the generated code had 
+added the annotations for nullable reference types then the user would get a warning
 and would know that `User.Address` could be null.
 
 ## Implementation
@@ -132,9 +133,11 @@ There are three projects that need to be changed to fully support nullable refer
 It will require collaboration between the Protocol Buffers team and the gRPC team to
 coordinate the release of this feature.
 
+Below lists the known changes that will be needed. Other changes needed may become apparent during development.
+
 ### Protocol buffers code generation
 
-Add the `enable_nrt` option, and when the enabled:
+Add the `enable_nrt` option, and when enabled changes will include:
 - add `#nullable` directive
 - add annotations to Message fields as they can be null
 - `Equals(obj)` and `Equals(T)` would have nullable parameters
@@ -142,7 +145,7 @@ Add the `enable_nrt` option, and when the enabled:
 
 ### gRPC plugin code generation
 
-Add the `enable_nrt` option, and when the enabled:
+Add the `enable_nrt` option, and when enabled changes will include:
 - add `#nullable` directive
 - `BindService` would have a nullable parameter
 - add annotations to the `headers` parameter on gRPC client methods
@@ -166,4 +169,4 @@ There is separate and ongoing work to implement nullable annotations in the
 runtime. This is not part of this proposal which is focused on the code generation.
 
 See:
-- [#10170 Set all but main project to nullable ](https://github.com/protocolbuffers/protobuf/pull/10170)
+- [#10170 Set all but main project to nullable](https://github.com/protocolbuffers/protobuf/pull/10170)
