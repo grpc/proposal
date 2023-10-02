@@ -3,8 +3,8 @@ A59: gRPC Audit Logging
 * Author(s): [Luwei Ge](https://github.com/rockspore)
 * Approver: [Eric Anderson](https://github.com/ejona86)
 * Status: In Review {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in:
-* Last updated: 2023-05-12
+* Implemented in: C++ and Go
+* Last updated: 2023-10-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/LbnuqGqEwuM
 
 ## Abstract
