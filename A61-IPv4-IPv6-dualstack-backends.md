@@ -5,7 +5,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2023-10-02
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/VjORlKP97cE/m/ihqyN32TAQAJ
 
 ## Abstract
 
