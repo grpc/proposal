@@ -329,9 +329,10 @@ two important features that apply to all the languages.
 
 As is also documented in all the languages below, the logging function is
 executed by gRPC synchronously during the authorization process. Therefore,
-its implementation should not block the RPC. When needed, it should invoke any
-long running operations asynchronously so that the function itself returns
-promptly. For this reason, no error or status code will be returned from it.
+its implementation **must** not block the RPC. If a logger implementation needs
+to trigger any long-running work, it **must** do so asynchronously so that the
+function itself returns promptly. For this reason, no error or status code will
+be returned from it.
 
 The logger factory (aka builder/provider) needs to implement a config parsing
 function for parsing and validation logger configs, and a build function to
