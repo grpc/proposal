@@ -612,24 +612,45 @@ update that set in place when it receives an updated address list.
 
 #### Outlier Detection
 
-As described in [gRFC A50][A50], outlier detection currently tracks the
-state of each individual address, and ejection decisions are made on a
-per-address basis.  With this design, the outlier detection policy will be
-changed to instead track the state and make ejection decisions on a
-per-endpoint basis.
+The goal of the outlier detection policy is to temporarily stop sending
+traffic to servers that are returning an unusually large error rate.
+The kinds of problems that it is intended to catch are primarily things
+that are independent of which address is used to connect to the server;
+a problem with the reachability of a particular address is more likely to
+cause connectivity problems than individual RPC failures, and problems
+that cause RPC failures are generally just as likely to occur on any
+address.  Therefore, this design changes the outlier detection policy
+to make ejection decisions on a per-endpoint basis, instead of on a
+per-address basis as it does today.  RPCs made to any address associated
+with an endpoint will count as activity on that endpoint, and ejection
+or unejection decisions for an endpoint will affect subchannels for all
+addresses of an endpoint.
 
-The outlier detection policy currently maintains a map keyed by
-individual address.  This map will be changed to instead be keyed by the
-unordered set of addresses in each endpoint.  All subchannels for any of
-the addresses for the endpoint will be stored in the map value, and
-calls made to any of those addresses will count as activity on the
-endpoint.  The set of entries in the map will continue to be set based
-on the address list that the outlier detection policy receives from its
-parent.
+As described in [gRFC A50][A50], the outlier detection policy currently
+maintains a map keyed by individual address.  The map values contain both
+the set of currently existing subchannels for a given address as well
+as the ejection state for that address.  This map will be split into
+two maps: a map of currently existing subchannels, keyed by individual
+address, and a map of ejection state, keyed by the unordered set of
+addresses on the endpoint.
 
-TODO: when updating map, need to retain subchannels for existing addresses
--- maybe instead key map by individual address and point to other
-equivalent addresses, just like in xds_override_host?
+The entry in the subchannel map will hold a ref to the corresponding
+entry in the endpoint map.  This ref will be updated when the LB policy
+receives an updated address list, when the list of addresses in the
+endpoint changes.  It will be used to update the successful and failed
+call counts as each RPC finishes.  Note that appropriate synchronization
+is required for those two different accesses.
+
+The entry in the endpoint map will hold a pointer to the entries in the
+subchannel map for the addresses associated with the endpoint.  These
+pointers will be accessed by the LB policy when ejecting or unejecting
+the endpoint, to send health state notifications to the corresponding
+subchannels.  Note that if the ejection timer runs in the same
+synchronization context as the rest of the activity in the LB policy, no
+additional synchronization should be needed here.
+
+The set of entries in both maps will continue to be set based on the
+address list that the outlier detection policy receives from its parent.
 
 Currently, the outlier detection policy wraps the subchannels and ejects
 them by reporting their connectivity state as TRANSIENT_FAILURE.
@@ -792,13 +813,16 @@ backoff spec][backoff-spec] seems to have originally envisioned.
   (https://github.com/grpc/grpc/pull/34337)
 - change WRR to delegate to pick_first
   (https://github.com/grpc/grpc/pull/34245)
+- implement happy eyeballs in pick_first
+  (https://github.com/grpc/grpc/pull/34426)
 - change resolver and LB policy APIs to support multiple addresses per
   endpoint, and update most LB policies
   (https://github.com/grpc/grpc/pull/33567)
+- support new xDS fields (https://github.com/grpc/grpc/pull/34506)
 - change stateful session affinity to handle multiple addresses per endpoint
-- implement happy eyeballs in pick_first
-  (https://github.com/grpc/grpc/pull/34426)
-- support new xDS fields
+  (https://github.com/grpc/grpc/pull/34472)
+- change outlier detection to handle multiple addresses per endpoint
+  (https://github.com/grpc/grpc/pull/34526)
 
 ### Java
 
