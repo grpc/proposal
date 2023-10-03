@@ -21,6 +21,8 @@ This behavior is problematic because allowing clients to establish HTTP/2 sessio
 
 The behavior of `bindAsync` will be modified, so that the server will begin handling requests immediately after the port is bound. `start` will become a no-op, except that it will throw an error in the same situations when it currently does, for compatibility with code that expects those errors. `start` will also be deprecated, which means that it will output a standard Node deprecation message once per process.
 
+An incidental consequence of this change is that the rule that `bindAsync` cannot be called after `start` will be removed.
+
 ## Rationale
 
 The state we currently provide between `bindAsync` and `start` has little practical use in a running server, but can cause significant behavior and performance degredation if reached by accident (e.g. by omitting the `start` call). So it would be best to avoid those mistakes entirely by not providing that option. This change is potentially breaking if anyone is deliberately using that state, but I think that is unlikely. Anyone who is currently calling `start` in the callback for `bindAsync` should see minimal behavioral difference with this change.
