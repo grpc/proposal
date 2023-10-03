@@ -2,10 +2,10 @@ Node: Make `Server#start` a no-op
 ----
 * Author(s): murgatroid99
 * Approver: wenbozhu
-* Status: Draft
+* Status: In Review
 * Implemented in: Node.js
 * Last updated: 2023-10-02
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/zcGg6ipiZMo
 
 ## Abstract
 
