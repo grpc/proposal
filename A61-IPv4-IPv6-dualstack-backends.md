@@ -463,6 +463,11 @@ which may cause some unnecessary connection churn.  For this design, we
 are accepting this limitation, but we may consider optimizing this in
 the future if it becomes a problem.
 
+Except for the cases noted below (Ring Hash and Outlier Detection),
+it is up to the implementation whether a given LB policy takes resolver
+attributes into account when comparing endpoints from the old list and
+the new list.
+
 #### Weighted Round Robin
 
 In the `weighted_round_robin` policy described in [gRFC A58][A58], some
@@ -610,6 +615,12 @@ approach more like that of [Java and Go](#address-list-updates-in-javago):
 it will maintain a map of endpoints by the set of addresses, and it will
 update that set in place when it receives an updated address list.
 
+Because ring_hash chooses which endpoint to use via a hash function based
+solely on the first address of the endpoint, it does not make sense to
+have multiple endpoints with the same address that are differentiated
+only by the resolver attributes.  Thus, resolver attributes are ignored
+when de-duping endpoints.
+
 #### Outlier Detection
 
 The goal of the outlier detection policy is to temporarily stop sending
@@ -651,6 +662,8 @@ additional synchronization should be needed here.
 
 The set of entries in both maps will continue to be set based on the
 address list that the outlier detection policy receives from its parent.
+And the map keys will continue to use only the addresses, not taking
+resolver attributes into account.
 
 Currently, the outlier detection policy wraps the subchannels and ejects
 them by reporting their connectivity state as TRANSIENT_FAILURE.
@@ -826,10 +839,10 @@ backoff spec][backoff-spec] seems to have originally envisioned.
   endpoint, and update most LB policies
   (https://github.com/grpc/grpc/pull/33567)
 - support new xDS fields (https://github.com/grpc/grpc/pull/34506)
-- change stateful session affinity to handle multiple addresses per endpoint
-  (https://github.com/grpc/grpc/pull/34472)
 - change outlier detection to handle multiple addresses per endpoint
   (https://github.com/grpc/grpc/pull/34526)
+- change stateful session affinity to handle multiple addresses per endpoint
+  (https://github.com/grpc/grpc/pull/34472)
 
 ### Java
 
