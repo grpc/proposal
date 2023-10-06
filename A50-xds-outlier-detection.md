@@ -286,7 +286,7 @@ Envoy defines some errors as "external" and some as "local origin", and their sp
 
 We chose to populate the map entries using the address list passed in from the parent LB policy. As an alternative, we considered populating the map using addresses that the child LB policy uses to create subchannels. These two options would have approximately the same behavior with all common child LB policies, and this choice simplifies management of the lifecycle of map entries.
 
-One consequence of this choice is that attributes could not be used in the map keys. The child LB policy can create subchannels with different attributes than the ones provided in the address update, making it impossible to guarantee that addresses used to create subchannels can be associated with map keys, if attributes are taking into account. We have no use case for having multiple copies of an address with different attributes, this consequence did not significantly factor in to this decision.
+One consequence of this choice is that attributes could not be used in the map keys. The child LB policy can create subchannels with different attributes than the ones provided in the address update, making it impossible to guarantee that addresses used to create subchannels can be associated with map keys, if attributes are taking into account. We have no use case for having multiple copies of an address with different attributes, so this consequence did not significantly factor in to this decision.
 
 ### Ejection Reporting
 
