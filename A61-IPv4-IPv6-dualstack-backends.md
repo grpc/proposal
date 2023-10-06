@@ -279,7 +279,7 @@ or more addresses.  However, the Happy Eyeballs algorithm assumes a flat
 list of addresses, not this two-dimensional list.  To address that, we
 need to define how pick_first will flatten the list.  We also need to
 define how that flattening interacts with both the sorting described in
-[RFC-8304 section 4](https://www.rfc-editor.org/rfc/rfc8305#section-4)
+[RFC-8305 section 4](https://www.rfc-editor.org/rfc/rfc8305#section-4)
 and with the optional shuffling described in [gRFC A62][A62].
 
 There are three cases to consider here:
@@ -298,7 +298,7 @@ C. If pick_first is used as the top-level policy in the channel with a
    custom resolver implementation, it may see more than one endpoint,
    each of which has one or more addresses.
 
-[RFC-8304 section 4](https://www.rfc-editor.org/rfc/rfc8305#section-4)
+[RFC-8305 section 4](https://www.rfc-editor.org/rfc/rfc8305#section-4)
 says to perform RFC-6724 sorting first.  In gRPC, that sorting happens
 in the DNS resolver before the address list is passed to the LB policy,
 so it will already be done by the time pick_first sees the address list.
@@ -318,7 +318,7 @@ steps in the following order:
    each of the endpoints, in order.
 
 3. In the flattened list, interleave addresses from the two address
-   families, as per [RFC-8304 section
+   families, as per [RFC-8305 section
    4](https://www.rfc-editor.org/rfc/rfc8305#section-4).  Doing this on
    the flattened address list ensures the best behavior if only one of
    the two address families is working.
