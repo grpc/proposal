@@ -1,13 +1,13 @@
 A72: OpenTelemetry Tracing 
 ----
 * Author(s): [Yifei Zhuang](https://github.com/YifeiZhuang)
-* Approver: [Eric Anderson](https://github.com/ejona86), [Mark
-  Roth](https://github.com/markdroth), [Doug Fawley](https://github.com/dfawley),
+* Approver: [Eric Anderson](https://github.com/ejona86)
+* Reviewers: [Mark Roth](https://github.com/markdroth), [Doug Fawley](https://github.com/dfawley),
 [Feng Li](https://github.com/fengli79)
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
 * Last updated: 2023-07
-* Discussion at: 
+* Discussion at: https://groups.google.com/g/grpc-io/c/e_ByaRmtJak
 
 ## Abstract
 This proposal adds support for OpenTelemetry tracing and suggests migration
@@ -98,7 +98,7 @@ where during migration one will use OpenCensus and the other will use OpenTeleme
 All related APIs here are experimental until OpenTelemetry metrics [gRPC A66][A66] 
 is design and implementation complete.
 
-### New function in OpenTelemetry plugin
+### New Function In OpenTelemetry Plugin
 We will add tracing functions in grpc-open-telemetry plugin, along with OpenTelemetry 
 metrics [gRPC A66][A66].
 Languages will keep using the same gRPC infrastructures, e.g. interceptor and 
@@ -127,11 +127,11 @@ keys are mapped to:
 
 And OpenTelemetry no longer has span end options as OpenCensus does.
 
-### Propagator Wire format
+### Propagator Wire Format
 While gRPC OpenCensus directly interacts with the metadata API, gRPC OpenTelemetry 
 will use the standardized propagators API for context propagation, for the 
 following benefits:
-1. Fully integration with OpenTelemetry APIs that is easier for users to reason about.
+1. Full integration with OpenTelemetry APIs that is easier for users to reason about.
 2. Make it possible to plugin other propagators that the community supports.
 3. Flexible API that allows clean and simple migration paths to a different propagator.
 
@@ -140,15 +140,15 @@ that is to send string key/value pairs between the client and server, which is
 different from the binary header that gRPC currently uses. The future roadmap 
 to support binary propagators at OpenTelemetry is unclear. So, gRPC will use 
 propagator API in TextMap format with an optimization path (Go and Java) to work 
-around the binary propagator API. In fact, text map propagator does not show 
-visible performance impact for C++, which is most sensitive to performance,
-based on internal micro benchmarking. Therefore, gRPC will not favor binary 
-propagators over TextMap propagators.
+around the lack of binary propagator API to support `grpc-trace-bin`. In fact,
+TextMap propagator does not show visible performance impact for C++, which is 
+the most sensitive language to performance, based on internal micro benchmarking. 
+Therefore, gRPC will only support `grpc-trace-bin` and TextMap propagators.
 
 gRPC will expose a custom `grpcTraceBinPropagator` that implements `TextMapPropagator`.
 This grpc-provided propagator still uses the `grpc-trace-bin` header for context 
-propagation. The OpenCensus spanContext and OpenTelemetry spanContext transmitted
-in binary header over the wire are identical, therefore a gRPC OpenCensus client can 
+propagation. When using `grpc-trace-bin` the OpenCensus spanContext and 
+OpenTelemetry spanContext  are identical, therefore a gRPC OpenCensus client can 
 speak with a gRPC OpenTelemetry server and vice versa. Users can provide a 
 single composite propagator that combines one or multiple `TextMapPropagator` 
 for their client and server separately. This way, users can define their own 
@@ -173,10 +173,10 @@ public class GrpcTraceBinPropagator implements TextMapPropagator {
       // the overloaded set(Metadata, String, byte[]) method added by gRPC.
       ((GrpcCommonSetter) setter).set((Metadata) carrier, "grpc-trace-bin", value);
     } else {
-      // Slow path for C++. gRPC C++ does not have type checking, so we encode bytes to 
-      // String to comply with the TextMapSetter API. This code path is also used in the 
-      // situation where GrpcTraceBinTextMapPropagator is used with a TextMapSetter 
-      // externally.
+      // Slow path for C++. gRPC C++ does not have runtime type inspection, so we 
+      // encode bytes to String to comply with the TextMapSetter API. This code 
+      // path is also used in the situation where GrpcTraceBinTextMapPropagator 
+      // is used with a TextMapSetter externally.
       setter.set(carrier, "grpc-trace-bin", Base64.getEncoder().encodeToString(value));
     }
   }
@@ -277,8 +277,9 @@ C++ will also support the propagators API, because this imposes API
 uniformity among languages. Due to the language restriction, 
 C++ can not take the optimization path to workaround lacking the binary 
 propagator API. That means using propagators API with C++ needs base64 encoding 
-and therefore is slower compared with just using metadata API. However, C++ can be 
-configured to interact with metadata directly, like the current gRPC OpenCensus.
+and therefore is slower compared with just using metadata API. However, C++ will 
+have an API that enables adding `grpc-trace-bin` to the metadata directly, without 
+using the propagators API.
 This is a faster way that avoids paying for the performance cost due to 
 string/binary encoding between the propagator and the getter/setter. 
 We use this strategy to balance between API simplicity and performance efficiency.
@@ -295,14 +296,14 @@ and `GrpcCommonSetter`.
 
 The `GrpcCommonSetter.set()` and `GrpcCommonGetter.get()` method in C++
 should handle both binary (`-bin`) header 
-(e.g. `grpc-trace-bin`) and ASCII header from other text map 
+(e.g. `grpc-trace-bin`) and ASCII header from other TextMap 
 propagators that users configure into gRPC OpenTelemetry, e.g. w3c.
 
-### Grpc OpenTelemetry Tracing API
+### gRPC OpenTelemetry Tracing API
 This section talks about enabling and configuring OpenTelemetry tracing.
-The OpenTelemetry API will coexist with the 
-OpenCensus API until the latter is dropped. Only one "grpc-trace-bin" header 
-will be sent for a single RPC.
+The OpenTelemetry API will coexist with the OpenCensus API. Only one 
+`grpc-trace-bin` header will be sent for a single RPC as long as only one of 
+OpenTelemetry or OpenCensus is enabled for the channel.
 
 The APIs are different among languages due to different underlying infrastructures.
 
@@ -361,16 +362,13 @@ In Go, the OpenTelemetry stream tracers and interceptors will be provided for us
 
 TODO: add Go API.
 
-### Migrate to OpenTelemetry: cross-process networking concerns
-When clients first introduce gRPC OpenTelemetry, for the time window when the 
+### Migrate to OpenTelemetry: Cross-process Networking Concerns
+When users first introduce gRPC OpenTelemetry, for the time window when the
 gRPC client and server have mixed plugins of OpenTelemetry and OpenCensus, 
-with `grpcTraceBinPropagator` users can do migration easily with the compatibility
-guaranteed. It is encouraged to use `grpcTraceBinPropagator` that propagates
-`grpc-trace-bin` header for migration because of the following advantages:
-* Simplified migration path, no migration phase deployments.
-* Binary header is more efficient.
+it is encouraged to use `grpcTraceBinPropagator` that propagates
+`grpc-trace-bin` header for the migration. Using the same header greatly simplifies rollout.
 
-A binary formatter implementation for OpenTelemetry is needed in each language, 
+A `grpc-trace-bin` formatter implementation for OpenTelemetry is needed in each language, 
 which can be similar to the OpenCensus implementation. Go already has community 
 support for that.
 
@@ -386,7 +384,7 @@ a new propagator. An example migration path can be:
 2. Configure the client with the desired new propagators and to drop the old propagator.
 3. Make the server only accept the new propagators and complete the migration.
 
-### Migrate to OpenTelemetry: in binary
+### Migrate to OpenTelemetry: In Binary
 The OpenCensus [shim](https://github.com/open-telemetry/opentelemetry-java/tree/main/opencensus-shim)
 (currently available in Java, Go, Python) allows binaries that have a mix of 
 OpenTelemetry and OpenCensus dependencies to export trace spans from both frameworks,
@@ -397,26 +395,34 @@ cross-cutting concerns migration can be done in parallel.
 The shim packages that bridge two libraries works as follows, considering the
 following migration scenarios example: 
 
-`|-- Application - Configured OpenCensus ------------------------------- |`\
-`|--  gRPC -> Using OpenCensus to generate Trace A  -------------------- |`\
-`|--  Application -> Using OpenCensus to generate a sub Trace B--------- |`
+```agsl
+|-- Application - Configured OpenCensus ------------------------------- |
+|--  gRPC -> Using OpenCensus to generate Trace A  -------------------- |
+|--  Application -> Using OpenCensus to generate a sub Trace B--------- |
+```
 
-The application may use a bridge package in the outermost layer first:\
-`|-- Application - Configured Otel w/ OpenCensus Shim ------------------- |`\
-`|--  gRPC -> Using OpenCensus to generate Trace A  --------------------- |`\
-`|--  Application -> Using OpenCensus to generate a sub Trace B---------- |`
+The application may use a bridge package in the outermost layer first:
+```agsl
+|-- Application - Configured Otel w/ OpenCensus Shim ------------------- |
+|--  gRPC -> Using OpenCensus to generate Trace A  --------------------- |
+|--  Application -> Using OpenCensus to generate a sub Trace B---------- |
+```
 
-Then the application changes the instrumentation to OpenTelemetry:\
-`|-- Application - Configured Otel w/ OpenCensus Shim ---------------------- |`\
-`|--  gRPC -> Using Otel to generate Trace A  ------------------------------ |`\
-`|--  Application -> Using Otel to generate a sub Trace B------------------- |`
+Then the application changes the instrumentation to OpenTelemetry:
+```agsl
+|-- Application - Configured Otel w/ OpenCensus Shim ---------------------- |
+|--  gRPC -> Using OpenCensus to generate Trace A  -------------------------|
+|--  Application -> Using Otel to generate a sub Trace B------------------- |
+```
 
-Finally, they switch to grpc-open-telemetry and finish the migration.\
-`|-- Application - Configured Otel standalone ----------------------------- |`\
-`|--  gRPC -> Using Otel to generate Trace A  ----------------------------- |`\
-`|--  Application -> Using Otel to generate a sub Trace B------------------ |`
+Finally, they switch to grpc-open-telemetry and finish the migration.
+```agsl
+|-- Application - Configured Otel standalone ----------------------------- |
+|--  gRPC -> Using Otel to generate Trace A  ----------------------------- |
+|--  Application -> Using Otel to generate a sub Trace B------------------ |
+```
 
-## Rational
+## Rationale
 N/A
 
 ## Implementation
