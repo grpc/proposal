@@ -1,11 +1,11 @@
 Node.js Reflection Server Library
 ----
 * Author(s): jtimmons
-* Approver:
-* Status: Draft
+* Approver: murgatroid99
+* Status: In Review
 * Implemented in: Node.js
-* Last updated: 2023-10-09
-* Discussion at:
+* Last updated: 2023-10-10
+* Discussion at: https://groups.google.com/g/grpc-io/c/Ie2jFIHCwrc
 
 ## Abstract
 
