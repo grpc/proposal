@@ -105,11 +105,15 @@ I (jtimmons) will implement this once the maintainers have approved
 
 ## Open issues (if applicable)
 
-### 1. Package Publishing
+### ~1. Package Publishing~
 
-Not sure how the package versioning and publishing works but may need some help from a maintainer to set that up and publish things into the `@grpc` scope
+~Not sure how the package versioning and publishing works but may need some help from a maintainer to set that up and publish things into the `@grpc` scope~
 
-### 2. keepCase Option
-One of the more awkward pieces in here is dealing with grpc-js/proto-loader's `keepCase` option, though this isn't unique to this library. Consumers can have their gRPC server configured with `keepCase` either on or off which changes the message handling substantially: for example if enabled then we would need to refer to the `listServices` field as `list_services` instead.
+**update**: addressed in [this PR thread](https://github.com/grpc/proposal/pull/397#discussion_r1355334943). Maintainers will handle package publishing separate from the initial implementation.
 
-I'm not sure if there's an official way of handling this but in the existing implementation we've had to introduce some [kludgey manual camel-casing logic](https://gitlab.com/jtimmons/nestjs-grpc-reflection-module/-/blob/30b67a78ff99e31ae54a0ab34c3784316579c665/src/grpc-reflection/controllers/v1.base.controller.ts#L48) to handle users of both settings.
+### ~2. keepCase Option~
+~One of the more awkward pieces in here is dealing with grpc-js/proto-loader's `keepCase` option, though this isn't unique to this library. Consumers can have their gRPC server configured with `keepCase` either on or off which changes the message handling substantially: for example if enabled then we would need to refer to the `listServices` field as `list_services` instead.~
+
+~I'm not sure if there's an official way of handling this but in the existing implementation we've had to introduce some [kludgey manual camel-casing logic](https://gitlab.com/jtimmons/nestjs-grpc-reflection-module/-/blob/30b67a78ff99e31ae54a0ab34c3784316579c665/src/grpc-reflection/controllers/v1.base.controller.ts#L48) to handle users of both settings.~
+
+**update**: addressed in [this PR thread](https://github.com/grpc/proposal/pull/397#discussion_r1355335656). Non-issue and seems to be unique to how NestJS gRPC controllers work - will be opening a ticket in their repo to address this
