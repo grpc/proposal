@@ -27,7 +27,7 @@ This feature was initially requested in grpc/grpc-node#79
 
 ## Proposal
 
-We are proposing the creation of a new `@grpc/reflection-server` package with the following external interface:
+We are proposing the creation of a new `@grpc/reflection` package with the following external interface:
 
 ```ts
 import type { Server as GrpcServer } from '@grpc/grpc-js';
