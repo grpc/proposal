@@ -4,7 +4,7 @@ Node.js Reflection Server Library
 * Approver: murgatroid99
 * Status: In Review
 * Implemented in: Node.js
-* Last updated: 2023-10-10
+* Last updated: 2023-10-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/Ie2jFIHCwrc
 
 ## Abstract
@@ -31,20 +31,13 @@ We are proposing the creation of a new `@grpc/reflection` package with the follo
 
 ```ts
 import type { Server as GrpcServer } from '@grpc/grpc-js';
-import type { Options as ProtoLoaderOptions } from '@grpc/proto-loader';
+import type { PackageDefinition } from '@grpc/proto-loader';
 
 type MinimalGrpcServer = Pick<GrpcServer, 'addService'>;
 
-interface ReflectionOptions {
-  filename: string | string[];
-  loader: ProtoLoaderOptions;
-}
-
 export interface ReflectionServer {
-  constructor(options?: ReflectionOptions);
-  load(options: ReflectionOptions);
-  loadSync(options: ReflectionOptions);
-
+  constructor(pkg: PackageDefinition);
+  reload(pkg: PackageDefinition);
   addToServer(server: MinimalGrpcServer);
 }
 ```
@@ -60,8 +53,7 @@ import {
 } from './proto/grpc/reflection/v1/reflection';
 
 export interface ReflectionV1Implementation {
-  async load(options: ReflectionOptions);
-  loadSync(options: ReflectionOptions);
+  constructor(pkg: PackageDefinition);
 
   listServices(listServices: string): ListServiceResponse;
   fileContainingSymbol(symbol: string): FileDescriptorResponse;
@@ -75,20 +67,23 @@ export interface ReflectionV1Implementation {
 The user will leverage the library in a way very similar to the [gRPC health check service](https://github.com/grpc/grpc-node/tree/83743646cf69baf9ae1294015de5ffed33339154/packages/grpc-health-check) by creating a new class to manage the reflection logic and then adding that to the gRPC server:
 
 ```ts
-import { ReflectionServer } from 'grpc-health-check';
+import { join } from 'path';
 
-// load synchronously with the files we have right now
-const reflection = new ReflectionServer({
-  filename: ['./proto/example.proto'],
-  loader: {
-    includeDirs: ['./node_modules/dependency/proto']
-  }
-});
-reflection.addToServer(server);
-server.start();
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
+import { ReflectionServer } from '@grpc/reflection';
 
-// can reload later on if additional services are added
-reflection.load({ ... })
+const pkg = protoLoader.loadSync(join(__dirname, 'sample.proto'));
+const reflection = new ReflectionServer(pkg);
+
+const server = new grpc.Server();
+const proto = grpc.loadPackageDefinition(pkg) as any;
+server.addService(proto.sample.SampleService.service, { ... });
+reflection.addToServer(server)
+
+server.bindAsync('0.0.0.0:5001', grpc.ServerCredentials.createInsecure(), () => { server.start(); });
+
+reflection.reload({ ... }) // can reload later on if additional services are added
 ```
 
 ## Rationale
