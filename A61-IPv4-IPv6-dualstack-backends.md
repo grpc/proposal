@@ -4,7 +4,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-10-11
+* Last updated: 2023-10-17
 * Discussion at: https://groups.google.com/g/grpc-io/c/VjORlKP97cE/m/ihqyN32TAQAJ
 
 ## Abstract
@@ -834,7 +834,8 @@ backoff spec][backoff-spec] seems to have originally envisioned.
 - change WRR to delegate to pick_first
   (https://github.com/grpc/grpc/pull/34245)
 - implement happy eyeballs in pick_first
-  (https://github.com/grpc/grpc/pull/34426)
+  (https://github.com/grpc/grpc/pull/34426 and
+  https://github.com/grpc/grpc/pull/34717)
 - implement address interleaving for happy eyeballs
   (https://github.com/grpc/grpc/pull/34615)
 - change resolver and LB policy APIs to support multiple addresses per
