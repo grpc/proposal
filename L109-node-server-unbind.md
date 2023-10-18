@@ -5,7 +5,7 @@ Node: Server API to unbind ports
 * Status: In Review
 * Implemented in: Node.js
 * Last updated: 2023-10-18
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/0R8lD87XDo8
 
 ## Abstract
 
