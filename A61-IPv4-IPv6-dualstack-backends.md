@@ -837,7 +837,8 @@ backoff spec][backoff-spec] seems to have originally envisioned.
   (https://github.com/grpc/grpc/pull/34426 and
   https://github.com/grpc/grpc/pull/34717)
 - implement address interleaving for happy eyeballs
-  (https://github.com/grpc/grpc/pull/34615)
+  (https://github.com/grpc/grpc/pull/34615 and
+  https://github.com/grpc/grpc/pull/34804)
 - change resolver and LB policy APIs to support multiple addresses per
   endpoint, and update most LB policies
   (https://github.com/grpc/grpc/pull/33567)
