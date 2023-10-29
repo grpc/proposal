@@ -35,14 +35,17 @@ import type { PackageDefinition } from '@grpc/proto-loader';
 
 type MinimalGrpcServer = Pick<GrpcServer, 'addService'>;
 
+interface ReflectionServerOptions {
+  services?: string[]; // whitelist of fully-qualified service names to expose. Default: expose all
+}
+
 export interface ReflectionServer {
-  constructor(pkg: PackageDefinition);
-  reload(pkg: PackageDefinition);
+  constructor(pkg: PackageDefinition, options?: ReflectionServerOptions);
   addToServer(server: MinimalGrpcServer);
 }
 ```
 
-this class will be responsible for managing requests for the various published versions of the gRPC Reflection Specification. At the time of writing, this includes `v1` and `v1alpha` but may include more in the future. These version-specific handlers will be isolated into their own services, such as the following which can be used for both `v1` and `v1alpha` due to their identical interface:
+this `ReflectionServer` class will be used to expose information about the user's gRPC package according to the gRPC Reflection Specification via their existing gRPC Server. Internally, the class will be responsible for managing incoming requests for each of the various published versions of the gRPC Reflection Specification: at the time of writing, this includes `v1` and `v1alpha` but may include more in the future. These version-specific handlers will be isolated into their own services in order to preserve backwards-compatibility, and will look like the following:
 
 **reflection.v1.ts**
 ```ts
@@ -82,8 +85,6 @@ server.addService(proto.sample.SampleService.service, { ... });
 reflection.addToServer(server)
 
 server.bindAsync('0.0.0.0:5001', grpc.ServerCredentials.createInsecure(), () => { server.start(); });
-
-reflection.reload({ ... }) // can reload later on if additional services are added
 ```
 
 ## Rationale
@@ -93,6 +94,14 @@ several reflection implementations linked above leverage protoc in order to gene
 
 ### 2. Design Decision: support multiple reflection implementations
 currently not all reflection clients request the `v1` version of the spec so we need to include handlers for both `v1` and `v1alpha` to support both during the transition. For this reason we separate the reflection handling logic itself to allow for reuse across multiple service versions
+
+### 3. Design Decision: restrict user to loading a single PackageDefinition
+
+ideally we would be able to support the user adding multiple `PackageDefinition` objects at a time in a similar way to the gRPC server itself, however due to some internal protobuf behavior discussed in [this thread](https://github.com/grpc/proposal/pull/397#discussion_r1357181337) this is currently difficult to accomplish. For that reason we will be restricting the user to loading a single PackageDefinition for the time being to avoid any confusing behavior or bugs. Detail on the issue is described below for completeness:
+
+**background**: when loading a `PackageDefinition` object via the `protoLoader.load(...)` function, proto-loader/protobufjs will rename the input `.proto` files based on their [protobuf package](https://protobuf.dev/programming-guides/proto3/#packages) name. For example a file named _file.proto_ in the `sample` package will actually be referred to as _sample.proto_ in all `FileDescriptorProto` objects in the resulting `PackageDefinition`.
+
+This behavior can cause issues when multiple files exist within the _same_ package as there can be confusion about what is the "real" contents of a file (which is critical information for the reflection API). Proto-loader/protobufjs handles this for a _single_ `load()` call by unifying all files into a single package-file; for example: if we have files _vendor/a.proto_ and _vendor/b.proto_ which are both in the `vendor` protobuf namespace then contents from both files will be combined into a single _vendor.proto_ file descriptor in the `PackageDefinition`. The issue arises when we attempt multiple invocations of `protoLoader.load()` as each may only fetch a subset of the package (in this example from _a.proto_ in the first invocation and _b.proto_ in the second). In these cases we have multiple different _vendor.proto_ references which breaks the assumptions of the reflection specification in which files are often looked up by name.
 
 ## Implementation
 
