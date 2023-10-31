@@ -4,7 +4,7 @@ Node.js Reflection Server Library
 * Approver: murgatroid99
 * Status: In Review
 * Implemented in: Node.js
-* Last updated: 2023-10-11
+* Last updated: 2023-10-31
 * Discussion at: https://groups.google.com/g/grpc-io/c/Ie2jFIHCwrc
 
 ## Abstract
@@ -95,29 +95,18 @@ several reflection implementations linked above leverage protoc in order to gene
 ### 2. Design Decision: support multiple reflection implementations
 currently not all reflection clients request the `v1` version of the spec so we need to include handlers for both `v1` and `v1alpha` to support both during the transition. For this reason we separate the reflection handling logic itself to allow for reuse across multiple service versions
 
-### 3. Design Decision: restrict user to loading a single PackageDefinition
-
-ideally we would be able to support the user adding multiple `PackageDefinition` objects at a time in a similar way to the gRPC server itself, however due to some internal protobuf behavior discussed in [this thread](https://github.com/grpc/proposal/pull/397#discussion_r1357181337) this is currently difficult to accomplish. For that reason we will be restricting the user to loading a single PackageDefinition for the time being to avoid any confusing behavior or bugs. Detail on the issue is described below for completeness:
-
-**background**: when loading a `PackageDefinition` object via the `protoLoader.load(...)` function, proto-loader/protobufjs will rename the input `.proto` files based on their [protobuf package](https://protobuf.dev/programming-guides/proto3/#packages) name. For example a file named _file.proto_ in the `sample` package will actually be referred to as _sample.proto_ in all `FileDescriptorProto` objects in the resulting `PackageDefinition`.
-
-This behavior can cause issues when multiple files exist within the _same_ package as there can be confusion about what is the "real" contents of a file (which is critical information for the reflection API). Proto-loader/protobufjs handles this for a _single_ `load()` call by unifying all files into a single package-file; for example: if we have files _vendor/a.proto_ and _vendor/b.proto_ which are both in the `vendor` protobuf namespace then contents from both files will be combined into a single _vendor.proto_ file descriptor in the `PackageDefinition`. The issue arises when we attempt multiple invocations of `protoLoader.load()` as each may only fetch a subset of the package (in this example from _a.proto_ in the first invocation and _b.proto_ in the second). In these cases we have multiple different _vendor.proto_ references which breaks the assumptions of the reflection specification in which files are often looked up by name.
-
 ## Implementation
 
 I (jtimmons) will implement this once the maintainers have approved
 
 ## Open issues (if applicable)
 
-### ~1. Package Publishing~
+### User is restricted to loading a single PackageDefinition
 
-~Not sure how the package versioning and publishing works but may need some help from a maintainer to set that up and publish things into the `@grpc` scope~
+ideally we would be able to support the user adding multiple `PackageDefinition` objects at a time in a similar way to the gRPC server itself, however due to some internal protobuf behavior discussed in [this thread](https://github.com/grpc/proposal/pull/397#discussion_r1357181337) this is currently difficult to accomplish. For that reason we will be restricting the user to loading a single PackageDefinition for the time being to avoid any confusing behavior or bugs. Practically, this will prevent the user from being able to load dynamic gRPC services that they are not aware of at startup time until this can be resolved.
 
-**update**: addressed in [this PR thread](https://github.com/grpc/proposal/pull/397#discussion_r1355334943). Maintainers will handle package publishing separate from the initial implementation.
+The issue is described in more detail below for completeness:
 
-### ~2. keepCase Option~
-~One of the more awkward pieces in here is dealing with grpc-js/proto-loader's `keepCase` option, though this isn't unique to this library. Consumers can have their gRPC server configured with `keepCase` either on or off which changes the message handling substantially: for example if enabled then we would need to refer to the `listServices` field as `list_services` instead.~
+**background**: when loading a `PackageDefinition` object via the `protoLoader.load(...)` function, proto-loader/protobufjs will rename the input `.proto` files based on their [protobuf package](https://protobuf.dev/programming-guides/proto3/#packages) name. For example a file named _file.proto_ in the `sample` package will actually be referred to as _sample.proto_ in all `FileDescriptorProto` objects in the resulting `PackageDefinition`.
 
-~I'm not sure if there's an official way of handling this but in the existing implementation we've had to introduce some [kludgey manual camel-casing logic](https://gitlab.com/jtimmons/nestjs-grpc-reflection-module/-/blob/30b67a78ff99e31ae54a0ab34c3784316579c665/src/grpc-reflection/controllers/v1.base.controller.ts#L48) to handle users of both settings.~
-
-**update**: addressed in [this PR thread](https://github.com/grpc/proposal/pull/397#discussion_r1355335656). Non-issue and seems to be unique to how NestJS gRPC controllers work - will be opening a ticket in their repo to address this
+This behavior can cause issues when multiple files exist within the _same_ package as there can be confusion about what is the "real" contents of a file (which is critical information for the reflection API). Proto-loader/protobufjs handles this for a _single_ `load()` call by unifying all files into a single package-file; for example: if we have files _vendor/a.proto_ and _vendor/b.proto_ which are both in the `vendor` protobuf namespace then contents from both files will be combined into a single _vendor.proto_ file descriptor in the `PackageDefinition`. The issue arises when we attempt multiple invocations of `protoLoader.load()` as each may only fetch a subset of the package (in this example from _a.proto_ in the first invocation and _b.proto_ in the second). In these cases we have multiple different _vendor.proto_ references which breaks the assumptions of the reflection specification in which files are often looked up by name.
