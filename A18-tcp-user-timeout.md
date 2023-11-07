@@ -93,9 +93,10 @@ cost, or need to introduce another configurable option.
 C-Core - [#16419](https://github.com/grpc/grpc/issues/16419) sets the
 TCP_USER_TIMEOUT socket option.
 
-JAVA - For JAVA, the OkHttp library we use does not support setting such an
-option. Netty with NIO also does not support this. Netty with epoll/kqueue
-allows setting this option and the user is already capable of configuring this.
+Java - [#5599](https://github.com/grpc/grpc-java/pull/5599) sets the
+TCP_USER_TIMEOUT socket option in grpc-netty, when the JNI components for epoll
+or kqueue is available. grpc-netty-shaded includes epoll and kqueue JNI
+components for common architectures.
 
 Go - [#2307](https://github.com/grpc/grpc-go/pull/2307) sets the
 TCP_USER_TIMEOUT socket option.
