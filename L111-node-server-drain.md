@@ -9,7 +9,7 @@ Node: Server API to drain connections on a port
 
 ## Abstract
 
-Add a new method `bind` to the `Server` class to close all active connections on a specific port or all ports
+Add a new method `drain` to the `Server` class to gracefully close all active connections on a specific port or all ports.
 
 ## Background
 
