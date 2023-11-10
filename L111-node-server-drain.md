@@ -5,7 +5,7 @@ Node: Server API to drain connections on a port
 * Status: In Review
 * Implemented in: Node.js
 * Last updated: 2023-11-09
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/-md8UlWAtKY
 
 ## Abstract
 
