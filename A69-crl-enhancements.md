@@ -22,7 +22,7 @@ gRPC has an MVP implementation for CRLs (Certificate Revocation Lists). We wish 
 * [A43: gRPC authorization API](https://github.com/grpc/proposal/blob/master/A43-grpc-authorization-api.md)
 
 ## Proposal
-We seek to provide an alternate option for users to customize CRL handling. In a similar way that `CredentialReloading` is implemented, we will add a `CrlProvider`` interface through which gRPC fetches CRLs. In gRPC we will implement two providers (these match what we provide for certificates as well):
+We seek to provide an alternate option for users to customize CRL handling. In a similar way that `CredentialReloading` is implemented, we will add a `CrlProvider` interface through which gRPC fetches CRLs. In gRPC we will implement two providers (these match what we provide for certificates as well):
 
 1. A `StaticCrlProvider` that takes a list of strings that represent CRL file content
 1. A `CrlReloaderProvider` that periodically and asynchronously reloads a local directory of CRLs.
@@ -46,7 +46,7 @@ public:
 // consistency as most X509 APIs that try to get a CRL expect to get a cert
 // passed in. In each language we may use an abstraction here that makes it easy
 // to get CRL-lookup information from the certificate.
-// Expected to use as read-only 
+// Return value expected to be as read-only 
 // Returns null if there isn't an associated CRL (as null is different than an
 // empty CRL)
   CRL Crl(certficate/certificateInfo)
@@ -86,16 +86,23 @@ RevocationStatus GetRevocationStatus(cert, crlProvider, settings) {
 This is a simple provider that takes in all CRLs to be used as raw strings during initialization, then returns them in the appropriate format when called. The CRLs will be stored in a mapping of a hash of the issuer to the CRL content.
 
 ### Provider Implementation - Directory Provider
-This provider will periodically read CRL files in a given directory and update gRPCs internal representation of those CRLs. We expect this will be heavily used, as a directory of CRLs is very common for X509 CRL files. The CRLs will be stored in a mapping of a hash of the issuer to the CRL content - `map<issuer_hash, crl_object>`.
+This provider will periodically read CRL files in a given directory and update gRPCs internal representation of those CRLs. We expect this will be heavily used, as a directory of CRLs is very common for X509 CRL files. The CRLs will be stored in a mapping of a hash of the issuer to the CRL content - `map<issuer_hash, crl_object>`. The initial read of the directory and filling of this map will be synchronous during server startup when the provider is created.
+
 In the case that the directory and all files within are read completely during an update, we will treat the directory as the exact truth. This means if a CRL was in-memory and is no longer in the directory after the update, it will be removed in-memory.
+
 In the case that there is an issue reading a file, we cannot be certain what exactly is happening. In particular, we enforce no naming convention on the CRL files, so if it cannot be read, we cannot know what it contains or what issuer it belongs to. We will do a best-effort safe update - for files which are read correctly, we can update those individual entries. Since we can't know the issuer if a file can't be read, it is unsafe to do deletion in this case. An overridable error callback will be called so the user can receive a signal that something has gone wrong with CRLs.
+
 We will also require that users perform safe and atomic file/directory operations with their CRL files using filesystem primitives (for example, the copy-rename pattern). If users do not exercise good file management hygiene, we cannot guarantee any exact behavior. For example, if a user creates a directory and writes files one-by-one, there is a chance the directory reloader would update when only 1 file was present and this would be seen as a success (so this would overall be unspecified behavior because of bad file hygiene). If a user has needs that don't match this, they can implement the interface per their needs.
+
 If a CRL is not found for an issuer this is fine - the verification code will return RevocationUndetermined per RFC5280, then the user will have a setting to fail-open or fail-closed indicating whether RevocationUndetermined should be treated as Unrevoked or Revoked respectively.
 
+
 #### API Outcomes and Error Handling
+An important note to make here is that all IO and error callbacks will happen asynchronously on a separate thread from the main grpc client/server. By design this error callback is purely informational, it is not a decision maker nor behavior adjusting callback.
+
 Because CRLs involve reading/writing from the filesystem, we will have to deal with potential edge cases of bad files, bad updates, etc. From a high-level perspective, we are going to follow the [Authz Policy design patterns](https://github.com/grpc/proposal/blob/master/A43-grpc-authorization-api.md) - use existing information in case an update contains bad data. Startup behavior is not different from updates. Particularly in the case of updating CRLs, we don't want to error and crash the server if there is a bad update. However, we still want this error to be known, so we will have an optional and overridable error callback when CRLs fail to be read. This will let users tie in whatever alerting/monitoring they may want in these failure cases. This callback will be for notifications/alerting, it will not be a decision-making callback (it is expected the IO for CRLs will already be done in the background, so these errors would not be on the main path by design anyways). Users should use `RevocationUndertermined` combined with the FailOpen/FailClosed knob for decision making on uncertain CRLs.
 
-These cases are all on a per-CRL level - a given CRL having an issue will not keep other good CRLs in an update batch to fail. The opposite behavior - failing the whole batch or dropping all the handshakes in the case of a bad CRL - might enable a DDOS-type attack vector.
+These cases are all on a per-CRL level - a given CRL having an issue will not keep other good CRLs in an update batch to fail. The opposite behavior - failing the whole batch or dropping all the handshakes in the case of a bad CRL - might enable a DOS-type attack vector.
 
 Example behavior for a directory reloader:
 
@@ -142,13 +149,10 @@ The core CrlProvider interface will look as follows. Since x509 is a built in go
 type CRLProvider interface {
 	// Callers are expected to use the returned value as read-only.
 	CRL(cert x509.Certificate) (*CertificateListExt, error)
-
-	// Close cleans up resources allocated by the Provider.
-	Close()
 }
 ```
 
-Regarding sharing between connections - since the providers are in a high-level configuration, the same provider should be used across many individual connections and handshakes. [Here is an example of how the credential reloading provider is configured](https://github.com/grpc/grpc-go/blob/master/security/advancedtls/examples/credential_reloading_from_files/server/main.go#L63). In this example, the server would use this provider for all connections.
+Regarding sharing between connections - since the providers are in a high-level configuration, the same provider should be used across many individual connections and handshakes. [Here is an example of how the credential reloading provider is configured](https://github.com/grpc/grpc-go/blob/7935c4f759419cb0ab4cc50070f5487b33a19bb7/security/advancedtls/examples/credential_reloading_from_files/server/main.go#L58-L63). In this example, the server would use this provider for all connections.
 
 #### Directory Reloader Specifics
 ![Directory Reloader Flow](A69_graphics/golang_reloader.png)
