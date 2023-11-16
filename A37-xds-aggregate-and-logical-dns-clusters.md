@@ -29,7 +29,7 @@ will be changing to meet the new spec.  gRPC's implementation will meet
 this new spec from the start.  For details, see
 https://github.com/envoyproxy/envoy/issues/13134.
 
-### Related Proposals: 
+### Related Proposals:
 
 This proposal builds on the earlier xDS work described in the following
 proposals:
@@ -126,6 +126,16 @@ If any of a CDS policy's watchers reports that the resource does not exist, the
 policy should report that it is in TRANSIENT_FAILURE. If any of the watchers
 reports a transient ADS stream error, the policy should report that it is in
 TRANSIENT_FAILURE if it has never passed a config to its child.
+
+In an aggregate cluster, the `locality_picking_policy` and
+`endpoint_picking_policy` fields of the `xds_cluster_resolver_experimental`
+policy config (see below) come from the aggregate cluster, not the underlying
+clusters. Currently, we do not support any LB policy except ROUND_ROBIN, so
+this decision is moot. The CDS policy can either hardcode those fields with
+their default values, or leave them empty and let the
+`xds_cluster_resolver_experimental` policy apply those defaults. In the future,
+when other LB policies are supported, these fields will be derived from the
+aggregate cluster.
 
 ### Splitting up EDS LB Policy
 

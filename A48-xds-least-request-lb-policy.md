@@ -101,11 +101,8 @@ config will be rejected.
 
 ##### Subchannel connectivity management
 
-The subchannel connectivity management implemented in the `round_robin` policy will be re-used
+The same subchannel connectivity management logic implemented in the `round_robin` policy will be used
 for `least_request_experimental`.
-Implementations may break out the connectivity management logic and have `round_robin` and `least_request_experimental`
-inherit it instead. This would be similar to the "base balancer" already implemented in grpc-go
-[here](https://github.com/grpc/grpc-go/blob/03268c8ed29e801944a2265a82f240f7c0e1b1c3/balancer/base/balancer.go).
 
 Just like the `round_robin` policy, the `least_request_experimental` policy will attempt to keep a subchannel connected
 to every address in the address list at all times. If a subchannel becomes disconnected, the policy will trigger
