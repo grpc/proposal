@@ -53,13 +53,27 @@ uses the route.  This is a `repeated` field, so it specifies a list of
 hash policies.  Each hash policy is evaluated individually, and the
 combined result is used to determine the request's hash.  The method of
 combination is deterministic, such that identical lists of hash policies
-will produce the same hash.  Since a hash policy examines specific parts of
+will produce the same hash. Any deterministic method of combination can be used
+here; the algorithm Envoy uses looks like this in pseudocode:
+
+```
+hash = Null
+for each policy:
+  policy_hash = calculate_hash(policy)
+  if policy_hash is not Null:
+    if hash is Null:
+      hash = policy_hash
+    else:
+      hash = rotate_left_shift(hash, 1) ^ policy_hash
+```
+
+Since a hash policy examines specific parts of
 a request, it can fail to produce a hash (e.g., if the hashed header is not
 present).  If (and only if) all configured hash policies fail to generate a
 hash, a random hash will be used for the request, which (assuming a
 hash-based LB policy is used) will result in picking a random endpoint
 for the request.  If a hash policy has the `terminal` attribute set to true,
-and the policy does generate a result, then all subsequent hash policies
+and there is already a hash generated, then all subsequent hash policies
 are skipped.
 
 These semantics allow gRPC to support only a subset of xDS hash policy
@@ -72,7 +86,11 @@ Here is how gRPC will handle each type of hash policy:
 
 - [`header`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/route/v3/route_components.proto#L710):
   gRPC will support this type of hash policy.  This allows hashing on a
-  request header.
+  request header.  The header matching logic will behave the same way as
+  specified for route matching, as per [gRFC
+  A28](https://github.com/grpc/proposal/blob/master/A28-xds-traffic-splitting-and-routing.md#picking)
+  (i.e., it will ignore headers with a `-bin` suffix and may need
+  special handling for `content-type`).
 - [`cookie`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/route/v3/route_components.proto#L713):
   gRPC does not support HTTP cookies, so we will not support this hash
   policy.  If specified, this policy will not return any result.
@@ -92,12 +110,15 @@ Here is how gRPC will handle each type of hash policy:
   the way that Envoy does.  However, we will support one special filter state
   [`key`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/route/v3/route_components.proto#L703)
   called `io.grpc.channel_id`, which will hash to the same value for all
-  requests on a given gRPC channel.  This can be used in similar situations
-  to where Envoy uses `connection_properties` to hash on the source IP address.
-  (Note that we do not recommend that applications create multiple gRPC
-  channels to the same virtual host, but if you do that, then the
-  behavior here will not be exactly the same as using `connection_properties`,
-  because each channel may use a different endpoint.)
+  requests on a given gRPC channel. In order to facilitate an even selection
+  of backends across different channels (which may or may not be in the same
+  process or machine), the value of `io.grpc.channel_id` should be initialized
+  with a random number from a uniform distribution. This can be used in similar
+  situations to where Envoy uses `connection_properties` to hash on the source
+  IP address. (Note that we do not recommend that applications create multiple
+  gRPC channels to the same virtual host, but if you do that, then the behavior
+  here will not be exactly the same as using `connection_properties`, because
+  each channel may use a different endpoint.)
 
 #### XdsClient Changes
 
@@ -154,7 +175,12 @@ of its values.  gRPC will support the
 [`minimum_ring_size`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L397)
 and
 [`maximum_ring_size`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L406)
-fields the same way that Envoy does.  The
+fields.  As in Envoy, values above 8M will be NACKed.  Note that gRPC has
+different restrictions on ring size than Envoy does and a different default
+for the max ring size (see below for details), so to ensure correct xDS
+defaults, the xDS code must explicitly set this field in the gRPC LB policy
+config even if the field is unset in the xDS resource (and therefore the
+default xDS value of 8388608 is used).  The
 [`hash_function`](https://github.com/envoyproxy/envoy/blob/2443032526cf6e50d63d35770df9473dd0460fc0/api/envoy/config/cluster/v3/cluster.proto#L401)
 field will be required to be set to `XX_HASH`; if it is set to any other
 value (at present, the only other value is `MURMUR_HASH_2`), gRPC will
@@ -248,6 +274,10 @@ hard-coded LB policy config fields in the CDS response:
   be empty.
 - For `RING_HASH`, the policy name will be `"RING_HASH"`, and the config will
   be the one for the `ring_hash_experimental` LB Policy described below.
+
+As mentioned in gRFC A37, if the `xds_cluster_resolver` config is generated
+from an aggregate cluster tree, the value of this field will be determined from
+the CDS update for the aggregate cluster, not the underlying clusters.
 
 Despite this new config field being structured as a `LoadBalancingConfig`
 message, it will not actually indicate a child policy; instead, the
@@ -347,8 +377,8 @@ ring will be stored within the picker, so any time a new ring is
 generated, a new picker will be returned.
 
 The picker will contain not just the ring but also the current state of
-every subchannel in the ring.  Whenever a subchannel's state changes, a
-new picker will need to be generated.
+every subchannel in the ring.  Implementations must generate a new
+picker every time a subchannel's state changes.
 
 ##### LB Policy Config
 
@@ -356,13 +386,36 @@ The `ring_hash_experimental` policy will have the following config:
 
 ```
 message RingHashLoadBalancingConfig {
+  // A client-side cap will limit these values.  If either of these values
+  // are greater than the client-side cap, they will be treated as the
+  // client-side cap.  The default cap is 4096.
   uint64 min_ring_size = 1;  // Optional, defaults to 1024.
-  uint64 max_ring_size = 2;  // Optional, defaults to 8M.
+  uint64 max_ring_size = 2;  // Optional, defaults to 4096, max is 8M.
 }
 ```
 
 These parameters are used to determine how the ring is constructed, just
-as they are in the Envoy implementation.
+as they are in the Envoy implementation.  However, in order to limit the
+possibility of a control plane causing a client to OOM by creating a lot
+of large rings, we want to limit the ring size to a much smaller value
+than Envoy does.  The `max_ring_size` field will default to 4096 instead
+of 8M (8,388,608) as in Envoy, although it will still accept values up to 8M
+for compatibility with Envoy (values above 8M will be NACKed).  In addition,
+the client will have a local option (either per-channel or global) to set
+a cap for the ring size, which will also default to 4096; if either the
+`min_ring_size` or `max_ring_size` values in the LB policy config are greater
+than the locally configured cap, they will be treated as the locally
+configured cap.  The resulting behavior will be:
+- When used via xDS, `max_ring_size` will be set to 8M when
+  `envoy.extensions.load_balancing_policies.ring_hash.v3.RingHash.maximum_ring_size`
+  is unset, but will be capped by the locally configured cap of 4096.  So
+  if an xDS-enabled client needs a larger ring size, they can just change
+  the locally configured cap without needing to modify the xDS config.
+- In the future, when we can use the `ring_hash` policy without xDS, the
+  default for `max_ring_size` will be 4096, the same as the locally
+  configured cap.  So if a client needs a larger ring size, they will
+  need to increase both the locally configured cap and the value of
+  `max_ring_size` in the config.
 
 The hash function will be `XX_HASH`, as defined in
 https://github.com/Cyan4973/xxHash in the `XXH64()` function with seed 0.
@@ -372,6 +425,17 @@ request via the same mechanism that we use to pass the cluster name to
 the `xds_cluster_manager` policy in the `RouteAction` design, as
 described above.  The picker will use that hash to determine which endpoint
 to choose from the ring.
+
+##### Ring Construction
+
+The ring is a list of addresses associated with hashes, sorted by the hash.
+Subchannels will often appear more than once in the ring, and each appearance
+should have a different hash. For example, when populating the ring, this can
+be accomplished by combining the subchannel's address with the number of
+previous appearances of that subchannel in the hash algorithm's input. The
+number of entries in the ring is equal to the smallest number greater than
+`min_ring_size` such that the subchannel with the smallest weight has a whole
+number of entries, clamped to `max_ring_size`.
 
 ##### Subchannel State Handling
 
@@ -406,36 +470,88 @@ parent.
 
 ##### Aggregated Connectivity State
 
-The `ring_hash` policy will use the normal aggregation rules for reporting
-the overall connectivity state to its parent (i.e., the same rules used
-by `weighted_target`), but with one special case.  If there are 2 or more
-subchannels in state `TRANSIENT_FAILURE` and all other subchannels are in
-state `IDLE` or `CONNECTING`, then the policy will report `TRANSIENT_FAILURE`.
-This heuristic ensures that the priority policy will fail over to the
-next priority quickly when there's an outage.
+Because the `ring_hash` policy does not proactively connect to
+subchannels but rather triggers connection attempts based on picks, it
+cannot use the aggregation rules used by most LB policies (e.g., those used
+by the `weighted_target` policy) as-is.  Instead, it has two differences
+in how it handles `TRANSIENT_FAILURE`, both of which are motivated by
+ensuring that the `ring_hash` policy will report reasonable connectivity
+state transitions to its parent (which today is always the `priority`
+policy but might at some point in the future be the channel itself).
 
-So the overall aggregation rules here are:
+The `priority` policy essentially has an ordered list of child policies and
+will send picks to the highest priority child that is currently reporting
+`READY` or `IDLE`.  This means that for `ring_hash` to function as a child
+of the `priority` policy, it needs to report `TRANSIENT_FAILURE` when its
+subchannels are not reachable.  However, `ring_hash` attempts to connect
+only to those subchannels that pick requests hash to, and if the first
+subchannel fails to connect, it then sequentially attempts to connecto to
+subsequent subchannels in ring order, so it may take a very long time
+for all of the subchannels to report `TRANSIENT_FAILURE` instead of `IDLE`.
+Under the normal aggregation rules, that means that the `ring_hash` policy
+would take far too long to report `TRANSIENT_FAILURE`.  And more
+generally, if `ring_hash` has only attempted to connect to a small
+subset of its subchannels, it cannot truly know the overall reachability
+of all of the subchannels.  To address these problems, the `ring_hash`
+policy will use a heuristic that if there are two or more subchannels
+reporting `TRANSIENT_FAILURE` and none in state `READY`, it will report
+an aggregated connectivity state of `TRANSIENT_FAILURE`.  This heuristic
+is an attempt to balance the need to allow the `priority` policy to
+quickly failover to the next priority and the desire to avoid reporting
+the entire `ring_hash` policy as having failed when the problem is just
+one individual subchannel that happens to be unreachable.
+
+In addition, once the `ring_hash` policy reports `TRANSIENT_FAILURE`, it
+needs some way to recover from that state.  The `ring_hash` policy
+normally requires pick requests to trigger subchannel connection
+attempts, but if it is being used as a child of the `priority` policy,
+it will not be getting any picks once it reports `TRANSIENT_FAILURE`.
+To work around this, it will make sure that it is attempting to
+connect (after applicable backoff period) to at least one subchannel at
+any given time.  After a given subchannel fails a connection attempt, it
+will move on to the next subchannel in the ring.  It will keep doing this
+until one of the subchannels successfully connects, at which point it
+will report `READY` and stop proactively trying to connect.
+
+Another issue is the way that the `priority` policy handles its failover
+timer.  The failover timer is used to apply an upper bound to the amount
+of time that `priority` policy waits for a child policy to become
+connected before it gives up and creates the child policy for the next
+priority.  The failover timer is started when a child is first created
+and is cancelled when the child reports any state other than `CONNECTING`.
+To allow this timer to work properly, the `ring_hash` policy should
+remain in state `CONNECTING` until it transitions to either
+`TRANSIENT_FAILURE` or `READY`.  Specifically, after the first subchannel
+reports `TRANSIENT_FAILURE` and all other subchannels are in `IDLE`, it
+should continue to report `CONNECTING` instead of `IDLE`.  In this case,
+just as in the `TRANSIENT_FAILURE` case above, it will proactively attempt
+to connect to at least one subchannel at all times while it is reporting
+`CONNECTING`, so that it does not stay in state `CONNECTING` indefinitely
+if it is not receiving picks (e.g., if the application is only occassionally
+starting RPCs and giving them very short deadlines).
+
+Note that when the `ring_hash` policy first starts up with a completely
+new set of subchannels that are all in state `IDLE`, it will report `IDLE`
+as a consequence of the aggregation rules shown below.  This is different
+from most policies, which start in state `CONNECTING`, and it will
+prevent the failover timer in the `priority` policy from working
+correctly, because the timer will be started when the child is created
+but then immediately cancelled when it reports `IDLE`.  To address this,
+we will change the `priority` policy to restart the failover timer when a
+child reports `CONNECTING`, if that child has not reported `TRANSIENT_FAILURE`
+more recently than it reported `READY` or `IDLE`.
+
+Taking all of the above into account, the aggregation rules for
+the `ring_hash` policy are as follows:
 1. If there is at least one subchannel in `READY` state, report `READY`.
 2. If there are 2 or more subchannels in `TRANSIENT_FAILURE` state, report
    `TRANSIENT_FAILURE`.
 3. If there is at least one subchannel in `CONNECTING` state, report
    `CONNECTING`.
-4. If there is at least one subchannel in `IDLE` state, report `IDLE`.
-5. Otherwise, report `TRANSIENT_FAILURE`.
-
-While the `ring_hash` policy is reporting `TRANSIENT_FAILURE`, it will not be
-getting any pick requests from the priority policy.  However, because the
-`ring_hash` policy does not attempt to reconnect to subchannels unless it
-is getting pick requests, it will need special handling to ensure that it
-will eventually recover from `TRANSIENT_FAILURE` state once the problem is
-resolved.  Specifically, it will make sure that it is attempting to
-connect (after applicable backoff period) to at least one subchannel at
-any given time.  After a given subchannel fails a connection attempt, it
-will move on to the next subchannel in the ring.  It will keep doing this
-until one of the subchannels successfully connects, at which point it
-will report `READY` and stop proactively trying to connect.  The policy
-will remain in `TRANSIENT_FAILURE` until at least one subchannel becomes
-connected, even if subchannels are in state `CONNECTING` during that time.
+4. If there is one subchannel in `TRANSIENT_FAILURE` and there is more than
+   one subchannel, report state `CONNECTING`.
+5. If there is at least one subchannel in `IDLE` state, report `IDLE`.
+6. Otherwise, report `TRANSIENT_FAILURE`.
 
 ##### Picker Behavior
 
@@ -504,6 +620,7 @@ if (ring[first_index].state == CONNECTING) {
   return PICK_QUEUE;
 }
 if (ring[first_index].state == TRANSIENT_FAILURE) {
+  ring[first_index].subchannel.TriggerConnectionAttemptInControlPlane();
   first_subchannel = ring[first_index].subchannel;
   found_second_subchannel = false;
   found_first_non_failed = false;

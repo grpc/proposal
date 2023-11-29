@@ -53,11 +53,12 @@ it will shutdown the transport gracefully.
 ```
 version = int;
 protocol extension flags = int;
+shutdown flags = int;
 num bytes = long;
 ping id = int;
 
 setup transport transaction = version, binder, [protocol extension flags];
-shutdown transport transaction = nothing;
+shutdown transport transaction = [shutdown flags];
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
 ping response transaction = ping id;
@@ -77,6 +78,11 @@ Both client and server transport may also include protocol extension flags at
 the end of their setup transport transaction. This is reserved for potential
 future protocol extensions, though no flags are currently specified.
 Unrecognized flags must be ignored.
+
+`shutdown flags` is a bit field reserved for future extensions to the shutdown
+transaction. Receivers must ignore flags they do not understand and current
+senders must set this field to zero (since no flags have been defined yet).
+This field is optional. If missing, no flags have been set.
 
 ### Stream Transactions
 
@@ -216,12 +222,12 @@ all but the last transaction having FLAG_MESSAGE_DATA_IS_PARTIAL set.
 
 Due to Android's limited per-process transaction buffer of 1MB, BinderTransport
 supports transport-level flow control, aiming to keep use of the process
-transaction buffer to at most 128KB. Each transaction we send adds to an
+transaction buffer to at most 128KB. Each stream transaction we send adds to an
 internal count of unacknowledged outbound data (here the count refers to the
 "data size" of the parcels). If that exceeds 128KB, we’ll stop sending
-transactions until we receive an acknowledgement message from the transport
-peer. Each transport sends an acknowledgement for each 16KB received, which
-should avoid blocking the transport most of the time.
+stream transactions until we receive an acknowledgement message from the transport
+peer. Each transport sends an acknowledgement for each 16KB of stream transaction
+received, which should avoid blocking the transport most of the time.
 
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel

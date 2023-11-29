@@ -29,7 +29,7 @@ will be changing to meet the new spec.  gRPC's implementation will meet
 this new spec from the start.  For details, see
 https://github.com/envoyproxy/envoy/issues/13134.
 
-### Related Proposals: 
+### Related Proposals:
 
 This proposal builds on the earlier xDS work described in the following
 proposals:
@@ -60,7 +60,12 @@ to represent logical DNS and aggregate clusters.  Specifically:
 
 - cluster type (EDS, logical DNS, or aggregate)
 - for logical DNS clusters, the DNS name to resolve (in "host:port" form)
+  - Using the `Cluster` proto field `load_assignment.endpoints[0].lb_endpoints[0].endpoint.address.socket_address`,
+    the host is the `address` field and the port is the `port_value` field.
 - for aggregate clusters, a prioritized list of underlying cluster names
+  - When the `Cluster` proto field `cluster_type.typed_config` is parsed as a
+    message of type `type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig`,
+    this list is the `clusters` field of that message.
 
 The existing field for the EDS service name will be used only when the
 cluster type is EDS.
@@ -95,7 +100,9 @@ For example:
 Each underlying cluster will have an associated discovery mechanism.
 The ordered list of discovery mechanisms will be passed down in the
 config for the new `xds_cluster_resolver_experimental` policy, which is the
-child of the CDS policy.
+child of the CDS policy. If an underlying cluster appears more than once in
+the list of clusters, only one discovery mechanism entry should be created for
+it, in the earliest position in the list in which it is seen.
 
 Note that if a cluster is used both by itself and via an aggregate
 cluster, the XdsClient will have two CDS watchers for the cluster
@@ -111,6 +118,24 @@ This is not ideal but is considered acceptable (and if it becomes a
 problem, we might be able to fix this later via subchannel pooling
 functionality).  However, we will share the atomic used for circuit breaking
 thresholds across all connections for a given cluster, as discussed below.
+
+The tree of aggregate clusters has a depth limit of 16. If a CDS policy's
+tree exceeds that depth, it should report that it is in TRANSIENT_FAILURE.
+
+If any of a CDS policy's watchers reports that the resource does not exist, the
+policy should report that it is in TRANSIENT_FAILURE. If any of the watchers
+reports a transient ADS stream error, the policy should report that it is in
+TRANSIENT_FAILURE if it has never passed a config to its child.
+
+In an aggregate cluster, the `locality_picking_policy` and
+`endpoint_picking_policy` fields of the `xds_cluster_resolver_experimental`
+policy config (see below) come from the aggregate cluster, not the underlying
+clusters. Currently, we do not support any LB policy except ROUND_ROBIN, so
+this decision is moot. The CDS policy can either hardcode those fields with
+their default values, or leave them empty and let the
+`xds_cluster_resolver_experimental` policy apply those defaults. In the future,
+when other LB policies are supported, these fields will be derived from the
+aggregate cluster.
 
 ### Splitting up EDS LB Policy
 
@@ -199,7 +224,9 @@ able to report structured data in a form equivalent to an EDS resource
 discovery instance will be able to optionally indicate that it wants to
 override the child policy to be used for its priorities, and it will be
 able to indicate whether it supports re-resolution (which will be used
-to set a new attribute in the priority policy config).
+to set a new attribute in the priority policy config). Each discovery
+instance will also separately track the priority names it generates and the
+corresponding localities, to preserve them across updates.
 
 There will be two discovery mechanism implementations:
 - EDS.  This will get data via an EDS watch on the XdsClient.  It will not
@@ -215,6 +242,12 @@ There will be two discovery mechanism implementations:
 
 The `xds_cluster_resolver_experimental` policy will be gracefully switched
 whenever its config changes, so it will not need to process config updates.
+
+If any discovery mechanism instance experiences an error retrieving data, and
+it has not previously reported any results, it should report a result that is
+a single priority with no endpoints. An EDS discovery mechanism should do the
+same if its watcher reports that the resource does not exist (whether or not
+it has previously reported a result).
 
 #### `xds_cluster_impl_experimental` LB Policy
 
@@ -315,6 +348,26 @@ message PriorityLoadBalancingPolicyConfig {
 This new field will be enabled for all priorities that come from EDS
 clusters, as described in the section about the
 `xds_cluster_resolver_experimental` LB policy above.
+
+### Validation
+
+The `Cluster` proto validation rules are modified as follows:
+
+- Either the `type` field must be set to `EDS` or `LOGICAL_DNS`, or the `cluster_type` field must be set.
+- If the `type` field is set to `EDS`, the `eds_cluster_config` field should be validated as before.
+- If the `type` field is set to `LOGICAL_DNS`, the `load_assignment` field must be set. Inside of it:
+  - The `endpoints` field must have exactly one entry. Inside of it:
+    - The `lb_endpoints` field must have exactly one entry. Inside of it:
+      - The `endpoint` field must be set. Inside of it:
+        - The `address` field must be set. Inside of it:
+          - The `socket_address` field must be set. Inside of it:
+            - The `address` field must be non-empty.
+            - The `port_value` field must be set.
+- If the `cluster_type` field is set, inside of it:
+  - The `typed_config` field must be set. Inside of it:
+    - The `type_url` field must have the value `type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig`
+    - Inside the `value` field, decoded as a `ClusterConfig` message:
+      - The `clusters` field must have at least one entry.
 
 ## Rationale
 

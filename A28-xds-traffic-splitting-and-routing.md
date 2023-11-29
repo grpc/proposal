@@ -254,8 +254,14 @@ tricky.
 Note that only [custom
 metadata](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests)
 is considered during header matching, unlike in Envoy, where all headers
-(including HTTP/2 pseudo-headers) are included. This is because pick happens
-above gRPC’s transport (HTTP/2) layer, so transport headers are not accessible.
+(including HTTP/2 pseudo-headers) are included. This is because the pick
+happens above gRPC’s transport (HTTP/2) layer, so transport headers are
+not accessible. However, we will support matching against the
+`content-type` header; if a gRPC implementation does not add that header
+until after xDS route selection is done, then xDS route selection will
+assume a hard-coded value of `application/grpc`. Also, we will explicitly
+exclude headers with a `-bin` suffix from matching (i.e., we will behave as
+if the header is not present, even if it actually is).
 
 The pick will consider the child policies that are not reporting READY (unlike
 in most gRPC LB policies, e.g. weighted_target, where only the READY child
@@ -404,10 +410,15 @@ and its
         [weights](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L278)
         must add up to the
         [total\_weight](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L335).
-*   Can be
-    [cluster\_header](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L712)
-    *   Note: the route containing this action will be ignored. This feature can
-        be accomplished by header matching.
+*   Can be unset or an unsupported field. The route containing this action will be
+   ignored.
+    *   At the time of this gRFC,
+        [cluster\_header](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L712)
+        is the only such unsupported field. But the client must handle other
+        fields in the `oneof` being added in the future, with or without
+        recompiling the client with the new proto. Protobuf considers unknown
+        fields of a oneof as an unset oneof, as it doesn't know the field is
+        part of the oneof.
 
 Duplicate matches are allowed, but because the first match wins, the second
 will never be used.
