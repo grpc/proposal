@@ -1,7 +1,7 @@
 A61: IPv4 and IPv6 Dualstack Backend Support
 ----
 * Author(s): @markdroth
-* Approver: @ejona86
+* Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2023-10-17
@@ -177,6 +177,16 @@ ready to start a connection attempt on a given subchannel:
   treat it as if we have already made a connection attempt on this
   subchannel, and we will immediately move on to the next subchannel.
 
+Note that because we do not report TRANSIENT_FAILURE until after the
+Happy Eyeballs pass has completed and we start a new Happy Eyeballs pass
+whenever we receive a new address list, there is a potential failure
+mode where we may never report TRANSIENT_FAILURE if we are receiving new
+address lists faster than we are completing Happy Eyeballs passes.  This
+is a pre-existing problem, and each gRPC implementation currently deals
+with it in its own way.  This design does not propose any changes to
+those existing approaches, although a future gRFC may attempt to achieve
+further convergence here.
+
 Once a subchannel does become READY, pick_first will unref all other
 subchannels, thus cancelling any connection attempts that were already
 in flight.  Note that the [connection backoff][backoff-spec] state is
@@ -247,7 +257,8 @@ includes the following:
 - round_robin (see [gRPC Load Balancing](https://github.com/grpc/grpc/blob/master/doc/load-balancing.md#round_robin))
 - weighted_round_robin (see [gRFC A58][A58])
 - ring_hash (see [gRFC A42][A42])
-- least_request (see [gRFC A48][A48] -- currently Java-only)
+- least_request (see [gRFC A48][A48] -- currently supported in Java and
+  Go only)
 
 The petiole policies will receive a list of endpoints, each of which
 may contain multiple addresses.  They will create a pick_first child
