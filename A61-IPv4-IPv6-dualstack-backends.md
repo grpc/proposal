@@ -109,7 +109,7 @@ instead use the Happy Eyeballs algorithm on the initial pass through the
 address list.  Specifically:
 
 - As per [RFC-8305 section
-  5](https://www.rfc-editor.org/rfc/rfc8305#section-5)), the default
+  5](https://www.rfc-editor.org/rfc/rfc8305#section-5), the default
   Connection Attempt Delay value is 250ms.  Implementations may provide
   a channel arg to control this value, although they must be between the
   recommended lower bound of 100ms and upper bound of 2s.  Any value
