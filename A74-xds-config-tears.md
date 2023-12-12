@@ -199,7 +199,9 @@ The xds resolver will pass the returned XdsConfig to the LB policies via
 an attribute, so that the LB policies can use the cluster data.  Note
 that we cannot simply pass the data via the cds LB policy's JSON config,
 because we need this to work in cases where the cluster is determined
-dynamically, such as where a route uses a ClusterSpecifierPlugin.
+dynamically, such as where a route uses a ClusterSpecifierPlugin.  (We
+have some internal functionality that uses this, not something that has
+been documented in a public gRFC.)
 
 In order to handle such cases, the XdsDependencyManager will also provide
 an API to subscribe to a particular cluster resource whose name was
