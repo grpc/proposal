@@ -179,6 +179,7 @@ Pros:
 - Straightforward to implement
 - No config tearing
 - Compatible with Envoy
+
 Cons:
 - May still unnecessarily discard better config from primary server
     - New channel to a new target
