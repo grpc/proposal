@@ -85,11 +85,11 @@ target. It will also require changes to the CSDS service to aggregate configs
 from multiple XdsClients. For gRPC Core, this would entail updating
 `grpc_dump_xds_configs` function to iterate over XdsClients and aggregate the
 data available in each. A new field will be added to the CSDS response
-to indicate with channel target the data is associated with. See [A40] for
+to indicate the channel target the data is associated with. See [A40] for
 details on CSDS.
 
 gRPC servers using the xDS configuration will share the same XdsClient instance
-keyd with a dedicated well-known key value.
+keyed with a dedicated well-known key value.
 
 ### Change xDS Bootstrap to handle multiple xDS configuration servers
 
@@ -109,7 +109,7 @@ The fallback process is initiated if both of the following conditions hold:
 * At least one watcher exists for a resource that is not cached.
 
 This may happen either when setting up a new channel or if the xDS control
-plane becomes unavailable after a resource changed notification was received.
+plane becomes unavailable after a resource change notification was received.
 
 XdsClients will need to be changed to support multiple ADS connections for each
 authority. Once the fallback process begins, impacted XdsClient will establish
@@ -131,7 +131,7 @@ Config tears happen when the client winds up using some combination
 of resources from the primary and fallback servers at the same time, even
 though that combination of resources was never validated to work together. In
 theory, this can cause correctness issues where we might send traffic to
-the wrong location or in the wrong way, or it can cause RPCs to fail. Note
+the wrong location or the wrong way, or it can cause RPCs to fail. Note
 that this can happen only when the primary and fallback server use the same
 resource names.
 
@@ -142,7 +142,7 @@ problem by inlining the RouteConfiguration into the LDS resource.
 
 gRPC team considered addressing this in the fallback case by making the source
 xDS server name to the XdsClient but ultimately decided against it as it would
-require a significant implementation work and would not recieve sufficient
+require a significant implementation work and would not receive sufficient
 testing and may reduce reliability instead of increasing it. It would still not
 help with config tears in non-fallback cases.
 
@@ -158,7 +158,7 @@ This will be addressed by moving the CDS and EDS watchers to the xDS resolver.
 
 ## Other approaches considered:
 
-### Uncoditionally perform fallback when xDS control plane becomes unreachable
+### Unconditionally perform fallback when xDS control plane becomes unreachable
 
 In this scenario, XdsClients discard cached resources and fetch new resources
 from the fallback server as soon as xDS server becomes unreachable.
@@ -193,7 +193,7 @@ Cons:
 
 ### Perform fallback at resource granularity
 
-This approach would drastically include likelyhood of config tears.
+This approach would drastically include the likelihood of config tears.
 
 ### Modify gRPC to support atomic config updates
 
@@ -214,3 +214,4 @@ file.
 [A57]: A57-xds-client-failure-mode-behavior.md
 
 [resource-does-not-exist]: https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist
+
