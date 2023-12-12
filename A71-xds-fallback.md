@@ -184,6 +184,16 @@ Cons:
     - New channel to a new target
     - Primary server goes down while client is processing an update
 
+### Have a separate XdsClient per gRPC channel
+
+Cons:
+- Increases xDS traffic when there are multiple channels for the same target.
+- Would break CSDS
+
+### Perform fallback at resource granularity
+
+This approach would drastically include likelyhood of config tears.
+
 ### Modify gRPC to support atomic config updates
 
 Builds on top of previous option but also move resource watches from
