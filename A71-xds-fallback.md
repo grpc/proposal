@@ -37,20 +37,8 @@ cached from the primary server, we want to use that instead of falling back.
 
 We have no guarantee that a combination of resources from different xDS servers
 form a valid cohesive configuration, so we cannot make this determination on
-a per-resource basis. We need any given gRPC channel to use the resources
-the same server
-
-### xDS resources caching
-
-The xDS client code caches any responses received from the xDS server. This
-includes:
-
-- Resources that have been successfully received and can be used.
-- Resources that are considered non-existent according
-to [xDS Protocol Specification][resource-does-not-exist].
-
-Note that only attempts at reading a resource that is not cached will trigger
-the fallback.
+a per-resource basis. We need any given gRPC channel to only use the resources
+the single server
 
 ### Related Proposals: 
 * [A27: xDS-Based Global Load Balancing][A27]
@@ -61,7 +49,7 @@ the fallback.
 
 ## Proposal
 
-Perform the following changes:
+Implement the following changes
 
 1. Change global XdsClient from a single instance to a map of instances keyed
 by channel target.
@@ -72,54 +60,61 @@ xDS authority from the bootstrap config.
 ### Change global XdsClient from a single instance to per-target instances
 
 Current gRPC implementation is using a single XdsClient for all data plane
-targets. For fallback, this would mean that all the channels would switch to
-using the data from the fallback xDS control plane which is not desirable (see
-below).
+targets. For fallback, if any one channel triggers fallback, then all channels
+regardless of authority would switch to using the data from the fallback xDS
+control plane which is not desirable.
+
+gRPC servers using the xDS configuration will share the same XdsClient instance
+keyed with a dedicated well-known key value.
 
 Changes XdsClient to per-data plane target would enable gRPC to switch to
-fallback configuration only for channels that need xDS resource that have not
+fallback configuration only for channels that need xDS resources that have not
 been downloaded yet.
 
 This change would change the channels to get XdsClient for their data plane
 target. It will also require changes to the CSDS service to aggregate configs
-from multiple XdsClients. For gRPC Core, this would entail updating
-`grpc_dump_xds_configs` function to iterate over XdsClients and aggregate the
-data available in each. A new field will be added to the CSDS response
-to indicate the channel target the data is associated with. See [A40] for
-details on CSDS.
+from multiple XdsClients. The CSDS RPC service will be changed to get data
+from all XdsClient instances. A new string field named `channel_target` will be
+added to the CSDS `ClientConfig` message to indicate the channel target
+the data is associated with.
 
-gRPC servers using the xDS configuration will share the same XdsClient instance
-keyed with a dedicated well-known key value.
+Adding this field will not require updating the CSDS client as its value will
+be the same for most resources in most cases.
 
 ### Change xDS Bootstrap to handle multiple xDS configuration servers
 
 Current gRPC xDS implementations only use the first xDS configuration server
 listed in the bootstrap JSON document. Fallback implementation requires changes
-to use server listed and keep track of their ordering as it defines the
-relative priority of the different xDS config servers.
+to use all servers listed in order from highest to lowest priority.
 
 ### Change XdsClient to support fallback within each xDS authority
 
 The fallback process is initiated if both of the following conditions hold:
 
-* There is a connectivity failure on the ADS stream, as described in [A57]:
+* There is a connectivity failure on the ADS stream, as described in [A57] this
+means either:
     - Channel reports TRANSIENT_FAILURE.
     - The ADS stream was closed before the first server response had been
     received.
-* At least one watcher exists for a resource that is not cached.
+* At least one watcher exists for a resource that is not cached. Cached
+resources include:
+    - Resources that have been successfully received and can be used.
+    - Resources that are considered non-existent according
+    to [xDS Protocol Specification][resource-does-not-exist].
 
-This may happen either when setting up a new channel or if the xDS control
-plane becomes unavailable after a resource change notification was received.
+This may happen during a new channel setup or mid-config update, when
+the control plane notifies of the config change and becomes unavailable before
+the new config resources are downloaded.
 
 XdsClients will need to be changed to support multiple ADS connections for each
-authority. Once the fallback process begins, impacted XdsClient will establish
+authority. Once the fallback process begins, an impacted XdsClient will establish
 a connection to the next xDS control plane listed in the bootstrap JSON. Then
-then XdsClient will subscribed to all watched resources on that server and will
+XdsClient will subscribe to all watched resources on that server and will
 update the cache based on the received responses.
 
 Connecting to the lower-priority servers does not close gRPC connections to the
 higher-priority servers. XdsClient will still wait for xDS resources on the ADS
-stream. Once such resource is received, XdsClient will close connections to the
+stream. Once such a resource is received, the XdsClient will close connections to the
 lower-priority server(s) and will use the resources from the higher priority
 servers.
 
@@ -135,16 +130,21 @@ the wrong location or the wrong way, or it can cause RPCs to fail. Note
 that this can happen only when the primary and fallback server use the same
 resource names.
 
-This may also happen in non-fallback cases with the configs that span several
-xDS resources. The main case where this is likely to come up in practice is
-HTTP filter configs split across LDS and RDS. Control planes may avoid that
-problem by inlining the RouteConfiguration into the LDS resource.
+Config tears can also happen in non-fallback cases with configs that span
+several xDS resources, and this is not something that the client can address
+in that more general case, so this is something control planes already need to
+be aware of. We considered trying to address it for the fallback case by adding
+the xDS server name to the XdsClient watcher API, so that it became part of
+the key for the dependent watchers, thus ensuring that we never mix resources
+from the primary or fallback servers. However, this would have required
+significant implementation work and would have introduced a seldom-used and
+therefore less well-exercised code-path that would likely have reduced
+reliability instead of increasing it. And since this would not have helped for
+the more general case anyway, we decided not to pursue it.
 
-gRPC team considered addressing this in the fallback case by making the source
-xDS server name to the XdsClient but ultimately decided against it as it would
-require a significant implementation work and would not receive sufficient
-testing and may reduce reliability instead of increasing it. It would still not
-help with config tears in non-fallback cases.
+The main case where config tears is likely to come up in practice is HTTP
+filter configs split across LDS and RDS. We recommend that control planes avoid
+that problem by inlining the RouteConfiguration into the LDS resource.
 
 #### Flapping
 
@@ -154,14 +154,19 @@ back to the previous server and then re-updates LDS and RDS. This would cause
 the client to fail RPCs for a short period of time. Note that this can happen
 only when the primary and fallback server use different resource names.
 
-This will be addressed by moving the CDS and EDS watchers to the xDS resolver.
+This will be addressed in a subsequent gRFC by moving the CDS and EDS watchers
+to the xDS resolver.
 
-## Other approaches considered:
+## Rationale
 
-### Unconditionally perform fallback when xDS control plane becomes unreachable
+The following subsections describe various alternatives we considered.
+
+### Perform fallback based only on xDS server reachability
 
 In this scenario, XdsClients discard cached resources and fetch new resources
-from the fallback server as soon as xDS server becomes unreachable.
+from the fallback server as soon as xDS server becomes unreachable. This was
+rejected because it would cause us to fallback even when everything is cached,
+which is undesirable.
 
 Pros:
 - No config tears
@@ -172,7 +177,11 @@ Cons:
 - Increases load on xDS servers
 - Decreases data quality by using data from the fallback server.
 
-### Do not split the XdsClient per-target and perform fallback when the required resource is not in the cache.
+### Keep a global XdsClient
+
+This was rejected because it would mean that if any one channel had a problem
+that triggered fallback, it would trigger fallback for all channels, even those
+that already have all of their resources cached.
 
 Pros:
 - Avoids fallback in most cases
