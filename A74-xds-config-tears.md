@@ -79,9 +79,9 @@ This proposal has several parts:
   obtaining endpoint addresses will now be done in the xds resolver.
   The code for generating the child policy configs for the priority
   policy will now be done in the cds LB policy.
-- This also allows simplifying the XdsCredentials plumbing by leveraging
-  the config passed to the LB policies instead of generating a map of
-  mTLS configs in the cds LB policy.
+- In some implementations, this may also allow simplifying the XdsCredentials
+  plumbing by leveraging the config passed to the LB policies instead of
+  generating a map of mTLS configs in the cds LB policy.
 
 Note that although all of the xDS resource watches will now be done in
 the xds resolver, it will still be necessary to pass the XdsClient to
@@ -96,16 +96,17 @@ The updated gRPC client xDS architecture is shown below.
 
 ### Changes in xds Resolver
 
-We will introduce a new component called the XdsDependencyManager,
-which sits in between the xds resolver and the XdsClient.  The
-XdsDependencyManager will watch all xDS resources, resolving dependencies
-between them, and returning a complete configuration to the xds resolver
-only once all necessary dependencies have been obtained.  For example,
-if the XdsDependencyManager receives an updated route configuration
-that refers to a new cluster, it will start a watch for the new cluster.
-If that cluster requires a new endpoint resource, it will start a watch
-for that endpoint resource.  Only once it has all necessary resources
-will it return a new configuration to the xds resolver.
+We will introduce a new subcomponent in the xds resolver called the
+XdsDependencyManager, which sits in between the xds resolver and the
+XdsClient.  The XdsDependencyManager will watch all xDS resources,
+resolving dependencies between them, and returning a complete
+configuration to the xds resolver only once all necessary dependencies
+have been obtained.  For example, if the XdsDependencyManager receives an
+updated route configuration that refers to a new cluster, it will start
+a watch for the new cluster.  If that cluster requires a new endpoint
+resource, it will start a watch for that endpoint resource.  Only once
+it has all necessary resources will it return a new configuration to
+the xds resolver.
 
 The XdsDependencyManager will be passed the listener resource name when
 it is instantiated, and it will immediately start a watch for that
@@ -196,17 +197,20 @@ obtaining endpoint data from EDS or DNS, the XdsDependencyManager will
 report that problem via the cluster's resolution_note field.
 
 The xds resolver will pass the returned XdsConfig to the LB policies via
-an attribute, so that the LB policies can use the cluster data.  Note
-that we cannot simply pass the data via the cds LB policy's JSON config,
+an attribute, so that the LB policies can use the cluster data.  Note that
+we cannot simply pass the data via the cds LB policy's JSON config,
 because we need this to work in cases where the cluster is determined
-dynamically, such as where a route uses a ClusterSpecifierPlugin.  (We
-have some internal functionality that uses this, not something that has
-been documented in a public gRFC.)
+dynamically, such as where a route uses a ClusterSpecifierPlugin, in
+which case the LB policy's config comes from the ClusterSpecifierPlugin,
+not from the xds resolver.  (We have some internal functionality that
+uses this, not something that has been documented in a public gRFC.)
 
-In order to handle such cases, the XdsDependencyManager will also provide
-an API to subscribe to a particular cluster resource whose name was
-not present in the route configuration.  The xds resolver will pass the
-XdsDependencyManager to the LB policies via an attribute, so that the
+In order to handle such cases, the XdsDependencyManager will also
+provide an API to subscribe to a particular cluster resource whose
+name was not present in the route configuration.  The xds resolver
+will pass the XdsDependencyManager (or an interface wrapping it, if
+the implementation does not want to expose XdsDependencyManager outside
+of the xds resolver) to the LB policies via an attribute, so that the
 cds LB policy can use this API.  The API will return some subscription
 handle that the caller can release when they are no longer interested
 in the cluster subscription.
@@ -221,7 +225,7 @@ entry.
 #### Changes in cds LB policy
 
 Instead of starting a watch on the XdsClient to get the cluster data,
-the cds LB policy will get its configuration by lookup up the cluster
+the cds LB policy will get its configuration by looking up the cluster
 name in the XdsConfig passed to it via an attribute.
 
 To address the case where the cluster is determined dynamically (e.g., a
@@ -234,10 +238,11 @@ the cds LB policy's configuration:
 bool is_dynamic = 2;
 ```
 
-If that field is set to true, then if the cluster name is not present in
-the XdsConfig, the cds policy will obtain a subscription handle from the
-XdsDependencyManager if it has not already done so.  This handle will
-not be released until the cds policy is destroyed.
+If that field is set to true, then if the cluster name is not present
+in the XdsConfig, the cds policy will obtain a subscription handle from
+the XdsDependencyManager (or the interface wrapping it) if it has not
+already done so.  This handle will not be released until the cds policy
+is destroyed.
 
 Note that when XdsDependencyManager returns a new configuration that
 removes a cluster, the cds policy for that cluster may continue to
