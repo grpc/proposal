@@ -44,26 +44,23 @@ of this aggregate cluster LB policy
 This incorrectly-perceived requirement led us to a design whereby
 each of a cluster's priorities could have its configuration come from
 a different underlying cluster.  This in turn meant that features like
-circuit breaking ([gRFC A32][A32]), outlier detection ([gRFC A50][A50]),
-and stateful session affinity ([gRFC A55][A55]) were designed to work only
-within a specific priority rather than working across all priorities
-within a cluster.  This limitation has caused problems for stateful
-session affinity and is likely a source of friction for the other features
-as well.
+outlier detection ([gRFC A50][A50]) and stateful session affinity ([gRFC
+A55][A55]) were designed to work only within a specific priority rather
+than working across all priorities within a cluster.  This limitation
+has caused problems for stateful session affinity and is likely a source
+of friction for outlier detection as well.
 
 This design describes how we are going to change our aggregate cluster
 implementation to solve these problems.
 
 ### Related Proposals: 
 * [A37: xDS Aggregate and Logical DNS Clusters][A37]
-* [A32: gRPC xDS circuit breaking][A32]
 * [A50: gRPC xDS Outlier Detection Support][A50]
 * [A55: xDS-Based Stateful Session Affinity for Proxyless gRPC][A55]
 * [A56: Priority LB policy][A56]
 * [A74: xDS Config Tears (pending)][A74]
 
 [A37]: A37-xds-aggregate-and-logical-dns-clusters.md
-[A32]: A32-xds-circuit-breaking.md
 [A50]: A50-xds-outlier-detection.md
 [A55]: A55-xds-stateful-session-affinity.md
 [A56]: A56-priority-lb-policy.md
@@ -79,18 +76,20 @@ cluster.
 
 This will allow us to move the outlier_detection, xds_cluster_impl, and
 xds_override_host LB policies up above the priority policy that chooses
-the priority within the cluster.  This will result in outlier detection,
-circuit breaking, and stateful session affinity working across
-priorities within a cluster, as they should.
+the priority within the cluster.  This will result in outlier detection
+and stateful session affinity working across priorities within a cluster,
+as they should.
 
 The architecture for a non-aggregate cluster will now look like this:
 
 ![gRPC Client xDS Architecture Diagram](A75_graphics/grpc_client_architecture_non_aggregate.png)
+
 [Link to SVG file](A75_graphics/grpc_client_architecture_non_aggregate.svg)
 
 And the architecture for an aggregate cluster will now look like this:
 
 ![gRPC Client xDS Architecture Diagram](A75_graphics/grpc_client_architecture_aggregate.png)
+
 [Link to SVG file](A75_graphics/grpc_client_architecture_aggregate.svg)
 
 TODO: flesh this out
