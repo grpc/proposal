@@ -2,9 +2,9 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 ----
 * Author(s): @markdroth
 * Approver: @ejona86, @dfawley
-* Status: {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in: <language, ...>
-* Last updated: 2023-10-17
+* Status: Ready for Implementation
+* Implemented in: C-core
+* Last updated: 2023-12-15
 * Discussion at: https://groups.google.com/g/grpc-io/c/VjORlKP97cE/m/ihqyN32TAQAJ
 
 ## Abstract
@@ -38,7 +38,7 @@ connection by parallelizing connection attempts in a reasonable way.
 Currently, all gRPC implementations perform connection attempts in a
 completely serial manner in the pick_first LB policy.
 
-This work is being doing in conjunction with an effort to add multiple
+This work is being done in conjunction with an effort to add multiple
 addresses per endpoint in xDS.  We will support the new xDS APIs being
 added for that effort as well.  Note that this change has implications
 for session affinity behavior in xDS.
@@ -340,51 +340,23 @@ gRPC currently supports two mechanisms that provide a health signal for
 a connection: client-side health checking, as described in [gRFC A17][A17],
 and outlier detection, as described in [gRFC A50][A50].  Currently, both
 mechanisms signal unhealthiness by essentially causing the subchannel to
-report TRANSIENT_FAILURE to the leaf LB policy.  That approach works
-reasonably when petiole policies directly create and manage subchannels,
-but it will not work when pick_first is the universal leaf policy.  When
-pick_first sees its chosen subchannel transition from READY to
-TRANSIENT_FAILURE, it will interpret that as the connection failing, so
-it will unref the subchannel and report IDLE to its parent.  This
-causes two problems.
+report TRANSIENT_FAILURE to the leaf LB policy.  However, that approach
+will no longer work with this design, as explained in the
+[Reaons for Generic Health Reporting](#reasons-for-generic-health-reporting)
+section below.
 
-The first problem is that we don't want unhealthiness to trigger
-connection churn, but pick_first would react in this case by dropping
-the existing connection unnecessarily.  Note that, as described in [gRFC
-A17](A17-client-side-health-checking.md#pick_first), the client-side
-health checking mechanism does not work with pick_first, for this exact
-reason.  In hindsight, we should have imposed the same restriction for
-outlier detection, but that was not explicitly stated in [gRFC A50][A50].
-However, that gRFC does say that outlier detection will ignore subchannels
-with multiple addresses, which is the case in Java and Go.  In C-core,
-it should have worked with pick_first, although it turns out that there
-was a bug that prevented it from working, which means that we can know
-that no users were actually counting on this behavior.  This means that
-we can retroactively say that outlier detection should never have worked
-with pick_first with minimal risk of affecting users that might have
-been counting on this use-case.  (It might affect Java/Go channels that
-use pick_first and happen to have only one address, and it might have
-been used in Node.)
+Instead, we need to make these health signals visible to the petiole
+policies without affecting the underlying connectivity management of
+the pick_first policy.  However, since both of these mechanisms work on
+individual subchannels rather than on endpoints with multiple subchannels,
+this functionality is best implemented in pick_first itself, since
+that's where we know which subchannel was actually chosen.  Therefore,
+pick_first will have an option to support these health signals, and
+that option will be used only when pick_first is used as a child policy
+underneath a petiole policy.
 
-The second problem is that this would cause pick_first to report IDLE
-instead of TRANSIENT_FAILURE up to the petiole policy.  This could
-affect the aggregated connectivity state that the petiole policy reports
-to *its* parent.  And parent policies like the priority policy (see
-[gRFC A56][A56]) may then make the wrong routing decision based on that
-incorrect state.
-
-To address these problems, we need to make these health signals visible
-to the petiole policies without affecting the underlying connectivity
-management of the pick_first policy.  However, since both of these
-mechanisms work on individual subchannels rather than on endpoints with
-multiple subchannels, this functionality is best implemented in pick_first
-itself, since that's where we know which subchannel was actually chosen.
-Therefore, pick_first will have an option to support these health
-signals, and that option will be used only when pick_first is used as
-a child policy underneath a petiole policy.
-
-Note that, for the reasons described above, we do not want either of these
-mechanisms to actually work with pick_first itself, so we will implement
+Note that we do not want either of these mechanisms to actually work
+when pick_first is used as an LB policy by itself, so we will implement
 this functionality in a way that it can be triggered by a parent policy
 such as round_robin but cannot be triggered by an external application.
 (For example, in C-core, this will be triggered via an internal-only
@@ -525,10 +497,10 @@ subsequent config change.
 
 #### Least Request
 
-The least-request LB policy (Java-only, described in [gRFC A48][A48])
-will work essentially the same way as WRR.  The only difference is that
-the data it is storing on a per-endpoint basis is outstanding request
-counts rather than weights.
+The least-request LB policy (Java and Go only, described in [gRFC
+A48][A48]) will work essentially the same way as WRR.  The only difference
+is that the data it is storing on a per-endpoint basis is outstanding
+request counts rather than weights.
 
 #### Ring Hash
 
@@ -663,13 +635,15 @@ endpoint changes.  It will be used to update the successful and failed
 call counts as each RPC finishes.  Note that appropriate synchronization
 is required for those two different accesses.
 
-The entry in the endpoint map will hold a pointer to the entries in the
-subchannel map for the addresses associated with the endpoint.  These
-pointers will be accessed by the LB policy when ejecting or unejecting
-the endpoint, to send health state notifications to the corresponding
-subchannels.  Note that if the ejection timer runs in the same
-synchronization context as the rest of the activity in the LB policy, no
-additional synchronization should be needed here.
+The entry in the endpoint map may hold a pointer to the entries in the
+subchannel map for the addresses associated with the endpoint, or the
+implementation may simply look up each of the endpoint's addresses in
+the subchannel map separately.  These accesses from the endpoint map
+to the subchannel map will be performed by the LB policy when ejecting
+or unejecting the endpoint, to send health state notifications to the
+corresponding subchannels.  Note that if the ejection timer runs in the
+same synchronization context as the rest of the activity in the LB policy,
+no additional synchronization should be needed here.
 
 The set of entries in both maps will continue to be set based on the
 address list that the outlier detection policy receives from its parent.
@@ -687,7 +661,7 @@ wrapping the subchannel's generic health reporting mechanism.
 The EDS resource has been updated to support multiple addresses per
 endpoint in
 [envoyproxy/envoy#27881](https://github.com/envoyproxy/envoy/pull/27881).
-Specifically, that PR adds a new `AdditionalAddresses` message, which
+Specifically, that PR adds a new `AdditionalAddress` message, which
 contains a single `address` field, and it adds a repeated
 `additional_addresses` field of that type to the `Endpoint` proto.
 
@@ -803,10 +777,14 @@ default, not something that is enabled via external input.
 
 ## Rationale
 
+### Happy Eyeballs Functionality
+
 Note that we will not support all parts of "Happy Eyeballs" as described
 in [RFC-8305][RFC-8305].  For example, because our resolver API does
 not provide a way to return some addresses without others, we will not
 start trying to connect before all of the DNS queries have returned.
+
+### Java and Go Pick First Restructuring
 
 In Java and Go, pick_first is currently implemented inside the subchannel
 rather than at the LB policy layer.  In those implementations, it
@@ -820,6 +798,46 @@ to the LB policy layer in Java and Go will have the nice effect of
 making their backoff work per-address instead of across all addresses,
 which is what C-core does and what the (poorly specified) [connection
 backoff spec][backoff-spec] seems to have originally envisioned.
+
+### Reasons for Generic Health Reporting
+
+Currently, client-side health checking and outlier detection
+signal unhealthiness by essentially causing the subchannel to report
+TRANSIENT_FAILURE to the leaf LB policy.  This existing approach works
+reasonably when petiole policies directly create and manage subchannels,
+but it will not work when pick_first is the universal leaf policy.
+When pick_first sees its chosen subchannel transition from READY to
+TRANSIENT_FAILURE, it will interpret that as the connection failing, so
+it will unref the subchannel and report IDLE to its parent.  This causes
+two problems.
+
+The first problem is that we don't want unhealthiness to trigger
+connection churn, but pick_first would react in this case by dropping
+the existing connection unnecessarily.  Note that, as described in [gRFC
+A17](A17-client-side-health-checking.md#pick_first), the client-side
+health checking mechanism does not work with pick_first, for this exact
+reason.  In hindsight, we should have imposed the same restriction for
+outlier detection, but that was not explicitly stated in [gRFC A50][A50].
+However, that gRFC does say that outlier detection will ignore subchannels
+with multiple addresses, which is the case in Java and Go.  In C-core,
+it should have worked with pick_first, although it turns out that there
+was a bug that prevented it from working, which means that we can know
+that no users were actually counting on this behavior.  This means that
+we can retroactively say that outlier detection should never have worked
+with pick_first with minimal risk of affecting users that might have
+been counting on this use-case.  (It might affect Java/Go channels that
+use pick_first and happen to have only one address, and it might have
+been used in Node.)
+
+The second problem is that this would cause pick_first to report IDLE
+instead of TRANSIENT_FAILURE up to the petiole policy.  This could
+affect the aggregated connectivity state that the petiole policy reports
+to *its* parent.  And parent policies like the priority policy (see
+[gRFC A56][A56]) may then make the wrong routing decision based on that
+incorrect state.
+
+These problems are solved via the introduction of the [Generic Health
+Reporting Mechanism](#generic-health-reporting-mechanism).
 
 ## Implementation
 
@@ -861,7 +879,6 @@ backoff spec][backoff-spec] seems to have originally envisioned.
 
 ### Java
 
-- change grpclb to delegate to RR or PF
 - move pick_first logic out of subchannel and into pick_first policy
 - make pick_first the universal leaf policy, including client-side
   health checking support
@@ -872,7 +889,6 @@ backoff spec][backoff-spec] seems to have originally envisioned.
 ### Go
 
 - change subchannel connectivity state API (maybe)
-- change grpclb to delegate to RR or PF
 - move pick_first logic out of subchannel and into pick_first policy
 - make pick_first the universal leaf policy, including client-side
   health checking support (includes moving health checking logic out of
