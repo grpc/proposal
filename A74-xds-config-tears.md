@@ -4,7 +4,7 @@ A74: xDS Config Tears
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-12-06
+* Last updated: 2023-12-15
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -215,6 +215,14 @@ cds LB policy can use this API.  The API will return some subscription
 handle that the caller can release when they are no longer interested
 in the cluster subscription.
 
+As per [gRFC A31][A31], the ConfigSelector gives each RPC a ref to the
+cluster that was selected for it to ensure that the cluster is not
+removed from the xds_cluster_manager LB policy config before the RPC is
+done with its LB picks.  These cluster refs will also hold a
+subscription for the cluster from the XdsDependencyManager, so that the
+XdsDependencyManager will not stop watching the cluster resource until
+the cluster is removed from the xds_cluster_manager LB policy config.
+
 Note that in the XdsConfig, the cluster map will contain an entry for
 every cluster that is either referenced in the route configuration or
 for which a dynamic subscription was registered.  If a cluster is
@@ -244,13 +252,13 @@ the XdsDependencyManager (or the interface wrapping it) if it has not
 already done so.  This handle will not be released until the cds policy
 is destroyed.
 
-Note that when XdsDependencyManager returns a new configuration that
-removes a cluster, the cds policy for that cluster may continue to
-exist for a short time due to the cluster refs taken for calls in the
-ConfigSelector, but it will no longer be present in the XdsConfig that
-is passed in via an attribute.  Thus, other than the is_dynamic behavior
-described above, the cds policy should ignore updates in which it does
-not find the cluster in the XdsConfig.
+Note that when a cds LB policy obtains a dynamic subscription to a
+cluster, there may be subsequent updates from the xds resolver that do not
+yet include the newly subscribed-to cluster.  Therefore, the cds policy
+will need to ignore updates in which the XdsConfig does not contain the
+cluster.  However, this case should not occur with non-dynamic clusters,
+because the xds resolver ensures that those clusters are being subscribed
+to until they are removed from the LB policy config.
 
 The code for generating the configuration for the priority policy (see
 [A56]) will be moved from the xds_cluster_resolver policy into the
