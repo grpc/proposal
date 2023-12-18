@@ -168,19 +168,24 @@ struct XdsConfig {
   // Cluster map.  A cluster will have a non-OK status if either
   // (a) there was an error and we did not already have a valid
   // resource or (b) the resource does not exist.
-  // For aggregate clusters, the aggregate cluster will be first in
-  // the list, followed by the list of leaf clusters.  For other types
-  // of clusters, the list will have only one element.
   struct ClusterConfig {
     // Cluster name and resource.
     std::string cluster_name;
     XdsClusterResource cluster;
+
     // Endpoint info.  If there was an error, endpoints will be null
     // and resolution_note will be set.
-    XdsEndpointResource endpoints;
-    std::string resolution_note;
+    struct EndpointConfig {
+      XdsEndpointResource endpoints;
+      std::string resolution_note;
+    };
+    // The list of leaf clusters for an aggregate cluster.
+    struct AggregateConfig {
+      std::vector<absl::string_view> leaf_clusters;
+    };
+    std::variant<EndpointConfig, AggregateConfig> children;
   };
-  std::map<std::string, absl::StatusOr<std::vector<ClusterConfig>>> clusters;
+  std::map<std::string, absl::StatusOr<ClusterConfig>> clusters;
 };
 ```
 
