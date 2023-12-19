@@ -4,7 +4,7 @@ A74: xDS Config Tears
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-12-15
+* Last updated: 2023-12-19
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -55,6 +55,7 @@ resource watches into the xds resolver.
 * [A29: xDS mTLS Security][A29]
 * [A31: xDS Timeout Support and Config Selector Design][A31]
 * [A37: xDS Aggregate and Logical DNS Clusters][A37]
+* [A55: xDS-Based Stateful Session Affinity for Proxyless gRPC][A55]
 * [A56: Priority LB Policy][A56]
 * [A71: xDS Fallback (pending)][A71]
 
@@ -63,6 +64,7 @@ resource watches into the xds resolver.
 [A29]: A29-xds-tls-security.md
 [A31]: A31-xds-timeout-support-and-config-selector.md
 [A37]: A37-xds-aggregate-and-logical-dns-clusters.md
+[A55]: A55-xds-stateful-session-affinity.md
 [A56]: A56-priority-lb-policy.md
 [A71]: https://github.com/grpc/proposal/pull/386
 
@@ -79,6 +81,10 @@ This proposal has several parts:
   obtaining endpoint addresses will now be done in the xds resolver.
   The code for generating the child policy configs for the priority
   policy will now be done in the cds LB policy.
+- As an optimization, we will change the xds_cluster_impl and
+  xds_override_host LB policies to get most of their configuration
+  parameters from the passed-in attribute rather than from their JSON
+  configs.
 - In some implementations, this may also allow simplifying the XdsCredentials
   plumbing by leveraging the config passed to the LB policies instead of
   generating a map of mTLS configs in the cds LB policy.
@@ -281,6 +287,23 @@ to EDS resources and for creating DNS resolvers for Logical DNS clusters.
 And the cds LB policy will be responsible for generating the configuration
 for the priority policy.
 
+#### Changes in xds_cluster_impl and xds_override_host LB policies
+
+Now that we are passing the XdsConfig to the LB policies via an
+attribute, the xds_cluster_impl and xds_override_host LB policies can
+now get the cluster's configuration from the XdsConfig rather than from
+their JSON config.  This will avoid the need to populate most of the
+fields in the JSON config in the cds LB policy and to parse these fields
+in the xds_cluster_impl and xds_override_host policies.
+
+In the xds_cluster_impl policy config, we will retain only the
+clusterName and childPolicy fields.  All other fields are deprecated
+and will no longer be used.
+
+In the xds_override_host policy config, we will retain the childPolicy
+field and add a clusterName field.  The overrideHostStatus field is
+deprecated and will no longer be used.
+
 #### XdsCredentials Simplification
 
 Because this design calls for passing the XdsConfig down to the LB
@@ -297,14 +320,8 @@ However, now that we are passing down the entire XdsConfig via an
 attribute, we can instead move the XdsCredentials plumbing from the cds
 LB policy down to the xds_cluster_impl policy (introduced in [A37]).
 The xds_cluster_impl policy already knows which leaf cluster it is for,
-it can look up the mTLS config directly and pass that down to the
+so it can look up the mTLS config directly and pass that down to the
 subchannels, so there is no longer any need for a map.
-
-Note that as mentioned above, if a cluster exists only underneath an
-aggregate cluster, it will not have its own entry in the cluster map in
-the XdsConfig.  Therefore, the xds_cluster_impl policy may need to look
-through all of the entries to find the one it needs.  If this becomes a
-bottleneck in the future, we can optimize it at that point.
 
 ### Temporary environment variable protection
 
@@ -319,6 +336,9 @@ client to be resilient to bad configs from the control plane, once we
 have enough observability infrastructure to make that tractable.
 
 ## Implementation
+
+LB policy config fields are updated in
+https://github.com/grpc/grpc-proto/pull/140.
 
 Implemented in C-core in https://github.com/grpc/grpc/pull/35011.
 
