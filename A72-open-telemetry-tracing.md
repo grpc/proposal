@@ -154,7 +154,7 @@ single composite propagator that combines one or multiple `TextMapPropagator`
 for their client and server separately. This way, users can define their own 
 migration path for context propagators in distributed components, see detailed
 discussion in the later session. Configuring gRPC OpenTelemetry with this 
-propagator when dealing with cross-cutting concerns during migration is 
+propagator when dealing with cross-process concerns during migration is 
 straightforward and recommended. In the long term, community
 standardized propagators, e.g. W3C is more encouraged than `grpcTraceBinPropagator`. 
 
@@ -264,16 +264,16 @@ private interface GrpcBinarySetter<Metadata> {
 
 ```
 
-The `GrpcCommonSetter` adds an overloaded `set()` method to directly take `bytes[]` 
+The `GrpcCommonSetter` adds an overloaded `set()` method to directly take `byte[]` 
 (Java and Go) to avoid extra base64 encoding. For the normal `set()` method it 
 should handle both binary (`-bin`) header and ASCII header from any TextMap 
-propagators that users may config.
+propagators that users may configure.
 The `GrpcCommonGetter` adds new method `getBinary()` for the optimized path for 
 the same reason in Java and Go. Similarly, the normal `get()` method handles both 
 binary header and TextMap propagators.
 
 #### Context Propagation APIs in C++
-C++ will also support the propagators API, because this imposes API 
+C++ will also support the propagators API, because this provides API 
 uniformity among languages. Due to the language restriction, 
 C++ can not take the optimization path to workaround lacking the binary 
 propagator API. That means using propagators API with C++ needs base64 encoding 
@@ -392,7 +392,7 @@ The OpenCensus [shim](https://github.com/open-telemetry/opentelemetry-java/tree/
 OpenTelemetry and OpenCensus dependencies to export trace spans from both frameworks,
 and keep the correct parent-child relationship. This is the recommended approach to migrate
 to OpenTelemetry in one binary gradually. Note that the in-binary migration and 
-cross-cutting concerns migration can be done in parallel.
+cross-process migration can be done in parallel.
 
 The shim packages that bridge two libraries works as follows, considering the
 following migration scenarios example: 
