@@ -235,11 +235,9 @@ XdsDependencyManager will not stop watching the cluster resource until
 the cluster is removed from the xds_cluster_manager LB policy config.
 
 Note that in the XdsConfig, the cluster map will contain an entry for
-every cluster that is either referenced in the route configuration or
-for which a dynamic subscription was registered.  If a cluster is
-present only underneath an aggregate cluster, it will be present in the
-list for that aggregate cluster, but it will not have its own top-level
-entry.
+every cluster that is either referenced in the route configuration,
+referenced in an aggregate cluster, or for which a dynamic subscription
+was registered.
 
 ### Changes in cds LB policy
 
