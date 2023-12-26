@@ -241,7 +241,7 @@ present only underneath an aggregate cluster, it will be present in the
 list for that aggregate cluster, but it will not have its own top-level
 entry.
 
-#### Changes in cds LB policy
+### Changes in cds LB policy
 
 Instead of starting a watch on the XdsClient to get the cluster data,
 the cds LB policy will get its configuration by looking up the cluster
@@ -278,7 +278,7 @@ minimize churn in priority child policy names as localities move between
 priorities.  The cds policy will also take the endpoint information from
 the XdsConfig and pass it down to the priority policy as addresses.
 
-#### Removing the xds_cluster_resolver LB Policy
+### Removing the xds_cluster_resolver LB Policy
 
 The xds_cluster_resolver LB policy (introduced in [A37]) will be removed
 completely, since all of its functionality is being moved elsewhere in
@@ -287,7 +287,7 @@ to EDS resources and for creating DNS resolvers for Logical DNS clusters.
 And the cds LB policy will be responsible for generating the configuration
 for the priority policy.
 
-#### Changes in xds_cluster_impl and xds_override_host LB policies
+### Changes in xds_cluster_impl and xds_override_host LB policies
 
 Now that we are passing the XdsConfig to the LB policies via an
 attribute, the xds_cluster_impl and xds_override_host LB policies can
@@ -304,7 +304,7 @@ In the xds_override_host policy config, we will retain the childPolicy
 field and add a clusterName field.  The overrideHostStatus field is
 deprecated and will no longer be used.
 
-#### XdsCredentials Simplification
+### XdsCredentials Simplification
 
 Because this design calls for passing the XdsConfig down to the LB
 policies, some gRPC implementations may be able to leverage that to
