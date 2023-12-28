@@ -103,15 +103,28 @@ And the architecture for an aggregate cluster will now look like this:
 
 [Link to SVG file](A75_graphics/grpc_client_architecture_aggregate.svg)
 
-TODO: backwards compat story:
-- new behavior will ignore LB policy config in aggregate cluster, not
-  require that it be set to CLUSTER_PROVIDED as in Envoy
-  ==> another option would be to support CLUSTER_PROVIDED via the new
-      LB policy config extension point rather than the old enum field.
-      maybe we even stick with the legacy behavior if the enum is used?
-      (but then we'd have to maintain it in the long run...)
-- for a few releases, will provide an env var to get the old behavior,
-  as a transition mechanism in case of problems
+One important consequence of this change is that we will no longer be
+getting the LB policy config from the aggregate cluster; instead, we
+will use the LB policy configured in the underlying cluster.  However,
+to avoid causing backward-compatibility problems, we will not require
+the aggregate cluster to be configured with the CLUSTER_PROVIDED LB
+policy the way that Envoy does; instead, we will simply ignore the LB
+policy configured in the aggregate cluster.  This seems unlikely to
+cause problems in practice, because Envoy's aggregate cluster
+functionality probably doesn't work with anything except the
+CLUSTER_PROVIDED LB policy anyway, so the LB policy in the aggregate
+cluster probably doesn't provide any useful information.
+
+The one case where this may be a problem is if there are existing
+control planes being used with gRPC that set the LB policy differently
+in the aggregate cluster vs. the underlying clusters and then expect the
+LB policy in the aggregate cluster to be used.  In order to provide a
+migration story for any such cases, we will support a temporary
+mechanism to tell gRPC to use the LB policy in the aggregate cluster.
+This will be enabled by setting the
+`GRPC_XDS_AGGREGATE_CLUSTER_BACKWARD_COMPAT` environment variable to
+`true`.  This mechanism will be supported for a couple of gRPC releases
+but will be removed in the long run.
 
 ### Stateful Session Affinity Changes
 
