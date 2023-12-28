@@ -51,7 +51,7 @@ This limitation is causing problems for stateful session affinity and
 is likely a source of friction for outlier detection as well.
 
 This design describes how we are going to change our aggregate cluster
-implementation to solve these problems.  It also describe some changes
+implementation to solve these problems.  It also describes some changes
 to the stateful session affinity design to support it working across
 priorities.
 
