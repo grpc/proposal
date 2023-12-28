@@ -123,17 +123,17 @@ if the endpoint moves to priority 1 and the priority policy continues to
 send non-SSA traffic to priority 0.
 
 Currently, the xds_override_host policy (see gRFCs [A55] and [A60])
-expects to wrap subchannels that are owned by its child policy in most
-cases.  The only case where it directly takes ownership of subchannels is
-if they are in EDS health state DRAINING, since it filters those addresses
+expects the subchannels to be owned by its child policy in most cases.
+The only case where it directly takes ownership of subchannels is if
+they are in EDS health state DRAINING, since it filters those addresses
 out of the list it passes down to the child policy and therefore does
 not expect the child policy to create subchannels for those addresses.
 We unconditionally retain the subchannels for all endpoints in state
 DRAINING, even if they are not actually being used for a session, on the
 assumption that we probably already had a connection to the endpoint,
 and it's not that harmful to retain that connection until the endpoint
-finishes draining and is removed from the EDS update, which should be a
-relatively short amount of time.
+finishes draining and is removed from the EDS update, which should be
+a relatively short amount of time.
 
 However, now that the xds_override_host policy is being moved up above
 the priority policy, the xds_override_host policy may not see subchannels
@@ -190,6 +190,8 @@ parsed CDS resource.
 
 We will make the following changes in the xds_override_host policy:
 
+- The xds_override_host policy will take ownership of any subchannel
+  that the child policy does not own if needed for session affinity.
 - Each entry in the subchannel map will contain a `last_used_time` field,
   which will indicate the last time at which the entry was used for a session.
   Note that this field will be updated only when the xds_override_host picker
