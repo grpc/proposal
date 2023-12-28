@@ -196,10 +196,13 @@ We will make the following changes in the xds_override_host policy:
   sees the attribute from the stateful session HTTP filter; if that filter
   is not present, then SSA is not being used for the request, and we do not
   need to retain ownership of the subchannel.
-- The xds_override_host policy will have a timer that fires every 5
-  seconds to do a sweep over the subchannel map and unref any owned
-  subchannel whose `last_used_time` is older than the `idle_timeout`
-  value from the CDS resource.
+- The xds_override_host policy will have a timer that runs periodically
+  to do a sweep over the subchannel map and unref any owned subchannel
+  whose `last_used_time` is older than the `idle_timeout` value from the
+  CDS resource.  The timer can initially be set for `idle_timeout`
+  duration, and subsequent runs can dynamically determine when to run
+  based on the `last_used_time` of the entries in the map, with a
+  minimum of 5 seconds between runs to minimize overhead.
 - When the child policy unrefs a subchannel it owns, if the entry's
   `last_used_time` is newer than the `idle_timeout`, the
   xds_override_host policy assumes ownership of the subchannel instead
