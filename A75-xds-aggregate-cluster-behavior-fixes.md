@@ -4,8 +4,8 @@ A75: xDS Aggregate Cluster Behavior Fixes
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-12-13
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 2023-12-28
+* Discussion at: https://groups.google.com/g/grpc-io/c/C1XAnRc2Z7E
 
 ## Abstract
 
