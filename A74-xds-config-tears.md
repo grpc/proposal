@@ -4,8 +4,8 @@ A74: xDS Config Tears
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-12-19
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 2023-12-28
+* Discussion at: https://groups.google.com/g/grpc-io/c/ifcC3DbopWM
 
 ## Abstract
 
