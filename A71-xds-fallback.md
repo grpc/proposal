@@ -4,7 +4,7 @@ A71: xDS Fallback
 * Approver: @markdroth
 * Status: Draft
 * Implemented in: <language, ...>
-* Last updated: 2023-11-16
+* Last updated: 2024-01-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/07M6Ua7q4Hc
 
 ## Abstract
@@ -22,23 +22,26 @@ inter-component connectivity and cause wider outages.
 
 Current xDS implementation in gRPC uses a single global instance of
 the XdsClient class to communicate with the xDS control plane. This instance
-is shared across all channels to reduce overhead by providing a shared cache
-for xDS resources and reducing the number of connections to xDS servers.
+is shared across all channels and xDS-enabled gRPC server listeners to reduce
+overhead by providing a shared cache for xDS resources and reducing the number
+of connections to xDS servers.
 
 ### Reservations about using the fallback server data
 
 We are expecting to use this in an environment where the data provided by
 the secondary xDS server is better than nothing but is less desirable than
-the data in the primary server. This means that while we definitely want to use
-the fallback data in preference to the client simply failing, we will always
-prefer to use the data from the primary server over the data from the fallback
-server. In principle, this means that whenever we have a resource already
-cached from the primary server, we want to use that instead of falling back.
+the data in the primary server. E.g. a fallback environment that uses
+an outdated static configuration. This means that while we definitely want
+to use the fallback data in preference to the client simply failing, we will
+always prefer to use the data from the primary server over the data from
+the fallback server. In principle, this means that whenever we have a resource
+already cached from the primary server, we want to use that instead of falling
+back.
 
 We have no guarantee that a combination of resources from different xDS servers
 form a valid cohesive configuration, so we cannot make this determination on
-a per-resource basis. We need any given gRPC channel to only use the resources
-the single server
+a per-resource basis. We need any given gRPC channel or server listener to only
+use the resources from the single server.
 
 ### Related Proposals: 
 * [A27: xDS-Based Global Load Balancing][A27]
@@ -53,6 +56,7 @@ Implement the following changes
 
 1. Change global XdsClient from a single instance to a map of instances keyed
 by channel target.
+1. Update CSDS to aggregate configs from multiple XdsClient instances.
 1. Change xDS bootstrap code to return the full list of servers for each
 xDS authority from the bootstrap config.
 1. Change XdsClient to support fallback within each xDS authority.
@@ -72,11 +76,14 @@ fallback configuration only for channels that need xDS resources that have not
 been downloaded yet.
 
 This change would change the channels to get XdsClient for their data plane
-target. It will also require changes to the CSDS service to aggregate configs
-from multiple XdsClients. The CSDS RPC service will be changed to get data
-from all XdsClient instances. A new string field named `channel_target` will be
-added to the CSDS `ClientConfig` message to indicate the channel target
-the data is associated with.
+target.
+
+### Update CSDS to aggregate configs from multiple XdsClient instances.
+
+The CSDS RPC service will be changed to get data from all XdsClient instances.
+A new string field named `channel_target` will be added to the CSDS
+`ClientConfig` message to indicate the channel target the data is associated
+with.
 
 Adding this field will not require updating the CSDS client as its value will
 be the same for most resources in most cases.
@@ -107,16 +114,16 @@ the control plane notifies of the config change and becomes unavailable before
 the new config resources are downloaded.
 
 XdsClients will need to be changed to support multiple ADS connections for each
-authority. Once the fallback process begins, an impacted XdsClient will establish
-a connection to the next xDS control plane listed in the bootstrap JSON. Then
-XdsClient will subscribe to all watched resources on that server and will
-update the cache based on the received responses.
+authority. Once the fallback process begins, an impacted XdsClient will
+establish a connection to the next xDS control plane listed in the bootstrap
+JSON. Then XdsClient will subscribe to all watched resources on that server
+and will update the cache based on the received responses.
 
 Connecting to the lower-priority servers does not close gRPC connections to the
 higher-priority servers. XdsClient will still wait for xDS resources on the ADS
-stream. Once such a resource is received, the XdsClient will close connections to the
-lower-priority server(s) and will use the resources from the higher priority
-servers.
+stream. Once such a resource is received, the XdsClient will close connections
+to the lower-priority server(s) and will use the resources from the higher
+priority servers.
 
 ### Potential issues
 
