@@ -4,7 +4,7 @@ A71: xDS Fallback
 * Approver: @markdroth
 * Status: Draft
 * Implemented in: <language, ...>
-* Last updated: 2024-01-02
+* Last updated: 2024-01-03
 * Discussion at: https://groups.google.com/g/grpc-io/c/07M6Ua7q4Hc
 
 ## Abstract
@@ -20,7 +20,7 @@ and subscribing to the configuration of a server mesh. Even a brief downtime
 of the xDS control plane may cause significant disruption in the service mesh
 inter-component connectivity and cause wider outages.
 
-Current xDS implementation in gRPC uses a single global instance of
+The current xDS implementation in gRPC uses a single global instance of
 the XdsClient class to communicate with the xDS control plane. This instance
 is shared across all channels and xDS-enabled gRPC server listeners to reduce
 overhead by providing a shared cache for xDS resources and reducing the number
@@ -41,7 +41,7 @@ back.
 We have no guarantee that a combination of resources from different xDS servers
 form a valid cohesive configuration, so we cannot make this determination on
 a per-resource basis. We need any given gRPC channel or server listener to only
-use the resources from the single server.
+use the resources from a single server.
 
 ### Related Proposals: 
 * [A27: xDS-Based Global Load Balancing][A27]
@@ -66,7 +66,7 @@ xDS authority from the bootstrap config.
 Current gRPC implementation is using a single XdsClient for all data plane
 targets. For fallback, if any one channel triggers fallback, then all channels
 regardless of authority would switch to using the data from the fallback xDS
-control plane which is not desirable.
+control plane, which is not desirable.
 
 gRPC servers using the xDS configuration will share the same XdsClient instance
 keyed with a dedicated well-known key value.
@@ -81,18 +81,26 @@ target.
 ### Update CSDS to aggregate configs from multiple XdsClient instances.
 
 The CSDS RPC service will be changed to get data from all XdsClient instances.
-A new string field named `channel_target` will be added to the CSDS
-`ClientConfig` message to indicate the channel target the data is associated
+A new string field named `client_scope` will be added to the CSDS
+[ClientConfig] message to indicate the channel target the data is associated
 with.
 
-Adding this field will not require updating the CSDS client as its value will
-be the same for most resources in most cases.
+```
+// For xDS clients, the scope in which the data is used. 
+// For example, gRPC indicates the data plane target or that the data is
+// associated with gRPC server(s).
+string client_scope = 4;
+```
+
+Adding this field will not require updating most CSDS clients as its value will
+be the same for all resources in most cases.
 
 ### Change xDS Bootstrap to handle multiple xDS configuration servers
 
 Current gRPC xDS implementations only use the first xDS configuration server
 listed in the bootstrap JSON document. Fallback implementation requires changes
-to use all servers listed in order from highest to lowest priority.
+to use all servers listed in order from highest to lowest priority. Priority is
+assigned based on the server ordering in bootstrap.json.
 
 ### Change XdsClient to support fallback within each xDS authority
 
@@ -109,9 +117,10 @@ resources include:
     - Resources that are considered non-existent according
     to [xDS Protocol Specification][resource-does-not-exist].
 
-This may happen during a new channel setup or mid-config update, when
-the control plane notifies of the config change and becomes unavailable before
-the new config resources are downloaded.
+This may happen during a new channel setup or mid-config update, such as
+when the control plane sends an updated RDS resource that points to a new
+cluster, but then the control plane becomes unavailable before the new CDS
+resource can be obtained.
 
 XdsClients will need to be changed to support multiple ADS connections for each
 authority. Once the fallback process begins, an impacted XdsClient will
@@ -230,4 +239,4 @@ file.
 [A57]: A57-xds-client-failure-mode-behavior.md
 
 [resource-does-not-exist]: https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist
-
+[ClientConfig]: https://github.com/envoyproxy/envoy/blob/e61e461736a28e26b6fcf0ca25d34c47ed29b0fc/api/envoy/service/status/v3/csds.proto#L130
