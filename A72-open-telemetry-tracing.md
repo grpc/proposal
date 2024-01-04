@@ -102,28 +102,28 @@ is design and implementation complete.
 We will add tracing functions in grpc-open-telemetry plugin, along with OpenTelemetry 
 metrics [gRPC A66][A66].
 Languages will keep using the same gRPC infrastructures, e.g. interceptor and 
-stream tracer to implement the feature. 
-We keep the grpc-census plugin to allow users who already depend on grpc-census to 
-continue using it for the newer grpc version and offer grace time for the migration.
+stream tracer to implement the feature.
+We keep the grpc-census plugin to allow users who already depend on grpc-census to
+continue using it for newer grpc versions.
 In the new function we will produce the same tracing information as we produce 
 for Census. But due to API differences between OpenCensus and OpenTelemetry, the
-trace information has slight differences.
+trace information is represented slightly differently.
 The OpenCensus `MessageEvent` fields maps to OpenTelemetry event attributes:
 
-| OpenCensus Trace Message Event Fields | OpenTelemetry Event Attribute Key |
-|---------------------------------------|-----------------------------------|
-| Type                                  | `message.event.type`              |
-| Message Id                            | `message.message.id`              |
-| Uncompressed message size             | `message.event.size.uncompressed` |
-| Compressed message size               | `message.event.size.compressed`   |
+| OpenCensus Trace Message Event Fields | OpenTelemetry Trace Event Attribute Key |
+|---------------------------------------|-----------------------------------------|
+| Type                                  | `message.event.type`                    |
+| Message Id                            | `message.message.id`                    |
+| Uncompressed message size             | `message.event.size.uncompressed`       |
+| Compressed message size               | `message.event.size.compressed`         |
 
-OpenCensus span annotation description maps to OpenTelemetry event name, attributes
-keys are mapped to:
+OpenCensus span annotation description maps to OpenTelemetry event name, and 
+annotation attributes keys are mapped to event attributes keys:
 
-| OpenCensus Trace Annotation Attribute Key | OpenTelemetry Event Attribute Key |
-|-------------------------------------------|-----------------------------------|
-| `id`                                      | `message.event.type`              |
-| `type`                                    | `message.message.id`              |
+| OpenCensus Trace Annotation Attribute Key | OpenTelemetry Trace Event Attribute Key |
+|-------------------------------------------|-----------------------------------------|
+| `id`                                      | `message.event.type`                    |
+| `type`                                    | `message.message.id`                    |
 
 And OpenTelemetry no longer has span end options as OpenCensus does.
 
@@ -145,21 +145,21 @@ TextMap propagator does not show visible performance impact for C++, which is
 the most sensitive language to performance, based on internal micro benchmarking. 
 Therefore, gRPC will only support `grpc-trace-bin` and TextMap propagators.
 
-gRPC will expose a custom `grpcTraceBinPropagator` that implements `TextMapPropagator`.
+gRPC will expose a custom `GrpcTraceBinPropagator` that implements `TextMapPropagator`.
 This grpc-provided propagator still uses the `grpc-trace-bin` header for context 
 propagation. When using `grpc-trace-bin` the OpenCensus spanContext and 
-OpenTelemetry spanContext  are identical, therefore a gRPC OpenCensus client can 
+OpenTelemetry spanContext are identical, therefore a gRPC OpenCensus client can 
 speak with a gRPC OpenTelemetry server and vice versa. Users can provide a 
 single composite propagator that combines one or multiple `TextMapPropagator` 
 for their client and server separately. This way, users can define their own 
 migration path for context propagators in distributed components, see detailed
 discussion in the later session. Configuring gRPC OpenTelemetry with this 
-propagator when dealing with cross-process concerns during migration is 
+propagator when dealing with cross-process concerns during migration is
 straightforward and recommended. In the long term, community
-standardized propagators, e.g. W3C is more encouraged than `grpcTraceBinPropagator`. 
+standardized propagators, e.g. W3C is more encouraged than `GrpcTraceBinPropagator`. 
 
 ####  Propagator API in Java/Go
-The pseudocode below demonstrates `grpcTraceBinPropagator` and the corresponding 
+The pseudocode below demonstrates `GrpcTraceBinPropagator` and the corresponding 
 gRPC Getter/Setter with an optimization path.
 
 ```Java
@@ -175,7 +175,7 @@ public class GrpcTraceBinPropagator implements TextMapPropagator {
     } else {
       // Slow path for C++. gRPC C++ does not have runtime type inspection, so we 
       // encode bytes to String to comply with the TextMapSetter API. This code 
-      // path is also used in the situation where GrpcTraceBinTextMapPropagator 
+      // path is also used in the situation where GrpcTraceBinPropagator 
       // is used with a TextMapSetter externally.
       setter.set(carrier, "grpc-trace-bin", Base64.getEncoder().encodeToString(value));
     }
@@ -187,9 +187,10 @@ public class GrpcTraceBinPropagator implements TextMapPropagator {
     if (textMapGetter instanceof GrpcCommonGetter) { //Fast path for Java/Go
       bytes = ((GrpcCommonGetter) textMapGetter).getBinary((Metadata) c, "grpc-trace-bin");
     } else {
-      // Slow path for C++. gRPC C++ does not have type checking, so we decode String
-      // from TextMapGetter API to bytes. This code path applies to the situation 
-      // where GrpcTraceBinTextMapPropagator is used with a TextMapGetter externally.
+      // Slow path for C++. gRPC C++ does not have runtime type inspection, so 
+      // we decode String from TextMapGetter API to bytes. This code path applies 
+      // to the situation where GrpcTraceBinPropagator is used with a TextMapGetter
+      // externally.
       String contextString = textMapGetter.get(c, "grpc-trace-bin");
       bytes = Base64.getDecoder().decode(contextString);
     }
@@ -200,13 +201,13 @@ public class GrpcTraceBinPropagator implements TextMapPropagator {
 
 ```
 
-The `grpcTraceBinPropagator` should be compatible with any Getter/Setter, but 
-internally in gRPC, in Java and Go we implement a special gRPC Getter/Setter 
-that uses an optimization path to work around the lack of binary propagator API 
-and thus avoid base64 (de)encoding when passing data between API interfaces. 
-This special gRPC Getter/Setter will also be responsible for handling other 
-propagators that users will configure with gRPC OpenTelemetry (e.g. w3c), 
-see the pseudocode below. 
+The `GrpcTraceBinPropagator` should be compatible with any Getter/Setter, but 
+internally in gRPC, in Java and Go we implement a special gRPC Getter/Setter
+that uses an optimization path to work around the lack of binary propagator API
+and thus avoid base64 (de)encoding when passing data between API interfaces.
+This special gRPC Getter/Setter will also be responsible for handling other
+propagators that users will configure with gRPC OpenTelemetry (e.g. W3C),
+see the pseudocode below.
 
 ```Java
 @Internal
@@ -222,12 +223,12 @@ class GrpcCommonSetter implements TextMapSetter<Metadata>, GrpcBinarySetter<Meta
   @Override
   void set(Metadata header, String key, String value) {
     if (key.endsWith("-bin")) {
-      // Slower path in C++. It shows the decoding part of the just encoded String at 
-      // GrpcTraceBinTextMapPropagator.inject(). 
-      // This can also be used to propagate any other binary header.
+      // Slower path in C++. It shows the decoding part of the just encoded 
+      // String at GrpcTraceBinPropagator.inject(). This can also be used to 
+      // propagate any other binary header.
       header.put(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER), Base64.getDecoder().decode(value));
     } else {
-      // Used by other TextMap propagators, e.g. w3c.
+      // Used by other TextMap propagators, e.g. W3C.
       header.put(Metadata.Key.of(key, ASCII_STRING_MARSHALLER), value);
     }
   }
@@ -238,11 +239,11 @@ class GrpcCommonGetter implements TextMapGetter<Metadata> {
   public String get(@Nullable Metadata carrier, String key) {   
     if (key.endsWith("-bin")) { 
       // Slow path for C++: return string encoded from bytes. Later we decode to 
-      // bytes in GrpcTraceBinTextMapPropagator.extract().
+      // bytes in GrpcTraceBinPropagator.extract().
       byte[] value = carrier.get(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER));
       return Base64.getEncoder().encodeToString(value);
     } else {
-      // Used by other TextMap propagators, e.g. w3c.
+      // Used by other TextMap propagators, e.g. W3C.
       return carrier.get(Metadata.Key.of(key, ASCII_STRING_MARSHALLER));
     }
   }
@@ -255,11 +256,11 @@ class GrpcCommonGetter implements TextMapGetter<Metadata> {
   }
 }
 
-// This interface will be implemented by gRPCCommonSetter/Getter as an optimization path 
-// to avoid base64 encoding between TextMap APIs due to lack of
-// OpenTelemetry binary propagator API.
+// This interface will be implemented by gRPCCommonSetter/Getter as an optimization
+// path to avoid base64 encoding between TextMap APIs due to lack of
+// OpenTelemetry binary propagator API. Not for C++.
 private interface GrpcBinarySetter<Metadata> {
-    void set(Metadata header, String key, byte[] value);
+  void set(Metadata header, String key, byte[] value);
 }
 
 ```
@@ -268,9 +269,9 @@ The `GrpcCommonSetter` adds an overloaded `set()` method to directly take `byte[
 (Java and Go) to avoid extra base64 encoding. For the normal `set()` method it 
 should handle both binary (`-bin`) header and ASCII header from any TextMap 
 propagators that users may configure.
-The `GrpcCommonGetter` adds new method `getBinary()` for the optimized path for 
-the same reason in Java and Go. Similarly, the normal `get()` method handles both 
-binary header and TextMap propagators.
+The `GrpcCommonGetter` in Java and Go adds a new method `getBinary()` for the 
+optimized path for the same reason. Similarly, the normal `get()` method handles
+both binary headers and TextMap propagators.
 
 #### Context Propagation APIs in C++
 C++ will also support the propagators API, because this provides API 
@@ -284,20 +285,20 @@ This is a faster way that avoids paying for the performance cost due to
 string/binary encoding between the propagator and the getter/setter. 
 We use this strategy to balance between API simplicity and performance efficiency.
 The two APIs C++ will support for the context propagation are:
-* If `grpcTraceBinPropagator` is configured, take a slower path in the pseudocode 
+* If `GrpcTraceBinPropagator` is configured, take a slower path in the pseudocode 
 described above. 
 * If explicitly configured, gRPC will directly use `Metadata.get()` and `Metadata.put()` 
 APIs on the `grpc-trace-bin` header. No TextMapPropagator API and TextMapSetter/Getter 
 will be involved. This is a faster path and mitigates performance concerns due 
 to base64 encoding.
 
-TODO: add pseudocode here in C++ for `grpcTraceBinPropagator`,`GrpcCommonSetter` 
+TODO: add pseudocode here in C++ for `GrpcTraceBinPropagator`,`GrpcCommonSetter` 
 and `GrpcCommonSetter`.
 
 The `GrpcCommonSetter.set()` and `GrpcCommonGetter.get()` method in C++
 should handle both binary (`-bin`) header 
 (e.g. `grpc-trace-bin`) and ASCII header from other TextMap 
-propagators that users configure into gRPC OpenTelemetry, e.g. w3c.
+propagators that users configure into gRPC OpenTelemetry, e.g. W3C.
 
 ### gRPC OpenTelemetry Tracing API
 This section talks about enabling and configuring OpenTelemetry tracing.
@@ -312,7 +313,7 @@ In Java, it will be part of global interceptors, so that the interceptors are
 managed in a more sustainable way and user-friendly. As a prerequisite, the stream
 tracer factory API will be stabilized. OpenTelemetryModule will be created with 
 an OpenTelemetryAPI instance passing in for necessary configurations. 
-Users can also rely on SDK autoconfig extension that configure the sdk object 
+Users can also rely on SDK autoconfig extension that configures the sdk object 
 through environmental variables or Java system properties, then obtain the sdk 
 object passed in to gRPC.
 
@@ -329,7 +330,7 @@ OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
   .setTracerProvider(sdkTracerProvider)
   .setMeterProvider(...)
   .setPropagators(
-     ContextPropagators.create(GrpcTraceBinTextMapPropagator.getInstance()))
+     ContextPropagators.create(GrpcTraceBinPropagator.getInstance()))
   .build();
 
 // Alternatively, use auto configuration:
@@ -365,7 +366,7 @@ TODO: add Go API.
 ### Migrate to OpenTelemetry: Cross-process Networking Concerns
 When users first introduce gRPC OpenTelemetry, for the time window when the
 gRPC client and server have mixed plugins of OpenTelemetry and OpenCensus, 
-it is encouraged to use `grpcTraceBinPropagator` that propagates
+it is encouraged to use `GrpcTraceBinPropagator` that propagates
 `grpc-trace-bin` header for the migration. Using the same header greatly simplifies rollout.
 
 A `grpc-trace-bin` formatter implementation for OpenTelemetry is needed in each language, 
@@ -373,10 +374,10 @@ which can be similar to the OpenCensus implementation. Go already has community
 support for that.
 
 After migration period, users have the flexibility to switch to other propagators.
-OpenTelemetry and its extension packages support multiple text map propagators, 
-e.g. W3C trace context or b3. The gRPC OpenTelemetry API allows specifying 
+OpenTelemetry and its extension packages support multiple text map propagators. 
+The gRPC OpenTelemetry API allows specifying 
 multiple propagators: either public standard ones or custom propagators that 
-implement the OpenTelemetry propagators API interface. The API composites the 
+implement the OpenTelemetry propagator API interface. The API composites the 
 propagators and gRPC puts all the propagator data into the wire through metadata. 
 This allows users to easily migrate a group of applications with an old propagator to 
 a new propagator. An example migration path can be:
@@ -387,12 +388,12 @@ a new propagator. An example migration path can be:
 ### Migrate to OpenTelemetry: In Binary
 The OpenCensus [shim](https://github.com/open-telemetry/opentelemetry-java/tree/main/opencensus-shim)
 (currently available in Java, Go, Python) allows binaries that have a mix of 
-OpenTelemetry and OpenCensus dependencies to export trace spans from both frameworks,
-and keep the correct parent-child relationship. This is the recommended approach to migrate
-to OpenTelemetry in one binary gradually. Note that the in-binary migration and 
-cross-process migration can be done in parallel.
+OpenTelemetry and OpenCensus dependencies to export trace spans from both 
+frameworks, and keep the correct parent-child relationship. This is the 
+recommended approach to migrate to OpenTelemetry in one binary gradually. 
+Note that the in-binary migration and cross-process migration can be done in parallel.
 
-The shim packages that bridge two libraries works as follows, considering the
+The shim package that bridges two libraries works as follows, considering the
 following migration scenarios example: 
 
 ```agsl
