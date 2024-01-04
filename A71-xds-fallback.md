@@ -2,9 +2,9 @@ A71: xDS Fallback
 ----
 * Author(s): @eostroukhov
 * Approver: @markdroth
-* Status: Draft
+* Status: Final
 * Implemented in: <language, ...>
-* Last updated: 2024-01-03
+* Last updated: 2024-01-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/07M6Ua7q4Hc
 
 ## Abstract
@@ -92,8 +92,8 @@ with.
 string client_scope = 4;
 ```
 
-Adding this field will not require updating most CSDS clients as its value will
-be the same for all resources in most cases.
+Adding this field will not require updating most CSDS clients as any given
+resource will have only a single `client_scope` in most cases.
 
 ### Change xDS Bootstrap to handle multiple xDS configuration servers
 
