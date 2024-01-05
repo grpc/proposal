@@ -224,3 +224,6 @@ The client interceptor design has interceptor lists and interceptor provider lis
 ## Implementation
 
 I (murgatroid99) will implement this immediately.
+
+[L5]: https://github.com/grpc/proposal/blob/master/L5-node-client-interceptors.md
+[A41]: https://github.com/grpc/proposal/blob/master/A41-xds-rbac.md
