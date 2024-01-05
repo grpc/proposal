@@ -151,6 +151,21 @@ const listener = (new ServerListenerBuilder())
       .build();
 ```
 
+#### Correspondence with client interceptor APIs
+
+The server interceptor APIs are roughly mirrors of the client interceptor APIs, in the sense that send operations on the client correspond to receive operations on the server, and vice versa. In particular, the methods are matched this way as follows:
+
+| Client API | Server API | Notes |
+| ---------- | ---------- | ----- |
+| `Requester.start` | `ServerListener.onReceiveMetadata` | |
+| `Requester.sendMessage` | `ServerListener.onReceiveMessage` | |
+| `Requester.halfClose` | `ServerListener.onReceiveHalfClose` | |
+| `Requester.cancel` | `ServerListener.onCancel` | This server API also handles calls ending in ways other than client cancellation. |
+| | `Responder.start` | This is a utility function for setting up interceptors that does not correspond to any client action. |
+| `Listener.onReceiveMetadata` | `Responder.sendMetadata` | |
+| `Listener.onReceiveMessage` | `Responder.sendMessage` | |
+| `Listener.onReceiveStatus` | `Responder.sendStatus` | |
+
 #### Internal Errors and Exceptions
 
 Exceptions are not handled by the interceptor framework, we expect
