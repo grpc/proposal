@@ -27,7 +27,7 @@ Server interceptors are one of the longest-standing feature requests in the Node
 A server interceptor is a function that takes an instance of `ServerInterceptingCall` and a `MethodDescriptor` (described in detail in [the client interceptors design][L5]), and returns another instance of that class:
 
 ```ts
-function interceptor(call: ServerInterceptingCall, methodDescriptor: MethodDescriptor): ServerInterceptingCall {
+function interceptor(methodDescriptor: MethodDescriptor, call: ServerInterceptingCall): ServerInterceptingCall {
   return new ServerInterceptingCall(call);
 }
 ```
