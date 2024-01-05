@@ -2,10 +2,10 @@ Node Server Interceptors
 ----
 * Author(s): murgatroid99
 * Approver: wenbozhu
-* Status: Draft
+* Status: In Review
 * Implemented in: Node.js
 * Last updated: 2024-01-05
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/oQRRnPfm7Dk
 
 ## Abstract
 
