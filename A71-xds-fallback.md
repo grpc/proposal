@@ -83,7 +83,9 @@ target.
 The CSDS RPC service will be changed to get data from all XdsClient instances.
 A new string field named `client_scope` will be added to the CSDS
 [ClientConfig] message to indicate the channel target the data is associated
-with.
+with. For gRPC clients, this field will contain the key channels use to lookup
+their XdsClient instance, such as dataplane target for client channels or
+special value for xDS-enabled gRPC servers.
 
 ```
 // For xDS clients, the scope in which the data is used. 
@@ -100,7 +102,7 @@ resource will have only a single `client_scope` in most cases.
 Current gRPC xDS implementations only use the first xDS configuration server
 listed in the bootstrap JSON document. Fallback implementation requires changes
 to use all servers listed in order from highest to lowest priority. Priority is
-assigned based on the server ordering in bootstrap.json.
+assigned based on server order in bootstrap.json.
 
 ### Change XdsClient to support fallback within each xDS authority
 
@@ -120,7 +122,7 @@ resources include:
 This may happen during a new channel setup or mid-config update, such as
 when the control plane sends an updated RDS resource that points to a new
 cluster, but then the control plane becomes unavailable before the new CDS
-resource can be obtained.
+resources can be obtained.
 
 XdsClients will need to be changed to support multiple ADS connections for each
 authority. Once the fallback process begins, an impacted XdsClient will
