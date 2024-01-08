@@ -234,7 +234,7 @@ For consistency with the client interceptors design, interceptors will see un-se
 
 ### Single injection point
 
-The client interceptor design has interceptor lists and interceptor provider lists, and interceptors specified at client construction vs interceptors specified for individual call invocations. In contrast, this design only specifies that an interceptor list can be provided at server construction. The primary purpose of this design is to solidify the interceptor part of the design. Additional injection points for interceptors could be specified in the future, and the way they interact with each other can be decided at that time.
+The client interceptor design has interceptor lists and interceptor provider lists, and interceptors specified at client construction vs interceptors specified for individual call invocations. In contrast, this design only specifies that an interceptor list can be provided at server construction. Per-call interceptors simply don't make sense on the server side, because there is no reasonable point at which to inject them that wouldn't just act as a regular interceptor. Interceptor providers on the other hand could work on the server, but they are not necessary for basic interceptor functionality. The primary purpose of this design is to solidify the interceptor part of the design. Additional injection points for interceptors could be specified in the future, and the way they interact with each other can be decided at that time.
 
 ## Implementation
 
