@@ -1,6 +1,6 @@
 # OpenTelemetry Metrics
 
-*   Author: Yash Tibrewal (@yashykt)
+*   Author: Yash Tibrewal (@yashykt), Zach Reyes (@zasweq), Vindhya Ningegowda (@DNVindhya)
 *   Approver: Mark Roth (@markdroth)
 *   Status: Final
 *   Implemented in: <language, ...>
