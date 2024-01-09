@@ -264,11 +264,13 @@ of message production to match the remote reader's rate of stream consumption.
 Each stream sender (both client and server) must keep track of the amount of
 space remaining in its peer's receive window, decrementing this counter by the
 `bytes data` or `parcelable` size of each `rpc transaction` it sends and
-incrementing it upon receipt of a `stream receive window update`. The initial
-window size of all new streams is provided by a peer in its `setup transport
-transaction`. A stream transaction must not be sent unless there's space for it
-in the peer's window.  Space in the peer's receive window should be exposed to
-the sending application using the language-specific stream readiness API. 
+incrementing it upon receipt of a `stream receive window update`. A stream
+transaction must not be sent unless there's room for its data in the peer's
+window. Availability of peer receive window space should be exposed to the
+sending application using the language-specific stream readiness API. 
+
+The initial receive window size of all new streams is specified by a peer in its
+`setup transport transaction` and cannot be changed for the life of a transport.
 
 ### Receiver Responsibilities
 A stream receiver (either client or server) must send window updates as
