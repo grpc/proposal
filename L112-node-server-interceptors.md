@@ -41,11 +41,11 @@ Note: interceptors will only be called when a request to a registered method is 
 A `ServerInterceptingCall` has the following API:
 
 ```ts
-interface ServerInterceptingCall {
+class ServerInterceptingCall {
   /**
    * Register the listener to handle inbound events.
    */
-  start(listener: Listener): void;
+  start(listener: InterceptingServerListener): void;
   /**
    * Send response metadata.
    */
@@ -53,7 +53,7 @@ interface ServerInterceptingCall {
   /**
    * Send a response message.
    */
-  sendMessage(message: any): void;
+  sendMessage(message: any, callback: (error: Error | null) => void): void;
   /**
    * End the call by sending this status.
    */
@@ -74,7 +74,7 @@ interface Responder {
   /**
    * An interception method called before handling of an inbound call starts. Used to register the listener to handle inbound events.
    */
-  start?: (listener: Listener, next: (listener: Listener) => void): void;
+  start?: (listener: InterceptingServerListener, next: (listener: InterceptingServerListener | ServerListener) => void): void;
   /**
    * An interception method called when sending response metadata.
    */
@@ -86,7 +86,7 @@ interface Responder {
   /**
    * An interception method called when sending the call status.
    */
-  sendStatus?: (status: StatusObject, next: (status: StatusObject) => void);
+  sendStatus?: (status: StatusObject, next: (status: StatusObject) => void): void;
 }
 ```
 
@@ -138,7 +138,7 @@ interface ServerListener {
 
 A `ServerListenerBuilder` will be provided to easily construct a listener:
 
-```javascript
+```ts
 const listener = (new ServerListenerBuilder())
       .withOnReceiveMetadata(function(metadata, next) {
           logger.log(metadata);
@@ -149,6 +149,17 @@ const listener = (new ServerListenerBuilder())
           next(message);
       })
       .build();
+```
+
+An `InterceptingServerListener` is an object like a `ServerListener` but without the `next` callbacks:
+
+```ts
+export interface InterceptingServerListener {
+  onReceiveMetadata(metadata: Metadata): void;
+  onReceiveMessage(message: any): void;
+  onReceiveHalfClose(): void;
+  onCancel(): void;
+}
 ```
 
 #### Correspondence with client interceptor APIs
