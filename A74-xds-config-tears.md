@@ -169,7 +169,7 @@ struct XdsConfig {
   // inlined into the Listener resource.
   XdsRouteConfigResource route_config;
   // Virtual host.  Points into route_config.  Will always be non-null.
-  dsRouteConfigResource::VirtualHost* virtual_host;
+  XdsRouteConfigResource::VirtualHost* virtual_host;
 
   // Cluster map.  A cluster will have a non-OK status if either
   // (a) there was an error and we did not already have a valid
