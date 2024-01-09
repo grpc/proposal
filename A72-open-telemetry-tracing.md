@@ -143,7 +143,7 @@ propagator API in TextMap format with an optimization path (Go and Java) to work
 around the lack of binary propagator API to support `grpc-trace-bin`. In fact,
 TextMap propagator does not show visible performance impact for C++, which is 
 the most sensitive language to performance, based on internal micro benchmarking. 
-Therefore, gRPC will only support `grpc-trace-bin` and TextMap propagators.
+Therefore, gRPC will only support propagating `grpc-trace-bin` in TextMap propagator.
 
 gRPC will expose a custom `GrpcTraceBinPropagator` that implements `TextMapPropagator`.
 This grpc-provided propagator still uses the `grpc-trace-bin` header for context 
@@ -274,28 +274,44 @@ optimized path for the same reason. Similarly, the normal `get()` method handles
 both binary headers and TextMap propagators.
 
 #### Context Propagation APIs in C++
-C++ will also support the propagators API, because this provides API 
-uniformity among languages. Due to the language restriction, 
-C++ can not take the optimization path to workaround lacking the binary 
-propagator API. That means using propagators API with C++ needs base64 encoding 
-and therefore is slower compared with just using metadata API. However, C++ will 
-have an API that enables adding `grpc-trace-bin` to the metadata directly, without 
-using the propagators API.
-This is a faster way that avoids paying for the performance cost due to 
-string/binary encoding between the propagator and the getter/setter. 
-We use this strategy to balance between API simplicity and performance efficiency.
-The two APIs C++ will support for the context propagation are:
-* If `GrpcTraceBinPropagator` is configured, take a slower path in the pseudocode 
-described above. 
-* If explicitly configured, gRPC will directly use `Metadata.get()` and `Metadata.put()` 
-APIs on the `grpc-trace-bin` header. No TextMapPropagator API and TextMapSetter/Getter 
-will be involved. This is a faster path and mitigates performance concerns due 
-to base64 encoding.
+C++ will also support propagator APIs to provides API 
+uniformity among languages, as well as getting all the benefits of propagator APIs 
+mentioned before. Due to the language restriction, C++ can not take the optimization 
+path to workaround lacking the binary propagator API. That means using propagators
+API with C++ needs base64 encoding and therefore is slower compared with just 
+using metadata API. 
 
-TODO: add pseudocode here in C++ for `GrpcTraceBinPropagator`,`GrpcCommonSetter` 
-and `GrpcCommonSetter`.
+TODO: add pseudocode here in C++ for `GrpcTraceBinPropagator`,`GrpcTextMapCarrier`.
 
-The `GrpcCommonSetter.set()` and `GrpcCommonGetter.get()` method in C++
+```C++
+class GrpcTraceBinPropagator : public TextMapPropagator {
+  public:
+  void Inject(TextMapCarrier &carrier, const context::Context &context) {
+    // Slow path for C++. gRPC C++ does not have runtime type inspection, so we 
+    // encode bytes to String to comply with the TextMapSetter API. This code 
+    // path is also used in the situation where GrpcTraceBinPropagator 
+    // is used with a TextMapSetter externally.
+    // TODO: add implementation
+  }
+  context::Context Extract(const TextMapCarrier &carrier, context::Context &context) {
+  // TODO: add implementaiton
+  } 
+}
+```
+
+```C++
+class GrpcTextMapCarrier : public TextMapCarrier {
+  public:
+  nostd::string_view Get(nostd::string_view key) {
+  // TODO: add implementation
+  }
+  void Set(nostd::string_view key, nostd::string_view value) {
+  // TODO: add implementation
+  }
+} 
+```
+
+The `GrpcTextMapCarrier.set()` and `GrpcTextMapCarrier.get()` method in C++
 should handle both binary (`-bin`) header 
 (e.g. `grpc-trace-bin`) and ASCII header from other TextMap 
 propagators that users configure into gRPC OpenTelemetry, e.g. W3C.
@@ -337,7 +353,8 @@ OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
 // OpenTelemetry openTelemetry = 
 // AutoConfiguredOpenTelemetrySdk.getOpenTelemetrySdk().
 
-// OpenTelemetryModule.getInstance() will be using GlobalOpenTelemetry
+// Create a module that hosts tracing infrastructures. Should document that 
+// the module implementation may change as OpenTelemetry evolves.
 OpenTelemetryModule otModule = OpenTelemetryModule.getInstance(openTelemetry);
 
 GlobalInterceptors.setInterceptors(
@@ -347,15 +364,22 @@ GlobalInterceptors.setInterceptors(
 ```
 
 #### C++
-In C++, it will be a method that mirrors OpenCensus API.
-
-TODO: update C++ API.
+In C++, we will add a new method in `OpenTelemetryPluginBuilder`, see [gRPC A66][A66].
 
 ```C++
-// Enable OpenTelemetry based tracing. Similar to
-// RegisterOpenCensusPlugin(). TracerProvider is configured via sdk separately.
-void RegisterOpenTelemetryTracingPlugin();
-
+class OpenTelemetryPluginBuilder {
+ public:
+  OpenTelemetryPluginBuilder();
+  // If `SetMeterProvider()` is not called, no metrics are collected.
+  OpenTelemetryPluginBuilder& SetMeterProvider(
+      std::shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
++ // Set one or multiple propagators for span context propagation, e.g. 
++ // GrpcTraceBinPropagator or community standard ones like W3C, etc.
++ OpenTelemetryPluginBuilder& SetPropagator(
++     std::shared_ptr<opentelemetry::context::propagation::TextMapPropagator> 
++         new grpc::GrpcTraceBinPropagator());
+...
+}
 ```
 
 #### Go
@@ -424,7 +448,23 @@ Finally, they switch to grpc-open-telemetry and finish the migration.
 ```
 
 ## Rationale
-N/A
+C++ will not have the optimization path in its `GrpcTraceBinPropagator` API. We
+considered to have an API that enables adding `grpc-trace-bin` to the metadata 
+directly, without using the propagators API. This will be a faster way that 
+avoids paying for the performance cost due to
+string/binary encoding between the propagator and the getter/setter.
+The two APIs C++ will support for the context propagation are:
+* If `GrpcTraceBinPropagator` is configured, take a slower path in the pseudocode
+  described above.
+* If explicitly configured, gRPC will directly use `Metadata.get()` and `Metadata.put()`
+  APIs on the `grpc-trace-bin` header. No TextMapPropagator API and TextMapSetter/Getter
+  will be involved. This is a faster path and mitigates performance concerns due
+  to base64 encoding.
+
+Alternatively, we can enable the fast path within C++ `GrpcTraceBinPropagator` 
+instead of explicitly configure on the OpenTelemetry plugin. However, for the initial
+implementation we don't have any fast path support. We leave it for the future when there
+are use cases or performance concerns users may have.
 
 ## Implementation
 Will be implemented in Java, C++, Go and Python.
