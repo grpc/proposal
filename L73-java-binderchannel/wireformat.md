@@ -257,10 +257,10 @@ received, which should avoid blocking the transport most of the time.
 
 While transport flow control limits consumption of scarce buffer resources at
 the Android/binder layer, stream flow control limits the amount of buffering at
-the gRPC layer for each stream. The resulting back pressure lets an application 
-adjust its rate of message production to match the remote reader's rate of
-stream consumption.
+the gRPC layer. The resulting back pressure lets an application adjust its rate
+of message production to match the remote reader's rate of stream consumption.
 
+### Sender Responsibilities
 Each stream sender (both client and server) must keep track of the amount of
 space remaining in its peer's receive window, decrementing this counter by the
 `bytes data` or `parcelable` size of each `rpc transaction` it sends and
@@ -270,6 +270,7 @@ transaction`. A stream transaction must not be sent unless there's space for it
 in the peer's window.  Space in the peer's receive window should be exposed to
 the sending application using the language-specific stream readiness API. 
 
+### Receiver Responsibilities
 A stream receiver (either client or server) must send window updates as
 its application layer requests messages and frees up space in the incoming
 transaction buffer. Window updates may be sent in their own stream transaction
@@ -288,11 +289,12 @@ window and respond by "out of band" closing the stream with canonical code
 `INTERNAL`. Receivers that reduce their incoming transaction buffer size must
 take care to account for window updates messages they sent before the reduction.
 
+### Backwards Compatibility
 Although stream flow control is a core part of the gRPC abstraction, the
 earliest drafts of this protocol unfortunately did not support it. For
 compatibility with old implementations, the behavior described in this section
 is optional. Support is negotiated in the setup transaction and is only enabled
-for a transport if both peers advertise the FLAG_STREAM_FLOW_CONTROL protocol
+for a transport if both sides advertise the FLAG_STREAM_FLOW_CONTROL protocol
 extension.
 
 [Binder]: https://developer.android.com/reference/android/os/Binder
