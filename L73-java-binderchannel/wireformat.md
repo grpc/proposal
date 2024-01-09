@@ -56,8 +56,17 @@ protocol extension flags = int;
 shutdown flags = int;
 num bytes = long;
 ping id = int;
+initial stream receive window size = int; (* The initial receive window size for
+                                             new streams created on this
+                                             transport, before any window
+                                             updates are sent. *)
 
-setup transport transaction = version, binder, [protocol extension flags];
+setup transport transaction =
+    version,
+    binder,
+    [protocol extension flags]
+    [initial stream receive window size] (* if FLAG_STREAM_FLOW_CONTROL is set *)
+    ;
 shutdown transport transaction = [shutdown flags];
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
@@ -75,14 +84,20 @@ is too low to be supported. The client may respond with SHUTDOWN_TRANSPORT if
 the server-selected version is too low to be supported.
 
 Both client and server transport may also include protocol extension flags at
-the end of their setup transport transaction. This is reserved for potential
-future protocol extensions, though no flags are currently specified.
-Unrecognized flags must be ignored.
+the end of their setup transport transaction. See the next section for currently
+defined flags. Unrecognized flags must be ignored.
 
 `shutdown flags` is a bit field reserved for future extensions to the shutdown
 transaction. Receivers must ignore flags they do not understand and current
 senders must set this field to zero (since no flags have been defined yet).
 This field is optional. If missing, no flags have been set.
+
+#### Protocol Extension Flags
+
+*   FLAG_STREAM_FLOW_CONTROL (0x1) - Indicates the sender is able to produce
+stream window update messages and will respect a receiver's stream flow control
+window. Stream flow control will be enabled for the transport if and only if
+both client and server set this flag.
 
 ### Stream Transactions
 
@@ -122,15 +137,20 @@ client suffix = (* currently empty *)
 server prefix = metadata (* headers *)
 server suffix = status, metadata (* trailers *)
 
+stream receive window update = int; (* A positive number of additional bytes the
+                                       peer can send on this stream. )
+
 message data = parcelable | bytes data (* parcelable iff
                                           FLAG_MESSAGE_DATA_IS_PARCELABLE
                                           set, bytes otherwise *)
 client rpc data = [client prefix] (* if FLAG_PREFIX is set *)
                   [message data]  (* if FLAG_MESSAGE_DATA is set *)
                   [client suffix] (* if FLAG_SUFFIX is set *)
+                  [stream receive window update] (* if FLAG_WINDOW_UPDATE set *)
 server rpc data = [server prefix] (* if FLAG_PREFIX is set *)
                   [message data]  (* if FLAG_MESSAGE_DATA is set *)
                   [server suffix] (* if FLAG_SUFFIX is set *)
+                  [stream receive window update] (* if FLAG_WINDOW_UPDATE set *)
 out of band close data = status;
 rpc data = client rpc data | server rpc data | out of band close data;
 
@@ -158,6 +178,9 @@ rpc transaction = flags, sequence no, rpc data;
     the receiver should continue reading. When a message doesn't fit into a
     single transaction, the message will be sent in multiple transactions with
     this bit set on all but the final transaction of the message.
+*   FLAG_WINDOW_UPDATE (0x100) - Indicates the transaction contains an increment
+    to the sender's receive window size. Can only be set if
+    FLAG_STREAM_FLOW_CONTROL was negotiated for this transport.
 *   status - If a status is included in the data, the status code will be
     present in the top 16 bits of the flags value.
 
@@ -218,7 +241,7 @@ We limit the amount of message data sent in a single transaction to 16KB.
 Messages larger than that will be sent in multiple sequential transactions, with
 all but the last transaction having FLAG_MESSAGE_DATA_IS_PARTIAL set.
 
-## Flow Control
+## Transport Flow Control
 
 Due to Android's limited per-process transaction buffer of 1MB, BinderTransport
 supports transport-level flow control, aiming to keep use of the process
@@ -228,6 +251,46 @@ internal count of unacknowledged outbound data (here the count refers to the
 stream transactions until we receive an acknowledgement message from the transport
 peer. Each transport sends an acknowledgement for each 16KB of stream transaction
 received, which should avoid blocking the transport most of the time.
+
+## Stream Flow Control
+
+In addition to flow control for the whole transport, the protocol also supports
+flow control on a stream by stream basis. This allows an application to
+avoid excess buffering by adjusting its rate of message production to match the
+remote reader's rate of consumption from the stream.
+
+Each stream sender (both client and server) must keep track of the amount of
+space remaining in its peer's receive window, decrementing this counter by the
+`bytes data` or `parcelable` size of each `rpc transaction` it sends and
+incrementing it upon receipt of a `stream receive window update`. The initial
+window size of all new streams is provided by a peer in its `setup transport
+transaction`. A stream transaction must not be sent unless there's space for it
+in the peer's window.  Space in the peer's receive window should be exposed to
+the sending application using the language-specific stream readiness API. 
+
+A stream receiver (either client or server) must send window updates as
+its application layer requests messages and frees up space in the incoming
+transaction buffer. Window updates may be sent in their own stream transaction
+or piggybacked on message data in the opposite direction on the same stream.
+Window updates may be delayed to increase the opportunity for such piggybacking,
+or simply to combine multiple window updates into a single larger one.
+
+A receiver may increase the size of the incoming transaction buffer of an existing
+stream simply by sending a window update message advertising the additional
+capacity. A receiver can also reduce the size of this buffer by suppressing
+window updates as incoming messages are consumed by the app. However, negative
+window updates are not allowed.
+
+Receivers must detect incoming transactions that exceed their advertised receive
+window and respond by "out of band" closing the stream with canonical code
+`INTERNAL`. Receivers that 
+
+Although stream flow control is a core part of the gRPC abstraction, the
+earliest drafts of this protocol unfortunately did not support it. For
+compatibility with old implementations, the behavior described in this section
+is optional. Support is negotiated in the setup transaction and is only enabled
+for a transport if both peers advertise the FLAG_STREAM_FLOW_CONTROL protocol
+extension.
 
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel
