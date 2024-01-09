@@ -254,10 +254,11 @@ received, which should avoid blocking the transport most of the time.
 
 ## Stream Flow Control
 
-In addition to flow control for the whole transport, the protocol also supports
-flow control on a stream by stream basis. This allows an application to
-avoid excess buffering by adjusting its rate of message production to match the
-remote reader's rate of consumption from the stream.
+While transport flow control limits consumption of scarce buffer resources at
+the Android/binder layer, stream flow control limits the amount of buffering at
+the gRPC layer for each stream. The resulting back pressure lets an application 
+adjust its rate of message production to match the remote reader's rate of
+stream consumption.
 
 Each stream sender (both client and server) must keep track of the amount of
 space remaining in its peer's receive window, decrementing this counter by the
