@@ -94,10 +94,11 @@ This field is optional. If missing, no flags have been set.
 
 #### Protocol Extension Flags
 
-*   FLAG_STREAM_FLOW_CONTROL (0x1) - Indicates the sender is able to produce
-stream window update messages and will respect a receiver's stream flow control
-window. Stream flow control will be enabled for the transport if and only if
-both client and server set this flag.
+*   FLAG_STREAM_FLOW_CONTROL (0x1) - Indicates that a peer supports the optional
+stream flow control aspect of this wire format. That is, it will respect its
+peer's stream flow control window as a sender and will produce stream window
+update messages as a receiver. Stream flow control will be enabled for the
+transport if and only if both client and server set this flag.
 
 ### Stream Transactions
 
