@@ -283,7 +283,9 @@ window updates are not allowed.
 
 Receivers must detect incoming transactions that exceed their advertised receive
 window and respond by "out of band" closing the stream with canonical code
-`INTERNAL`. Receivers that 
+`INTERNAL`. Receivers that have reduced their incoming transaction buffer size
+must take care to account for window updates messages they've already sent based
+on the old larger buffer size.
 
 Although stream flow control is a core part of the gRPC abstraction, the
 earliest drafts of this protocol unfortunately did not support it. For
