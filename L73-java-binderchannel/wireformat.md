@@ -293,7 +293,7 @@ take care to account for window updates messages they sent before the reduction.
 
 ### Backwards Compatibility
 Although stream flow control is a core part of the gRPC abstraction, the
-earliest drafts of this protocol unfortunately did not support it. For
+earliest drafts of this document unfortunately did not support it. For
 compatibility with old implementations, the behavior described in this section
 is optional. Support is negotiated in the setup transaction and is only enabled
 for a transport if both sides advertise the FLAG_STREAM_FLOW_CONTROL protocol
