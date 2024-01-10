@@ -132,7 +132,7 @@ interface ServerListener {
   /**
    * An inbound interception method called when the request ends for any reason, including when cancelled by the remote end.
    */
-  onCancel?: (next: () => void): void;
+  onCancel?: (): void;
 }
 ```
 
@@ -238,6 +238,8 @@ The `Responder#start` method is the only one that does not correspond to any act
 #### The `onCancel` method
 
 The `ServerListener#onCancel` method is "called when the request ends for any reason, including when cancelled by the remote end", which does not strictly match the meaning of the term "cancel". The purpose of handling cancellation on the server is to let the handler know when it does not need to do any further processing to send information to the client, because the client will not see it. So, it is useful to notify whenever that condition is true, no matter what triggered it.
+
+The `onCancel` method has no callback because its purpose is to notify each interceptor and the handler that the call has ended. There is no use in allowing one interceptor to choose not to propagate that notification or to delay propagating it.
 
 ### Interceptors only called for registered methods
 
