@@ -171,16 +171,12 @@ struct XdsConfig {
   // Virtual host.  Points into route_config.  Will always be non-null.
   XdsRouteConfigResource::VirtualHost* virtual_host;
 
-  // Cluster map.  A cluster will have a non-OK status if either
-  // (a) there was an error and we did not already have a valid
-  // resource or (b) the resource does not exist.
   struct ClusterConfig {
-    // Cluster name and resource.
-    std::string cluster_name;
+    // Cluster resource.
     XdsClusterResource cluster;
 
-    // Endpoint info.  If there was an error, endpoints will be null
-    // and resolution_note will be set.
+    // Endpoint info for EDS and LOGICAL_DNS clusters.  If there was an
+    // error, endpoints will be null and resolution_note will be set.
     struct EndpointConfig {
       XdsEndpointResource endpoints;
       std::string resolution_note;
@@ -191,6 +187,9 @@ struct XdsConfig {
     };
     std::variant<EndpointConfig, AggregateConfig> children;
   };
+  // Cluster map.  A cluster will have a non-OK status if either
+  // (a) there was an error and we did not already have a valid
+  // resource or (b) the resource does not exist.
   std::map<std::string, absl::StatusOr<ClusterConfig>> clusters;
 };
 ```
