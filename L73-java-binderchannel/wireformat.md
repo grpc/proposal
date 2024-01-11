@@ -58,8 +58,8 @@ num bytes = long;
 ping id = int;
 initial stream receive window size = int; (* The initial receive window size for
                                              new streams created on this
-                                             transport, before any window
-                                             updates are sent. *)
+                                             transport, in bytes, before any
+                                             window updates are sent. *)
 
 setup transport transaction =
     version,
@@ -269,8 +269,11 @@ transaction must not be sent unless there's room for its data in the peer's
 window. Availability of peer receive window space should be exposed to the
 sending application using the language-specific stream readiness API. 
 
-The initial receive window size of all new streams is specified by a peer in its
-`setup transport transaction` and cannot be changed for the life of a transport.
+The initial receive window size for new streams is specified independently by
+each receiver in its `setup transport transaction`. While a receiver may change
+the window size in its direction for an established stream (described below),
+the initial window size for new streams cannot change for the life of the
+transport.
 
 ### Receiver Responsibilities
 A stream receiver (either client or server) must send window updates as
@@ -289,11 +292,11 @@ window updates are not allowed.
 Receivers must detect incoming transactions that exceed their advertised receive
 window and respond by "out of band" closing the stream with canonical code
 `INTERNAL`. Receivers that reduce their incoming transaction buffer size must
-take care to account for window updates messages they sent before the reduction.
+take care to account for window update messages they sent before the reduction.
 
 ### Backwards Compatibility
 Although stream flow control is a core part of the gRPC abstraction, the
-earliest drafts of this document unfortunately did not support it. For
+earliest revisions of this wire format unfortunately did not support it. For
 compatibility with old implementations, the behavior described in this section
 is optional. Support is negotiated in the setup transaction and is only enabled
 for a transport if both sides advertise the FLAG_STREAM_FLOW_CONTROL protocol
