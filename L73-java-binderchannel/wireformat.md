@@ -302,7 +302,20 @@ is optional. Support is negotiated in the setup transaction and is only enabled
 for a transport if both sides advertise the FLAG_STREAM_FLOW_CONTROL protocol
 extension.
 
+### Parcelable Messages
+
+[Parcelable] messages are a special case with respect to stream flow control
+because the #writeToParcel API we need is all-or-nothing: it creates an opaque
+and arbitrarily large blob of data that must either be included with the next
+transaction or not at all. The inability to send part of a Parcelable in one
+transaction and the rest in subsequent transactions makes it impossible for a
+sender to strictly respect its peer’s receive window in all cases.
+
+Senders of this payload type must be willing to overflow their receiver's
+window. Receivers must tolerate this possibility.
+
 [Binder]: https://developer.android.com/reference/android/os/Binder
 [Parcel]: https://developer.android.com/reference/android/os/Parcel
+[Parcelable]: https://developer.android.com/reference/android/os/Parcelable
 [onBind]: https://developer.android.com/reference/android/app/Service#onBind\(android.content.Intent\)
 [data size]: https://developer.android.com/reference/android/os/Parcel#dataSize()
