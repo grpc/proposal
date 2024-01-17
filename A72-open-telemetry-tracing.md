@@ -1,12 +1,12 @@
 A72: OpenTelemetry Tracing 
 ----
-* Author(s): [Yifei Zhuang](https://github.com/YifeiZhuang)
+* Author(s): [Yifei Zhuang](https://github.com/YifeiZhuang), [Yash Tibrewal](https://github.com/yashykt)
 * Approver: [Eric Anderson](https://github.com/ejona86)
 * Reviewers: [Mark Roth](https://github.com/markdroth), [Doug Fawley](https://github.com/dfawley),
 [Feng Li](https://github.com/fengli79)
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
-* Last updated: 2023-07
+* Last updated: 2024-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/e_ByaRmtJak
 
 ## Abstract
@@ -281,40 +281,113 @@ path to workaround lacking the binary propagator API. That means using propagato
 API with C++ needs base64 encoding and therefore is slower compared with just 
 using metadata API. 
 
-TODO: add pseudocode here in C++ for `GrpcTraceBinPropagator`,`GrpcTextMapCarrier`.
+```C++
+std::unique_ptr<opentelemetry::context::TextMapCarrier> MakeGrpcTraceBinTextMapPropagator();
+```
+
+The following shows a sketch on what the internal implementation details of this API would look within gRPC C++/Core.
 
 ```C++
-class GrpcTraceBinPropagator : public TextMapPropagator {
-  public:
-  void Inject(TextMapCarrier &carrier, const context::Context &context) {
-    // Slow path for C++. gRPC C++ does not have runtime type inspection, so we 
-    // encode bytes to String to comply with the TextMapSetter API. This code 
-    // path is also used in the situation where GrpcTraceBinPropagator 
+
+namespace grpc {
+namespace internal {
+
+class GrpcTraceBinTextMapPropagator
+    : public opentelemetry::context::TextMapPropagator {
+ public:
+  void Inject(opentelemetry::context::TextMapCarrier& carrier,
+              const opentelemetry::context::Context& context) {
+    // Slow path for C++. gRPC C++ does not have runtime type inspection, so we
+    // encode bytes to String to comply with the TextMapSetter API. This code
+    // path is also used in the situation where GrpcTraceBinTextMapPropagator
     // is used with a TextMapSetter externally.
-    // TODO: add implementation
+    auto span_context = opentelemetry::trace::GetSpan(context)->GetContext();
+    if (!span_context.IsValid()) {
+      return;
+    }
+    carrier.Set(
+        "grpc-trace-bin",
+        absl::Base64Escape(
+            absl::string_view(SpanContextToGrpcTraceBinHeader(span_context))
+                .data()),
+        kGrpcTraceBinHeaderLen);
   }
-  context::Context Extract(const TextMapCarrier &carrier, context::Context &context) {
-  // TODO: add implementaiton
-  } 
-}
-```
 
-```C++
-class GrpcTextMapCarrier : public TextMapCarrier {
-  public:
+  context::Context Extract(const context::propagation::TextMapCarrier& carrier,
+                           opentelemetry::context::Context& context) {
+    return trace::SetSpan(
+        context, nostd::shared_ptr<Span> sp(new DefaultSpan(
+                     GrpcTraceBinHeaderToSpanContext(absl::Base64Unescape(
+                         carrier.Get("grpc-trace-bin"))))));
+  }
+
+ private:
+  constexpr int kGrpcTraceBinHeaderLen = 29;
+
+  std::array<uint8_t, kGrpcTraceBinHeaderLen> SpanContextToGrpcTraceBinHeader(
+      const opentelemetry::trace::SpanContext& ctx) {
+    std::array<uint8_t, kGrpcTraceBinHeaderLen> header;
+    header[0] = 0;
+    header[1] = 0;
+    ctx.trace_id().CopyBytesTo(&header[2], 16);
+    header[18] = 1;
+    ctx.span_id().CopyBytesTo(&header[19], 8);
+    header[27] = 2;
+    header[28] = ctx.trace_flags().flags();
+    return header;
+  }
+
+  opentelemetry::trace::SpanContext GrpcTraceBinHeaderToSpanContext(
+      nostd::string_view header) {
+    if (header.size() != kGrpcTraceBinHeaderLen || header[0] != 0 ||
+        header[1] != 0 || header[18] != 1 || header[27] != 2) {
+      return SpanContext::GetInvalid();
+    }
+    return SpanContext(TraceId(&header[2], 16), SpanId(&header[19], 8),
+                       TraceFlags(header[28]), /*is_remote*/ true);
+  }
+};
+
+class GrpcTextMapCarrier : public opentelemetry::context::TextMapCarrier {
+ public:
+  GrpcTextMapCarrier(grpc_metadata_batch* metadata) : metadata_(metadata) {}
+
   nostd::string_view Get(nostd::string_view key) {
-  // TODO: add implementation
+    if (key == "grpc-trace-bin") {
+      return absl::Base64Escape(metadata_->GetStringValue(key).value_or(""));
+    } else if (absl::EndsWith(key, "-bin")) {
+      // TODO() : Unclear how to handle this
+    }
+    return metadata_->GetStringValue(key);
   }
-  void Set(nostd::string_view key, nostd::string_view value) {
-  // TODO: add implementation
-  }
-} 
-```
 
-The `GrpcTextMapCarrier.set()` and `GrpcTextMapCarrier.get()` method in C++
-should handle both binary (`-bin`) header 
-(e.g. `grpc-trace-bin`) and ASCII header from other TextMap 
-propagators that users configure into gRPC OpenTelemetry, e.g. W3C.
+  void Set(nostd::string_view key, nostd::string_view value) {
+    if (key == "grpc-trace-bin") {
+      metadata_->Set(
+          grpc_core::GrpcTraceBinMetadata(),
+          grpc_core::Slice::FromCopiedString(absl::Base64Unescape(value)));
+    } else if (absl::EndsWith(key, "-bin")) {
+      // TODO() : Unclear how to handle this
+    } else {
+      // A propagator other than GrpcTraceBinTextMapPropagator was used.
+      metadata_->Append(key, grpc_core::Slice::FromCopiedString(value));
+    }
+  }
+
+ private:
+  grpc_metadata_batch* metadata_;
+};
+
+}  // namespace internal
+
+std::unique_ptr<opentelemetry::context::TextMapCarrier>
+MakeGrpcTraceBinTextMapPropagator() {
+  return std::make_unique<internal::GrpcTraceBinTextMapPropagator>();
+}
+
+}  // namespace grpc
+
+```
 
 ### gRPC OpenTelemetry Tracing API
 This section talks about enabling and configuring OpenTelemetry tracing.
@@ -364,22 +437,21 @@ GlobalInterceptors.setInterceptors(
 ```
 
 #### C++
-In C++, we will add a new method in `OpenTelemetryPluginBuilder`, see [gRPC A66][A66].
+The following new methods will be added in `OpenTelemetryPluginBuilder`.
 
 ```C++
 class OpenTelemetryPluginBuilder {
  public:
-  OpenTelemetryPluginBuilder();
-  // If `SetMeterProvider()` is not called, no metrics are collected.
-  OpenTelemetryPluginBuilder& SetMeterProvider(
-      std::shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
-+ // Set one or multiple propagators for span context propagation, e.g. 
-+ // GrpcTraceBinPropagator or community standard ones like W3C, etc.
-+ OpenTelemetryPluginBuilder& SetPropagator(
-+     std::shared_ptr<opentelemetry::context::propagation::TextMapPropagator> 
-+         new grpc::GrpcTraceBinPropagator());
-...
-}
+  // If `SetTracerProvider()` is not called, no traces are collected.
+  OpenTelemetryPluginBuilder& SetTracerProvider(
+      std::shared_ptr<opentelemetry::metrics::SetTracerProvider>
+          tracer_provider);
+  // Set one or multiple text map propagators for span context propagation, e.g.
+  // GrpcTraceBinPropagator or community standard ones like W3C, etc.
+  OpenTelemetryPluginBuilder& SetTextMapPropagator(
+      std::unique_ptr<opentelemetry::context::propagation::TextMapPropagator>
+          text_map_propagator);
+};
 ```
 
 #### Go
