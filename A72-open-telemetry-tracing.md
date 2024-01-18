@@ -274,15 +274,17 @@ optimized path for the same reason. Similarly, the normal `get()` method handles
 both binary headers and TextMap propagators.
 
 #### Context Propagation APIs in C++
-C++ will also support propagator APIs to provides API 
-uniformity among languages, as well as getting all the benefits of propagator APIs 
-mentioned before. Due to the language restriction, C++ can not take the optimization 
-path to workaround lacking the binary propagator API. That means using propagators
-API with C++ needs base64 encoding and therefore is slower compared with just 
-using metadata API. 
+C++ will also support propagator APIs to provides API uniformity among
+languages. Since gRPC C++ avoids RTTI, it can not use the same optimization path
+as Java/Go. This will result in an extra base64 encoding/decoding step to
+satisfy `TextMapPropagator` requirement that the key/value pair be a valid HTTP
+field. There are possible optimizations C++ might pursue in the future, for
+example, providing an explicit knob on `GrpcTraceBinTextMapPropagator` that
+assumes that this propagator is being used with gRPC and can hence skirt `TextMapPropagator` compatibility requirements.
 
 ```C++
-std::unique_ptr<opentelemetry::context::TextMapCarrier> MakeGrpcTraceBinTextMapPropagator();
+std::unique_ptr<opentelemetry::context::TextMapCarrier>
+MakeGrpcTraceBinTextMapPropagator();
 ```
 
 The following shows a sketch on what the internal implementation details of this API would look within gRPC C++/Core.
@@ -297,10 +299,6 @@ class GrpcTraceBinTextMapPropagator
  public:
   void Inject(opentelemetry::context::TextMapCarrier& carrier,
               const opentelemetry::context::Context& context) {
-    // Slow path for C++. gRPC C++ does not have runtime type inspection, so we
-    // encode bytes to String to comply with the TextMapSetter API. This code
-    // path is also used in the situation where GrpcTraceBinTextMapPropagator
-    // is used with a TextMapSetter externally.
     auto span_context = opentelemetry::trace::GetSpan(context)->GetContext();
     if (!span_context.IsValid()) {
       return;
@@ -356,7 +354,9 @@ class GrpcTextMapCarrier : public opentelemetry::context::TextMapCarrier {
     if (key == "grpc-trace-bin") {
       return absl::Base64Escape(metadata_->GetStringValue(key).value_or(""));
     } else if (absl::EndsWith(key, "-bin")) {
-      // TODO() : Unclear how to handle this
+      // It's unclear how we want to handle other headers that end with "-bin".
+      // Return an empty string for now.
+      return "";
     }
     return metadata_->GetStringValue(key);
   }
@@ -367,7 +367,9 @@ class GrpcTextMapCarrier : public opentelemetry::context::TextMapCarrier {
           grpc_core::GrpcTraceBinMetadata(),
           grpc_core::Slice::FromCopiedString(absl::Base64Unescape(value)));
     } else if (absl::EndsWith(key, "-bin")) {
-      // TODO() : Unclear how to handle this
+      // It's unclear how we want to handle other headers that end with "-bin".
+      // Do nothing for now.
+      return;
     } else {
       // A propagator other than GrpcTraceBinTextMapPropagator was used.
       metadata_->Append(key, grpc_core::Slice::FromCopiedString(value));
@@ -444,10 +446,9 @@ class OpenTelemetryPluginBuilder {
  public:
   // If `SetTracerProvider()` is not called, no traces are collected.
   OpenTelemetryPluginBuilder& SetTracerProvider(
-      std::shared_ptr<opentelemetry::metrics::SetTracerProvider>
-          tracer_provider);
+      std::shared_ptr<opentelemetry::metrics::TracerProvider> tracer_provider);
   // Set one or multiple text map propagators for span context propagation, e.g.
-  // GrpcTraceBinPropagator or community standard ones like W3C, etc.
+  // GrpcTraceBinTextMapPropagator or community standard ones like W3C, etc.
   OpenTelemetryPluginBuilder& SetTextMapPropagator(
       std::unique_ptr<opentelemetry::context::propagation::TextMapPropagator>
           text_map_propagator);
