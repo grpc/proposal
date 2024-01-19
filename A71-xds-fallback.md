@@ -83,7 +83,7 @@ A new string field named `client_scope` will be added to the CSDS
 [ClientConfig] message to indicate the channel target the data is associated
 with. For gRPC clients, this field will contain the key channels use to lookup
 their XdsClient instance, such as dataplane target for client channels or
-special value "@server" for xDS-enabled gRPC servers.
+special value "#server" for xDS-enabled gRPC servers.
 
 ```
 // For xDS clients, the scope in which the data is used. 
