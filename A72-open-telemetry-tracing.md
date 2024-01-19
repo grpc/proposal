@@ -36,13 +36,11 @@ and OpenCensus's binary format for (de)serialization. The header name is unique
 from other census library propagators to differentiate with the application’s 
 tracing instrumentation.
 
-The following tracing information during an RPC lifecycle is captured:
+The following tracing information during an RPC lifecycle should be captured:
 
 At the client, on parent span:
 * When the call is started, annotate name resolution completed if the RPC had 
 name resolution delay.
-* When the uncompressed size of some outbound data is revealed, annotate seq no.,
-type(Received) and wire message size.
 * When the call is closed, end the parent span with RPC status.
 
 On attempt span:
@@ -51,34 +49,36 @@ number of preceding attempts for the RPC, and attribute `transparent-retry` that
 shows whether stream is a transparent retry.
 * When the stream is created on transport, annotate delayed load balancer pick 
 complete, if any.
-* When an outbound message has been sent, add a message event to capture seq no., 
-type(SENT) and wire size.
-* When an inbound message has been received from the transport, add a message 
-event to capture seq no., type(Received) and uncompressed message size.
+* When an outbound message has been sent, add message events to capture seq no.,
+type(SENT), uncompressed message size, and compressed message size if any 
+compression. The seq no. is a sequence of integer numbers starting from 0 
+to identify sent messages within the stream. The size is the total attempt message 
+bytes without encryption, not including grpc or transport framing bytes.
+* When an inbound message has been received from the transport, add message 
+events to capture seq no., type(Received), wire message size, and uncompressed
+message size if any decompression. The seq no. is a sequence of integer numbers 
+starting from 0 to identify received messages within the stream.
 * When the stream is closed, end the attempt span with RPC status.
 
 At the server:
-* When an outbound message has been sent, add a message event to capture seq no.,
-type(SENT) and size.
-* When an inbound message has been read from the transport, add a message event 
-to capture seq no., type(Received) and size.
-* When the uncompressed size of some inbound data is revealed, annotate seq no.,
-type(Received) and wire message size.
+* When an outbound message has been sent, add message events to capture seq no.,
+type(SENT) and uncompressed message size, and compressed message size if any compression.
+* When an inbound message has been read from the transport, add message events
+to capture seq no., type(Received), wire message size, and uncompressed message size,
+if any decompression.
 * When the stream is closed, end the span with RPC status.
+
+Note that C++ is missing the seq no. information. And Java has issue of reporting 
+decompressed message size upon receiving messages, 
+as a workaround, on the client parent span and server span:
+* When the uncompressed size of some outbound data is revealed, annotate seq no.,
+type(Received) and uncompressed message size.
 
 ### gRPC Census API
 The APIs to enable gRPC tracing are different between languages, e.g. in 
 grpc-java it is zero-configuration: as long as the grpc-census dependency exists in
 the classpath, the traces are automatically generated. In C++, there is an API 
 for users to call to enable tracing. In Go, it is exposed via stream tracers.
-
-### gRPC GCP Observability
-Following the census tracing instrumentation, gRPC supports exporting traces
-to GCP Stackdriver for visualization and analysis, see [user guide][grpc-observability-public-doc]. 
-We distinguish and exclude gRPC GCP observability from this design: gRPC GCP 
-observability is about exporting data while this design is about instrumentation. 
-Migrating gRPC GCP observability to OpenTelemetry is a future project that depends
-on this work.
 
 ### Related Proposals and Documents: 
 * [gRFC L29: C++ API Changes for OpenCensus Integration][L29]
@@ -98,17 +98,19 @@ where during migration one will use OpenCensus and the other will use OpenTeleme
 All related APIs here are experimental until OpenTelemetry metrics [gRPC A66][A66] 
 is design and implementation complete.
 
-### New Function In OpenTelemetry Plugin
+### Tracing Function In OpenTelemetry Plugin
 We will add tracing functions in grpc-open-telemetry plugin, along with OpenTelemetry 
 metrics [gRPC A66][A66].
 Languages will keep using the same gRPC infrastructures, e.g. interceptor and 
 stream tracer to implement the feature.
 We keep the grpc-census plugin to allow users who already depend on grpc-census to
 continue using it for newer grpc versions.
-In the new function we will produce the same tracing information as we produce 
+In the new tracing function we will produce the same tracing information as we produce 
 for Census. But due to API differences between OpenCensus and OpenTelemetry, the
 trace information is represented slightly differently.
-The OpenCensus `MessageEvent` fields maps to OpenTelemetry event attributes:
+In the new tracing function, the client will add `Event`s (name:
+`Outbound message sent` and `Inbound message read`) with corresponding attributes,
+mapped from OpenCensus `MessageEvent` fields:
 
 | OpenCensus Trace Message Event Fields | OpenTelemetry Trace Event Attribute Key |
 |---------------------------------------|-----------------------------------------|
@@ -122,8 +124,8 @@ annotation attributes keys are mapped to event attributes keys:
 
 | OpenCensus Trace Annotation Attribute Key | OpenTelemetry Trace Event Attribute Key |
 |-------------------------------------------|-----------------------------------------|
-| `id`                                      | `message.event.type`                    |
-| `type`                                    | `message.message.id`                    |
+| `type`                                    | `message.event.type`                    |
+| `id`                                      | `message.message.id`                    |
 
 And OpenTelemetry no longer has span end options as OpenCensus does.
 
@@ -216,17 +218,19 @@ class GrpcCommonSetter implements TextMapSetter<Metadata>, GrpcBinarySetter<Meta
   // base64 encoding/decoding between API boundaries.
   @Override
   void set(Metadata header, String key, byte[] value) {
-    assert key.endsWith("-bin");
+    assert key.equals("grpc-trace-bin");
     header.put(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER), value);
   }
 
   @Override
   void set(Metadata header, String key, String value) {
-    if (key.endsWith("-bin")) {
+    if (key.equals("grpc-trace-bin")) {
       // Slower path in C++. It shows the decoding part of the just encoded 
       // String at GrpcTraceBinPropagator.inject(). This can also be used to 
       // propagate any other binary header.
       header.put(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER), Base64.getDecoder().decode(value));
+    } else if (key.endsWith("-bin")) {
+      logger.log(Level.ERROR, "Binary propagator other than GrpcTraceBinPropagator is not supported.");
     } else {
       // Used by other TextMap propagators, e.g. W3C.
       header.put(Metadata.Key.of(key, ASCII_STRING_MARSHALLER), value);
@@ -236,12 +240,14 @@ class GrpcCommonSetter implements TextMapSetter<Metadata>, GrpcBinarySetter<Meta
 
 class GrpcCommonGetter implements TextMapGetter<Metadata> {
   @Override
-  public String get(@Nullable Metadata carrier, String key) {   
-    if (key.endsWith("-bin")) { 
+  public String get(@Nullable Metadata carrier, String key) {
+    if (key.equals("grpc-trace-bin")) {
       // Slow path for C++: return string encoded from bytes. Later we decode to 
       // bytes in GrpcTraceBinPropagator.extract().
       byte[] value = carrier.get(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER));
       return Base64.getEncoder().encodeToString(value);
+    } else if (key.endsWith("-bin")) {
+      logger.log(Level.ERROR, "Binary propagator other than GrpcTraceBinPropagator is not supported.");
     } else {
       // Used by other TextMap propagators, e.g. W3C.
       return carrier.get(Metadata.Key.of(key, ASCII_STRING_MARSHALLER));
@@ -251,7 +257,7 @@ class GrpcCommonGetter implements TextMapGetter<Metadata> {
   // Add a new method to optimize the TextMap propagator to avoid base64 encoding.
   @Override
   public byte[] getBinary(@Nullable Metadata carrier, String key) {
-    assert key.endsWith("bin");
+    assert key.equals("grpc-trace-bin");
     return carrier.get(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER));
   }
 }
@@ -354,8 +360,9 @@ class GrpcTextMapCarrier : public opentelemetry::context::TextMapCarrier {
     if (key == "grpc-trace-bin") {
       return absl::Base64Escape(metadata_->GetStringValue(key).value_or(""));
     } else if (absl::EndsWith(key, "-bin")) {
-      // It's unclear how we want to handle other headers that end with "-bin".
-      // Return an empty string for now.
+      // Maybe ok to support a custom binary propagator. Needs based64 encoding 
+      // validation if so. Not for now.
+      gpr_log(GPR_ERROR, "Binary propagator other than GrpcTraceBinPropagator is not supported.");
       return "";
     }
     return metadata_->GetStringValue(key);
@@ -367,8 +374,7 @@ class GrpcTextMapCarrier : public opentelemetry::context::TextMapCarrier {
           grpc_core::GrpcTraceBinMetadata(),
           grpc_core::Slice::FromCopiedString(absl::Base64Unescape(value)));
     } else if (absl::EndsWith(key, "-bin")) {
-      // It's unclear how we want to handle other headers that end with "-bin".
-      // Do nothing for now.
+      gpr_log(GPR_ERROR, "Binary propagator other than GrpcTraceBinPropagator is not supported.");
       return;
     } else {
       // A propagator other than GrpcTraceBinTextMapPropagator was used.
