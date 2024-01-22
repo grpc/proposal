@@ -79,46 +79,47 @@ policy config. The ring hash policy will be modified as follows:
 
 Upon loading the load balancing config, if the `request_metadata_key` field
 contains a value that is not a valid metadata key, then the configuration is
-rejected. If the `request_metadata_key` refers to a binary metadata (prefixed
+rejected. If the `request_metadata_key` refers to a binary metadata (suffixed
 with `-bin`), the configuration is also rejected.
 
 At pick time:
 - If `request_metadata_key` is not empty, and the request metadata has a
 non-empty value, then the request hash key will be set to this value. If
 `request_metadata_key` contains multiple values, then values are joined with a
-coma `,` character between each value before hashing.
+comma `,` character between each value before hashing.
 - If `request_metadata_key` is not empty, and the request has no value or an
 empty value associated with the metadata key defined, then the picker will
 generate a random hash for it. The use of a random hash key will effectively
 sends the request to a random endpoint.
-- If `request_metadata_key` is not set or empty, then the request hash key will
-be based on the xDS hash policy in RDS, which keeps the existing LB
-configuration for ring hash working as before with xDS.
-- If `request_metadata_key` is not set or empty but the xDS configuration does
-not provide the hash key, then the picker will generate a random hash for it to
-select a random endpoint, which matches the current behavior for xDS.
+- If `request_metadata_key` is empty, then the request hash key will be based on
+the xDS hash policy in RDS, which keeps the existing LB configuration for ring
+hash working as before with xDS.
+- If `request_metadata_key` is empty but the xDS configuration does not provide
+the hash key, then the picker will generate a random hash for it to select a
+random endpoint, which matches the current behavior for xDS.
 
 
 ### Explicitly setting the endpoint hash key
 
 The `ring_hash` policy will be changed such that the hash key used for
 determining the locations of each endpoint on the ring will be extracted from a
-pre-defined name resolver attribute called `hash_key`. If this attribute is set,
-then the endpoint is placed on the ring by hashing its value. If this attribute
-is not set or empty, then the endpoint IP address is used (current
-behavior). The location of an existing endpoint on the ring changes if its
-`hash_key` name resolver attribute changes.
+pre-defined endpoint attribute called `hash_key`. If this attribute is set, then
+the endpoint is placed on the ring by hashing its value. If this attribute is
+not set or empty, then the endpoint IP address is hashed, matching the current
+behavior. The locations of an existing endpoint on the ring is updated if its
+`hash_key` endpoint attribute changes.
 
-The xDS resolver will be changed so that when converting EDS responses to
-resolver endpoints, it will set the `hash_key` name resolver attribute to the
-value of [LbEndpoint.Metadata][LbEndpoint.Metadata] `envoy.lb` `hash_key` field,
-as described in [Envoy's documentation for the ring hash load
-balancer](envoy-ring-hash).
+The cluster resolver LB policy responsible for translating EDS responses into
+resolver endpoints will be changed to set the `hash_key` endpoint attribute to
+the value of [LbEndpoint.Metadata][LbEndpoint.Metadata] `envoy.lb` `hash_key`
+field, as described in [Envoy's documentation for the ring hash load
+balancer][envoy-ring-hash].
 
 ### LB Policy Config Changes
 
 After the addition of this field, the `ring_hash` LB policy config will be:
 
+```proto
     message RingHashLoadBalancingConfig {
       // A client-side cap will limit these values.  If either of these values
       // are greater than the client-side cap, they will be treated as the
@@ -126,9 +127,9 @@ After the addition of this field, the `ring_hash` LB policy config will be:
       uint64 min_ring_size = 1;        // Optional, defaults to 1024.
       uint64 max_ring_size = 2;        // Optional, defaults to 4096, max is 8M.
 
-      string request_metadata_key = 3; // Optional, defaults to the empty string.
+      string request_metadata_key = 3; // Optional, unused if unset.
     }
-
+```
 
 ### Temporary environment variable protection
 
@@ -141,7 +142,7 @@ The second behavior change will be enabled by the
 `GRPC_EXPERIMENTAL_XDS_RING_HASH_ENDPOINT_HASH_KEY` environment variable. This
 will protect from the case where an xDS control plane is already setting the
 `LbEndpoint.Metadata` `envoy.lb` `hash_key` field, in which case deploying this
-new behavior would churn all endpoint hash keys. This environment variable will
+new behavior would change all endpoint hash keys. This environment variable will
 be removed once the feature has proven stable.
 
 ## Rationale
@@ -159,15 +160,7 @@ decided to keep only extract `hash_key` to limit the scope of this gRFC.
 
 ## Implementation
 
-[A description of the steps in the implementation, who will do them, and when.
-If a particular language is going to get the implementation first, this section
-should list the proposed order.]
-
 Will provide an implementation in Go.
-
-## Open issues (if applicable)
-
-N/A
 
 [A42]: A42-xds-ring-hash-lb-policy.md
 [envoy-ringhash]: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers#ring-hash
