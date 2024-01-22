@@ -1,6 +1,6 @@
 # OpenTelemetry Metrics
 
-*   Author: Yash Tibrewal (@yashykt), Zach Reyes (@zasweq), Vindhya Ningegowda (@DNVindhya)
+*   Author: Yash Tibrewal (@yashykt), Zach Reyes (@zasweq), Vindhya Ningegowda (@DNVindhya), Xuan Wang (@XuanWang-Amos)
 *   Approver: Mark Roth (@markdroth)
 *   Status: Final
 *   Implemented in: <language, ...>
@@ -266,22 +266,62 @@ func ServerOption(mo MetricsOptions) grpc.ServerOption {}
 
 ```python
 
- # This class is part of an EXPERIMENTAL API and subject to major changes.
-class OpenTelemetryObservability:
-    def set_meter_provider(meter_provider: MeterProvider) -> None:
-        # If `set_meter_provider()` is not called, no metrics are collected.
-        pass
+from opentelemetry.sdk.metrics import MeterProvider
 
-    def set_target_attribute_filter(filter: Callable[str, bool]) -> None:
-        # If set, this filter will be called per channel to decide whether to
-        # record the target attribute on client or to replace it with "other".
-        pass
+class OpenTelemetryPlugin:
+    """Describes a Plugin for OpenTelemetry observability.
 
-    def set_generic_method_attribute_filter(filter: Callable[str, bool]) -> None:
-        # If set, this filter will be called per call with a generic method type
-        # to decide whether record the target attribute on client or to replace
-        # it with "other".
-        pass
+    This is class is part of an EXPERIMENTAL API.
+    """
+
+    def get_meter_provider(self) -> Optional[MeterProvider]:
+        """
+        This function will be used to get the MeterProvider for this OpenTelemetryPlugin
+        instance.
+
+        Returns:
+            A MeterProvider which will be used to collect telemetry data, or None which
+            means no metrics will be collected.
+        """
+        return None
+
+    def target_attribute_filter(
+        self, target: str
+    ) -> bool:
+        """
+        If set, this will be called per channel to decide whether to record the
+        target attribute on client or to replace it with "other".
+        This helps reduce the cardinality on metrics in cases where many channels
+        are created with different targets in the same binary (which might happen
+        for example, if the channel target string uses IP addresses directly).
+
+        Args:
+            target: The target for the RPC.
+
+        Returns:
+            bool: True means the original target string will be used, False means target string
+            will be replaced with "other".
+        """
+        return True
+
+    def generic_method_attribute_filter(
+        self, method: str
+    ) -> bool:
+        """
+        If set, this will be called with a generic method type to decide whether to
+        record the method name or to replace it with "other".
+
+        Note that pre-registered methods will always be recorded no matter what this
+        function returns.
+
+        Args:
+            method: The method name for the RPC.
+
+        Returns:
+            bool: True means the original method name will be used, False means method name
+            will be replaced with "other".
+        """
+        return False
 ```
 
 ### Metrics Schema
@@ -565,4 +605,5 @@ Java, Go and Python.
     CMake support will also be added shortly.
 *   Java - TBD but assumed to be implemented by @DNVindhya.
 *   Go - TBD but assumed to be implemented by @zasweq.
-*   Python - TBD but assumed to be implemented by @XuanWang-Amos.
+*   Python - Basic functionalities have been implemented and are expected to be
+    available in version 1.62.0.
