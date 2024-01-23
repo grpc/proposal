@@ -1,19 +1,20 @@
 A76: Improvements to the Ring Hash LB Policy
 ----
-* Author(s): @atollena
-* Approver: ?
+* Author(s): atollena
+* Approver: markdroth
 * Status: Draft
 * Implemented in: <language, ...>
-* Last updated: 2024-01-15
-* Discussion at: TODO
+* Last updated: 2024-01-23
+* Discussion at: https://groups.google.com/g/grpc-io/c/ZKI1RIF0e_s/m/oBXqOFb0AQAJ
 
 ## Abstract
 
-This proposal describes two improvements to the `ring_hash` load balancing policy:
+This proposal describes two improvements to the `ring_hash` load balancing
+policy:
 
 1. The ability to use ring hash without xDS, by extending the policy
-   configuration to define the [request metadata][metadata] to use as the
-   request hash key.
+   configuration to define the [request header][header] to use as the request
+   hash key.
 2. The ability to specify endpoint hash keys explicitly, instead of hashing the
    endpoint IP address.
 
@@ -35,11 +36,9 @@ other way to configure the hash for a request but to use the route configuration
 `ring_hash` policy unusable without an xDS infrastructure in place.
 
 This proposal extends the configuration of `ring_hash` policy to specify a
-metadata key. The value associated with this metadata key will be used as the
-request hash key if present. This will make it possible to use `ring_hash` by
-configuring it entirely in the [service config][service-config]. If this
-configuration is omitted, we will preserve the current behavior of using the xDS
-hash policy.
+header to hash. This will make it possible to use `ring_hash` by configuring it
+entirely in the [service config][service-config]. If this configuration is
+omitted, we will preserve the current behavior of using the xDS hash policy.
 
 ### Using an explicit endpoint hash key
 
@@ -74,30 +73,33 @@ This proposal extends the following existing gRFC:
 
 ### Explicitly setting the request hash key
 
-A new string field `request_metadata_key` will be added to the `ring_hash`
-policy config. The ring hash policy will be modified as follows:
+A new field `request_hash_header` will be added to the `ring_hash` policy
+config:
 
-Upon loading the load balancing config, if the `request_metadata_key` field
-contains a value that is not a valid metadata key, then the configuration is
-rejected. If the `request_metadata_key` refers to a binary metadata (suffixed
-with `-bin`), the configuration is also rejected.
+```proto
+    message RingHashLoadBalancingConfig {
+      // (existing fields omitted)
+      string request_hash_header = 3;
+    }
+```
+
+Upon loading the load balancing config, if the `request_hash_header` field
+contains a value that is not a valid header name, then the configuration is
+rejected. If the `request_hash_header` refers to a binary header (suffixed with
+`-bin`), the configuration is also rejected.
 
 At pick time:
-- If `request_metadata_key` is not empty, and the request metadata has a
-non-empty value, then the request hash key will be set to this value. If
-`request_metadata_key` contains multiple values, then values are joined with a
-comma `,` character between each value before hashing.
-- If `request_metadata_key` is not empty, and the request has no value or an
-empty value associated with the metadata key defined, then the picker will
-generate a random hash for it. The use of a random hash key will effectively
-sends the request to a random endpoint.
-- If `request_metadata_key` is empty, then the request hash key will be based on
+- If `request_hash_header` is not empty, and the header has a non-empty value,
+then the request hash key will be set to this value. If `request_hash_header`
+contains multiple values, then values are joined with a comma `,` character
+between each value before hashing.
+- If `request_hash_header` is not empty, and the request has no value or an
+empty value associated with the header defined, then the picker will generate a
+random hash for it. The use of a random hash key will effectively sends the
+request to a random endpoint.
+- If `request_hash_header` is empty, then the request hash key will be based on
 the xDS hash policy in RDS, which keeps the existing LB configuration for ring
 hash working as before with xDS.
-- If `request_metadata_key` is empty but the xDS configuration does not provide
-the hash key, then the picker will generate a random hash for it to select a
-random endpoint, which matches the current behavior for xDS.
-
 
 ### Explicitly setting the endpoint hash key
 
@@ -109,27 +111,11 @@ not set or empty, then the endpoint IP address is hashed, matching the current
 behavior. The locations of an existing endpoint on the ring is updated if its
 `hash_key` endpoint attribute changes.
 
-The cluster resolver LB policy responsible for translating EDS responses into
-resolver endpoints will be changed to set the `hash_key` endpoint attribute to
-the value of [LbEndpoint.Metadata][LbEndpoint.Metadata] `envoy.lb` `hash_key`
-field, as described in [Envoy's documentation for the ring hash load
+For xDS, the cluster resolver LB policy responsible for translating EDS
+responses into resolver endpoints will be changed to set the `hash_key` endpoint
+attribute to the value of [LbEndpoint.Metadata][LbEndpoint.Metadata] `envoy.lb`
+`hash_key` field, as described in [Envoy's documentation for the ring hash load
 balancer][envoy-ring-hash].
-
-### LB Policy Config Changes
-
-After the addition of this field, the `ring_hash` LB policy config will be:
-
-```proto
-    message RingHashLoadBalancingConfig {
-      // A client-side cap will limit these values.  If either of these values
-      // are greater than the client-side cap, they will be treated as the
-      // client-side cap.  The default cap is 4096.
-      uint64 min_ring_size = 1;        // Optional, defaults to 1024.
-      uint64 max_ring_size = 2;        // Optional, defaults to 4096, max is 8M.
-
-      string request_metadata_key = 3; // Optional, unused if unset.
-    }
-```
 
 ### Temporary environment variable protection
 
@@ -138,18 +124,22 @@ existing deployment because the new behavior requires setting a load balancing
 policy configuration field that did not exist before. Therefore, it is not gated
 behind an environment variable.
 
-The second behavior change will be enabled by the
-`GRPC_EXPERIMENTAL_XDS_RING_HASH_ENDPOINT_HASH_KEY` environment variable. This
-will protect from the case where an xDS control plane is already setting the
-`LbEndpoint.Metadata` `envoy.lb` `hash_key` field, in which case deploying this
-new behavior would change all endpoint hash keys. This environment variable will
-be removed once the feature has proven stable.
+Adding support for the hash_key in xDS endpoint metadata could potentially break
+existing clients whose control plane is setting this key, because upgrading the
+client to a new version of gRPC would automatically cause the key to start being
+used. We expect that this change will not cause problems for most users, but
+just in case there is a problem, we will provide a migration story by supporting
+a temporary mechanism to tell gRPC to ignore the `hash_key` endpoint
+metadata. This will be enabled by setting the
+`GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT` environment variable to true. This
+mechanism will be supported for a couple of gRPC releases but will be removed in
+the long run.
 
 ## Rationale
 
 We originally proposed using language specific interfaces to set the request
 hash key. The advantage would have been that the request hash key would not have
-to be exposed through gRPC outgoing metadata. However, this would have required
+to be exposed through gRPC outgoing headers. However, this would have required
 defining language specific APIs, which would increase the complexity of this
 change.
  
@@ -164,6 +154,6 @@ Will provide an implementation in Go.
 
 [A42]: A42-xds-ring-hash-lb-policy.md
 [envoy-ringhash]: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers#ring-hash
-[metadata]: https://grpc.io/docs/what-is-grpc/core-concepts/#metadata
+[header]: https://grpc.io/docs/guides/metadata/#headers
 [service-config]: https://github.com/grpc/grpc/blob/master/doc/service_config.md
 [LbEndpoint.Metadata]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/endpoint/v3/endpoint_components.proto#envoy-v3-api-field-config-endpoint-v3-lbendpoint-metadata
