@@ -254,11 +254,10 @@ the cds LB policy's configuration:
 bool is_dynamic = 2;
 ```
 
-If that field is set to true, then if the cluster name is not present
-in the XdsConfig, the cds policy will obtain a subscription handle from
-the XdsDependencyManager (or the interface wrapping it) if it has not
-already done so.  This handle will not be released until the cds policy
-is destroyed.
+If that field is set to true, then the cds policy will obtain a
+subscription handle from the XdsDependencyManager (or the interface
+wrapping it) if it has not already done so.  This handle will not be
+released until the cds policy is destroyed.
 
 Note that when a cds LB policy obtains a dynamic subscription to a
 cluster, there may be subsequent updates from the xds resolver that do not
