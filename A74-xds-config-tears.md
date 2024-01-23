@@ -1,7 +1,7 @@
 A74: xDS Config Tears
 ----
 * Author(s): @markdroth
-* Approver: @ejona86
+* Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2023-12-28
@@ -57,7 +57,7 @@ resource watches into the xds resolver.
 * [A37: xDS Aggregate and Logical DNS Clusters][A37]
 * [A55: xDS-Based Stateful Session Affinity for Proxyless gRPC][A55]
 * [A56: Priority LB Policy][A56]
-* [A71: xDS Fallback (pending)][A71]
+* [A71: xDS Fallback][A71]
 
 [A27]: A27-xds-global-load-balancing.md
 [A28]: A28-xds-traffic-splitting-and-routing.md
@@ -66,7 +66,7 @@ resource watches into the xds resolver.
 [A37]: A37-xds-aggregate-and-logical-dns-clusters.md
 [A55]: A55-xds-stateful-session-affinity.md
 [A56]: A56-priority-lb-policy.md
-[A71]: https://github.com/grpc/proposal/pull/386
+[A71]: A71-xds-fallback.md
 
 ## Proposal
 
