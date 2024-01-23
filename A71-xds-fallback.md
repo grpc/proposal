@@ -218,7 +218,7 @@ Cons:
 
 ### Perform fallback at resource granularity
 
-This approach would drastically include the likelihood of config tears.
+This approach would drastically increase the likelihood of config tears.
 
 ### Modify gRPC to support atomic config updates
 
