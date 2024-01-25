@@ -24,10 +24,10 @@ Server interceptors are one of the longest-standing feature requests in the Node
 
 ### Interceptor API
 
-A server interceptor is a function that takes an instance of `ServerInterceptingCall` and a `MethodDescriptor` (described in detail in [the client interceptors design][L5]), and returns another instance of that class:
+A server interceptor is a function that takes an instance of `ServerInterceptingCall` and a `ServerMethodDefinition` object, and returns another instance of that class:
 
 ```ts
-function interceptor(methodDescriptor: MethodDescriptor, call: ServerInterceptingCall): ServerInterceptingCall {
+function interceptor(methodDescriptor: ServerMethodDefinition, call: ServerInterceptingCall): ServerInterceptingCall {
   return new ServerInterceptingCall(call);
 }
 ```
@@ -37,6 +37,19 @@ An interceptor function allows developers to define interception methods and to 
 The interceptor function must return a `ServerInterceptingCall` object. A `ServerInterceptingCall` represents an element in the interceptor chain. Any intercepted methods are implemented in the `responder` object, an optional parameter to the constructor. Returning `new ServerInterceptingCall(call)` will satisfy the contract (but provide no interceptor functionality).
 
 Note: interceptors will only be called when a request to a registered method is made.
+
+A `ServerMethodDefinition` object describes the method that is called, and is defined as follows:
+
+```ts
+export interface ServerMethodDefinition<RequestType, ResponseType> {
+  path: string;
+  requestStream: boolean;
+  responseStream: boolean;
+  responseSerialize: Serialize<ResponseType>;
+  requestDeserialize: Deserialize<RequestType>;
+  originalName?: string;
+}
+```
 
 A `ServerInterceptingCall` has the following API:
 
@@ -53,15 +66,23 @@ class ServerInterceptingCall {
   /**
    * Send a response message.
    */
-  sendMessage(message: any, callback: (error: Error | null) => void): void;
+  sendMessage(message: any, callback: () => void): void;
   /**
    * End the call by sending this status.
    */
-  sendStatus(status: StatusObject): void;
+  sendStatus(status: PartialStatusObject): void;
   /**
    * Start a single read, eventually triggering either listener.onReceiveMessage or listener.onReceiveHalfClose.
    */
   startRead(): void;
+  /**
+   * Return the peer address of the client making the request, if known, or "unknown" otherwise
+   */
+  getPeer(): string;
+  /**
+   * Return the call deadline set by the client. The value is Infinity if there is no deadline.
+   */
+  getDeadline(): Deadline;
 }
 ```
 
@@ -86,7 +107,7 @@ interface Responder {
   /**
    * An interception method called when sending the call status.
    */
-  sendStatus?: (status: StatusObject, next: (status: StatusObject) => void): void;
+  sendStatus?: (status: PartialStatusObject, next: (status: PartialStatusObject) => void): void;
 }
 ```
 
