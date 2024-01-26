@@ -95,7 +95,7 @@ interface Responder {
   /**
    * An interception method called before handling of an inbound call starts. Used to register the listener to handle inbound events.
    */
-  start?: (listener: InterceptingServerListener, next: (listener: InterceptingServerListener | ServerListener) => void): void;
+  start?: (next: (listener?: ServerListener) => void): void;
   /**
    * An interception method called when sending response metadata.
    */
@@ -255,6 +255,8 @@ The `Responder` and `ServerListener` APIs are modeled very closely on the `Reque
 #### The `start` method
 
 The `Responder#start` method is the only one that does not correspond to any actual network activity. At the HTTP/2 level, the beginning of an incoming call is signalled by receiving the request headers for that call. However, this start method provides a simple way to register the listeners in the proper order after all interceptors have been invoked and to allow those listeners to handle the incoming metadata.
+
+Unlike in the corresponding method in the client interceptor's `Requester`, this `start` method does not take any argument other than the `next` callback. On the client having direct access to the previous listener is useful to be able to fake or copy incoming network events. For example, a client-side caching interceptor could pass a previously received message directly to the listener for a new request, without any corresponding network event on the current request. There are not similar use cases on the server, so the corresponding argument is omitted.
 
 #### The `onCancel` method
 
