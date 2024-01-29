@@ -3,8 +3,8 @@ A75: xDS Aggregate Cluster Behavior Fixes
 * Author(s): @markdroth
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
-* Implemented in: <language, ...>
-* Last updated: 2023-12-28
+* Implemented in: C-core
+* Last updated: 2024-01-29
 * Discussion at: https://groups.google.com/g/grpc-io/c/C1XAnRc2Z7E
 
 ## Abstract
@@ -227,7 +227,7 @@ We will make the following changes in the xds_override_host policy:
   CONNECTING and we do find entries that do not have any subchannel, we
   will trigger creation of a subchannel for one of those entries.
 
-The picker logic will now look like this:
+The picker logic will now look like this (pseudo-code):
 
 ```
 def Pick(pick_args):
