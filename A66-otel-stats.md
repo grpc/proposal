@@ -243,6 +243,15 @@ type MetricsOptions struct {
   // to Named Meter instances to instrument an application. To enable metrics
   // collection, set a meter provider. If unset, no metrics will be recorded.
   MeterProvider metric.MeterProvider
+  // TargetAttributeFilter is a callback that takes the target string and
+  // returns a bool representing whether to use target as a label value or use
+  // the string "other". If unset, will use the target string as is.
+  TargetAttributeFilter func(string) bool
+  // MethodAttributeFilter is a callback that takes the method string and
+  // returns a bool representing whether to use method as a label value or use
+  // the string "other". If unset, will use the method string as is. This is
+  // used only for generic methods, and not registered methods.
+  MethodAttributeFilter func(string) bool
 }
 
 // DialOption returns a dial option which enables OpenTelemetry instrumentation
