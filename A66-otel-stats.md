@@ -249,7 +249,8 @@ type MetricsOptions struct {
   TargetAttributeFilter func(string) bool
   // MethodAttributeFilter is a callback that takes the method string and
   // returns a bool representing whether to use method as a label value or use
-  // the string "other". If unset, will use the method string as is.
+  // the string "other". If unset, will use the method string as is. This is
+  // used only for generic methods, and not registered methods.
   MethodAttributeFilter func(string) bool
 }
 
