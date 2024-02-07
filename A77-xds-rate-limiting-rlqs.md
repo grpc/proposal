@@ -52,9 +52,13 @@ will cover four major parts needed for language-specific gRPC implementations:
 2. Implement the client side of RLQS protocol (RLQS
    Client): `StreamRateLimitQuotas.StreamRateLimitQuotas`. It will establish
    bidirectional gRPC stream to the remote [Rate Limit Quota Service][rlqs].
-3. Implement a Server Interceptor (filter in C-core, later called
+   4. Send and receive updates. 
+3. Implement a HTTP filter (filter in C-core, later called
    "the Interceptor" for simplicity) that requests.
-4. Send and receive updates.
+5. Fault modes
+
+
+/// per-host and per-route overrides
 
 ### Related Proposals:
 
@@ -69,7 +73,13 @@ will cover four major parts needed for language-specific gRPC implementations:
 
 ### xDS types support
 #### Unified Matchers
+add a note that we'll be using this in the future
+list specific matcher
+start from the assumption we implement both
+
 #### io.envoyproxy.envoy.config.core.v3.GrpcService.GoogleGrpc
+consider credential could be a security/ 3p trust issue.
+TODO(sergiitk): meeting with leads about this
 #### Canonical CEL
 
 TODO(sergiitk): A precise statement of the proposed change.
@@ -86,7 +96,7 @@ TODO(sergiitk): A precise statement of the proposed change.
 3. gRPC Server parses [RateLimitQuotaFilterConfig.bucket_matchers] tree and
    caches it in the filter state.
 4. gRPC Server installs a Server Interceptor (filter in C-core, later called
-   "the Interceptor" for simplicity)
+   "the Interceptor" for simplicity) // TODO(sergiitk): HTTP filter
 5. Once a request is intercepted by the Interceptor:
     - The request is matched into a Bucket by evaluating the `bucket_matchers`
       tree against the request attributes.
@@ -95,7 +105,7 @@ TODO(sergiitk): A precise statement of the proposed change.
       throttled according
       to [RateLimitQuotaBucketSettings.no_assignment_behavior].
     - If the Bucket exists, the request is throttled according to Bucket's quota
-      assignment. Bucket's `num_requests_allowed`
+      assignment. Bucket's `num_requests_allowed` // TODO(sergiitk): explain what's throttle
       or `num_requests_denied` request counter is increased by one.
 6. For all existing buckets, a `BucketQuotaUsage` report is sent
    every [RateLimitQuotaBucketSettings.reporting_interval]
@@ -103,6 +113,12 @@ TODO(sergiitk): A precise statement of the proposed change.
 7. RLQS may send Bucket quota assignments via `RateLimitQuotaResponse` at any
    time. Once received, it must the quota must be applied to a Bucket with
    matching [bucket_id].
+
+
+// TODO(sergiitk): think about it from the perspective what events needs to be handled:
+1. parsing config
+2. getting an update
+can be described with pseudo-code
 
 ### Temporary environment variable protection
 
