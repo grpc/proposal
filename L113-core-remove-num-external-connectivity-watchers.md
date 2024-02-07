@@ -5,7 +5,7 @@ L113: C-core: Remove `grpc_channel_num_external_connectivity_watchers()`
 * Status: Implemented
 * Implemented in: C-core
 * Last updated: 2024-02-07
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/CKzjGVVcVBE
 
 ## Abstract
 
