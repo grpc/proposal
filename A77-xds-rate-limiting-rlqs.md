@@ -43,7 +43,40 @@ types of such service:
 gRPC only intends to support quota-based global rate limiting, Rate Limiting
 Quota Service (RLQS), which is described in this document.
 
-Simplified RLQS flow happy-path:
+This proposal details how gRPC will add support
+for [Rate Limit Quota xDS HTTP filter][rate_limit_quota_filter]
+configured via [xDS HTTP Filters][A39] to [xDS-Enabled gRPC servers][A36]. It
+will cover four major parts needed for language-specific gRPC implementations:
+
+1. Support missing xDS types needed to parse the Rate Limit Quota Filter config.
+2. Implement the client side of RLQS protocol (RLQS
+   Client): `StreamRateLimitQuotas.StreamRateLimitQuotas`. It will establish
+   bidirectional gRPC stream to the remote [Rate Limit Quota Service][rlqs].
+3. Implement a Server Interceptor (filter in C-core, later called
+   "the Interceptor" for simplicity) that requests.
+4. Send and receive updates.
+
+### Related Proposals:
+
+* [A36: xDS-Enabled Servers][A36]
+* [A39: xDS HTTP Filter Support][A39]
+
+[A36]: A36-xds-for-servers.md
+
+[A39]: A39-xds-http-filters.md
+
+## Proposal
+
+### xDS types support
+#### Unified Matchers
+#### io.envoyproxy.envoy.config.core.v3.GrpcService.GoogleGrpc
+#### Canonical CEL
+
+TODO(sergiitk): A precise statement of the proposed change.
+
+#### Simplified RLQS flow happy-path:
+
+// TODO(sergiitk): Insert graphics
 
 1. [Rate Limit Quota xDS HTTP filter][rate_limit_quota_filter]
    is configured on a gRPC Server via an LDS update in the HTTP connection
@@ -55,31 +88,21 @@ Simplified RLQS flow happy-path:
 4. gRPC Server installs a Server Interceptor (filter in C-core, later called
    "the Interceptor" for simplicity)
 5. Once a request is intercepted by the Interceptor:
-    1. The request is matched into a Bucket by evaluating the `bucket_matchers`
-       tree against the request attributes.
-    2. If the Bucket doesn't exist, gRPC server immediately sends the
-       initial `BucketQuotaUsage` report to the RLQS server. The request is
-       throttled according
-       to [RateLimitQuotaBucketSettings.no_assignment_behavior].
-    3. If the Bucket exists, the request is throttled according to Bucket's
-       quota assignment. Bucket's `num_requests_allowed`
-       or `num_requests_denied` request counter is increased by one.
+    - The request is matched into a Bucket by evaluating the `bucket_matchers`
+      tree against the request attributes.
+    - If the Bucket doesn't exist, gRPC server immediately sends the
+      initial `BucketQuotaUsage` report to the RLQS server. The request is
+      throttled according
+      to [RateLimitQuotaBucketSettings.no_assignment_behavior].
+    - If the Bucket exists, the request is throttled according to Bucket's quota
+      assignment. Bucket's `num_requests_allowed`
+      or `num_requests_denied` request counter is increased by one.
 6. For all existing buckets, a `BucketQuotaUsage` report is sent
    every [RateLimitQuotaBucketSettings.reporting_interval]
    to `RateLimitQuotaService.StreamRateLimitQuotas`.
 7. RLQS may send Bucket quota assignments via `RateLimitQuotaResponse` at any
    time. Once received, it must the quota must be applied to a Bucket with
    matching [bucket_id].
-
-### Related Proposals:
-
-* [A36: xDS-Enabled Servers][A36]
-
-[A36]: A36-xds-for-servers.md
-
-## Proposal
-
-TODO(sergiitk): A precise statement of the proposed change.
 
 ### Temporary environment variable protection
 
@@ -118,3 +141,5 @@ none.
 [RateLimitQuotaFilterConfig.bucket_matchers]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#envoy-v3-api-field-extensions-filters-http-rate-limit-quota-v3-ratelimitquotafilterconfig-bucket-matchers
 
 [bucket_id]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/rate_limit_quota/v3/rlqs.proto#envoy-v3-api-field-service-rate-limit-quota-v3-ratelimitquotaresponse-bucketaction-bucket-id
+
+[rlqs]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/service/rate_limit_quota/v3/rlqs.proto
