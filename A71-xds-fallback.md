@@ -71,10 +71,10 @@ control plane, which is not desirable.
 gRPC servers using the xDS configuration will share the same XdsClient instance
 keyed with a dedicated well-known key value.
 
-Changing the XdsClient to per-data plane target enables gRPC to switch to
-fallback configuration only for channels that need xDS resources that have not
-been downloaded yet. This proposal details changing the channels to get
-XdsClient for their data plane target.
+Implementations will change the XdsClient to be per-data plane target to enable
+switch to fallback configuration only for channels that need xDS resources that
+have not been downloaded yet. This proposal details changing the channels
+to get XdsClient for their data plane target.
 
 ### Update CSDS to aggregate configs from multiple XdsClient instances.
 
