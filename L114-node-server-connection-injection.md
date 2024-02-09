@@ -5,7 +5,7 @@ L114: Node Server Connection Injection
 * Status: In Review
 * Implemented in: Node.js
 * Last updated: 2024-02-09
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/Uv3DJRRrvRA
 
 ## Abstract
 
