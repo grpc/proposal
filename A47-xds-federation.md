@@ -4,7 +4,7 @@ A47: xDS Federation
 * Approver: @ejona86, @dfawley
 * Status: Implemented
 * Implemented in: C++
-* Last updated: 2022-01-24
+* Last updated: 2022-02-22
 * Discussion at: https://groups.google.com/g/grpc-io/c/17pQyP31yL8
 
 ## Abstract
@@ -102,9 +102,9 @@ an optional authority in the `xds` URI.  The procedure for handling an
 
 Note that the authority used for the data plane connections (which is
 also used to select the VirtualHost within the xDS RouteConfiguration)
-will continue to be the last path component of the `xds` URI used to
-create the gRPC channel (i.e., the part following the last `/` character, or
-the entire path if the path contains no `/` character).
+will continue to be the path component of the `xds` URI used to create the
+gRPC channel, stripping off the leading `/` if any.  (Any remaining `/`
+characters will be percent-encoded, as is normal for gRPC target URIs.)
 
 ### Bootstrap Config Changes
 
