@@ -4,7 +4,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-02-13
+* Last updated: 2024-02-22
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -93,7 +93,7 @@ All Pick First metrics will have the following label:
 
 | Name        | Description |
 | ----------- | ----------- |
-| grpc.target | Indicates the target of the gRPC channel in which WRR is used.  (Same as the attribute defined in [A66].) |
+| grpc.target | Indicates the target of the gRPC channel in which PF is used.  (Same as the attribute defined in [A66].) |
 
 The following metrics will be exported:
 
@@ -114,7 +114,7 @@ The following labels may be used for XdsClient metrics:
 
 | Name        | Description |
 | ----------- | ----------- |
-| grpc.target | For clients, indicates the target of the gRPC channel in which WRR is used (i.e., the same as the attribute defined in [A66]). For servers, will be the string "#server". |
+| grpc.target | For clients, indicates the target of the gRPC channel in which the XdsClient is used (i.e., the same as the attribute defined in [A66]). For servers, will be the string "#server". |
 | grpc.xds_server | The name of the xDS server with which the XdsClient is communicating. |
 | grpc.xds_authority | The xDS authority.  The value will be "old" for old-style non-xdstp resource names. |
 | grpc.xds_cache_state | Indicates the cache state of an xDS resource.  The value will be one of: <ul><li>"requested": The resource has been requested from the xDS server but has not yet been received.<li>"does_not_exist": The server has indicated that the resource does not exist.<li>"acked": The resource has been received and is valid.<li>"nacked": The resource was received but was not valid.<li>"nacked_but_cached": There is a version of the resource cached, but the most recent update of the resource was invalid.</ul> |
@@ -125,12 +125,12 @@ The following metrics will be exported:
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
 | grpc.xds_client.xds_server.connected | Gauge | {bool} | grpc.target, grpc.xds_server | Whether or not the xDS client currently has a working ADS stream to the xDS server.  For a given server, this will be set to 0 when we have a connectivity failure or when the ADS stream fails without seeing a response message, as per [A57].  It will be set to 1 when we receive the first response on an ADS stream. |
-| grpc.xds_client.xds_server.updates | Counter | {updates} | grpc.target, grpc.xds_server, grpc.xds_resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice. |
+| grpc.xds_client.xds_server.updates | Counter | {updates} | grpc.target, grpc.xds_server, grpc.xds_resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice.  The counter will be incremented even for resources that have not changed. |
 | grpc.xds_client.xds_server.resources | Gauge | {resources} | grpc.target, grpc.xds_server, grpc.xds_authority, grpc.xds_cache_state, grpc.xds_resource_type | Number of xDS resources. |
 
 ### Temporary environment variable protection
 
-This proposal does not include any features enabled via exteranl I/O, so
+This proposal does not include any features enabled via external I/O, so
 it does not need environment variable protection.
 
 ## Rationale
