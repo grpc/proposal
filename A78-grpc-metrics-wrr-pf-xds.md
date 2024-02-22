@@ -49,8 +49,6 @@ include a label indicating which xDS locality the metrics are associated
 with.  In particular, we want to provide this optional label for the
 metrics in the WRR LB policy, described below.
 
-FIXME: is this the option we want?
-
 To support this, we will extend the `weighted_target` LB policy (see
 [A28]) to define a resolver attribute that indicates the name of its
 child.  This attribute will be passed down to each of its children with
