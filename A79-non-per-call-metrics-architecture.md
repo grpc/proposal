@@ -2,10 +2,10 @@
 
 *   Author(s): Yash Tibrewal (@yashykt)
 *   Approver: Mark Roth (@markdroth)
-*   Status: Draft
+*   Status: In Review
 *   Implemented in: <language, ...>
 *   Last updated: Feb 23, 2024
-*   Discussion at: <google group thread> (filled after thread exists)
+*   Discussion at: https://groups.google.com/g/grpc-io/c/VfZOj7940Dc
 
 ## Abstract
 
