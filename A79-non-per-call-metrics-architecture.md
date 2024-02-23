@@ -9,8 +9,7 @@
 
 ## Abstract
 
-Describe a cross-language plugin architecture for collecting non-per-call
-metrics in the various gRPC implementations.
+Describe a cross-language architecture for collecting non-per-call metrics.
 
 ## Background
 
