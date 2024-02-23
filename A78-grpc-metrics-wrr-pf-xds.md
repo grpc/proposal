@@ -4,7 +4,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-02-22
+* Last updated: 2024-02-23
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -60,18 +60,12 @@ the appropriate value, so that any LB policy that sits underneath the
 The `weighted_round_robin` LB policy is described in [A58].  We propose to
 add the following metrics to it.
 
-All WRR metrics will have the following label:
+WRR metrics will have the following labels:
 
-| Name        | Description |
-| ----------- | ----------- |
-| grpc.target | Indicates the target of the gRPC channel in which WRR is used.  (Same as the attribute defined in [A66].) |
-
-In addition, the following optional label will be available when WRR is
-used with xDS:
-
-| Name          | Description |
-| ------------- | ----------- |
-| grpc.locality | The locality to which the traffic is being sent. This will be based on the resolver attribute passed down from the `weighted_target` policy. |
+| Name        | Disposition | Description |
+| ----------- | ----------- | ----------- |
+| grpc.target | required | Indicates the target of the gRPC channel in which WRR is used.  (Same as the attribute defined in [A66].) |
+| grpc.lb.locality | optional | The locality to which the traffic is being sent. This will be based on the resolver attribute passed down from the `weighted_target` policy. |
 
 The following metrics will be exported:
 
@@ -87,11 +81,11 @@ The following metrics will be exported:
 The Pick First LB policy predates the gRFC process but was updated in
 [A62].  We propose to add the following metrics to it.
 
-All Pick First metrics will have the following label:
+Pick First metrics will have the following labels:
 
-| Name        | Description |
-| ----------- | ----------- |
-| grpc.target | Indicates the target of the gRPC channel in which PF is used.  (Same as the attribute defined in [A66].) |
+| Name        | Disposition | Description |
+| ----------- | ----------- | ----------- |
+| grpc.target | required | Indicates the target of the gRPC channel in which PF is used.  (Same as the attribute defined in [A66].) |
 
 The following metrics will be exported:
 
@@ -108,23 +102,23 @@ The XdsClient component was originally described in [A27].  Note that in
 separate global XdsClient instance for each channel target.  The
 proposed metric schema here reflects that change.
 
-The following labels may be used for XdsClient metrics:
+XdsClient metrics will have the following labels:
 
-| Name        | Description |
-| ----------- | ----------- |
-| grpc.target | For clients, indicates the target of the gRPC channel in which the XdsClient is used (i.e., the same as the attribute defined in [A66]). For servers, will be the string "#server". |
-| grpc.xds_server | The name of the xDS server with which the XdsClient is communicating. |
-| grpc.xds_authority | The xDS authority.  The value will be "old" for old-style non-xdstp resource names. |
-| grpc.xds_cache_state | Indicates the cache state of an xDS resource.  The value will be one of: <ul><li>"requested": The resource has been requested from the xDS server but has not yet been received.<li>"does_not_exist": The server has indicated that the resource does not exist.<li>"acked": The resource has been received and is valid.<li>"nacked": The resource was received but was not valid.<li>"nacked_but_cached": There is a version of the resource cached, but the most recent update of the resource was invalid.</ul> |
-| grpc.xds_resource_type | Indicates an xDS resource type, such as "envoy.config.listener.v3.Listener". |
+| Name        | Disposition | Description |
+| ----------- | ----------- | ----------- |
+| grpc.target | required | For clients, indicates the target of the gRPC channel in which the XdsClient is used (i.e., the same as the attribute defined in [A66]). For servers, will be the string "#server". |
+| grpc.xds.server | required | The name of the xDS server with which the XdsClient is communicating. |
+| grpc.xds.authority | required | The xDS authority.  The value will be "old" for old-style non-xdstp resource names. |
+| grpc.xds.cache_state | required | Indicates the cache state of an xDS resource.  The value will be one of: <ul><li>"requested": The resource has been requested from the xDS server but has not yet been received.<li>"does_not_exist": The server has indicated that the resource does not exist.<li>"acked": The resource has been received and is valid.<li>"nacked": The resource was received but was not valid.<li>"nacked_but_cached": There is a version of the resource cached, but the most recent update of the resource was invalid.</ul> |
+| grpc.xds.resource_type | required | Indicates an xDS resource type, such as "envoy.config.listener.v3.Listener". |
 
 The following metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.xds_client.xds_server.connected | Gauge | {bool} | grpc.target, grpc.xds_server | Whether or not the xDS client currently has a working ADS stream to the xDS server.  For a given server, this will be set to 0 when we have a connectivity failure or when the ADS stream fails without seeing a response message, as per [A57].  It will be set to 1 when we receive the first response on an ADS stream. |
-| grpc.xds_client.xds_server.updates | Counter | {updates} | grpc.target, grpc.xds_server, grpc.xds_resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice.  The counter will be incremented even for resources that have not changed. |
-| grpc.xds_client.xds_server.resources | Gauge | {resources} | grpc.target, grpc.xds_server, grpc.xds_authority, grpc.xds_cache_state, grpc.xds_resource_type | Number of xDS resources. |
+| grpc.xds_client.xds_server.connected | Gauge | {bool} | grpc.target, grpc.xds.server | Whether or not the xDS client currently has a working ADS stream to the xDS server.  For a given server, this will be set to 0 when we have a connectivity failure or when the ADS stream fails without seeing a response message, as per [A57].  It will be set to 1 when we receive the first response on an ADS stream. |
+| grpc.xds_client.xds_server.updates | Counter | {updates} | grpc.target, grpc.xds.server, grpc.xds.resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice.  The counter will be incremented even for resources that have not changed. |
+| grpc.xds_client.xds_server.resources | Gauge | {resources} | grpc.target, grpc.xds.server, grpc.xds.authority, grpc.xds.cache_state, grpc.xds.resource_type | Number of xDS resources. |
 
 ### Temporary environment variable protection
 
