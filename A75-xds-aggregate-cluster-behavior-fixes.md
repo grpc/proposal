@@ -4,7 +4,7 @@ A75: xDS Aggregate Cluster Behavior Fixes
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: C-core
-* Last updated: 2024-01-29
+* Last updated: 2024-02-23
 * Discussion at: https://groups.google.com/g/grpc-io/c/C1XAnRc2Z7E
 
 ## Abstract
@@ -120,8 +120,8 @@ control planes being used with gRPC that set the LB policy differently
 in the aggregate cluster vs. the underlying clusters and then expect the
 LB policy in the aggregate cluster to be used.  In order to provide a
 migration story for any such cases, we will support a temporary
-mechanism to tell gRPC to use the LB policy in the aggregate cluster.
-This will be enabled by setting the
+mechanism to tell gRPC to have the underlying clusters use the LB policy
+configured in the aggregate cluster.  This will be enabled by setting the
 `GRPC_XDS_AGGREGATE_CLUSTER_BACKWARD_COMPAT` environment variable to
 `true`.  This mechanism will be supported for a couple of gRPC releases
 but will be removed in the long run.
@@ -280,8 +280,9 @@ def Pick(pick_args):
 
 ### Temporary environment variable protection
 
-This design does not provide any new functionality that will be enabled
-by external I/O, so no environment variable guard is necessary.
+This design makes significant structural changes in the LB policy tree,
+which makes it infeasible to guard the new code-paths with an
+environment variable guard until it proves stable as we normally would.
 
 ## Rationale
 
