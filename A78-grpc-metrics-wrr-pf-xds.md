@@ -15,13 +15,13 @@ Weighted Round Robin (WRR) and Pick First LB policies and for the XdsClient.
 ## Background
 
 gRPC recently added a set of basic per-call metrics, defined in [A66].
-[A??] is building upon that by providing a framework for non-per-call
+[A79] is building upon that by providing a framework for non-per-call
 metrics.  The metrics described in this document will be the first
 metrics added using that new non-per-call metric framework.
 
 ### Related Proposals: 
 * [A66]: OpenTelemetry Metrics
-* [A??]: gRPC Non-Per-Call Metrics Framework
+* [A79]: gRPC Non-Per-Call Metrics Framework (pending)
 * [A58]: Weighted Round Robin LB Policy
 * [A62]: Pick First: Sticky TRANSIENT_FAILURE and Address Order Randomization
 * [A27]: xDS-Based Global Load Balancing
@@ -30,7 +30,7 @@ metrics added using that new non-per-call metric framework.
 * [A57]: XdsClient Failure Mode Behavior
 
 [A66]: A66-otel-stats.md
-[A??]: ???
+[A79]: https://github.com/grpc/proposal/pull/421
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
 [A62]: A62-pick-first.md
 [A27]: A27-xds-global-load-balancing.md
