@@ -92,7 +92,7 @@ The following metrics will be exported:
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
 | grpc.lb.pick_first.disconnections | Counter | {disconnections} | grpc.target | Number of times the selected subchannel becomes disconnected. |
-| grpc.lb.pick_first.connections_succeeded | Counter | {connections} | grpc.target | Number of times a subchannel is successfully connected. |
+| grpc.lb.pick_first.connection_attempts_succeeded | Counter | {attempts} | grpc.target | Number of successful connection attempts. |
 | grpc.lb.pick_first.connection_attempts_failed | Counter | {attempts} | grpc.target | Number of failed connection attempts. |
 
 ### XdsClient
@@ -116,9 +116,9 @@ The following metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.xds_client.xds_server.connected | Gauge | {bool} | grpc.target, grpc.xds.server | Whether or not the xDS client currently has a working ADS stream to the xDS server.  For a given server, this will be set to 0 when we have a connectivity failure or when the ADS stream fails without seeing a response message, as per [A57].  It will be set to 1 when we receive the first response on an ADS stream. |
-| grpc.xds_client.xds_server.updates | Counter | {updates} | grpc.target, grpc.xds.server, grpc.xds.resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice.  The counter will be incremented even for resources that have not changed. |
-| grpc.xds_client.xds_server.resources | Gauge | {resources} | grpc.target, grpc.xds.server, grpc.xds.authority, grpc.xds.cache_state, grpc.xds.resource_type | Number of xDS resources. |
+| grpc.xds_client.connected | Gauge | {bool} | grpc.target, grpc.xds.server | Whether or not the xDS client currently has a working ADS stream to the xDS server.  For a given server, this will be set to 0 when we have a connectivity failure or when the ADS stream fails without seeing a response message, as per [A57].  It will be set to 1 when we receive the first response on an ADS stream. |
+| grpc.xds_client.resource_updates | Counter | {updates} | grpc.target, grpc.xds.server, grpc.xds.resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice.  The counter will be incremented even for resources that have not changed. |
+| grpc.xds_client.resources | Gauge | {resources} | grpc.target, grpc.xds.server, grpc.xds.authority, grpc.xds.cache_state, grpc.xds.resource_type | Number of xDS resources. |
 
 ### Temporary environment variable protection
 
