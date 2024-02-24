@@ -5,7 +5,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2024-02-23
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
 
 ## Abstract
 
