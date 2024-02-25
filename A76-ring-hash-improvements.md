@@ -93,13 +93,22 @@ At pick time:
 then the request hash key will be set to this value. If `request_hash_header`
 contains multiple values, then values are joined with a comma `,` character
 between each value before hashing.
-- If `request_hash_header` is not empty, and the request has no value or an
-empty value associated with the header defined, then the picker will generate a
-random hash for it. The use of a random hash key will effectively sends the
-request to a random endpoint.
 - If `request_hash_header` is empty, then the request hash key will be based on
 the xDS hash policy in RDS, which keeps the existing LB configuration for ring
 hash working as before with xDS.
+- If `request_hash_header` is not empty, and the request has no value associated
+with the header or its value is empty, then the picker behave as follows: the
+picker will generate a random hash for the request. If the use of this random
+hash triggers a connection attempt (according to the rules described in [A42:
+Picker Behavior][A42-picker-behavior]), then before queuing the pick, the picker
+will scan forward searching for a subchannel in `READY` state. If it finds a
+subchannel in `READY` state, the picker returns it.
+
+This behavior ensures that a single request creates at most one new connection,
+and that missing header does not add extra latency in the common case where
+there is already at least one subchannel in `READY` state. It converges to
+picking a random host, since each request may create a new connection to a
+random endpoint.
 
 ### Explicitly setting the endpoint hash key
 
@@ -111,11 +120,10 @@ not set or empty, then the endpoint IP address is hashed, matching the current
 behavior. The locations of an existing endpoint on the ring is updated if its
 `hash_key` endpoint attribute changes.
 
-For xDS, the cluster resolver LB policy responsible for translating EDS
-responses into resolver endpoints will be changed to set the `hash_key` endpoint
-attribute to the value of [LbEndpoint.Metadata][LbEndpoint.Metadata] `envoy.lb`
-`hash_key` field, as described in [Envoy's documentation for the ring hash load
-balancer][envoy-ring-hash].
+The xDS resolver, described in [A74][A74], will be changed to set the `hash_key`
+endpoint attribute to the value of [LbEndpoint.Metadata][LbEndpoint.Metadata]
+`envoy.lb` `hash_key` field, as described in [Envoy's documentation for the ring
+hash load balancer][envoy-ring-hash].
 
 ### Temporary environment variable protection
 
@@ -148,12 +156,32 @@ through name resolver attributes, instead of only extracting the specific
 `hash_key` attribute, so as to make them available to custom LB policies. We
 decided to keep only extract `hash_key` to limit the scope of this gRFC.
 
+We discussed various option to handle requests that are missing a hash key in
+the non-xDS case. When using ring hash with xDS, the hash is assigned a random
+value in the xDS config selector, which ensure all picks for this request can
+trigger a connection to at most one endpoint. However, without xDS, there is no
+place in the code to assign the hash such that it retains this property. We
+considered the following alternative solutions:
+1. Add a config selector or filter to pick the hash. There currently is no
+   public API to do so from the service config, so we would have had to define
+   one.
+2. Using an internal request attribute to set the hash. Again, there is no
+   cross-language public API for this.
+3. Failing the pick. We generally prefer the lack of a header to affect load
+   balancing but not correctness, so this option was not ideal.
+4. Treating a missing header as being present but having the empty string for
+   value. All instances of the channel would end up picking the same endpoint to
+   send requests with a missing header, which could overload this endpoint if a
+   lot of requests do not have a request hash key.
+
 ## Implementation
 
 Will provide an implementation in Go.
 
 [A42]: A42-xds-ring-hash-lb-policy.md
+[A74]: A74-xds-config-tears.md
 [envoy-ringhash]: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers#ring-hash
 [header]: https://grpc.io/docs/guides/metadata/#headers
 [service-config]: https://github.com/grpc/grpc/blob/master/doc/service_config.md
 [LbEndpoint.Metadata]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/endpoint/v3/endpoint_components.proto#envoy-v3-api-field-config-endpoint-v3-lbendpoint-metadata
+[A42-picker-behavior]: A42-xds-ring-hash-lb-policy.md#picker-behavior
