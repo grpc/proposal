@@ -1,10 +1,10 @@
-## Title
+## A79: Non-per-call Metrics Architecture
 
 *   Author(s): Yash Tibrewal (@yashykt)
 *   Approver: Mark Roth (@markdroth)
 *   Status: In Review
 *   Implemented in: <language, ...>
-*   Last updated: Feb 23, 2024
+*   Last updated: 2024-02-26
 *   Discussion at: https://groups.google.com/g/grpc-io/c/VfZOj7940Dc
 
 ## Abstract
@@ -18,13 +18,14 @@ client/server per-attempt/call metrics for OpenTelemetry. It details an
 architecture that uses a CallTracer approach to record various per-call metrics
 like latency and message sizes. This approach works for per-attempt/call metrics
 but does not work so well for non-per-call metrics such as xDS metrics, load
-balancing policy metrics, resolver metrics and transport metrics which are not
+balancing policy metrics, resolver metrics, and transport metrics which are not
 necessarily tied to a particular call. This calls for a newer architecture that
 allows to collect such metrics.
 
 ### Related Proposals:
 
 *   [A66: OpenTelemetry Metrics](A66-otel-stats.md)
+*   [A71: xDS Fallback](A71-xds-fallback.md)
 *   [A78: gRPC OTel Metrics for WRR, Pick First and XdsClient](https://github.com/grpc/proposal/pull/419)
 
 ## Proposal
@@ -36,11 +37,14 @@ allows to collect such metrics.
     defines metrics for WRR, Pick-First and XdsClient components. In the future,
     we would want to record metrics for other components as well. Additionally,
     third-party plugins to gRPC (custom load balancing policies/resolvers) might
-    want to use the same architecture to record metrics as well.
+    want to use the same architecture to record metrics as well. (Note that
+    supporting metrics for third-party plugins through this architecture is not
+    an immediate requirement and proposed APIs would start off as
+    internal/experimental, but we might want to make the API public in the
+    future.)
 *   Channel-scoped stats plugins - Applications should be able to register stats
     plugins such that metrics for only certain channels are recorded on those
-    plugins. (Current implementations only support global registration of stats
-    plugins.) There can be multiple stats plugins registered as well.
+    plugins. There can be multiple stats plugins registered as well.
 *   gRPC/Third-party plugins control the metric instrument definition - As gRPC
     library/component writers, we want to be in control of the metric definition
     that gRPC provides, irrespective of the stats plugin used. OpenTelemetry is
@@ -65,7 +69,9 @@ Instrument Descriptor -
 *   Name (string) - The name of the instrument
 *   Description (string) - The description of the instrument
 *   Unit (string) - The unit for the recordings, e.g. `s` (seconds), `By`
-    (bytes).
+    (bytes). Follow
+    [OpenTelemetry conventions](https://opentelemetry.io/docs/specs/semconv/general/metrics/#instrument-units)
+    for consistency.
 *   Type - Implementation defined instrument type, e.g. Long Counter, Double
     Histogram.
 *   Set of Label Keys (set of strings) - These determine the set of labels that
@@ -179,7 +185,9 @@ The application will use a stats plugin builder (e.g.
 creation, stats plugins should query the global instruments registry to get the
 list of instrument descriptors. Based on these descriptors and the stats
 plugin's configuration, backing instruments (e.g., `OpenTelemetry Instruments`)
-will be created.
+will be created. Implementations can choose an alternative form of
+representation for the global stats plugin registry. For example, gRPC Go might
+choose to register global stats plugin through global dial options.
 
 ![](A79_graphics/global-stats-plugin-registry-usage.png)
 
@@ -200,13 +208,16 @@ In the second approach, stats plugins that are to be scoped to a channel are
 registered with the corresponding channel directly, instead of the global stats
 plugin registry. On channel creation time, stats plugins from the registry are
 combined with the list of stats plugins registered directly on the channel to
-form the complete list of stats plugins for this channel. There is a known issue
-with this approach. There are certain components like XdsClient instances that
-are not 1:1 to the channel but instead to the channel's target. (Multiple
-channels with the same xDS target will use the same XdsClient instance.) If
-there are multiple channels to the same target (with potentially different stats
+form the complete list of stats plugins for this channel.
+
+There is a known issue with this approach. There are certain components like
+XdsClient instances that are not 1:1 to the channel but instead to the channel's
+target. (As per [A71: xDS Fallback](A71-xds-fallback.md) Multiple channels with
+the same xDS target will use the same XdsClient instance.) If there are multiple
+xDS enabled channels to the same target (with potentially different stats
 plugins), the XdsClient will use the stats plugins provided by the first channel
-created with that target.
+created with that target while ignoring the stats plugins passed to the second
+client.
 
 Implementations can also choose to implement both approaches.
 
@@ -304,10 +315,9 @@ as OpenTelemetry. The following additional guidelines apply -
 From a stability perspective, metrics exported by gRPC will be in one of the
 following categories -
 
-*   On by default
-*   Off by default
-    *   Experimental
-    *   Non-Experimental
+*   Experimental, off by default
+*   Stable, off by default
+*   Stable, on by default
 
 Experimental metrics should always be off-by-default. gRPC reserves the right to
 change or remove these metrics. Documentation for the given metric determines
@@ -333,7 +343,9 @@ API to enable/disable metrics - Users should be able to override the default
 behavior.
 
 Channel Scoped OpenTelemetry Plugins - API should be provided based on the
-approach chosen from the `Scoping Stats Plugins for Channels` section.
+approach chosen from the
+[Scoping Stats Plugins for Channels](#scoping-stats-plugins-for-channels)
+section.
 
 #### C++
 
@@ -342,6 +354,7 @@ The following API will be added to `OpenTelemetryPluginBuilder` introduced in
 
 ```c++
 class OpenTelemetryPluginBuilder {
+  using ChannelScope = grpc_core::StatsPlugin::ChannelScope;
   // Records \a optional_label_key on all metrics that provide it.
   void AddOptionalLabel(absl::string_view optional_label_key);
   // Set scope filter to choose which channels are recorded by this plugin.
