@@ -71,10 +71,10 @@ The following metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.lb.wrr.rr_fallback | Counter | {updates} | grpc.target, grpc.locality | Number of scheduler updates in which there were not enough endpoints with valid weight, which caused the WRR policy to fall back to RR behavior. |
-| grpc.lb.wrr.endpoint_weight_not_yet_usable | Counter | {endpoints} | grpc.target, grpc.locality | Number of endpoints from each scheduler update that don't yet have usable weight information (i.e., either the load report has not yet been received, or it is within the blackout period). |
-| grpc.lb.wrr.endpoint_weight_stale | Counter | {endpoints} | grpc.target, grpc.locality | Number of endpoints from each scheduler update whose latest weight is older than the expiration period. |
-| grpc.lb.wrr.endpoint_weights | Histogram | {weights} | grpc.target, grpc.locality | The histogram buckets will be endpoint weight ranges.  Each bucket will be a counter that is incremented once for every endpoint whose weight is within that range.  Note that endpoints without usable weights will have weight 0. |
+| grpc.lb.wrr.rr_fallback | Counter | {update} | grpc.target, grpc.locality | Number of scheduler updates in which there were not enough endpoints with valid weight, which caused the WRR policy to fall back to RR behavior. |
+| grpc.lb.wrr.endpoint_weight_not_yet_usable | Counter | {endpoint} | grpc.target, grpc.locality | Number of endpoints from each scheduler update that don't yet have usable weight information (i.e., either the load report has not yet been received, or it is within the blackout period). |
+| grpc.lb.wrr.endpoint_weight_stale | Counter | {endpoint} | grpc.target, grpc.locality | Number of endpoints from each scheduler update whose latest weight is older than the expiration period. |
+| grpc.lb.wrr.endpoint_weights | Histogram | {weight} | grpc.target, grpc.locality | The histogram buckets will be endpoint weight ranges.  Each bucket will be a counter that is incremented once for every endpoint whose weight is within that range.  Note that endpoints without usable weights will have weight 0. |
 
 ### Pick First LB Policy
 
@@ -91,9 +91,9 @@ The following metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.lb.pick_first.disconnections | Counter | {disconnections} | grpc.target | Number of times the selected subchannel becomes disconnected. |
-| grpc.lb.pick_first.connection_attempts_succeeded | Counter | {attempts} | grpc.target | Number of successful connection attempts. |
-| grpc.lb.pick_first.connection_attempts_failed | Counter | {attempts} | grpc.target | Number of failed connection attempts. |
+| grpc.lb.pick_first.disconnections | Counter | {disconnection} | grpc.target | Number of times the selected subchannel becomes disconnected. |
+| grpc.lb.pick_first.connection_attempts_succeeded | Counter | {attempt} | grpc.target | Number of successful connection attempts. |
+| grpc.lb.pick_first.connection_attempts_failed | Counter | {attempt} | grpc.target | Number of failed connection attempts. |
 
 ### XdsClient
 
@@ -117,8 +117,8 @@ The following metrics will be exported:
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
 | grpc.xds_client.connected | Gauge | {bool} | grpc.target, grpc.xds.server | Whether or not the xDS client currently has a working ADS stream to the xDS server.  For a given server, this will be set to 0 when we have a connectivity failure or when the ADS stream fails without seeing a response message, as per [A57].  It will be set to 1 when we receive the first response on an ADS stream. |
-| grpc.xds_client.resource_updates | Counter | {updates} | grpc.target, grpc.xds.server, grpc.xds.resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice.  The counter will be incremented even for resources that have not changed. |
-| grpc.xds_client.resources | Gauge | {resources} | grpc.target, grpc.xds.server, grpc.xds.authority, grpc.xds.cache_state, grpc.xds.resource_type | Number of xDS resources. |
+| grpc.xds_client.resource_updates | Counter | {update} | grpc.target, grpc.xds.server, grpc.xds.resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice.  The counter will be incremented even for resources that have not changed. |
+| grpc.xds_client.resources | Gauge | {resource} | grpc.target, grpc.xds.server, grpc.xds.authority, grpc.xds.cache_state, grpc.xds.resource_type | Number of xDS resources. |
 
 ### Temporary environment variable protection
 
