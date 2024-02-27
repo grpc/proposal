@@ -55,7 +55,7 @@ allows to collect such metrics.
 *   Stats plugins should be able to enable/disable recorded metrics - gRPC has
     many components that would want to record metrics. Not all of those metrics
     will be interesting to stats plugins. Stats plugin writers should allow
-    users to configure which metrics and enabled/disabled.
+    users to configure which metrics are enabled/disabled.
 
 ### Proposed Architecture
 
@@ -224,7 +224,7 @@ Implementations can also choose to implement both approaches.
 ##### Core
 
 ```c++
-// Each stats plugin will register an instance of StatsPlugin with the
+// Each stats plugin instance will be registered with the
 // GlobalStatsPluginRegistry. On creation, it should fetch the list of
 // instrument descriptors from the GlobalInstrumentsRegistry and create an
 // instrument for each relevant descriptor.
@@ -257,32 +257,40 @@ public:
 };
 
 class GlobalStatsPluginRegistry {
-public:
- class StatsPluginGroup {
-  public:
-   // Use the stats plugin group object to record metrics
-   template <typename T>
-   void CounterAdd(GlobalUInt64CounterHandle handle, T value,
-                   RefCountedPtr<LabelValueSet> label_values,
-                   RefCountedPtr<LabelValueSet> optional_values);
-   template <typename T>
-   void HistogramRecord(GlobalDoubleHistogramHandle handle, T value,
-                        RefCountedPtr<LabelValueSet> label_values,
-                        RefCountedPtr<LabelValueSet> optional_values);
+ public:
+  class StatsPluginGroup {
+   public:
+    // Use the stats plugin group object to record metrics
+    template <class T, class U>
+    void AddCounter(T handle, U value,
+                    absl::Span<const absl::string_view> label_values,
+                    absl::Span<const absl::string_view> optional_values) {
+      for (auto& plugin : plugins_) {
+        plugin->AddCounter(handle, value, label_values, optional_values);
+      }
+    }
+    template <class T, class U>
+    void RecordHistogram(T handle, U value,
+                         absl::Span<const absl::string_view> label_values,
+                         absl::Span<const absl::string_view> optional_values) {
+      for (auto& plugin : plugins_) {
+        plugin->RecordHistogram(handle, value, label_values, optional_values);
+      }
+    }
 
-   // Use the stats plugin to get a representation of label values that can be
-   // saved for multiple uses later.
-   RefCountedPtr<LabelValueSet> MakeLabelValueSet(
-       absl::Span<absl::string_view> label_values);
- };
+    // Use the stats plugin to get a representation of label values that can be
+    // saved for multiple uses later.
+    RefCountedPtr<LabelValueSet> MakeLabelValueSet(
+        absl::Span<const absl::string_view> label_values);
+  };
 
- void RegisterStatsPlugin(std::shared_ptr<StatsPlugin> plugin);
+  static void RegisterStatsPlugin(std::shared_ptr<StatsPlugin> plugin);
 
- // Invoked to get a stats plugin list for a specified scope.
- static StatsPluginGroup GetStatsPluginsForChannel(ChannelScope scope);
+  // Invoked to get a stats plugin list for a specified scope.
+  static StatsPluginGroup GetStatsPluginsForChannel(ChannelScope scope);
 
-private:
- std::vector<std::shared_ptr<StatsPlugin>> plugins_;
+ private:
+  static NoDestruct<std::vector<std::shared_ptr<StatsPlugin>>> plugins_;
 };
 ```
 
