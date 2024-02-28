@@ -4,7 +4,7 @@ A75: xDS Aggregate Cluster Behavior Fixes
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: C-core
-* Last updated: 2024-02-23
+* Last updated: 2024-02-28
 * Discussion at: https://groups.google.com/g/grpc-io/c/C1XAnRc2Z7E
 
 ## Abstract
@@ -286,15 +286,16 @@ environment variable guard until it proves stable as we normally would.
 
 ## Rationale
 
-We considered implementing nested aggregate clusters as nested cds LB
-policy instances, each with their own underlying priority policy.
+We considered implementing nested aggregate clusters as nested cds
+LB policy instances, each with their own underlying priority policy.
 However, since the XdsDependencyManager already needs to resolve the
-aggregate cluster dependency graph to make sure the entire config is
-loaded, it seemed fairly straightforward to pass down the flattened list
-and deal with it all in a single layer.  Also, having nested priority
-policies would have caused problems with the failover timers, where the
-timer in the upper priority policy would fire before the lower priority
-policy has had a chance to try all of its children.
+aggregate cluster dependency graph to make sure the entire config
+is loaded, it made sense to continue to pass down the flattened list
+and deal with it all in a single layer, just as we were doing prior to
+this design.  Also, having nested priority policies would have caused
+problems with the failover timers, where the timer in the upper priority
+policy would fire before the lower priority policy has had a chance to
+try all of its children.
 
 ## Implementation
 
