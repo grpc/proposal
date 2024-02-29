@@ -108,7 +108,7 @@ XdsClient metrics will have the following labels:
 | ----------- | ----------- | ----------- |
 | grpc.target | required | For clients, indicates the target of the gRPC channel in which the XdsClient is used (i.e., the same as the attribute defined in [A66]). For servers, will be the string "#server". |
 | grpc.xds.server | required | The name of the xDS server with which the XdsClient is communicating. |
-| grpc.xds.authority | required | The xDS authority.  The value will be "old" for old-style non-xdstp resource names. |
+| grpc.xds.authority | required | The xDS authority.  The value will be "#old" for old-style non-xdstp resource names. |
 | grpc.xds.cache_state | required | Indicates the cache state of an xDS resource.  The value will be one of: <ul><li>"requested": The resource has been requested from the xDS server but has not yet been received.<li>"does_not_exist": The server has indicated that the resource does not exist.<li>"acked": The resource has been received and is valid.<li>"nacked": The resource was received but was not valid.<li>"nacked_but_cached": There is a version of the resource cached, but the most recent update of the resource was invalid.</ul> |
 | grpc.xds.resource_type | required | Indicates an xDS resource type, such as "envoy.config.listener.v3.Listener". |
 
