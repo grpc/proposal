@@ -4,7 +4,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-02-23
+* Last updated: 2024-02-29
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
 
 ## Abstract
@@ -118,7 +118,7 @@ The following metrics will be exported:
 | ------------- | ----- | ----- | ------- | ----------- |
 | grpc.xds_client.connected | Gauge | {bool} | grpc.target, grpc.xds.server | Whether or not the xDS client currently has a working ADS stream to the xDS server.  For a given server, this will be set to 0 when we have a connectivity failure or when the ADS stream fails without seeing a response message, as per [A57].  It will be set to 1 when we receive the first response on an ADS stream. |
 | grpc.xds_client.resource_updates | Counter | {update} | grpc.target, grpc.xds.server, grpc.xds.resource_type | A counter of resource updates from the xDS server.  Note that this is a count of resources, not response messages; if a response message contains two resources, then we will increment the counter twice.  The counter will be incremented even for resources that have not changed. |
-| grpc.xds_client.resources | Gauge | {resource} | grpc.target, grpc.xds.server, grpc.xds.authority, grpc.xds.cache_state, grpc.xds.resource_type | Number of xDS resources. |
+| grpc.xds_client.resources | Gauge | {resource} | grpc.target, grpc.xds.authority, grpc.xds.cache_state, grpc.xds.resource_type | Number of xDS resources. |
 
 ### Temporary environment variable protection
 
