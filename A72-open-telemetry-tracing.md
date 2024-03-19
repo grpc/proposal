@@ -87,7 +87,7 @@ OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
 
 // Create a module that hosts tracing infrastructures. Should document that 
 // the module implementation may change as OpenTelemetry evolves.
-OpenTelemetryModule otModule = OpenTelemetryModule.getInstance(openTelemetry);
+OpenTelemetryModule otModule = OpenTelemetryModule.newBuilder().sdk(openTelemetry).build();
 
 GlobalInterceptors.setInterceptors(
     Arrays.asList(otModule.getClientTracingInterceptor()),
@@ -167,9 +167,10 @@ following benefits:
 3. Flexible API that allows clean and simple migration paths to a different propagator.
 
 This will allow gRPC to keep using `grpc-trace-bin` header for context
-propagation and also support other propagators. 
+propagation and also support other propagators. gRPC will expose a custom 
+`GrpcTraceBinPropagator` that implements `TextMapPropagator`. However, there is a caveat: 
 
-As of today, OpenTelemetry propagator API only supports `TextMapPropagator`, 
+Currently, OpenTelemetry propagator API only supports `TextMapPropagator`, 
 that is to send string key/value pairs between the client and server, which is 
 different from the binary header that gRPC currently uses. The future roadmap 
 to support binary propagators at OpenTelemetry is unclear. So, gRPC will use 
@@ -178,10 +179,7 @@ around the lack of binary propagator API to support `grpc-trace-bin`. In fact,
 TextMap propagator does not show visible performance impact for C++, which is 
 the most sensitive language to performance, based on internal micro benchmarking. 
 Therefore, gRPC will only support propagating `grpc-trace-bin` in TextMap propagator.
-
-gRPC will expose a custom `GrpcTraceBinPropagator` that implements `TextMapPropagator`.
-This grpc-provided propagator still uses the `grpc-trace-bin` header for context 
-propagation. A `grpc-trace-bin` formatter implementation for OpenTelemetry is 
+A `grpc-trace-bin` formatter implementation for OpenTelemetry is 
 needed in each language, which can be similar to the OpenCensus implementation. 
 Go already has community support for that.
 
@@ -318,7 +316,7 @@ example, providing an explicit knob on `GrpcTraceBinTextMapPropagator` that
 assumes that this propagator is being used with gRPC and can hence skirt `TextMapPropagator` compatibility requirements.
 
 ```C++
-std::unique_ptr<opentelemetry::context::TextMapCarrier>
+std::unique_ptr<opentelemetry::context::TextMapPropagator>
 MakeGrpcTraceBinTextMapPropagator();
 ```
 
@@ -419,7 +417,7 @@ class GrpcTextMapCarrier : public opentelemetry::context::TextMapCarrier {
 
 }  // namespace internal
 
-std::unique_ptr<opentelemetry::context::TextMapCarrier>
+std::unique_ptr<opentelemetry::context::TextMapPropagator>
 MakeGrpcTraceBinTextMapPropagator() {
   return std::make_unique<internal::GrpcTraceBinTextMapPropagator>();
 }
@@ -430,33 +428,9 @@ MakeGrpcTraceBinTextMapPropagator() {
 
 
 ## Migrate from OpenCensus to OpenTelemetry
-### Tracing Information
-gRPC is generating similar tracing information for OpenTelemetry compared with OpenCensus, 
-but due to API differences between those two libraries, the
-trace information is represented slightly differently.
-In the new OpenTelemetry plugin, the client will add `Event`s (name:
-`Outbound message sent` and `Inbound message read`) with corresponding attributes,
-mapped from OpenCensus `MessageEvent` fields:
-
-| OpenCensus Trace Message Event Fields | OpenTelemetry Trace Event Attribute Key |
-|---------------------------------------|-----------------------------------------|
-| Type                                  | `message.event.type`                    |
-| Message Id                            | `message.message.id`                    |
-| Uncompressed message size             | `message.event.size.uncompressed`       |
-| Compressed message size               | `message.event.size.compressed`         |
-
-OpenCensus span annotation description maps to OpenTelemetry event name, and
-annotation attributes keys are mapped to event attributes keys:
-
-| OpenCensus Trace Annotation Attribute Key | OpenTelemetry Trace Event Attribute Key |
-|-------------------------------------------|-----------------------------------------|
-| `type`                                    | `message.event.type`                    |
-| `id`                                      | `message.message.id`                    |
-
-And OpenTelemetry no longer has span end options as OpenCensus does.
 
 ### gRPC Census API
-The gRPC OpenCensus tracing APIs in grpc-census plugin are different between
+The existing gRPC OpenCensus tracing APIs in grpc-census plugin are different between
 languages, e.g. in grpc-java it is zero-configuration: as long as the grpc-census
 dependency exists in the classpath, the traces are automatically generated.
 In C++, there is an API for users to call to enable tracing. In Go, it is exposed via stream tracers.
@@ -532,6 +506,31 @@ Finally, they switch to grpc-open-telemetry and finish the migration.
 |--  gRPC -> Using Otel to generate Trace A  ----------------------------- |
 |--  Application -> Using Otel to generate a sub Trace B------------------ |
 ```
+### Tracing Information
+gRPC is generating similar tracing information for OpenTelemetry compared with OpenCensus,
+but due to API differences between those two libraries, the
+trace information is represented slightly differently.
+In the new OpenTelemetry plugin, the client will add `Event`s (name:
+`Outbound message sent` and `Inbound message read`) with corresponding attributes,
+mapped from OpenCensus `MessageEvent` fields:
+
+| OpenCensus Trace Message Event Fields | OpenTelemetry Trace Event Attribute Key |
+|---------------------------------------|-----------------------------------------|
+| Type                                  | `message.event.type`                    |
+| Message Id                            | `message.message.id`                    |
+| Uncompressed message size             | `message.event.size.uncompressed`       |
+| Compressed message size               | `message.event.size.compressed`         |
+
+OpenCensus span annotation description maps to OpenTelemetry event name, and
+annotation attributes keys are mapped to event attributes keys:
+
+| OpenCensus Trace Annotation Attribute Key | OpenTelemetry Trace Event Attribute Key |
+|-------------------------------------------|-----------------------------------------|
+| `type`                                    | `message.event.type`                    |
+| `id`                                      | `message.message.id`                    |
+
+And OpenTelemetry no longer has span end options as OpenCensus does.
+
 
 ## Rationale
 C++ will not have the optimization path in its `GrpcTraceBinPropagator` API. We
