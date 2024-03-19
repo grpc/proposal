@@ -47,7 +47,7 @@ tracing instrumentation.
 ## Proposal
 ### gRPC OpenTelemetry Tracing API
 We will add tracing functions in grpc-open-telemetry plugin, along with OpenTelemetry
-metrics [gRPC A66][A66]. Languages will keep using gRPC infrastructures, e.g. interceptor and
+metrics [gRFC A66][A66]. Languages will keep using gRPC infrastructures, e.g. interceptor and
 stream tracer to implement the feature, the same as Census.
 
 The OpenTelemetry API will coexist with the OpenCensus API. Only one
@@ -60,10 +60,10 @@ underlying infrastructures.
 In Java, it will be part of global interceptors, so that the interceptors are
 managed in a more sustainable way and user-friendly. As a prerequisite, the stream
 tracer factory API will be stabilized. OpenTelemetryModule will be created with
-an OpenTelemetryAPI instance passing in for necessary configurations.
+an OpenTelemetry API instance passing in for necessary configurations.
 Users can also rely on SDK autoconfig extension that configures the sdk object
-through environmental variables or Java system properties, then obtain the sdk
-object passed in to gRPC.
+through environmental variables or Java system properties, then pass the 
+obtained sdk object to gRPC.
 
 ```Java
 // Construct OpenTelemetry to be passed to gRPC OpenTelemetry module for 
@@ -125,7 +125,7 @@ should be captured:
 At the client, on parent span:
 * When the call is started, annotate name resolution completed if the RPC had
   name resolution delay.
-* When the call is closed, end the parent span with RPC status.
+* When the call is closed, set RPC status and end the parent span.
 
 On attempt span:
 * When span is created, add attribute `previous-rpc-attempts` that captures the
@@ -142,7 +142,7 @@ On attempt span:
   events to capture seq no., type(Received), wire message size, and uncompressed
   message size if any decompression. The seq no. is a sequence of integer numbers
   starting from 0 to identify received messages within the stream.
-* When the stream is closed, end the attempt span with RPC status.
+* When the stream is closed, set RPC status and end the attempt span.
 
 At the server:
 * When an outbound message has been sent, add message events to capture seq no.,
@@ -150,7 +150,7 @@ At the server:
 * When an inbound message has been read from the transport, add message events
   to capture seq no., type(Received), wire message size, and uncompressed message size,
   if any decompression.
-* When the stream is closed, end the span with RPC status.
+* When the stream is closed, set the RPC status and end the span.
 
 Note that C++ is missing the seq no. information. And Java has issue of reporting
 decompressed message size upon receiving messages,
@@ -308,12 +308,13 @@ both binary headers and TextMap propagators.
 
 #### Context Propagation APIs in C++
 C++ will also support propagator APIs to provides API uniformity among
-languages. Since gRPC C++ avoids RTTI, it can not use the same optimization path
-as Java/Go. This will result in an extra base64 encoding/decoding step to
-satisfy `TextMapPropagator` requirement that the key/value pair be a valid HTTP
-field. There are possible optimizations C++ might pursue in the future, for
-example, providing an explicit knob on `GrpcTraceBinTextMapPropagator` that
-assumes that this propagator is being used with gRPC and can hence skirt `TextMapPropagator` compatibility requirements.
+languages. Since gRPC C++ avoids Run-time type information (RTTI), it can not 
+use the same optimization path as Java/Go. This will result in an extra base64 
+encoding/decoding step to satisfy `TextMapPropagator` requirement that the
+key/value pair be a valid HTTP field. There are possible optimizations C++ might
+pursue in the future, for example, providing an explicit knob on 
+`GrpcTraceBinTextMapPropagator` that assumes that this propagator is being used 
+with gRPC and can hence skirt `TextMapPropagator` compatibility requirements.
 
 ```C++
 std::unique_ptr<opentelemetry::context::TextMapPropagator>
@@ -338,8 +339,7 @@ class GrpcTraceBinTextMapPropagator
     }
     carrier.Set(
         "grpc-trace-bin",
-        // gRPC C++ does not have runtime type inspection, so we 
-        // encode bytes to String to comply with the TextMapSetter API. 
+        // gRPC C++ does not have RTTI, so we encode bytes to String to comply with the TextMapSetter API. 
         absl::Base64Escape(
             absl::string_view(SpanContextToGrpcTraceBinHeader(span_context))
                 .data()),
@@ -474,7 +474,7 @@ The OpenCensus [shim](https://github.com/open-telemetry/opentelemetry-java/tree/
 (currently available in Java, Go, Python) allows binaries that have a mix of 
 OpenTelemetry and OpenCensus dependencies to export trace spans from both 
 frameworks, and keep the correct parent-child relationship. This is the 
-recommended approach to migrate to OpenTelemetry in one binary gradually. 
+recommended approach to migrate to OpenTelemetry incrementally within a single binary. 
 Note that the in-binary migration and cross-process migration can be done in parallel.
 
 The shim package that bridges two libraries works as follows, considering the
@@ -528,8 +528,6 @@ annotation attributes keys are mapped to event attributes keys:
 |-------------------------------------------|-----------------------------------------|
 | `type`                                    | `message.event.type`                    |
 | `id`                                      | `message.message.id`                    |
-
-And OpenTelemetry no longer has span end options as OpenCensus does.
 
 
 ## Rationale
