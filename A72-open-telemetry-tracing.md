@@ -208,10 +208,8 @@ public class GrpcTraceBinPropagator implements TextMapPropagator {
       // the overloaded set(Metadata, String, byte[]) method added by gRPC.
       ((GrpcCommonSetter) setter).set((Metadata) carrier, "grpc-trace-bin", value);
     } else {
-      // Slow path for C++. gRPC C++ does not have runtime type inspection, so we 
-      // encode bytes to String to comply with the TextMapSetter API. This code 
-      // path is also used in the situation where GrpcTraceBinPropagator 
-      // is used with a TextMapSetter externally.
+      // Slow path. For the situation where GrpcTraceBinPropagator is used with
+      // a TextMapSetter externally.
       setter.set(carrier, "grpc-trace-bin", Base64.getEncoder().encodeToString(value));
     }
   }
@@ -222,9 +220,7 @@ public class GrpcTraceBinPropagator implements TextMapPropagator {
     if (textMapGetter instanceof GrpcCommonGetter) { //Fast path for Java/Go
       bytes = ((GrpcCommonGetter) textMapGetter).getBinary((Metadata) c, "grpc-trace-bin");
     } else {
-      // Slow path for C++. gRPC C++ does not have runtime type inspection, so 
-      // we decode String from TextMapGetter API to bytes. This code path applies 
-      // to the situation where GrpcTraceBinPropagator is used with a TextMapGetter
+      // Slow path. For the situation where GrpcTraceBinPropagator is used with a TextMapGetter
       // externally.
       String contextString = textMapGetter.get(c, "grpc-trace-bin");
       bytes = Base64.getDecoder().decode(contextString);
@@ -258,8 +254,8 @@ class GrpcCommonSetter implements TextMapSetter<Metadata>, GrpcBinarySetter<Meta
   @Override
   void set(Metadata header, String key, String value) {
     if (key.equals("grpc-trace-bin")) {
-      // Slower path in C++. It shows the decoding part of the just encoded 
-      // String at GrpcTraceBinPropagator.inject(). This can also be used to 
+      // Slower path. It shows the decoding part of the just encoded
+      // String at GrpcTraceBinPropagator.inject(). This can be used to
       // propagate any other binary header.
       header.put(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER), Base64.getDecoder().decode(value));
     } else if (key.endsWith("-bin")) {
@@ -275,7 +271,7 @@ class GrpcCommonGetter implements TextMapGetter<Metadata> {
   @Override
   public String get(@Nullable Metadata carrier, String key) {
     if (key.equals("grpc-trace-bin")) {
-      // Slow path for C++: return string encoded from bytes. Later we decode to 
+      // Slow path: return string encoded from bytes. Later we decode to
       // bytes in GrpcTraceBinPropagator.extract().
       byte[] value = carrier.get(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER));
       return Base64.getEncoder().encodeToString(value);
@@ -344,6 +340,8 @@ class GrpcTraceBinTextMapPropagator
     }
     carrier.Set(
         "grpc-trace-bin",
+        // gRPC C++ does not have runtime type inspection, so we 
+        // encode bytes to String to comply with the TextMapSetter API. 
         absl::Base64Escape(
             absl::string_view(SpanContextToGrpcTraceBinHeader(span_context))
                 .data()),
