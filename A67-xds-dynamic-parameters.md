@@ -4,7 +4,7 @@
 *   Approver: @markdroth
 *   Status: Draft
 *   Implemented in:
-*   Last updated: 2023-07-21
+*   Last updated: 2024-03-18
 *   Discussion at:
 
 ## Abstract
