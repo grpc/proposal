@@ -56,7 +56,7 @@ And two APIs for the backend server to record metrics:
 ### Wire Format
 
 Backend metric data will be encoded in the ORCA format for transmission on the wire. 
-Specifically, it will be transmitted as a binary-encoded [xds.data.orca.v3.LoadReport](https://github.com/cncf/xds/blob/eded343319d09f30032952beda9840bbd3dcf7ac/xds/data/orca/v3/orca_load_report.proto#L15) protobuf.
+Specifically, it will be transmitted as a binary-encoded [xds.data.orca.v3.LoadReport](https://github.com/cncf/xds/blob/0fa0005c9caaaae56e586ec2c6c26ef93704d29f/xds/data/orca/v3/orca_load_report.proto#L15) protobuf.
 
 ### Recorder APIs
 
