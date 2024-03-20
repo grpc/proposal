@@ -214,7 +214,7 @@ form the complete list of stats plugins for this channel.
 
 There is a known issue with this approach. There are certain components like
 XdsClient instances that are not 1:1 to the channel but instead to the channel's
-target. (As per [A71: xDS Fallback](A71-xds-fallback.md) multiple channels with
+target. (As per [A71: xDS Fallback](A71-xds-fallback.md), multiple channels with
 the same xDS target will use the same XdsClient instance.) If there are multiple
 xDS enabled channels to the same target (with potentially different stats
 plugins), the XdsClient will use the stats plugins provided by the first channel
