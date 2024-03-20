@@ -80,9 +80,10 @@ Instrument Descriptor -
     labels that stats plugins can choose to either record or throw away based on
     user configuration. This is useful in cases where certain labels might be
     deemed not useful for the majority of the cases, and hence shouldn't be
-    recorded by default. (OpenTelemetry allows users to create custom views that
-    can filter labels, but in the absence of custom views, the view takes the
-    entire set of labels provided by the instrumentation library.)
+    recorded by default. (OpenTelemetry allows users to create
+    [custom views](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view)
+    that can filter labels, but in the absence of custom views, the view takes
+    the entire set of labels provided by the instrumentation library.)
 
 On registering an instrument a `GlobalInstrumentHandle` is returned. The
 suggested implementation of this handle is an index that allows stats plugins to
@@ -198,9 +199,10 @@ implementations can choose one of two approaches.
 
 In the first approach, stats plugins provide a scope filter that applications
 can configure. Based on the channel's configuration, a stats plugin can decide
-whether it wants to record metrics for the channel. At channel creation time,
-the channel's target and the authority is provided to the stats plugin to make
-this decision.
+whether it is interested in the channel. At channel creation time, the channel's
+target and the authority is provided to the stats plugin to make this decision.
+Various gRPC components use this list of interested stats plugins
+(`StatsPluginGroup`) to record metrics.
 
 ![](A79_graphics/stats-plugin-scoping.png)
 
@@ -212,12 +214,12 @@ form the complete list of stats plugins for this channel.
 
 There is a known issue with this approach. There are certain components like
 XdsClient instances that are not 1:1 to the channel but instead to the channel's
-target. (As per [A71: xDS Fallback](A71-xds-fallback.md) Multiple channels with
+target. (As per [A71: xDS Fallback](A71-xds-fallback.md) multiple channels with
 the same xDS target will use the same XdsClient instance.) If there are multiple
 xDS enabled channels to the same target (with potentially different stats
 plugins), the XdsClient will use the stats plugins provided by the first channel
 created with that target while ignoring the stats plugins passed to the second
-client.
+channel.
 
 Implementations can also choose to implement both approaches.
 
@@ -310,8 +312,8 @@ as OpenTelemetry. The following additional guidelines apply -
 
 *   Metrics defined by gRPC should go under the `grpc.` namespace.
 *   Third-party plugins to gRPC should NOT use the `grpc.` namespace.
-*   Newer metrics should follow the same style as existing metrics. * Metrics
-    from load-balancing policies should be nested under `grpc.lb.`, e.g.
+*   Newer metrics should follow the same style as existing metrics.
+*   Metrics from load-balancing policies should be nested under `grpc.lb.`, e.g.
     `grpc.lb.pick_first.`.
 *   Metrics from resolvers should be nested under `grpc.resolver.`, e.g.
     `grpc.resolver.dns.`.
@@ -364,7 +366,8 @@ The following API will be added to `OpenTelemetryPluginBuilder` introduced in
 class OpenTelemetryPluginBuilder {
   using ChannelScope = grpc_core::StatsPlugin::ChannelScope;
   // Records \a optional_label_key on all metrics that provide it.
-  void AddOptionalLabel(absl::string_view optional_label_key);
+  OpenTelemetryPluginBuilderImpl& AddOptionalLabels(
+      absl::Span<const absl::string_view> optional_label_keys);
   // Set scope filter to choose which channels are recorded by this plugin.
   // Server-side recording remains unaffected.
   OpenTelemetryPluginBuilder& SetChannelScope(
@@ -402,8 +405,11 @@ on various interesting events. This approach has two major issues.
     from all possible gRPC components so that it can record metrics for those
     components. This would not work for third-party plugins. (Note that one
     major reason the `CallTracer` architecture was chosen for per-attempt/call
-    metrics was for legacy reasons. It was already implemented in various
-    languages for various stats plugins.)
+    metrics was that it allowed us to batch and report multiple metrics together
+    at the end of the call resulting in better performance compared to reporting
+    metrics separately. In the future, if the non-per-call metrics architecture
+    adds support for batching metrics, we would be able to use it for the
+    per-call metrics as well.)
 2.  The event data propagated along with the event call-out would need to be
     encoded in some extensible format (e.g. JSON) which would result in an
     encoding-decoding cost on every event.
