@@ -41,7 +41,6 @@ tracing instrumentation.
 ### Related Proposals and Documents:
 * [gRFC L29: C++ API Changes for OpenCensus Integration][L29]
 * [gRFC A45: Exposing OpenCensus Metrics and Tracing for gRPC retry][A45]
-* [Microservices observability overview][grpc-observability-public-doc]
 * [gRFC A66: OpenTelemetry Metrics][A66]
 
 ## Proposal
@@ -113,9 +112,47 @@ class OpenTelemetryPluginBuilder {
 ```
 
 #### Go
-In Go, the OpenTelemetry stream tracers and interceptors will be provided for users to install.
 
-TODO: add Go API.
+```go
+import (
+  "go.opentelemetry.io/otel/trace"
+)
+
+// TraceOptions are the trace options for OpenTelemetry instrumentation.
+type TraceOptions struct {
+  TraceProvider trace.TraceProvider
+}
+
+// DialOption returns a dial option which enables OpenCensus instrumentation
+// code for a grpc.ClientConn.
+//
+// Client applications interested in instrumenting their grpc.ClientConn should
+// pass the dial option returned from this function as a dial option to
+// grpc.Dial().
+//
+// Using this option will always lead to instrumentation, however in order to
+// use the data a SpanExporter must be registered with the TraceProvider in the
+// TraceOption. Client side has retries, so a Unary and Streaming Interceptor are
+// registered to handle per RPC traces, and a Stats Handler is registered to handle
+// per RPC attempt trace. These three components registered work together in
+// conjunction, and do not work standalone. It is not supported to use this
+// alongside another stats handler dial option.
+func DialOption(to TraceOptions) grpc.DialOption {}
+
+// ServerOption returns a server option which enables OpenTelemetry
+// instrumentation code for a grpc.Server.
+//
+// Server applications interested in instrumenting their grpc.Server should pass
+// the server option returned from this function as an argument to
+// grpc.NewServer().
+//
+// Using this option will always lead to instrumentation, however in order to
+// use the data a SpanExporter must be registered with the TraceProvider option.
+// Server side does not have retries, so a registered Stats Handler is the only
+// option that is returned. It is not supported to use this alongside another 
+// stats handler server option.
+func ServerOption(to TraceOptions) grpc.ServerOption {}
+```
 
 ### Tracing Information
 With the new OpenTelemetry plugin we will produce the same tracing information as we 
@@ -253,8 +290,7 @@ class GrpcCommonSetter implements TextMapSetter<Metadata>, GrpcBinarySetter<Meta
   void set(Metadata header, String key, String value) {
     if (key.equals("grpc-trace-bin")) {
       // Slower path. It shows the decoding part of the just encoded
-      // String at GrpcTraceBinPropagator.inject(). This can be used to
-      // propagate any other binary header.
+      // String at GrpcTraceBinPropagator.inject().
       header.put(Metadata.Key.of(key, BINARY_BYTE_MARSHALLER), Base64.getDecoder().decode(value));
     } else if (key.endsWith("-bin")) {
       logger.log(Level.ERROR, "Binary propagator other than GrpcTraceBinPropagator is not supported.");
@@ -554,5 +590,4 @@ Will be implemented in Java, C++, Go and Python.
 
 [L29]: L29-cpp-opencensus-filter.md
 [A45]: A45-retry-stats.md
-[grpc-observability-public-doc]: https://cloud.google.com/stackdriver/docs/solutions/grpc
 [A66]: A66-otel-stats.md
