@@ -83,7 +83,9 @@ Instrument Descriptor -
     recorded by default. (OpenTelemetry allows users to create
     [custom views](https://opentelemetry.io/docs/specs/otel/metrics/sdk/#view)
     that can filter labels, but in the absence of custom views, the view takes
-    the entire set of labels provided by the instrumentation library.)
+    the entire set of labels provided by the instrumentation library.) gRPC
+    reserves the right to add optional labels (including existing optional
+    labels) to existing metrics.
 
 On registering an instrument a `GlobalInstrumentHandle` is returned. The
 suggested implementation of this handle is an index that allows stats plugins to
@@ -365,7 +367,8 @@ The following API will be added to `OpenTelemetryPluginBuilder` introduced in
 ```c++
 class OpenTelemetryPluginBuilder {
   using ChannelScope = grpc_core::StatsPlugin::ChannelScope;
-  // Records \a optional_label_key on all metrics that provide it.
+  // Adds all entries in \a optional_label_keys to the set of optional labels
+  // recorded across all metrics.
   OpenTelemetryPluginBuilderImpl& AddOptionalLabels(
       absl::Span<const absl::string_view> optional_label_keys);
   // Set scope filter to choose which channels are recorded by this plugin.
