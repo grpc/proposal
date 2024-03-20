@@ -213,16 +213,17 @@ GRPCAPI void grpc_tls_credentials_options_watch_identity_key_cert_pairs(
 /** ------------------------------------ Provider ------------------------------------ */
 
 /* Factory function for file-watcher provider (implemented inside core). */
-grpc_tls_certificate_provider* grpc_tls_certificate_provider_file_watcher_create(const char* private_key_file_name, const char* identity_certificate_file_name, const char* root_certificate_file_name);
+GRPCAPI grpc_tls_certificate_provider*
+grpc_tls_certificate_provider_file_watcher_create(
+    const char* private_key_path, const char* identity_certificate_path,
+    const char* root_cert_path, unsigned int refresh_interval_sec);
+
 /* Factory function for static file provider (implemented inside core). */
-grpc_tls_certificate_provider* grpc_tls_certificate_provider_file_static_create(const char* private_key_file_name, const char* identity_certificate_file_name, const char* root_certificate_file_name);
+GRPCAPI grpc_tls_certificate_provider*
+grpc_tls_certificate_provider_static_data_create(
+    const char* root_certificate, grpc_tls_identity_pairs* pem_key_cert_pairs);
 
-/* API for creating external provider. */
-struct grpc_tls_certificate_provider_external {
-  grpc_tls_certificate_distributor* (*get_distributor)(grpc_tls_certificate_provider_external*);
-  void (*destroy)(grpc_tls_certificate_provider_external*);
-};
-
+// TODO(gtcooke94) Approach to distributor, it's not currently exposed, none of these APIs exist publicly. None of this is how it got implemented. There is also no `ExternalCertificateProvider`.
 /** ------------------------------------ Distributor ------------------------------------ */
 /* Creates a TLS certificate distributor object. This object is ref-counted. */
 GRPCAPI grpc_tls_certificate_distributor* grpc_tls_certificate_distributor_create();
