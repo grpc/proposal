@@ -4,13 +4,14 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-03-13
+* Last updated: 2024-03-21
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
 
 ## Abstract
 
 This document proposes some new metrics that will be added in gRPC for the
 Weighted Round Robin (WRR) and Pick First LB policies and for the XdsClient.
+It also adds a new optional label for the existing per-call metrics.
 
 ## Background
 
@@ -42,18 +43,30 @@ metrics added using that new non-per-call metric framework.
 
 This document proposes changes to the following gRPC components.
 
-### Weighted Target LB Policy
+### Optional xDS Locality Label
 
-When xDS is used, it is desirable for LB policies to export metrics that
-include a label indicating which xDS locality the metrics are associated
-with.  In particular, we want to provide this optional label for the
-metrics in the WRR LB policy, described below.
+When xDS is used, it is desirable for some metrics to include an optional
+label label indicating which xDS locality the metrics are associated
+with.  We want to provide this optional label for the metrics in both
+the existing per-call metrics defined in [A66] and in the new metrics
+for the WRR LB policy, described below.
 
-To support this, we will extend the `weighted_target` LB policy (see
-[A28]) to define a resolver attribute that indicates the name of its
-child.  This attribute will be passed down to each of its children with
-the appropriate value, so that any LB policy that sits underneath the
-`weighted_target` policy will be able to use it.
+#### Per-Call Metrics
+
+To support the locality label in the per-call metrics, we will do the
+provide a mechanism for LB picker to add optional labels to the call
+attempt tracer.  We will then use this mechanism in the `xds_cluster_impl`
+policy's picker to set the locality label.  It will get the locality
+label from the wrapped subchannel that it is already creating for load
+reporting purposes, when that subchannel is returned by the child picker.
+
+#### Weighted Target LB Policy
+
+To support the locality label in the WRR metrics, we will extend the
+`weighted_target` LB policy (see [A28]) to define a resolver attribute
+that indicates the name of its child.  This attribute will be passed down
+to each of its children with the appropriate value, so that any LB policy
+that sits underneath the `weighted_target` policy will be able to use it.
 
 ### Weighted Round Robin LB Policy
 
@@ -71,10 +84,10 @@ The following metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.lb.wrr.rr_fallback | Counter | {update} | grpc.target, grpc.locality | Number of scheduler updates in which there were not enough endpoints with valid weight, which caused the WRR policy to fall back to RR behavior. |
-| grpc.lb.wrr.endpoint_weight_not_yet_usable | Counter | {endpoint} | grpc.target, grpc.locality | Number of endpoints from each scheduler update that don't yet have usable weight information (i.e., either the load report has not yet been received, or it is within the blackout period). |
-| grpc.lb.wrr.endpoint_weight_stale | Counter | {endpoint} | grpc.target, grpc.locality | Number of endpoints from each scheduler update whose latest weight is older than the expiration period. |
-| grpc.lb.wrr.endpoint_weights | Histogram | {weight} | grpc.target, grpc.locality | The histogram buckets will be endpoint weight ranges.  Each bucket will be a counter that is incremented once for every endpoint whose weight is within that range.  Note that endpoints without usable weights will have weight 0. |
+| grpc.lb.wrr.rr_fallback | Counter | {update} | grpc.target, grpc.lb.locality | Number of scheduler updates in which there were not enough endpoints with valid weight, which caused the WRR policy to fall back to RR behavior. |
+| grpc.lb.wrr.endpoint_weight_not_yet_usable | Counter | {endpoint} | grpc.target, grpc.lb.locality | Number of endpoints from each scheduler update that don't yet have usable weight information (i.e., either the load report has not yet been received, or it is within the blackout period). |
+| grpc.lb.wrr.endpoint_weight_stale | Counter | {endpoint} | grpc.target, grpc.lb.locality | Number of endpoints from each scheduler update whose latest weight is older than the expiration period. |
+| grpc.lb.wrr.endpoint_weights | Histogram | {weight} | grpc.target, grpc.lb.locality | The histogram buckets will be endpoint weight ranges.  Each bucket will be a counter that is incremented once for every endpoint whose weight is within that range.  Note that endpoints without usable weights will have weight 0. |
 
 ### Pick First LB Policy
 
