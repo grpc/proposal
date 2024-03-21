@@ -58,12 +58,12 @@ by encoding them in metadata, for the following benefits:
 
 In order for the propagator to perform injecting and extracting spanContext value 
 from the carrier, which is the Metadata in gRPC, languages will 
-implement Getter and Setter corresponding to the propagator.
+implement Getter and Setter corresponding to the propagator type.
 Currently, OpenTelemetry propagator API only supports `TextMapPropagator`,
 that is to send string key/value pairs between the client and server.
-Therefore, to implement Getter and Setter is to implement the TextMap carrier interface: 
-`TextMapCarrier` (For C++/Go), or `TextMapGetter`/`TextMapSetter` (For Java), see
-pseudocode in later sections.
+Therefore, adding Getter and Setter is to implement the TextMap carrier interface: 
+`TextMapCarrier` (For C++/Go), or `TextMapGetter`/`TextMapSetter` (For Java). (see
+pseudocode in section [Migrate to OpenTelemetry](#migrate-to-opentelemetry--cross-process-networking-concerns)).
 
  The APIs to enable and configure OpenTelemetry tracing are different among 
  languages due to different underlying infrastructures.
@@ -194,7 +194,9 @@ At the client, on parent span:
 * If the RPC experienced name resolution delay, add an Event at the start of the
   call with the name "Delayed name resolution complete" upon completion of the
   name resolution process.
-* When the call is closed, set RPC status and end the parent span.
+* When the call is closed, set RPC status and end the parent span. gRPC status "OK" 
+  is recorded with status "OK", while other gRPC statuses are marked as "ERROR". 
+  Non-"OK" statuses include their code as a description, the same below.
 
 On attempt span:
 * When span is created, set the attribute with key `previous-rpc-attempts` and an 
@@ -204,42 +206,40 @@ On attempt span:
 * If the RPC experienced load balancer pick delay, add an Event with the name 
   "Delayed LB pick complete" upon creation of the stream on the transport. 
 * When the application sends an outbound message to the transport, add an Event 
-  with the following attributes:
-  * key `message.event.type` with String value "SENT"
-  * key `message.message.id` with integer value seq no. The seq no. is a sequence
-    of integer numbers starting from 0 to identify sent messages within the stream
+  with name "Outbound message sent" and the following attributes:
+  * key `message.event.type` with string value "SENT".
+  * key `message.message.id` with integer value of the seq no. The seq no. is a sequence
+    of integer numbers starting from 0 to identify sent messages within the stream, the same below.
   * key `message.event.size.uncompressed` with integer value of uncompressed 
     message size. The size is the total attempt message bytes without encryption,
-    not including grpc or transport framing bytes.
+    not including grpc or transport framing bytes, the same below.
   * If any compression, key `message.event.size.compressed` with integer value
     of compressed message size.
 * When an inbound message has been received from the transport, add an Event
-  with the following attributes:
-  * key `message.event.type` with String value "RECEIVED"
-  * key `message.message.id` with integer value seq no.
-  * key `message.event.size.uncompressed` with integer value of wire message. 
-  * If any compression, key `message.event.size.compressed` with integer value
-    of compressed message size.
+  with name "Inbound message read" and the following attributes:
+  * key `message.event.type` with String value "RECEIVED".
+  * key `message.message.id` with integer value of the seq no.
+  * key `message.event.size.compressed` with integer value of wire message size. 
+  * If any compression, key `message.event.size.uncompressed` with integer value
+    of uncompressed message size.
 * When the stream is closed, set RPC status and end the attempt span.
 
 At the server:
 * When the application sends an outbound message to the transport, add an Event
-  with the following attributes:
-  * key `message.event.type` with String value "SENT"
-  * key `message.message.id` with integer value seq no. The seq no. is a sequence
-    of integer numbers starting from 0 to identify sent messages within the stream
+  with name "Outbound message sent" and the following attributes:
+  * key `message.event.type` with string value "SENT".
+  * key `message.message.id` with integer value of the seq no.
   * key `message.event.size.uncompressed` with integer value of uncompressed
-    message size. The size is the total attempt message bytes without encryption,
-    not including grpc or transport framing bytes.
+    message size.
   * If any compression, key `message.event.size.compressed` with integer value
     of compressed message size.
 * When an inbound message has been read from the transport, add an Event
-  with the following attributes:
-  * key `message.event.type` with String value "RECEIVED"
-  * key `message.message.id` with integer value seq no.
-  * key `message.event.size.compressed` with integer value of wire message.
-  * If any decompression, key `message.event.size.uncompressed` with integer value
-    of compressed message size.
+  with name "Inbound message read" and the following attributes:
+  * key `message.event.type` with string value "RECEIVED".
+  * key `message.message.id` with integer value of the seq no.
+  * key `message.event.size.compressed` with integer value of wire message size.
+  * If any compression, key `message.event.size.uncompressed` with integer value
+    of uncompressed message size.
 * When the stream is closed, set the RPC status and end the span.
 
 ### Limitations
@@ -248,12 +248,12 @@ While it's not critical, we can include these information if users request it in
 
 Java has an issue of reporting decompressed message size upon receiving messages,
 as a workaround, on the client parent span and server span:
-* When the uncompressed size of some outbound data is revealed, add an Event
-  with the following attributes:
-  * key `message.event.type` with String value "RECEIVED"
-  * key `message.message.id` with integer value seq no.
+* When the uncompressed size of some inbound data is revealed, add an Event
+  with name "Inbound message read" and the following attributes:
+  * key `message.event.type` with string value "RECEIVED".
+  * key `message.message.id` with integer value of the seq no.
   * key `message.event.size.uncompressed` with integer value
-    of uncompressed message size
+    of uncompressed message size.
 
 ## Migrate from OpenCensus to OpenTelemetry
 
@@ -278,10 +278,11 @@ Here are the suggested solutions for both use cases.
 
 ### Migrate to OpenTelemetry: Cross-process Networking Concerns
 When users first introduce gRPC OpenTelemetry, for the time window when the
-gRPC client and server have mixed plugins of OpenTelemetry and OpenCensus. 
-To tackle this, gRPC will expose a custom `GrpcTraceBinPropagator` that implements 
-`TextMapPropagator`. This will allow gRPC to keep using `grpc-trace-bin` header 
-for context propagation and also support other propagators.
+gRPC client and server have mixed plugins of OpenTelemetry and OpenCensus, 
+spanContext can not directly propagate due to different header name and wire format. 
+To tackle this, gRPC will expose a custom `GrpcTraceBinPropagator` 
+that implements `TextMapPropagator`. This will allow gRPC to keep using `grpc-trace-bin` 
+header for context propagation and also support other propagators.
 When using `grpc-trace-bin` the OpenCensus spanContext and OpenTelemetry spanContext 
 are identical, therefore a gRPC OpenCensus client can speak with a gRPC OpenTelemetry 
 server and vice versa. It is encouraged to use `GrpcTraceBinPropagator` for the migration. 
@@ -303,13 +304,7 @@ A `grpc-trace-bin` formatter implementation for OpenTelemetry is
 needed in each language, which can be similar to the OpenCensus implementation.
 Go already has community support for that.
 
-Users can provide a single composite propagator that combines one or multiple `TextMapPropagator`
-for their client and server separately. This way, users can define their own
-migration path for context propagators in distributed components, see detailed
-discussion later. Configuring gRPC OpenTelemetry with this
-propagator when dealing with cross-process concerns during migration is
-straightforward and recommended. In the long term, community
-standardized propagators, e.g. W3C is more encouraged than `GrpcTraceBinPropagator`.
+
 
 #### GrpcTraceBinPropagator and TextMapGetter/Setter in Java/Go
 The pseudocode below demonstrates `GrpcTraceBinPropagator` and the corresponding
@@ -545,13 +540,16 @@ MakeGrpcTraceBinTextMapPropagator() {
 
 ```
 
-After migration period, users have the flexibility to switch to other propagators.
-OpenTelemetry and its extension packages support multiple text map propagators. 
-The gRPC OpenTelemetry API allows specifying 
-multiple propagators: either public standard ones or custom propagators that 
-implement the OpenTelemetry propagator API interface. The API composites the 
-propagators and gRPC puts all the propagator data into the wire through metadata. 
-This allows users to easily migrate a group of applications with an old propagator to 
+With gRPC OpenTelemetry API, users can provide a single composite propagator that 
+combines one or multiple `TextMapPropagator` for their client and server separately.
+OpenTelemetry and its extension packages support multiple text map propagators.
+gRPC puts all the propagator data into the wire through metadata, and receives all the
+data specified from the propagator configuration.
+Users can define their own migration path for context propagators in distributed components.
+Configuring gRPC OpenTelemetry with this propagator when dealing with 
+cross-process concerns during migration is straightforward and recommended. 
+In the long term, community standardized propagators, e.g. W3C is more encouraged than `GrpcTraceBinPropagator`.
+This also allows users to easily migrate a group of applications with an old propagator to 
 a new propagator. An example migration path can be:
 1. Configure server to accept both old and new propagators.
 2. Configure the client with the desired new propagators and to drop the old propagator.
@@ -594,6 +592,7 @@ Finally, they switch to grpc-open-telemetry and finish the migration.
 |--  gRPC -> Using Otel to generate Trace A  ----------------------------- |
 |--  Application -> Using Otel to generate a sub Trace B------------------ |
 ```
+
 ### OpenCensus vs OpenTelemetry Tracing Information Mapping
 gRPC is generating similar tracing information for OpenTelemetry compared with OpenCensus,
 but due to API differences between those two libraries, the
@@ -604,10 +603,10 @@ mapped from OpenCensus `MessageEvent` fields:
 
 | OpenCensus Trace Message Event Fields | OpenTelemetry Trace Event Attribute Key |
 |---------------------------------------|-----------------------------------------|
-| Type                                  | `message.event.type`                    |
-| Message Id                            | `message.message.id`                    |
-| Uncompressed message size             | `message.event.size.uncompressed`       |
-| Compressed message size               | `message.event.size.compressed`         |
+| `Type`                                | `message.event.type`                    |
+| `Message Id`                          | `message.message.id`                    |
+| `Uncompressed message size`           | `message.event.size.uncompressed`       |
+| `Compressed message size`             | `message.event.size.compressed`         |
 
 OpenCensus span annotation description maps to OpenTelemetry event name, and
 annotation attributes keys are mapped to event attributes keys:
