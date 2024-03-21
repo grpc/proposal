@@ -9,7 +9,7 @@ A72: OpenTelemetry Tracing
 * Last updated: 2024-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/e_ByaRmtJak
 
-## Abstract
+# Abstract
 This proposal adds support for OpenTelemetry tracing and suggests migration
 paths away from OpenCensus tracing. Discussions include:
 * The API surface to enable and configure OpenTelemetry tracing.
@@ -21,7 +21,7 @@ paths away from OpenCensus tracing. Discussions include:
 
 Note that stats and logging are out of scope.
 
-## Background
+# Background
 This work aligns with the community consensus to switch to OpenTelemetry as the 
 next generation OpenCensus. The latter is no longer maintained after July 31, 2023.
 
@@ -43,19 +43,32 @@ tracing instrumentation.
 * [gRFC A45: Exposing OpenCensus Metrics and Tracing for gRPC retry][A45]
 * [gRFC A66: OpenTelemetry Metrics][A66]
 
-## Proposal
-### gRPC OpenTelemetry Tracing API
+# Proposal
+## gRPC OpenTelemetry Tracing API
 We will add tracing functions in grpc-open-telemetry plugin, along with OpenTelemetry
-metrics [gRFC A66][A66]. Languages will keep using gRPC infrastructures, e.g. interceptor and
-stream tracer to implement the feature, the same as Census.
+metrics [gRFC A66][A66]. Internally, the tracing functionality will be implemented
+using existing gRPC infrastructure such as interceptors and stream tracers.
 
-The OpenTelemetry API will coexist with the OpenCensus API. Only one
-`grpc-trace-bin` header will be sent for a single RPC as long as only one of
-OpenTelemetry or OpenCensus is enabled for the channel. The APIs to enable and
-configure OpenTelemetry tracing are different among languages due to different 
-underlying infrastructures.
+#### Propagator Wire Format
+gRPC OpenTelemetry will use the existing OpenTelemetry propagators API for context propagation
+by encoding them in metadata, for the following benefits:
+1. Full integration with OpenTelemetry APIs that is easier for users to reason about.
+2. Make it possible to plugin other propagators that the community supports.
+3. Flexible API that allows clean and simple migration paths to a different propagator.
 
-#### Java
+In order for the propagator to perform injecting and extracting spanContext value 
+from the carrier, which is the Metadata in gRPC, languages will 
+implement Getter and Setter corresponding to the propagator.
+Currently, OpenTelemetry propagator API only supports `TextMapPropagator`,
+that is to send string key/value pairs between the client and server.
+Therefore, to implement Getter and Setter is to implement the TextMap carrier interface: 
+`TextMapCarrier` (For C++/Go), or `TextMapGetter`/`TextMapSetter` (For Java), see
+pseudocode in later sections.
+
+ The APIs to enable and configure OpenTelemetry tracing are different among 
+ languages due to different underlying infrastructures.
+
+### Java
 In Java, it will be part of global interceptors, so that the interceptors are
 managed in a more sustainable way and user-friendly. As a prerequisite, the stream
 tracer factory API will be stabilized. OpenTelemetryModule will be created with
@@ -64,37 +77,53 @@ Users can also rely on SDK autoconfig extension that configures the sdk object
 through environmental variables or Java system properties, then pass the 
 obtained sdk object to gRPC.
 
+The following methods will be added to OpenTelemetryModule.
+
 ```Java
-// Construct OpenTelemetry to be passed to gRPC OpenTelemetry module for 
-// trace and metrics configurations.
-SdkTracerProvider sdkTracerProvider = SdkTracerProvider
-  .builder()
-  .addSpanProcessor(
-     BatchSpanProcessor.builder(exporter).build())
-  .build();
+// A module that hosts OpenTelemetry tracing/metrics infrastructures. Module 
+// implementation may change as OpenTelemetry evolves.
+public class OpenTelemetryModule {
+  /**
+   * OpenTelemetry instance is used to configure metrics and traces settings.
+   * Build a module by passing in an OpenTelemetry instance. Then get interceptor
+   * and ServerStreamTracerFactory from the module and install to the GlobalInterceptors. 
+   * 
+   * Sample:
+   * Construct a TraceProvider that will be used to provide traces during instrumentation.
+   *    
+   *    SdkTracerProvider sdkTracerProvider = SdkTracerProvider.builder()
+   *         .addSpanProcessor(
+   *             BatchSpanProcessor.builder(exporter).build())
+   *         .build();
+   *
+   * Construct OpenTelemetry to be passed to gRPC OpenTelemetry module for
+   * traces and metrics configurations.
+   * 
+   *    OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+   *         .setTracerProvider(sdkTracerProvider)
+   *         .setMeterProvider(...)
+   *         .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+   *         .build();
+   *    OpenTelemetryModule otModule = OpenTelemetryModule.newBuilder().sdk(openTelemetry).build();
+   * 
+   *     
+   * Add interceptors and StreamTracerFactory obtained from the module to GlobalInterceptors.    
+   * 
+   *    GlobalInterceptors.setInterceptors(
+   *      Arrays.asList(otModule.getClientTracingInterceptor()),
+   *      Arrays.asList(otModule.getServerTracerFactory()));        
+   */
+  
+  // Return the client interceptor to be installed by users to generate trace information.
+  public ClientInterceptor getClientTracingInterceptor();
 
-OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
-  .setTracerProvider(sdkTracerProvider)
-  .setMeterProvider(...)
-  .setPropagators(
-     ContextPropagators.create(GrpcTraceBinPropagator.getInstance()))
-  .build();
-
-// Alternatively, use auto configuration:
-// OpenTelemetry openTelemetry = 
-// AutoConfiguredOpenTelemetrySdk.getOpenTelemetrySdk().
-
-// Create a module that hosts tracing infrastructures. Should document that 
-// the module implementation may change as OpenTelemetry evolves.
-OpenTelemetryModule otModule = OpenTelemetryModule.newBuilder().sdk(openTelemetry).build();
-
-GlobalInterceptors.setInterceptors(
-    Arrays.asList(otModule.getClientTracingInterceptor()),
-    Arrays.asList(otModule.getServerTracerFactory()));
+  // Return the ServerStreamTracerFactory to be installed by users to generate trace information.
+  public ServerStreamTracerFactory getServerTracerFactory();
+}
 
 ```
 
-#### C++
+### C++
 The following new methods will be added in `OpenTelemetryPluginBuilder`.
 
 ```C++
@@ -104,15 +133,15 @@ class OpenTelemetryPluginBuilder {
   OpenTelemetryPluginBuilder& SetTracerProvider(
       std::shared_ptr<opentelemetry::metrics::TracerProvider> tracer_provider);
   // Set one or multiple text map propagators for span context propagation, e.g.
-  // GrpcTraceBinTextMapPropagator or community standard ones like W3C, etc.
+  // the community standard ones like W3C, etc.
   OpenTelemetryPluginBuilder& SetTextMapPropagator(
       std::unique_ptr<opentelemetry::context::propagation::TextMapPropagator>
           text_map_propagator);
 };
 ```
 
-#### Go
-
+### Go
+The following methods will be added to the opentelemetry package.
 ```go
 import (
   "go.opentelemetry.io/otel/trace"
@@ -154,82 +183,136 @@ func DialOption(to TraceOptions) grpc.DialOption {}
 func ServerOption(to TraceOptions) grpc.ServerOption {}
 ```
 
-### Tracing Information
-With the new OpenTelemetry plugin we will produce the same tracing information as we 
-produce for Census. The following tracing information during an RPC lifecycle 
-should be captured:
+## Tracing Information
+RPCs on the client side may undergo retry attempts, whereas on the server side, 
+they do not. gRPC records both per-call tracing details (at the parent span) 
+and per-attempt tracing details (on the attempt span) on the client side. 
+On the server side, there is only per-call traces.  With the new OpenTelemetry 
+plugin we will produce the following tracing information during an RPC lifecycle:
 
 At the client, on parent span:
-* When the call is started, annotate name resolution completed if the RPC had
-  name resolution delay.
+* If the RPC experienced name resolution delay, add an Event at the start of the
+  call with the name "Delayed name resolution complete" upon completion of the
+  name resolution process.
 * When the call is closed, set RPC status and end the parent span.
 
 On attempt span:
-* When span is created, add attribute `previous-rpc-attempts` that captures the
-  number of preceding attempts for the RPC, and attribute `transparent-retry` that
-  shows whether stream is a transparent retry.
-* When the stream is created on transport, annotate delayed load balancer pick
-  complete, if any.
-* When an outbound message has been sent, add message events to capture seq no.,
-  type(SENT), uncompressed message size, and compressed message size if any
-  compression. The seq no. is a sequence of integer numbers starting from 0
-  to identify sent messages within the stream. The size is the total attempt message
-  bytes without encryption, not including grpc or transport framing bytes.
-* When an inbound message has been received from the transport, add message
-  events to capture seq no., type(Received), wire message size, and uncompressed
-  message size if any decompression. The seq no. is a sequence of integer numbers
-  starting from 0 to identify received messages within the stream.
+* When span is created, set the attribute with key `previous-rpc-attempts` and an 
+  integer value representing the count of previous attempts made for the RPC.
+* When span is created, set the attribute with key `transparent-retry` and a 
+  boolean value indicating whether the stream is undergoing a transparent retry.
+* If the RPC experienced load balancer pick delay, add an Event with the name 
+  "Delayed LB pick complete" upon creation of the stream on the transport. 
+* When the application sends an outbound message to the transport, add an Event 
+  with the following attributes:
+  * key `message.event.type` with String value "SENT"
+  * key `message.message.id` with integer value seq no. The seq no. is a sequence
+    of integer numbers starting from 0 to identify sent messages within the stream
+  * key `message.event.size.uncompressed` with integer value of uncompressed 
+    message size. The size is the total attempt message bytes without encryption,
+    not including grpc or transport framing bytes.
+  * If any compression, key `message.event.size.compressed` with integer value
+    of compressed message size.
+* When an inbound message has been received from the transport, add an Event
+  with the following attributes:
+  * key `message.event.type` with String value "RECEIVED"
+  * key `message.message.id` with integer value seq no.
+  * key `message.event.size.uncompressed` with integer value of wire message. 
+  * If any compression, key `message.event.size.compressed` with integer value
+    of compressed message size.
 * When the stream is closed, set RPC status and end the attempt span.
 
 At the server:
-* When an outbound message has been sent, add message events to capture seq no.,
-  type(SENT) and uncompressed message size, and compressed message size if any compression.
-* When an inbound message has been read from the transport, add message events
-  to capture seq no., type(Received), wire message size, and uncompressed message size,
-  if any decompression.
+* When the application sends an outbound message to the transport, add an Event
+  with the following attributes:
+  * key `message.event.type` with String value "SENT"
+  * key `message.message.id` with integer value seq no. The seq no. is a sequence
+    of integer numbers starting from 0 to identify sent messages within the stream
+  * key `message.event.size.uncompressed` with integer value of uncompressed
+    message size. The size is the total attempt message bytes without encryption,
+    not including grpc or transport framing bytes.
+  * If any compression, key `message.event.size.compressed` with integer value
+    of compressed message size.
+* When an inbound message has been read from the transport, add an Event
+  with the following attributes:
+  * key `message.event.type` with String value "RECEIVED"
+  * key `message.message.id` with integer value seq no.
+  * key `message.event.size.compressed` with integer value of wire message.
+  * If any decompression, key `message.event.size.uncompressed` with integer value
+    of compressed message size.
 * When the stream is closed, set the RPC status and end the span.
 
-Note that C++ is missing the seq no. information. And Java has issue of reporting
-decompressed message size upon receiving messages,
+### Limitations
+Note that C++ is missing the seq no. information due to lack of transport support.
+While it's not critical, we can include these information if users request it in the future.
+
+Java has an issue of reporting decompressed message size upon receiving messages,
 as a workaround, on the client parent span and server span:
-* When the uncompressed size of some outbound data is revealed, annotate seq no.,
-  type(Received) and uncompressed message size.
+* When the uncompressed size of some outbound data is revealed, add an Event
+  with the following attributes:
+  * key `message.event.type` with String value "RECEIVED"
+  * key `message.message.id` with integer value seq no.
+  * key `message.event.size.uncompressed` with integer value
+    of uncompressed message size
 
-### Propagator Wire Format
-While gRPC OpenCensus directly interacts with the metadata API, gRPC OpenTelemetry 
-will use the standardized propagators API for context propagation, for the 
-following benefits:
-1. Full integration with OpenTelemetry APIs that is easier for users to reason about.
-2. Make it possible to plugin other propagators that the community supports.
-3. Flexible API that allows clean and simple migration paths to a different propagator.
+## Migrate from OpenCensus to OpenTelemetry
 
-This will allow gRPC to keep using `grpc-trace-bin` header for context
-propagation and also support other propagators. gRPC will expose a custom 
-`GrpcTraceBinPropagator` that implements `TextMapPropagator`. However, there is a caveat: 
+### gRPC OpenCensus API
+The existing gRPC OpenCensus tracing APIs in grpc-census plugin are different between
+languages, e.g. in grpc-java it is zero-configuration: as long as the grpc-census
+dependency exists in the classpath, the traces are automatically generated.
+In C++, there is an API for users to call to enable tracing. In Go, it is exposed 
+via stream tracers. The OpenTelemetry API will coexist with the OpenCensus API.
+We keep the grpc-census plugin to allow users who already depend on grpc-census to
+continue using it for newer grpc versions.
 
-Currently, OpenTelemetry propagator API only supports `TextMapPropagator`, 
-that is to send string key/value pairs between the client and server, which is 
-different from the binary header that gRPC currently uses. The future roadmap 
-to support binary propagators at OpenTelemetry is unclear. So, gRPC will use 
-propagator API in TextMap format with an optimization path (Go and Java) to work 
+gRPC users depending on the grpc-census plugin have non-trivial migration paths
+to OpenTelemetry. Consider the following use cases:
+1. Compatibility between a gRPC client and server as two distributed components,
+where during migration one will use OpenCensus and the other will use OpenTelemetry. 
+2. Migrate an application binary where both OpenCensus and OpenTelemetry maybe exist
+   in the dependency tree. This can be the application’s own tracing code, or gRPC
+   OpenCensus, or other dependencies that involve OpenCensus and/or OpenTelemetry.
+
+Here are the suggested solutions for both use cases. 
+
+### Migrate to OpenTelemetry: Cross-process Networking Concerns
+When users first introduce gRPC OpenTelemetry, for the time window when the
+gRPC client and server have mixed plugins of OpenTelemetry and OpenCensus. 
+To tackle this, gRPC will expose a custom `GrpcTraceBinPropagator` that implements 
+`TextMapPropagator`. This will allow gRPC to keep using `grpc-trace-bin` header 
+for context propagation and also support other propagators.
+When using `grpc-trace-bin` the OpenCensus spanContext and OpenTelemetry spanContext 
+are identical, therefore a gRPC OpenCensus client can speak with a gRPC OpenTelemetry 
+server and vice versa. It is encouraged to use `GrpcTraceBinPropagator` for the migration. 
+Using the same header greatly simplifies rollout. However, there is a caveat about 
+`GrpcTraceBinPropagator`:
+
+Currently, OpenTelemetry propagator API only supports `TextMapPropagator`,
+that is to send string key/value pairs between the client and server, which is
+different from the binary header that gRPC currently uses. The future roadmap
+to support binary propagators at OpenTelemetry is unclear. So, gRPC will use
+propagator API in TextMap format with an optimization path (Go and Java) to work
 around the lack of binary propagator API to support `grpc-trace-bin`. In fact,
-TextMap propagator does not show visible performance impact for C++, which is 
-the most sensitive language to performance, based on internal micro benchmarking. 
+TextMap propagator does not show visible performance impact for C++, which is
+the most sensitive language to performance, based on internal micro benchmarking.
 Therefore, gRPC will only support propagating `grpc-trace-bin` in TextMap propagator.
-A `grpc-trace-bin` formatter implementation for OpenTelemetry is 
-needed in each language, which can be similar to the OpenCensus implementation. 
+Only one `grpc-trace-bin` header will be sent for a single RPC as long as only one of
+OpenTelemetry or OpenCensus is enabled for the channel.
+A `grpc-trace-bin` formatter implementation for OpenTelemetry is
+needed in each language, which can be similar to the OpenCensus implementation.
 Go already has community support for that.
 
-Users can provide a single composite propagator that combines one or multiple `TextMapPropagator` 
-for their client and server separately. This way, users can define their own 
+Users can provide a single composite propagator that combines one or multiple `TextMapPropagator`
+for their client and server separately. This way, users can define their own
 migration path for context propagators in distributed components, see detailed
-discussion in the later session. Configuring gRPC OpenTelemetry with this 
+discussion later. Configuring gRPC OpenTelemetry with this
 propagator when dealing with cross-process concerns during migration is
 straightforward and recommended. In the long term, community
-standardized propagators, e.g. W3C is more encouraged than `GrpcTraceBinPropagator`. 
+standardized propagators, e.g. W3C is more encouraged than `GrpcTraceBinPropagator`.
 
-####  Propagator API in Java/Go
-The pseudocode below demonstrates `GrpcTraceBinPropagator` and the corresponding 
+#### GrpcTraceBinPropagator and TextMapGetter/Setter in Java/Go
+The pseudocode below demonstrates `GrpcTraceBinPropagator` and the corresponding
 gRPC Getter/Setter with an optimization path.
 
 ```Java
@@ -267,7 +350,7 @@ public class GrpcTraceBinPropagator implements TextMapPropagator {
 
 ```
 
-The `GrpcTraceBinPropagator` should be compatible with any Getter/Setter, but 
+The `GrpcTraceBinPropagator` should be compatible with any Getter/Setter, but
 internally in gRPC, in Java and Go we implement a special gRPC Getter/Setter
 that uses an optimization path to work around the lack of binary propagator API
 and thus avoid base64 (de)encoding when passing data between API interfaces.
@@ -334,22 +417,22 @@ private interface GrpcBinarySetter<Metadata> {
 
 ```
 
-The `GrpcCommonSetter` adds an overloaded `set()` method to directly take `byte[]` 
-(Java and Go) to avoid extra base64 encoding. For the normal `set()` method it 
-should handle both binary (`-bin`) header and ASCII header from any TextMap 
+The `GrpcCommonSetter` adds an overloaded `set()` method to directly take `byte[]`
+(Java and Go) to avoid extra base64 encoding. For the normal `set()` method it
+should handle both binary (`-bin`) header and ASCII header from any TextMap
 propagators that users may configure.
-The `GrpcCommonGetter` in Java and Go adds a new method `getBinary()` for the 
+The `GrpcCommonGetter` in Java and Go adds a new method `getBinary()` for the
 optimized path for the same reason. Similarly, the normal `get()` method handles
 both binary headers and TextMap propagators.
 
-#### Context Propagation APIs in C++
+#### GrpcTraceBinPropagator and TextMapCarrier in C++
 C++ will also support propagator APIs to provides API uniformity among
-languages. Since gRPC C++ avoids Run-time type information (RTTI), it can not 
-use the same optimization path as Java/Go. This will result in an extra base64 
+languages. Since gRPC C++ avoids Run-time type information (RTTI), it can not
+use the same optimization path as Java/Go. This will result in an extra base64
 encoding/decoding step to satisfy `TextMapPropagator` requirement that the
 key/value pair be a valid HTTP field. There are possible optimizations C++ might
-pursue in the future, for example, providing an explicit knob on 
-`GrpcTraceBinTextMapPropagator` that assumes that this propagator is being used 
+pursue in the future, for example, providing an explicit knob on
+`GrpcTraceBinTextMapPropagator` that assumes that this propagator is being used
 with gRPC and can hence skirt `TextMapPropagator` compatibility requirements.
 
 ```C++
@@ -462,37 +545,6 @@ MakeGrpcTraceBinTextMapPropagator() {
 
 ```
 
-
-## Migrate from OpenCensus to OpenTelemetry
-
-### gRPC Census API
-The existing gRPC OpenCensus tracing APIs in grpc-census plugin are different between
-languages, e.g. in grpc-java it is zero-configuration: as long as the grpc-census
-dependency exists in the classpath, the traces are automatically generated.
-In C++, there is an API for users to call to enable tracing. In Go, it is exposed via stream tracers.
-We keep the grpc-census plugin to allow users who already depend on grpc-census to
-continue using it for newer grpc versions.
-
-gRPC users depending on the grpc-census plugin have non-trivial migration paths
-to OpenTelemetry. Consider the following use cases:
-1. Compatibility between a gRPC client and server as two distributed components,
-where during migration one will use OpenCensus and the other will use OpenTelemetry. 
-2. Migrate an application binary where both OpenCensus and OpenTelemetry maybe exist
-   in the dependency tree. This can be the application’s own tracing code, or gRPC
-   OpenCensus, or other dependencies that involve OpenCensus and/or OpenTelemetry.
-
-Here are the suggested solutions for both use cases. 
-
-### Migrate to OpenTelemetry: Cross-process Networking Concerns
-When users first introduce gRPC OpenTelemetry, for the time window when the
-gRPC client and server have mixed plugins of OpenTelemetry and OpenCensus, 
-it is encouraged to use `GrpcTraceBinPropagator`, as described in the previous section,
-that propagates `grpc-trace-bin` header for the migration.
-When using `grpc-trace-bin` the OpenCensus spanContext and
-OpenTelemetry spanContext are identical, therefore a gRPC OpenCensus client can
-speak with a gRPC OpenTelemetry server and vice versa. Using the same header 
-greatly simplifies rollout.
-
 After migration period, users have the flexibility to switch to other propagators.
 OpenTelemetry and its extension packages support multiple text map propagators. 
 The gRPC OpenTelemetry API allows specifying 
@@ -542,7 +594,7 @@ Finally, they switch to grpc-open-telemetry and finish the migration.
 |--  gRPC -> Using Otel to generate Trace A  ----------------------------- |
 |--  Application -> Using Otel to generate a sub Trace B------------------ |
 ```
-### Tracing Information
+### OpenCensus vs OpenTelemetry Tracing Information Mapping
 gRPC is generating similar tracing information for OpenTelemetry compared with OpenCensus,
 but due to API differences between those two libraries, the
 trace information is represented slightly differently.
@@ -564,7 +616,6 @@ annotation attributes keys are mapped to event attributes keys:
 |-------------------------------------------|-----------------------------------------|
 | `type`                                    | `message.event.type`                    |
 | `id`                                      | `message.message.id`                    |
-
 
 ## Rationale
 C++ will not have the optimization path in its `GrpcTraceBinPropagator` API. We
