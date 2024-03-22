@@ -87,7 +87,7 @@ Instrument Descriptor -
     reserves the right to add optional labels (including existing optional
     labels) to existing metrics.
 
-On registering an instrument a `GlobalInstrumentHandle` is returned. The
+On registering an instrument, a `GlobalInstrumentHandle` is returned. The
 suggested implementation of this handle is an index that allows stats plugins to
 quickly look up the corresponding instrument when a measurement is being
 recorded.
