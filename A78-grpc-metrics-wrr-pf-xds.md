@@ -4,7 +4,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-03-21
+* Last updated: 2024-03-22
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
 
 ## Abstract
@@ -46,16 +46,16 @@ This document proposes changes to the following gRPC components.
 ### Optional xDS Locality Label
 
 When xDS is used, it is desirable for some metrics to include an optional
-label label indicating which xDS locality the metrics are associated
-with.  We want to provide this optional label for the metrics in both
-the existing per-call metrics defined in [A66] and in the new metrics
-for the WRR LB policy, described below.
+label indicating which xDS locality the metrics are associated with.
+We want to provide this optional label for the metrics in both the
+existing per-call metrics defined in [A66] and in the new metrics for
+the WRR LB policy, described below.
 
 #### Per-Call Metrics
 
-To support the locality label in the per-call metrics, we will do the
-provide a mechanism for LB picker to add optional labels to the call
-attempt tracer.  We will then use this mechanism in the `xds_cluster_impl`
+To support the locality label in the per-call metrics, we will provide
+a mechanism for LB picker to add optional labels to the call attempt
+tracer.  We will then use this mechanism in the `xds_cluster_impl`
 policy's picker to set the locality label.  It will get the locality
 label from the wrapped subchannel that it is already creating for load
 reporting purposes, when that subchannel is returned by the child picker.
@@ -78,7 +78,7 @@ WRR metrics will have the following labels:
 | Name        | Disposition | Description |
 | ----------- | ----------- | ----------- |
 | grpc.target | required | Indicates the target of the gRPC channel in which WRR is used.  (Same as the attribute defined in [A66].) |
-| grpc.lb.locality | optional | The locality to which the traffic is being sent. This will be based on the resolver attribute passed down from the `weighted_target` policy. |
+| grpc.lb.locality | optional | The locality to which the traffic is being sent. This will be set to the resolver attribute passed down from the `weighted_target` policy, or the empty string if the resolver attribute is unset. |
 
 The following metrics will be exported:
 
@@ -120,7 +120,7 @@ XdsClient metrics will have the following labels:
 | Name        | Disposition | Description |
 | ----------- | ----------- | ----------- |
 | grpc.target | required | For clients, indicates the target of the gRPC channel in which the XdsClient is used (i.e., the same as the attribute defined in [A66]). For servers, will be the string "#server". |
-| grpc.xds.server | required | The name of the xDS server with which the XdsClient is communicating. |
+| grpc.xds.server | required | The target URI of the xDS server with which the XdsClient is communicating. |
 | grpc.xds.authority | required | The xDS authority.  The value will be "#old" for old-style non-xdstp resource names. |
 | grpc.xds.cache_state | required | Indicates the cache state of an xDS resource.  The value will be one of: <ul><li>"requested": The resource has been requested from the xDS server but has not yet been received.<li>"does_not_exist": The server has indicated that the resource does not exist.<li>"acked": The resource has been received and is valid.<li>"nacked": The resource was received but was not valid.<li>"nacked_but_cached": There is a version of the resource cached, but the most recent update of the resource was invalid.</ul> |
 | grpc.xds.resource_type | required | Indicates an xDS resource type, such as "envoy.config.listener.v3.Listener". |
