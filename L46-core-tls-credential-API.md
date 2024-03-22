@@ -4,7 +4,7 @@ L46: C-core: New TLS Credentials API
 * Approver: 
 * Status: Draft
 * Implemented in:
-* Last updated: March 13, 2024
+* Last updated: March 22, 2024
 
 ## Abstract
 
@@ -63,8 +63,6 @@ GRPCAPI void grpc_tls_credentials_options_set_cert_request_type(
     grpc_ssl_client_certificate_request_type type);
 
 /**
- * EXPERIMENTAL API - Subject to change
- *
  * Sets the options of whether to verify server certs on the client side.
  * Passing in a non-zero value indicates verifying the certs.
  */
@@ -72,8 +70,6 @@ GRPCAPI void grpc_tls_credentials_options_set_verify_server_cert(
     grpc_tls_credentials_options* options, int verify_server_cert);
 
 /**
- * EXPERIMENTAL API - Subject to change
- *
  * Sets whether or not a TLS server should send a list of CA names in the
  * ServerHello. This list of CA names is read from the server's trust bundle, so
  * that the client can use this list as a hint to know which certificate it
@@ -89,8 +85,6 @@ GRPCAPI void grpc_tls_credentials_options_set_send_client_ca_list(
     grpc_tls_credentials_options* options, bool send_client_ca_list);
 
 /**
- * EXPERIMENTAL API - Subject to change
- *
  * Sets the minimum TLS version that will be negotiated during the TLS
  * handshake. If not set, the underlying SSL library will set it to TLS v1.2.
  */
@@ -98,8 +92,6 @@ GRPCAPI void grpc_tls_credentials_options_set_min_tls_version(
     grpc_tls_credentials_options* options, grpc_tls_version min_tls_version);
 
 /**
- * EXPERIMENTAL API - Subject to change
- *
  * Sets the maximum TLS version that will be negotiated during the TLS
  * handshake. If not set, the underlying SSL library will set it to TLS v1.3.
  */
@@ -107,8 +99,6 @@ GRPCAPI void grpc_tls_credentials_options_set_max_tls_version(
     grpc_tls_credentials_options* options, grpc_tls_version max_tls_version);
 
 /**
- * EXPERIMENTAL API - Subject to change
- *
  * Creates a TLS channel credential object based on the
  * grpc_tls_credentials_options specified by callers. The
  * grpc_channel_credentials will take the ownership of the |options|. The
@@ -118,8 +108,6 @@ grpc_channel_credentials* grpc_tls_credentials_create(
     grpc_tls_credentials_options* options);
 
 /**
- * EXPERIMENTAL API - Subject to change
- *
  * Creates a TLS server credential object based on the
  * grpc_tls_credentials_options specified by callers. The
  * grpc_server_credentials will take the ownership of the |options|.
@@ -186,8 +174,6 @@ GRPCAPI void grpc_tls_credentials_options_set_certificate_provider(
     grpc_tls_certificate_provider* provider);
 
 /**
- * EXPERIMENTAL API - Subject to change
- *
  * If set, gRPC stack will keep watching the root certificates with
  * name |root_cert_name|.
  * If this is not set on the client side, we will use the root certificates
@@ -201,8 +187,6 @@ GRPCAPI void grpc_tls_credentials_options_watch_root_certs(
     grpc_tls_credentials_options* options);
 
 /**
- * EXPERIMENTAL API - Subject to change
- *
  * If set, gRPC stack will keep watching the identity key-cert pairs
  * with name |identity_cert_name|.
  * This is required on the server side, and optional on the client side.
