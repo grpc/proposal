@@ -1,7 +1,7 @@
 L46: C-core: New TLS Credentials API
 ----
 * Author(s): ZhenLian, gtcooke94
-* Approver: markdroth, yashykt, jiangtaoli2016
+* Approver: 
 * Status: Draft
 * Implemented in:
 * Last updated: March 13, 2024
