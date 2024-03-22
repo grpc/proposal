@@ -289,25 +289,7 @@ grpc_tls_credentials_options* options = grpc_tls_credentials_options_create();
 grpc_tls_certificate_provider* file_provider = grpc_tls_certificate_provider_file_watcher_create(...);
 grpc_tls_credentials_options_set_certificate_provider(options, file_provider);
 ```
-And wrap languages can just wrap `grpc_tls_certificate_provider_file_watcher_create`.
- 
-If the wrap language also wants users to be able to implement their own `Provider` implementations, a bit of the design is needed, because the wrapper class needs to expose part of the `Distributor` API.
-The Core API will be called like this: 
-```c
-static grpc_tls_certificate_distributor* GetDistributor(grpc_tls_certificate_provider_external* external_provider) {
-    /* .... */
-}
-static void Destroy(grpc_tls_certificate_provider_external* external_provider) {
-    /* .... */
-    delete  external_provider;
-}
-grpc_tls_certificate_provider_external* external_provider = new grpc_tls_certificate_provider_external(); 
-external_provider->get_distributor = GetDistributor;
-external_provider->destroy = Destroy;
-/* The ownership will be taken by provider. */
-grpc_tls_certificate_provider* my_provider = grpc_tls_certificate_provider_external_create(external_provider);
-grpc_tls_credentials_options_set_certificate_provider(options, my_provider);
-```
+
 Each wrap language is free to choose the design suitable for its language characteristics, but consider some general advices first:
 1. create an interface-like class `ProviderInterface` which contains two functions GetDistributor() and Destroy()
 2. create a concrete class `FileCertificateProvider` that implements `ProviderInterface` and wraps the provider created by `grpc_tls_certificate_provider_file_watcher_create`
@@ -315,6 +297,7 @@ Each wrap language is free to choose the design suitable for its language charac
 4. create an interface-like class `CertificateProvider` that implements `ProviderInterface`, and exposes several APIs in the distributor to users, such as `grpc_tls_certificate_distributor_set_key_materials`, etc
 5. users could extend `CertificateProvider` to define their own provider implementations
 
+// TODO(gtcooke94) we can directly use C++ APIs, remove external stuff from the below definitions
 As a reference, here is how `CertificateProvider` might be defined in C++:
 ```cpp
 namespace grpc {
@@ -334,9 +317,6 @@ class CertificateProvider {
     grpc_tls_certificate_distributor_destroy(distributor_);
   }
 
-  grpc_tls_certificate_provider* c_provider() const {
-    return grpc_tls_certificate_provider_external_create(&base_);
-  }
 
   virtual void OnWatchStatusChanged(
       const std::string& cert_name, bool watching_root,
@@ -411,6 +391,7 @@ GRPCAPI int grpc_tls_credentials_options_set_authorization_check_config(
     grpc_tls_credentials_options* options,
     grpc_tls_authorization_check_config* config);
 
+// TODO(gtcooke94) This is really custom verification, not authorization? Change it all?
 /** ------------------------------------ Authorization Check ------------------------------------ */
 
 /** callback function provided by gRPC used to handle the result of server
