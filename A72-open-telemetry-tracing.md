@@ -186,7 +186,9 @@ On attempt span:
   boolean value indicating whether the stream is undergoing a transparent retry.
 * If the RPC experienced load balancer pick delay, add an Event with the name 
   "Delayed LB pick complete" upon creation of the stream on the transport. 
-* When the application sends an outbound message to the transport, add an Event 
+* When the application sends an outbound message to the transport, add Event(s)
+  (it depends on implementation whether there is a single event or two separate 
+  events for compressed/uncompressed message sizes, the same below) 
   with name "Outbound message sent" and the following attributes:
   * key `message.event.type` with string value "SENT".
   * key `message.message.id` with integer value of the seq no. The seq no. indicates
@@ -195,62 +197,45 @@ On attempt span:
   * key `message.event.size.uncompressed` with integer value of uncompressed 
     message size. The size is the total attempt message bytes without encryption,
     not including grpc or transport framing bytes, the same below.
-* If the message needs compression, add an Event with name "Outbound message compressed" 
-  when the compression is done with the following attributes:
-  * key `message.event.type` with string value "SENT".
-  * key `message.message.id` with integer value of the seq no.
-  * key `message.event.size.compressed` with integer value of compressed message size.
-* When an inbound message has been received from the transport, add an Event
-  with name "Inbound message read" and the following attributes:
+  * If compression needed, add key `message.event.size.compressed` with integer 
+    value of compressed message size.
+* When an inbound message has been received from wire, add Event(s) with name
+  "Inbound message read" and the following attributes:
   * key `message.event.type` with string value "RECEIVED".
   * key `message.message.id` with integer value of the seq no. The seq no. indicates
     the order of the received messages on the attempt (i.e., it starts at 0 and is
     incremented by 1 for each message received), the same below.
   * key `message.event.size.compressed` with integer value of wire message size.
-* If the inbound message was compressed, add an Event with name "Inbound message uncompressed" 
-  when the decompression is done with the following attributes:
-  * key `message.event.type` with string value "RECEIVED".
-  * key `message.message.id` with integer value of the seq no.
-  * key `message.event.size.uncompressed` with integer value of uncompressed message size.
+  * If the message needs decompression, add key `message.event.size.uncompressed`
+    with integer value of uncompressed message size.
 * When the stream is closed, set RPC status and end the attempt span.
 
 At the server:
-* When the application sends an outbound message to the transport, add an Event
+* When the application sends an outbound message to the transport, add Event(s) 
   with name "Outbound message sent" and the following attributes:
   * key `message.event.type` with string value "SENT".
-  * key `message.message.id` with integer value of the seq no. The seq no. indicates
-    the order of the sent messages on the attempt (i.e., it starts at 0 and is
-    incremented by 1 for each message sent), the same below.
+  * key `message.message.id` with integer value of the seq no.
   * key `message.event.size.uncompressed` with integer value of uncompressed
-    message size. The size is the total attempt message bytes without encryption,
-    not including grpc or transport framing bytes, the same below.
-* If the message needs compression, add an Event with name "Outbound message compressed"
-  when the compression is done with the following attributes:
-  * key `message.event.type` with string value "SENT".
-  * key `message.message.id` with integer value of the seq no.
-  * key `message.event.size.compressed` with integer value of compressed message size.
-* When an inbound message has been received from the transport, add an Event
-  with name "Inbound message read" and the following attributes:
+    message size.
+  * If compression needed, add key `message.event.size.compressed` with integer
+    value of compressed message size.
+* When an inbound message has been received from wire, add Event(s) with name
+  "Inbound message read" and the following attributes:
   * key `message.event.type` with string value "RECEIVED".
-  * key `message.message.id` with integer value of the seq no. The seq no. indicates
-    the order of the received messages on the attempt (i.e., it starts at 0 and is
-    incremented by 1 for each message received), the same below.
+  * key `message.message.id` with integer value of the seq no.
   * key `message.event.size.compressed` with integer value of wire message size.
-* If the inbound message was compressed, add an Event with name "Inbound message uncompressed"
-  when the decompression is done with the following attributes:
-  * key `message.event.type` with string value "RECEIVED".
-  * key `message.message.id` with integer value of the seq no.
-  * key `message.event.size.uncompressed` with integer value of uncompressed message size.
+  * If the message needs decompression, add key `message.event.size.uncompressed`
+    with integer value of uncompressed message size.
 * When the stream is closed, set the RPC status and end the span.
 
 ### Limitations
-Note that C++ is missing the seq no. information due to lack of transport support.
-While it's not critical, we can include these information if users request it in the future.
+The timestamp information on the Events that report compressed/uncompressed message
+sizes are not accurate or useful. It only gives you a relative order with other Events. 
+We can tighten the timing in the future if users find this information critical.
 
-Implementations that cannot report separate events for the inbound uncompressed
-message size on each attempt will report once at the parent span. 
-Implementations that can not report uncompressed outbound message size before compression
-will report a single event that has compressed and uncompressed size attributes.
+Java has an open issue of reporting uncompressed message size upon receiving message.
+It does that at a later time when deserializing. Therefore, at the client Java only 
+reports the uncompressed message size for incoming messages on parent span, not attempt span.
 
 ## Propagator Wire Format
 gRPC OpenTelemetry will use the existing OpenTelemetry propagators API for context propagation
