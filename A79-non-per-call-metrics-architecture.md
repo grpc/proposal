@@ -1,10 +1,10 @@
 ## A79: Non-per-call Metrics Architecture
 
-*   Author(s): Yash Tibrewal (@yashykt)
+*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya)
 *   Approver: Mark Roth (@markdroth)
 *   Status: In Review
 *   Implemented in: <language, ...>
-*   Last updated: 2024-02-26
+*   Last updated: 2024-03-27
 *   Discussion at: https://groups.google.com/g/grpc-io/c/VfZOj7940Dc
 
 ## Abstract
@@ -172,7 +172,57 @@ class GlobalInstrumentsRegistry {
 
 ##### Java
 
-(To be filled.)
+```java
+/**
+ * Registry for metric instruments (also known as metric descriptors).
+ */
+@Internal
+public class MetricInstrumentRegistry {
+  
+  // Returns a default MetricInstrumentRegistry instance
+  public static MetricInstrumentRegistry getInstance();
+  
+  // Returns a list of registered metric descriptors.
+  public List<MetricDescriptor> getMetricInstruments();
+  
+  // Register and return a long counter metric descriptor for recording long
+  // counter values.
+  public LongCounterDescriptor registerLongCounter(
+      String name, String description, String unit, List<String> labelKeys, 
+      List<String> optionalLabelKeys, boolean isEnabledByDefault);
+
+  // Register and return a double histogram metric descriptor for recording 
+  // double histogram values.
+  public DoubleHistogramDescriptor registerDoubleHistogram(
+      String name, String description, String unit, List<Double> bucketBoundaries,
+      List<String> labelKeys, List<String> optionalLabelKeys, 
+      boolean isEnabledByDefault);
+}
+
+interface MetricDescriptor {
+  long index;
+  default long getIndex() { return index; }
+}
+
+class LongCounterDescriptor implements MetricDescriptor {
+  String name;
+  String description;
+  String unit;
+  List<String> labelKeys;
+  List<String> optionalLabelKeys;
+  boolean isEnabledByDefault;
+}
+
+class DoubleHistogramDescriptor implements MetricDescriptor {
+  String name;
+  String description;
+  String unit;
+  List<Double> bucketBoundaries;
+  List<String> labelKeys;
+  List<String> optionalLabelKeys;
+  boolean isEnabledByDefault;
+}
+```
 
 ##### Go
 
@@ -188,9 +238,10 @@ The application will use a stats plugin builder (e.g.
 creation, stats plugins should query the global instruments registry to get the
 list of instrument descriptors. Based on these descriptors and the stats
 plugin's configuration, backing instruments (e.g., `OpenTelemetry Instruments`)
-will be created. Implementations can choose an alternative form of
-representation for the global stats plugin registry. For example, gRPC Go might
-choose to register global stats plugin through global dial options.
+will be created. For java, backing instruments will be lazily created. 
+Implementations can choose an alternative form of representation for the global 
+stats plugin registry. For example, gRPC Go might choose to register global 
+stats plugin through global dial options.
 
 ![](A79_graphics/global-stats-plugin-registry-usage.png)
 
@@ -299,8 +350,89 @@ class GlobalStatsPluginRegistry {
 ```
 
 ##### Java
+```java
+/**
+ * Metrics Plugin measures (also known as backing instruments) are initialised 
+ * with empty list of measures on metrics plugin creation and are lazily 
+ * initialised.
+ */
+@Internal
+interface MetricsPlugin { 
+  
+  /** Returns set of metrics enabled by the plugin. */
+  public Set<String> getEnabledMetrics();
+  
+  /** Returns optional labels configured by the plugin. */
+  public List<String> getOptionalLabels();
 
-(To be filled)
+  /**
+   * Update list of plugin specific measures based on registered metric
+   * descriptors in MetricInstrumentRegistry.
+   */
+  protected void updateMeasures(MetricInstrumentRegistry registry);
+
+  /** Returns list of plugin specific measures. */
+  public List<Object> getMetricsMeasures();
+  
+  /** Records a value for a long counter measure. */
+  default void recordLongCounter(MetricDescriptor counterDescriptor, Long value, 
+      List<String> labelValues, List<String> optionalLabelValues) {}
+
+  /** Records a value for double histogram measure. */
+  default void recordDoubleHistogram(MetricDescriptor histogramDescriptor, 
+      Double value, List<String> labelValues, List<String> optionalLabelValues) 
+  {}
+}
+
+public final class OpenTelemetryModule {
+  
+  /**
+   * Register plugin globally.
+   * 
+   * Please note as an initial offering only one of the plugins can be 
+   * registered globally. Any subsequent call to registerGlobal() will throw an
+   * exception. The restriction to register only one plugin as global will be
+   * removed in the future once the underlying APIs are stable.
+   */
+  public void registerGlobal();
+
+  /** Register plugin for @param builder channel. */
+  public void configureChannelBuilder(ManagedChannelBuilder builder);
+}
+
+/**
+ * MetricRecorder will provide APIs for gRPC components to record metric values.
+ * MetricsRecorder abstracts away the complexity of handling multiple metrics 
+ * plugin from individual gRPC components.
+ */
+@Internal
+public interface MetricsRecorder {
+
+  /**
+   * Records a value for a long counter metric.
+   * 
+   * @param counterDescriptor The descriptor of the counter metric.
+   * @param value The value to record.
+   * @param labelValues  Required labels for identifying the metric.
+   * @param optionalLabelValues Additional labels to provide more context.
+   */
+  default void recordLongCounter(MetricDescriptor counterDescriptor, Long
+      value, List<String> labelValues, List<String> optionalLabelValues) {}
+
+  /**
+   * Records a value for a double histogram metric.
+   *
+   * @param histogramDescriptor The descriptor of the histogram metric.
+   * @param value The value to record.
+   * @param labelValues  Required labels for identifying the metric.
+   * @param optionalLabelValues Additional labels to provide more context.
+   */
+  default void recordDoubleHistogram(MetricDescriptor histogramDescriptor, 
+      Double value, List<String> labelValues, List<String> optionalLabelValues) 
+  {}
+}
+
+```
 
 ##### Go
 
@@ -386,7 +518,38 @@ class OpenTelemetryPluginBuilder {
 
 #### Java
 
-(To be filled)
+The following APIs will be added to `OpenTelemetryModule` introduced in
+[A66: OpenTelemetry Metrics](A66-otel-stats.md)
+
+```java
+public final class OpenTelemetryModule {
+  
+  /** Register plugin globally. */
+  public void registerGlobal();
+  
+  /** Register plugin for specific channel. */
+  public void configureChannelBuilder(ManagedChannelBuilder builder);
+
+  public static class Builder {
+    /** 
+     * Adds optionalLabelKey to all the metrics that can provide value for the 
+     * optionalLabelKey. */
+    public void addOptionalLabel(String optionalLabelKey);
+
+    /** 
+     * Enables metrics specified in the set along with metrics that are enabled 
+     * by default.
+     */
+    public Builder enableMetrics(Set<String> enableMetrics);
+    
+    /** Disable metrics specified in the set. */
+    public Builder disableMetrics(Set<String> disableMetrics);
+    
+    /** Disable all metrics that are enabled by default. */
+    public Builder disableAllMetrics();
+  }
+}
+```
 
 #### Go
 
