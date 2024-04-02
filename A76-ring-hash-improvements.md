@@ -4,7 +4,7 @@ A76: Improvements to the Ring Hash LB Policy
 * Approver: markdroth
 * Status: Draft
 * Implemented in: <language, ...>
-* Last updated: 2024-01-23
+* Last updated: 2024-04-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/ZKI1RIF0e_s/m/oBXqOFb0AQAJ
 
 ## Abstract
@@ -65,9 +65,11 @@ attribute through the language specific resolver attribute interface.
 
 ### Related Proposals:
 
-This proposal extends the following existing gRFC:
+This proposal extends the following existing gRFCs:
 
 * [gRFC A42: xDS Ring Hash LB Policy][A42]
+* [gRFC A61: IPv4 and IPv6 Dualstack Backend Support][A61]
+* [gRFC A74: xDS Config Tears][A74]
 
 ## Proposal
 
@@ -89,26 +91,69 @@ rejected. If the `request_hash_header` refers to a binary header (suffixed with
 `-bin`), the configuration is also rejected.
 
 At pick time:
-- If `request_hash_header` is not empty, and the header has a non-empty value,
-then the request hash key will be set to this value. If `request_hash_header`
-contains multiple values, then values are joined with a comma `,` character
-between each value before hashing.
 - If `request_hash_header` is empty, then the request hash key will be based on
 the xDS hash policy in RDS, which keeps the existing LB configuration for ring
 hash working as before with xDS.
+- If `request_hash_header` is not empty, and the header has a non-empty value,
+then the request hash key will be set to this value. If the header contains
+multiple values, then values are joined with a comma `,` character before
+hashing.
 - If `request_hash_header` is not empty, and the request has no value associated
-with the header or its value is empty, then the picker behave as follows: the
-picker will generate a random hash for the request. If the use of this random
-hash triggers a connection attempt (according to the rules described in [A42:
-Picker Behavior][A42-picker-behavior]), then before queuing the pick, the picker
-will scan forward searching for a subchannel in `READY` state. If it finds a
-subchannel in `READY` state, the picker returns it.
+with the header or its value is empty, then the picker will generate a random
+hash for the request. If the use of this random hash triggers a connection
+attempt (according to the rules described in [A42: Picker
+Behavior][A42-picker-behavior] and updated in [A61: Ring Hash][A61-ring-hash]),
+then before queuing the pick, the picker will scan forward searching for a
+subchannel in `READY` state. If it finds a subchannel in `READY` state, the
+picker returns it.
+
+The following pseudo code describes the updated picker logic:
+
+```
+// Determine request hash.
+using_random_hash = false;
+if (config.request_hash_header.empty()) {
+  request_hash = call_attributes.hash;
+} else {
+  header = headers.find(config.request_hash_header);
+  if (header == null) {
+    using_random_hash = true;
+    request_hash = ComputeRandomHash();
+  } else {
+    request_hash = ComputeHash(header);
+  }
+}
+
+// Do pick based on hash.
+first_index = ring.FindIndexForHash(request_hash);
+requested_connection = false;
+for (i = 0; i < ring.size(); ++i) {
+  index = (first_index + i) % ring.size();
+  if (ring[index].state == READY) {
+    return ring[index].picker->Pick(...);
+  }
+  if (requested_connection) continue;
+  if (ring[index].state == IDLE) {
+    ring[index].endpoint.TriggerConnectionAttemptInControlPlane();
+    if (using_random_hash) {
+      requested_connection = true;
+      continue;
+    }
+    return PICK_QUEUE;
+  }
+  if (ring[index].state == CONNECTING) {
+    return PICK_QUEUE;
+  }
+}
+if (requested_connection) return PICK_QUEUE;
+return PICK_FAIL;
+```
 
 This behavior ensures that a single request creates at most one new connection,
-and that missing header does not add extra latency in the common case where
-there is already at least one subchannel in `READY` state. It converges to
-picking a random host, since each request may create a new connection to a
-random endpoint.
+and that a request missing the header does not add extra latency in the common
+case where there is already at least one subchannel in `READY` state. It
+converges to picking a random host, since each request may create a new
+connection to a random endpoint.
 
 ### Explicitly setting the endpoint hash key
 
@@ -116,9 +161,9 @@ The `ring_hash` policy will be changed such that the hash key used for
 determining the locations of each endpoint on the ring will be extracted from a
 pre-defined endpoint attribute called `hash_key`. If this attribute is set, then
 the endpoint is placed on the ring by hashing its value. If this attribute is
-not set or empty, then the endpoint IP address is hashed, matching the current
-behavior. The locations of an existing endpoint on the ring is updated if its
-`hash_key` endpoint attribute changes.
+not set or empty, then the endpoint's first address is hashed, matching the
+current behavior. The locations of an existing endpoint on the ring is updated
+if its `hash_key` endpoint attribute changes.
 
 The xDS resolver, described in [A74][A74], will be changed to set the `hash_key`
 endpoint attribute to the value of [LbEndpoint.Metadata][LbEndpoint.Metadata]
@@ -150,7 +195,7 @@ hash key. The advantage would have been that the request hash key would not have
 to be exposed through gRPC outgoing headers. However, this would have required
 defining language specific APIs, which would increase the complexity of this
 change.
- 
+
 We also discussed the option of exposing all `LbEndpoint.metadata` from EDS
 through name resolver attributes, instead of only extracting the specific
 `hash_key` attribute, so as to make them available to custom LB policies. We
@@ -179,9 +224,11 @@ considered the following alternative solutions:
 Will provide an implementation in Go.
 
 [A42]: A42-xds-ring-hash-lb-policy.md
+[A61]: A61-IPv4-IPv6-dualstack-backends.md
 [A74]: A74-xds-config-tears.md
 [envoy-ringhash]: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers#ring-hash
 [header]: https://grpc.io/docs/guides/metadata/#headers
 [service-config]: https://github.com/grpc/grpc/blob/master/doc/service_config.md
 [LbEndpoint.Metadata]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/endpoint/v3/endpoint_components.proto#envoy-v3-api-field-config-endpoint-v3-lbendpoint-metadata
 [A42-picker-behavior]: A42-xds-ring-hash-lb-policy.md#picker-behavior
+[A61-ring-hash]: A61-IPv4-IPv6-dualstack-backends.md#ring-hash
