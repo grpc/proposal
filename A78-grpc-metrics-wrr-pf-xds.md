@@ -4,7 +4,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-03-22
+* Last updated: 2024-04-03
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
 
 ## Abstract
@@ -133,6 +133,13 @@ The following metrics will be exported:
 | grpc.xds_client.resource_updates_valid | Counter | {resource} | grpc.target, grpc.xds.server, grpc.xds.resource_type | A counter of resources received that were considered valid.  The counter will be incremented even for resources that have not changed. |
 | grpc.xds_client.resource_updates_invalid | Counter | {resource} | grpc.target, grpc.xds.server, grpc.xds.resource_type | A counter of resources received that were considered invalid. |
 | grpc.xds_client.resources | Gauge | {resource} | grpc.target, grpc.xds.authority, grpc.xds.cache_state, grpc.xds.resource_type | Number of xDS resources. |
+
+### Metric Stability
+
+All metrics added in this proposal will start as experimental and
+therefore off by default.  The long term goal will be to
+de-experimentalize them and have them be on by default, but the exact
+criteria for that change are TBD.
 
 ### Temporary environment variable protection
 
