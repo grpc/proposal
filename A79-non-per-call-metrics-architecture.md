@@ -416,7 +416,7 @@ public interface MetricsRecorder {
    * @param labelValues  Required labels for identifying the metric.
    * @param optionalLabelValues Additional labels to provide more context.
    */
-  default void recordLongCounter(MetricDescriptor counterDescriptor, Long
+  default void recordLongCounter(LongCounterDescriptor counterDescriptor, Long
       value, List<String> labelValues, List<String> optionalLabelValues) {}
 
   /**
@@ -427,7 +427,7 @@ public interface MetricsRecorder {
    * @param labelValues  Required labels for identifying the metric.
    * @param optionalLabelValues Additional labels to provide more context.
    */
-  default void recordDoubleHistogram(MetricDescriptor histogramDescriptor, 
+  default void recordDoubleHistogram(DoubleHistogramDescriptor histogramDescriptor, 
       Double value, List<String> labelValues, List<String> optionalLabelValues) 
   {}
 }
@@ -540,12 +540,12 @@ public final class OpenTelemetryModule {
      * Enables metrics specified in the set along with metrics that are enabled 
      * by default.
      */
-    public Builder enableMetrics(Set<String> enableMetrics);
+    public Builder enableMetrics(Collection<String> enableMetrics);
     
     /** Disable metrics specified in the set. */
-    public Builder disableMetrics(Set<String> disableMetrics);
+    public Builder disableMetrics(Collection<String> disableMetrics);
     
-    /** Disable all metrics that are enabled by default. */
+    /** Disable all metrics. */
     public Builder disableAllMetrics();
   }
 }
