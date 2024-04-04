@@ -4,7 +4,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-04-03
+* Last updated: 2024-04-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
 
 ## Abstract
@@ -51,6 +51,12 @@ We want to provide this optional label for the metrics in both the
 existing per-call metrics defined in [A66] and in the new metrics for
 the WRR LB policy, described below.
 
+If locality information is available, the value of this label will be of
+the form `{region="${REGION}", zone="${ZONE}", sub_zone="${SUB_ZONE}"}`,
+where `${REGION}`, `${ZONE}`, and `${SUB_ZONE}` are replaced with the
+actual values.  If no locality information is available, the label will
+be set to the empty string.
+
 #### Per-Call Metrics
 
 To support the locality label in the per-call metrics, we will provide
@@ -59,6 +65,11 @@ tracer.  We will then use this mechanism in the `xds_cluster_impl`
 policy's picker to set the locality label.  It will get the locality
 label from the wrapped subchannel that it is already creating for load
 reporting purposes, when that subchannel is returned by the child picker.
+
+This label will be available on the following per-call metrics:
+- `grpc.client.attempt.duration`
+- `grpc.client.attempt.sent_total_compressed_message_size`
+- `grpc.client.attempt.rcvd_total_compressed_message_size`
 
 #### Weighted Target LB Policy
 
