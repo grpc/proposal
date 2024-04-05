@@ -260,7 +260,7 @@ can configure. Based on the channel's configuration, a stats plugin can decide
 whether it is interested in the channel. At channel creation time, the channel's
 canonical target and the default authority is provided to the stats plugin to
 make this decision. (The default authority provided is derived from the target
-unless an override was specified on the channel) Various gRPC components use
+unless an override was specified on the channel.) Various gRPC components use
 this list of interested stats plugins (`StatsPluginGroup`) to record metrics.
 
 ![](A79_graphics/stats-plugin-scoping.png)
