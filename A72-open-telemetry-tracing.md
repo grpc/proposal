@@ -186,46 +186,59 @@ On attempt span:
   boolean value indicating whether the stream is undergoing a transparent retry.
 * If the RPC experienced load balancer pick delay, add an Event with the name 
   "Delayed LB pick complete" upon creation of the stream on the transport. 
-* When the application sends an outbound message to the transport, add Event(s)
-  (it depends on implementation whether there is a single event or two separate 
-  events for compressed/uncompressed message sizes, the same below) 
+* When the application sends an outbound message, add Event(s)
+  (it depends on implementation whether there is a single event or an additional 
+  separate event with name "Outbound message compressed" for compressed message size) 
   with name "Outbound message sent" and the following attributes:
   * key `message.event.type` with string value "SENT".
   * key `message.message.id` with integer value of the seq no. The seq no. indicates
     the order of the sent messages on the attempt (i.e., it starts at 0 and is 
     incremented by 1 for each message sent), the same below.
-  * key `message.event.size.uncompressed` with integer value of uncompressed 
+  * key `message.event.size` with integer value of uncompressed 
     message size. The size is the total attempt message bytes without encryption,
     not including grpc or transport framing bytes, the same below.
   * If compression needed, add key `message.event.size.compressed` with integer 
-    value of compressed message size.
-* When an inbound message has been received from wire, add Event(s) with name
+    value of compressed message size. If this is reported as a separate event in 
+    an implementation, the event name is "Outbound message compressed" and the 
+    order of the event must be after the first event that reports the message size.
+* When an inbound message has been received, add Event(s) (it depends on 
+  implementation whether there is a single event or an additional separate event
+  with name "Inbound message uncompressed" for uncompressed message size) with name 
   "Inbound message read" and the following attributes:
   * key `message.event.type` with string value "RECEIVED".
   * key `message.message.id` with integer value of the seq no. The seq no. indicates
     the order of the received messages on the attempt (i.e., it starts at 0 and is
     incremented by 1 for each message received), the same below.
-  * key `message.event.size.compressed` with integer value of wire message size.
+  * key `message.event.size` with integer value of wire message size.
   * If the message needs decompression, add key `message.event.size.uncompressed`
-    with integer value of uncompressed message size.
+    with integer value of uncompressed message size. If this is reported as a 
+    separate event in an implementation, the event name is "Inbound message uncompressed"
+    and the order of the event must be after the first event that reports the wire message size.
 * When the stream is closed, set RPC status and end the attempt span.
 
 At the server:
-* When the application sends an outbound message to the transport, add Event(s) 
+* When the application sends an outbound message, add Event(s) 
+  (it depends on implementation whether there is a single event or an additional
+  separate event with name "Outbound message compressed" for compressed message size)
   with name "Outbound message sent" and the following attributes:
   * key `message.event.type` with string value "SENT".
   * key `message.message.id` with integer value of the seq no.
-  * key `message.event.size.uncompressed` with integer value of uncompressed
-    message size.
+  * key `message.event.size` with integer value of uncompressed message size.
   * If compression needed, add key `message.event.size.compressed` with integer
-    value of compressed message size.
-* When an inbound message has been received from wire, add Event(s) with name
+    value of compressed message size. If this is reported as a separate event in
+    an implementation, the event name is "Outbound message compressed" and the
+    order of the event must be after the first event that reports the message size.
+* When an inbound message has been received, add Event(s) (it depends on
+  implementation whether there is a single event or an additional separate event
+  with name "Inbound message uncompressed" for uncompressed message size) with name
   "Inbound message read" and the following attributes:
   * key `message.event.type` with string value "RECEIVED".
   * key `message.message.id` with integer value of the seq no.
-  * key `message.event.size.compressed` with integer value of wire message size.
+  * key `message.event.size` with integer value of wire message size.
   * If the message needs decompression, add key `message.event.size.uncompressed`
-    with integer value of uncompressed message size.
+    with integer value of uncompressed message size. If this is reported as a
+    separate event in an implementation, the event name is "Inbound message uncompressed"
+    and the order of the event must be after the first event that reports the wire message size.
 * When the stream is closed, set the RPC status and end the span.
 
 ### Limitations
