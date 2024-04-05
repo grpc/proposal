@@ -178,24 +178,24 @@ class GlobalInstrumentsRegistry {
  */
 @Internal
 public class MetricInstrumentRegistry {
-  
+
   // Returns a default MetricInstrumentRegistry instance
   public static MetricInstrumentRegistry getInstance();
-  
+
   // Returns a list of registered metric descriptors.
   public List<MetricDescriptor> getMetricInstruments();
-  
+
   // Register and return a long counter metric descriptor for recording long
   // counter values.
   public LongCounterDescriptor registerLongCounter(
-      String name, String description, String unit, List<String> labelKeys, 
+      String name, String description, String unit, List<String> labelKeys,
       List<String> optionalLabelKeys, boolean isEnabledByDefault);
 
-  // Register and return a double histogram metric descriptor for recording 
+  // Register and return a double histogram metric descriptor for recording
   // double histogram values.
   public DoubleHistogramDescriptor registerDoubleHistogram(
       String name, String description, String unit, List<Double> bucketBoundaries,
-      List<String> labelKeys, List<String> optionalLabelKeys, 
+      List<String> labelKeys, List<String> optionalLabelKeys,
       boolean isEnabledByDefault);
 }
 
@@ -238,9 +238,9 @@ The application will use a stats plugin builder (e.g.
 creation, stats plugins should query the global instruments registry to get the
 list of instrument descriptors. Based on these descriptors and the stats
 plugin's configuration, backing instruments (e.g., `OpenTelemetry Instruments`)
-will be created. For java, backing instruments will be lazily created. 
-Implementations can choose an alternative form of representation for the global 
-stats plugin registry. For example, gRPC Go might choose to register global 
+will be created. For java, backing instruments will be lazily created.
+Implementations can choose an alternative form of representation for the global
+stats plugin registry. For example, gRPC Go might choose to register global
 stats plugin through global dial options.
 
 ![](A79_graphics/global-stats-plugin-registry-usage.png)
@@ -253,9 +253,10 @@ implementations can choose one of two approaches.
 In the first approach, stats plugins provide a scope filter that applications
 can configure. Based on the channel's configuration, a stats plugin can decide
 whether it is interested in the channel. At channel creation time, the channel's
-canonical target and the authority is provided to the stats plugin to make this
-decision. Various gRPC components use this list of interested stats plugins
-(`StatsPluginGroup`) to record metrics.
+canonical target and the default authority is provided to the stats plugin to
+make this decision. (The default authority provided is derived from the target
+unless an override was specified on the channel) Various gRPC components use
+this list of interested stats plugins (`StatsPluginGroup`) to record metrics.
 
 ![](A79_graphics/stats-plugin-scoping.png)
 
@@ -350,18 +351,19 @@ class GlobalStatsPluginRegistry {
 ```
 
 ##### Java
+
 ```java
 /**
- * Metrics Plugin measures (also known as backing instruments) are initialised 
- * with empty list of measures on metrics plugin creation and are lazily 
+ * Metrics Plugin measures (also known as backing instruments) are initialised
+ * with empty list of measures on metrics plugin creation and are lazily
  * initialised.
  */
 @Internal
-interface MetricsPlugin { 
-  
+interface MetricsPlugin {
+
   /** Returns set of metrics enabled by the plugin. */
   public Set<String> getEnabledMetrics();
-  
+
   /** Returns optional labels configured by the plugin. */
   public List<String> getOptionalLabels();
 
@@ -373,23 +375,23 @@ interface MetricsPlugin {
 
   /** Returns list of plugin specific measures. */
   public List<Object> getMetricsMeasures();
-  
+
   /** Records a value for a long counter measure. */
-  default void recordLongCounter(MetricDescriptor counterDescriptor, Long value, 
+  default void recordLongCounter(MetricDescriptor counterDescriptor, Long value,
       List<String> labelValues, List<String> optionalLabelValues) {}
 
   /** Records a value for double histogram measure. */
-  default void recordDoubleHistogram(MetricDescriptor histogramDescriptor, 
-      Double value, List<String> labelValues, List<String> optionalLabelValues) 
+  default void recordDoubleHistogram(MetricDescriptor histogramDescriptor,
+      Double value, List<String> labelValues, List<String> optionalLabelValues)
   {}
 }
 
 public final class OpenTelemetryModule {
-  
+
   /**
    * Register plugin globally.
-   * 
-   * Please note as an initial offering only one of the plugins can be 
+   *
+   * Please note as an initial offering only one of the plugins can be
    * registered globally. Any subsequent call to registerGlobal() will throw an
    * exception. The restriction to register only one plugin as global will be
    * removed in the future once the underlying APIs are stable.
@@ -402,7 +404,7 @@ public final class OpenTelemetryModule {
 
 /**
  * MetricRecorder will provide APIs for gRPC components to record metric values.
- * MetricsRecorder abstracts away the complexity of handling multiple metrics 
+ * MetricsRecorder abstracts away the complexity of handling multiple metrics
  * plugin from individual gRPC components.
  */
 @Internal
@@ -410,7 +412,7 @@ public interface MetricsRecorder {
 
   /**
    * Records a value for a long counter metric.
-   * 
+   *
    * @param counterDescriptor The descriptor of the counter metric.
    * @param value The value to record.
    * @param labelValues  Required labels for identifying the metric.
@@ -427,8 +429,8 @@ public interface MetricsRecorder {
    * @param labelValues  Required labels for identifying the metric.
    * @param optionalLabelValues Additional labels to provide more context.
    */
-  default void recordDoubleHistogram(MetricDescriptor histogramDescriptor, 
-      Double value, List<String> labelValues, List<String> optionalLabelValues) 
+  default void recordDoubleHistogram(MetricDescriptor histogramDescriptor,
+      Double value, List<String> labelValues, List<String> optionalLabelValues)
   {}
 }
 
@@ -523,28 +525,28 @@ The following APIs will be added to `OpenTelemetryModule` introduced in
 
 ```java
 public final class OpenTelemetryModule {
-  
+
   /** Register plugin globally. */
   public void registerGlobal();
-  
+
   /** Register plugin for specific channel. */
   public void configureChannelBuilder(ManagedChannelBuilder builder);
 
   public static class Builder {
-    /** 
-     * Adds optionalLabelKey to all the metrics that can provide value for the 
+    /**
+     * Adds optionalLabelKey to all the metrics that can provide value for the
      * optionalLabelKey. */
     public void addOptionalLabel(String optionalLabelKey);
 
-    /** 
-     * Enables metrics specified in the set along with metrics that are enabled 
+    /**
+     * Enables metrics specified in the set along with metrics that are enabled
      * by default.
      */
     public Builder enableMetrics(Set<String> enableMetrics);
-    
+
     /** Disable metrics specified in the set. */
     public Builder disableMetrics(Set<String> disableMetrics);
-    
+
     /** Disable all metrics that are enabled by default. */
     public Builder disableAllMetrics();
   }
