@@ -434,8 +434,8 @@ public interface MetricsRecorder {
    * @param labelValues  Required labels for identifying the metric.
    * @param optionalLabelValues Additional labels to provide more context.
    */
-  default void recordDoubleHistogram(DoubleHistogramDescriptor histogramDescriptor, 
-      Double value, List<String> labelValues, List<String> optionalLabelValues) 
+  default void recordDoubleHistogram(DoubleHistogramDescriptor histogramDescriptor,
+      Double value, List<String> labelValues, List<String> optionalLabelValues)
   {}
 }
 
@@ -548,10 +548,10 @@ public final class OpenTelemetryModule {
      * by default.
      */
     public Builder enableMetrics(Collection<String> enableMetrics);
-    
+
     /** Disable metrics specified in the set. */
     public Builder disableMetrics(Collection<String> disableMetrics);
-    
+
     /** Disable all metrics. */
     public Builder disableAllMetrics();
   }
