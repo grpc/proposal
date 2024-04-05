@@ -253,8 +253,8 @@ implementations can choose one of two approaches.
 In the first approach, stats plugins provide a scope filter that applications
 can configure. Based on the channel's configuration, a stats plugin can decide
 whether it is interested in the channel. At channel creation time, the channel's
-target and the authority is provided to the stats plugin to make this decision.
-Various gRPC components use this list of interested stats plugins
+canonical target and the authority is provided to the stats plugin to make this
+decision. Various gRPC components use this list of interested stats plugins
 (`StatsPluginGroup`) to record metrics.
 
 ![](A79_graphics/stats-plugin-scoping.png)
