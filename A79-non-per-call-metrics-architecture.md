@@ -200,8 +200,13 @@ public class MetricInstrumentRegistry {
 }
 
 interface MetricDescriptor {
-  long index;
-  default long getIndex() { return index; }
+  long getIndex();
+  String getName();
+  String getDescription();
+  String getUnit();
+  Collection<String> getLabelKeys();
+  Collection<String> getOptionalLabelKeys();
+  boolean getDefaultState();
 }
 
 class LongCounterDescriptor implements MetricDescriptor {
