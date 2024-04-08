@@ -2,8 +2,8 @@
 
 *   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya)
 *   Approver: Mark Roth (@markdroth)
-*   Status: In Review
-*   Implemented in: <language, ...>
+*   Status: Final
+*   Implemented in: Core, C++
 *   Last updated: 2024-03-27
 *   Discussion at: https://groups.google.com/g/grpc-io/c/VfZOj7940Dc
 
@@ -599,7 +599,10 @@ Implementations for the architecture plugin are planned in Core, Java and Go.
 Changes to the gRPC OpenTelemetry plugin would be made in C++, Java, Go and
 Python.
 
-*   C++ - TBD but assumed to be implemented by @yashykt/@yijiem.
+*   C++ - Implemented by @yashykt/@yijiem in
+    [#36070](https://github.com/grpc/grpc/pull/36070),
+    [#36183](https://github.com/grpc/grpc/pull/36183) and
+    [#36189](https://github.com/grpc/grpc/pull/36189).
 *   Java - TBD but assumed to be implemented by @DNVindhya.
 *   Go - TBD but assumed to be implemented by @zasweq.
 *   Python - TBD but assumed to be implemented by @XuanWang-Amos.
