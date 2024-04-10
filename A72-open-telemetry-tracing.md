@@ -194,7 +194,8 @@ On attempt span:
   * key `message.message.id` with integer value of the seq no. The seq no. indicates
     the order of the sent messages on the attempt (i.e., it starts at 0 and is 
     incremented by 1 for each message sent), the same below.
-  * key `message.event.size` with integer value of uncompressed 
+  * key named `message.event.size.uncompressed` if the message needs compression,
+    otherwise named `message.event.size`, with integer value of uncompressed
     message size. The size is the total attempt message bytes without encryption,
     not including grpc or transport framing bytes, the same below.
   * If compression needed, add key `message.event.size.compressed` with integer 
@@ -209,7 +210,8 @@ On attempt span:
   * key `message.message.id` with integer value of the seq no. The seq no. indicates
     the order of the received messages on the attempt (i.e., it starts at 0 and is
     incremented by 1 for each message received), the same below.
-  * key `message.event.size` with integer value of wire message size.
+  * key named `message.event.size.compressed` if the message needs decompression,
+    otherwise named `message.event.size`, with integer value of wire message size.
   * If the message needs decompression, add key `message.event.size.uncompressed`
     with integer value of uncompressed message size. If this is reported as a 
     separate event in an implementation, the event name is "Inbound message uncompressed"
@@ -223,7 +225,9 @@ At the server:
   with name "Outbound message sent" and the following attributes:
   * key `message.event.type` with string value "SENT".
   * key `message.message.id` with integer value of the seq no.
-  * key `message.event.size` with integer value of uncompressed message size.
+  * key named `message.event.size.uncompressed` if the message needs compression,
+    otherwise named `message.event.size`, with integer value of uncompressed
+    message size.
   * If compression needed, add key `message.event.size.compressed` with integer
     value of compressed message size. If this is reported as a separate event in
     an implementation, the event name is "Outbound message compressed" and the
@@ -234,7 +238,8 @@ At the server:
   "Inbound message read" and the following attributes:
   * key `message.event.type` with string value "RECEIVED".
   * key `message.message.id` with integer value of the seq no.
-  * key `message.event.size` with integer value of wire message size.
+  * key named `message.event.size.compressed` if the message needs decompression,
+    otherwise named `message.event.size`, with integer value of wire message size.
   * If the message needs decompression, add key `message.event.size.uncompressed`
     with integer value of uncompressed message size. If this is reported as a
     separate event in an implementation, the event name is "Inbound message uncompressed"
