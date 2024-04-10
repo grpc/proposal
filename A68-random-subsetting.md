@@ -1,4 +1,4 @@
-A68: `random_subsetting` LB policy.
+A68: Random subsetting with rendezvous hashing LB policy.
 ----
 * Author(s): @s-matyukevich
 * Approver: 
