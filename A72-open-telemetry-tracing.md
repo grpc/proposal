@@ -123,8 +123,6 @@ class OpenTelemetryPluginBuilder {
 };
 ```
 
-```
-
 ### Python
 The following new fields will be added in `OpenTelemetryPlugin`.
 
