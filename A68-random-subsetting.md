@@ -29,7 +29,7 @@ Introduce a new LB policy, `random_subsetting`. This policy selects a subset of 
 * The policy receives a single configuration parameter: `subset_size`, which must be configured by the user.
 * When the lb policy is initialized it also creates a random 32-byte long `salt` string. 
 * After every resolver update the policy picks a new subset. It does this by implementing `rendezvous hashing` algorithm:
-  * Concatenate string representation of every address in the list with `salt`.
+  * Concatenate `salt` to each address in the list.
   * For every resulting entity compute [MurmurHash3](https://en.wikipedia.org/wiki/MurmurHash) hash, which produces 128-byte output.
   * Sort all entities by hash.
   * Pick first `subset_size` values from the list.
