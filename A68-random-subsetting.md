@@ -3,9 +3,9 @@ A68: Random subsetting with rendezvous hashing LB policy.
 * Author(s): @s-matyukevich
 * Approver: 
 * Status: Draft
-* Implemented in: Go, Java
+* Implemented in: PoC in Go
 * Last updated: [Date]
-* Discussion at: 
+* Discussion at: https://groups.google.com/g/grpc-io/c/oxNJT1GgjEg
 
 ## Abstract
 
