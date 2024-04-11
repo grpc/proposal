@@ -55,7 +55,7 @@ Though it could be done, we don't provide any mathematical guaranties about the 
 
 #### Low connection churn during server rollouts
 
-The graphs provided in the previous section prove this is the case in practice (we rollout all servers in the middle of every test) Low connection churn during server rollouts is the primary motivation why rendezvous hashing was used as the subsetting algorithm: it guaranties that if a single server is either added or removed to the IP address list, every client will update at most 1 entry in its subset. This is because the hashes for all unaffected servers remain stable, which guarantees that the order of the servers after sorting also remains stable. 
+The graphs provided in the previous section prove this is the case in practice (we rollout all servers in the middle of every test, and there is no visible increase in the number of connections per server) Low connection churn during server rollouts is the primary motivation why rendezvous hashing was used as the subsetting algorithm: it guaranties that if a single server is either added or removed to the IP address list, every client will update at most 1 entry in its subset. This is because the hashes for all unaffected servers remain the same, which guarantees that the order of the servers after sorting also remains stable. The same logic applies to the situation when multiple servers got updated. 
 
 ### LB Policy Config and Parameters
 
