@@ -97,9 +97,9 @@ Note that the LB policies will have "experimental" suffixes for their
 names for now.  These suffixes will be removed when the functionality
 has proven to be stable.
 
-![gRPC Client Architecture Diagram](A27_graphics/grpc_client_architecture.png)
+![gRPC Client Architecture Diagram](graphics/A027/grpc_client_architecture.png)
 
-[Link to SVG file](A27_graphics/grpc_client_architecture.svg)
+[Link to SVG file](graphics/A027/grpc_client_architecture.svg)
 
 #### XdsClient and Bootstrap File
 

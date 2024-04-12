@@ -30,7 +30,7 @@ For now, assume that the `WORKSPACE` root is the gRPC repository.
 
 According to the dependencies in an iOS application that uses gRPC Objc library (shown below), we created two `objc_library` targets in the `src/objective-c` package within the `com_github_grpc_grpc` workspace: `grpc_objc_client` and `proto_objc_rpc`.
 
-![gRPC Objective-C Library Dependency](L56_graphics/dependency.png)
+![gRPC Objective-C Library Dependency](graphics/L056/dependency.png)
 
 * Target `//src/objective-c:grpc_objc_client` compiles all the files in `src/objective-c/GRPCClient/`, dependent on `//:grpc` which compiles core gRPC and `//src/objective-c:rx_library` which compiles `src/objective-c/RxLibrary`. It is publicly visible so that any application-specific Objective-C code can depend on it. It is only necessary when the app does not use protocol buffers (which means the service stub libraries, plus all that they are dependent on, are not included) - it is a rare case.
 * `//src/objective-c:proto_objc_rpc` does the `src/objective-c/ProtoRPC/` directory. It is also made publicly visible so that the generated service stubs can be compiled depending on this rule. Users do not need to manually add this label to `deps`, though.
@@ -54,11 +54,11 @@ In terms of the execution of `protoc`, the command is similar to that in a [pods
 
 Generated files in the directory above follow the same hierarchy as the `.proto` files. Consider this project where we are building from package `//A`:
 
-![hierarchy Example](L56_graphics/hierarchy1.png)
+![hierarchy Example](graphics/L056/hierarchy1.png)
 
 The resulting structure in `bin` will be:
 
-![hierarchy Result Example](L56_graphics/hierarchy2.png)
+![hierarchy Result Example](graphics/L056/hierarchy2.png)
 
 Lastly, three other targets are created to split the files into `hdrs`, `srcs` (potentially empty, since there might be no service stubs), and `non_arc_srcs`. They will be fed into a `objc_library` rule.
 

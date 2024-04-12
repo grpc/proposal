@@ -423,7 +423,7 @@ One of the existing policies (`xds_wrr_locality_experimental`,
 or `ring_hash_experimental`) is created as the child policy of
 `xds_override_host_experimental` as shown in the diagram below.
 
-![LB Policy Hierarchy Diagram](A55_graphics/lb-hierarchy.png)
+![LB Policy Hierarchy Diagram](graphics/A055/lb-hierarchy.png)
 
 To propagate [`common_lb_config.override_host_status`][or-host-status] the
 following changes are required:

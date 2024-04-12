@@ -83,7 +83,7 @@ The gRPC RetryPolicy is converted from Envoy RetryPolicy, where the Envoy RetryP
 
 If retry is allowed by the RetryPolicy, after the backoff period, each retry attempt will re-pick a subchannel that routes to the upstream cluster from the most up-to-date picker provided by the load balancer.
 
-![xDS retry workflow](A44_graphics/grpc_xds_retry_workflow.png)
+![xDS retry workflow](graphics/A044/grpc_xds_retry_workflow.png)
 
 ## Rationale
 

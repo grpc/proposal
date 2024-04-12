@@ -130,9 +130,9 @@ This load balancer will be responsible for generating the configuration of its c
 
 These two elements will be combined to create the `weighted_target_experimental` configuration with a weighted policy selection for each locale. The format of this configuration will not change, allowing the `weighted_target_experimental` policy to remain unchanged.
 
-![gRPC Client Architecture Diagram](A52_graphics/grpc_xds_client_architecture.png)
+![gRPC Client Architecture Diagram](graphics/A052/grpc_xds_client_architecture.png)
 
-[Link to SVG file](A52_graphics/grpc_xds_client_architecture.svg)
+[Link to SVG file](graphics/A052/grpc_xds_client_architecture.svg)
 
 ### xDS Cluster Resolver Load Balancer
 

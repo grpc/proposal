@@ -152,7 +152,7 @@ steps above in that order, it will drop the RPC with an INTERNAL status code.
 The following drawing shows which parts of the system will contain which current
 Load Balancing Policies.
 
-![xDS Architecture](A31_graphics/xds_architecture.png "xDS Architecture")
+![xDS Architecture](graphics/A031/xds_architecture.png "xDS Architecture")
 
 #### Supported Fields
 

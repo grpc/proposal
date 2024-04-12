@@ -292,9 +292,9 @@ to do what it does today, assuming that the locality-picking policy is
 policy tree will look like this (see also "Move Load Reporting into
 `xds_cluster_impl` Policy" below):
 
-![gRPC Client Architecture Diagram (Round Robin)](A42_graphics/grpc_xds_client_architecture_round_robin.png)
+![gRPC Client Architecture Diagram (Round Robin)](graphics/A042/grpc_xds_client_architecture_round_robin.png)
 
-[Link to SVG file](A42_graphics/grpc_xds_client_architecture_round_robin.svg)
+[Link to SVG file](graphics/A042/grpc_xds_client_architecture_round_robin.svg)
 
 However, when the `xds_cluster_resolver` policy sees `"RING_HASH"`, it will
 create a priority policy where the child for each priority is a
@@ -302,9 +302,9 @@ create a priority policy where the child for each priority is a
 will be passed along verbatim from the `xds_cluster_resolver` policy's
 config.  The LB policy tree will then look like this:
 
-![gRPC Client Architecture Diagram (Ring Hash)](A42_graphics/grpc_xds_client_architecture_ring_hash.png)
+![gRPC Client Architecture Diagram (Ring Hash)](graphics/A042/grpc_xds_client_architecture_ring_hash.png)
 
-[Link to SVG file](A42_graphics/grpc_xds_client_architecture_ring_hash.svg)
+[Link to SVG file](graphics/A042/grpc_xds_client_architecture_ring_hash.svg)
 
 In the `RING_HASH` case, the endpoint weights will need to be adjusted by
 the locality weight.  We will add a per-address attribute for endpoint

@@ -49,9 +49,9 @@ As part of this design, we are making further changes, splitting the
 `xds_cluster_resolver_experimental` and `xds_cluster_impl_experimental`.
 The new LB policy tree is shown in the following diagram.
 
-![gRPC Client Architecture Diagram](A37_graphics/grpc_xds_client_architecture.png)
+![gRPC Client Architecture Diagram](graphics/A037/grpc_xds_client_architecture.png)
 
-[Link to SVG file](A37_graphics/grpc_xds_client_architecture.svg)
+[Link to SVG file](graphics/A037/grpc_xds_client_architecture.svg)
 
 ### XdsClient ClusterWatcher Changes
 

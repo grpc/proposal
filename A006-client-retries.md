@@ -71,9 +71,9 @@ In some cases, gRPC can guarantee that a request has never been seen by the serv
 
 Lastly, information about number of retry attempts will be exposed to the client and server applications through metadata. Find more details [here](#exposed-retry-metadata).
 
-![State Diagram](A6_graphics/basic_retry.png)
+![State Diagram](graphics/A006/basic_retry.png)
 
-[Link to SVG file](A6_graphics/basic_retry.svg)
+[Link to SVG file](graphics/A006/basic_retry.svg)
 
 ### Detailed Design
 
@@ -100,9 +100,9 @@ Each of these configuration options is detailed in its own section below.
 
 gRPC's call deadline applies across all attempts for a given RPC. For example, if the specified deadline for an RPC is July 23 9:00:00pm PDT the operation will fail after that time regardless of how many attempts were configured or attempted.
 
-![State Diagram](A6_graphics/too_many_attempts.png)
+![State Diagram](graphics/A006/too_many_attempts.png)
 
-[Link to SVG file](A6_graphics/too_many_attempts.svg)
+[Link to SVG file](graphics/A006/too_many_attempts.svg)
 
 ##### Exponential Backoff
 
@@ -161,9 +161,9 @@ If `hedgingPolicy` is specified in a service config choice, the following valida
 2. `hedgingDelay` is an optional field but if specified MUST follow the JSON representation of proto3 Duration type.
 3. `nonFatalStatusCodes` is an optional field but if specified MUST be specified as a JSON array of status codes. Each status code MUST be a valid gRPC status code and specified in the integer form or the case-insensitive string form (eg. [14], ["UNAVAILABLE"] or ["unavailable"]).
 
-![State Diagram](A6_graphics/basic_hedge.png)
+![State Diagram](graphics/A006/basic_hedge.png)
 
-[Link to SVG file](A6_graphics/basic_hedge.svg)
+[Link to SVG file](graphics/A006/basic_hedge.svg)
 
 #### Throttling Retry Attempts and Hedged RPCs
 
@@ -233,9 +233,9 @@ There are five possible types of server responses. The list below enumerates the
     1. Retry policy: Retry in *n* ms. If this attempt also fails, retry delay will reset to initial backoff for the following retry (if applicable)
     2. Hedging policy: Send next hedged request in *n* ms. Subsequent hedged requests will resume at `n + hedgingDelay`
 
-![State Diagram](A6_graphics/StateDiagram.png)
+![State Diagram](graphics/A006/StateDiagram.png)
 
-[Link to SVG file](A6_graphics/StateDiagram.svg)
+[Link to SVG file](graphics/A006/StateDiagram.svg)
 
 ### Retry Internals
 
@@ -243,9 +243,9 @@ There are five possible types of server responses. The list below enumerates the
 
 The retry policy will be implemented in-between the channel and the load balancing policy. That way every retry gets a chance to be sent out on a different subchannel than it originally failed on.
 
-![Where Retries Occur](A6_graphics/WhereRetriesOccur.png)
+![Where Retries Occur](graphics/A006/WhereRetriesOccur.png)
 
-[Link to SVG file](A6_graphics/WhereRetriesOccur.svg)
+[Link to SVG file](graphics/A006/WhereRetriesOccur.svg)
 
 #### When Retries are Valid
 
@@ -289,9 +289,9 @@ RPC failures can occur in four distinct ways:
 3. The RPC reaches the server, but has never been seen by the server application logic.
 4. The RPC is seen by the server application logic, and fails.
 
-![Where RPCs Fail](A6_graphics/WhereRPCsFail.png)
+![Where RPCs Fail](graphics/A006/WhereRPCsFail.png)
 
-[Link to SVG file](A6_graphics/WhereRPCsFail.svg)
+[Link to SVG file](graphics/A006/WhereRPCsFail.svg)
 
 The last case is handled by the configurable retry policy that is the main focus of this document. The second and third cases are retried automatically by the gRPC client library, **regardless** of the retry configuration set by the service owner. We are able to do this because these request have not made it to the server application logic, and thus are always safe to retry.
 
@@ -305,9 +305,9 @@ Since retry throttling is designed to prevent server application overload, and t
 
 Similarly, transparent retries do not count toward the limit of configured RPC attempts (`maxAttempts`).
 
-![State Diagram](A6_graphics/transparent.png)
+![State Diagram](graphics/A006/transparent.png)
 
-[Link to SVG file](A6_graphics/transparent.svg)
+[Link to SVG file](graphics/A006/transparent.svg)
 
 #### Exposed Retry Metadata
 

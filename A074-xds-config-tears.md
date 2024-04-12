@@ -96,9 +96,9 @@ XdsClient for load reporting.
 
 The updated gRPC client xDS architecture is shown below.
 
-![gRPC Client xDS Architecture Diagram](A74_graphics/grpc_client_architecture.png)
+![gRPC Client xDS Architecture Diagram](graphics/A074/grpc_client_architecture.png)
 
-[Link to SVG file](A74_graphics/grpc_client_architecture.svg) 
+[Link to SVG file](graphics/A074/grpc_client_architecture.svg) 
 
 ### Changes in xds Resolver
 

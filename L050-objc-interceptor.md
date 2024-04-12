@@ -60,7 +60,7 @@ Control](https://github.com/grpc/proposal/blob/c28ba74bbacc8c1fb5d269f48d89b06c5
 We structure the interceptors as a chain of objects that are similar to gRPC
 calls but pass requests and responses from one to the next:
 
-![gRPC Objective-C interceptor architecture overview](L50_graphics/overview.png)
+![gRPC Objective-C interceptor architecture overview](graphics/L050/overview.png)
 
 Each interceptor in the chain conforms to a request interface and a response
 interface. The request interface is related to controling the logic of a gRPC

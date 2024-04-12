@@ -47,7 +47,7 @@ SecureCallCredentials inherits CallCredentials and will have an implementation
 that relies on its underlying grpc_call_credentials structure to get the
 debug string contents
 
-![CallCredentials class hierarchy](L63_graphics/call_creds_class_hierarchy.png)
+![CallCredentials class hierarchy](graphics/L063/call_creds_class_hierarchy.png)
 
 ### C Call credentials and its derived classes
 The base C struct grpc_call_credentials will provide a helper debug_string().
@@ -56,7 +56,7 @@ We will discuss how every derived grpc_call_credentials struct will implement
 the debug_string method.  For now we will exclude grpc_plugin_credentials and
 grpc_composite_call_credentials. They will be discussed in separate sections
 
-![C CallCredentials hierarchy](L63_graphics/c_call_creds_hierarchy.png)
+![C CallCredentials hierarchy](graphics/L063/c_call_creds_hierarchy.png)
 
 ### GRPC Oauth2 Token fetcher credentials (`grpc_oauth2_token_fetcher_credentials`)
 Return that the token is present/absent and the token expiration time.
@@ -87,7 +87,7 @@ plugin
 callback uninitialized. The caller has to initialize the method if they plan
 to use the `debug_string` method.**
 
-![GRPC metadata creds plugin codeflow](L63_graphics/plugin_creds_codeflow.png)
+![GRPC metadata creds plugin codeflow](graphics/L063/plugin_creds_codeflow.png)
 
 * The grpc_plugin_credentials composes a grpc_metadata_credentials_plugin
 that has all the callbacks to interact with the Credential type.

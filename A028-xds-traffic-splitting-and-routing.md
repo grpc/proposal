@@ -43,7 +43,7 @@ support the latter.
 
 The new architecture will be:
 
-![gRPC xDS client Architecture](A28_graphics/grpc_xds_client_architecture.png)
+![gRPC xDS client Architecture](graphics/A028/grpc_xds_client_architecture.png)
 
 The next section of this doc covers what fields of RDS response will be
 processed, how the xDS client will convert RDS to service config, and how the

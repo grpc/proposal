@@ -633,9 +633,9 @@ if the implementation ever wanted to.   No known implementations do this, but it
 isn't forbidden.  Specifying the full hierarchy in the key would give rise to
 errors about the channel not being found.
 
-[message ref structure]: A14_graphics/1.png "Message Reference Structure"
-[channel hierarchy 1]: A14_graphics/2.png "Channel Hierarchy"
-[channel hierarchy 2]: A14_graphics/3.png "Channel Hierarchy"
+[message ref structure]: graphics/A014/1.png "Message Reference Structure"
+[channel hierarchy 1]: graphics/A014/2.png "Channel Hierarchy"
+[channel hierarchy 2]: graphics/A014/3.png "Channel Hierarchy"
 [connectivity-semantics]: https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
 
 

@@ -255,9 +255,9 @@ All other fields will be ignored, and all unsupported algorithms will be treated
 
 The `child_policy` config will be the `xds_cluster_impl` policy config that previously would have been at the top level for the priority. For example, when using round robin, the LB policy tree will look like this:
 
-![gRPC Client Architecture Diagram](A50_graphics/grpc_xds_client_architecture.png)
+![gRPC Client Architecture Diagram](graphics/A050/grpc_xds_client_architecture.png)
 
-[Link to SVG file](A50_graphics/grpc_xds_client_architecture.svg)
+[Link to SVG file](graphics/A050/grpc_xds_client_architecture.svg)
 
 
 #### xDS Validation

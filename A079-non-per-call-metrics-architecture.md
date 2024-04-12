@@ -113,7 +113,7 @@ return the previously registered instrument. This would be useful in cases where
 a library is dynamically loaded and unloaded multiple times during the lifetime
 of the process.
 
-![](A79_graphics/global-instruments-registry.png)
+![](graphics/A079/global-instruments-registry.png)
 
 ##### Core
 
@@ -248,7 +248,7 @@ Implementations can choose an alternative form of representation for the global
 stats plugin registry. For example, gRPC Go might choose to register global
 stats plugin through global dial options.
 
-![](A79_graphics/global-stats-plugin-registry-usage.png)
+![](graphics/A079/global-stats-plugin-registry-usage.png)
 
 ##### Scoping Stats Plugins for Channels
 
@@ -263,7 +263,7 @@ make this decision. (The default authority provided is derived from the target
 unless an override was specified on the channel.) Various gRPC components use
 this list of interested stats plugins (`StatsPluginGroup`) to record metrics.
 
-![](A79_graphics/stats-plugin-scoping.png)
+![](graphics/A079/stats-plugin-scoping.png)
 
 In the second approach, stats plugins that are to be scoped to a channel are
 registered with the corresponding channel directly, instead of the global stats

@@ -17,7 +17,7 @@ This document contains the v1 implementation of balancer in gRPC-go, the issues 
 
 ### The v1 implementation
 
-![before](L9_graphics/bar_before.png)
+![before](graphics/L009/bar_before.png)
 
 gRPC talks to balancer directly, but doesn't know about the existence of the resolver. Resolver is essentially a part of balancer from gRPC's point of view. Balancer maintains the pool of resolved addresses and monitors the updates from resolver.
 
@@ -86,7 +86,7 @@ Change the resolver API, balancer API and the structure.
 
 Change the balancer API and structure between gRPC, resolver and balancer.
 
-![after](L9_graphics/bar_after.png)
+![after](graphics/L009/bar_after.png)
 
 In the new structure, gRPC talks to both resolver and balancer directly. gRPC maintains the address pool and connection pool, notifies balancer about the updates from resolver. The balancer calls gRPC callbacks to create and remove connections.
 

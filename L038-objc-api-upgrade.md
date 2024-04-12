@@ -145,7 +145,7 @@ NSData *data = ...;
 ### Design Details
 A figure of the relationships of the main gRPC Objective-C classes exposed as part of the APIs are as below:
 
-![Class diagram](L38_graphics/class_diagram.png)
+![Class diagram](graphics/L038/class_diagram.png)
 
 The green items are classes and relationships that already exist in gRPC and is not changed. The yellow items are new classes for the new API. The white items have both legacy and new components.
 

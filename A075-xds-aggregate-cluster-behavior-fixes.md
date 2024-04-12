@@ -93,15 +93,15 @@ as they should.
 
 The architecture for a non-aggregate cluster will now look like this:
 
-![gRPC Client xDS Architecture Diagram](A75_graphics/grpc_client_architecture_non_aggregate.png)
+![gRPC Client xDS Architecture Diagram](graphics/A075/grpc_client_architecture_non_aggregate.png)
 
-[Link to SVG file](A75_graphics/grpc_client_architecture_non_aggregate.svg)
+[Link to SVG file](graphics/A075/grpc_client_architecture_non_aggregate.svg)
 
 And the architecture for an aggregate cluster will now look like this:
 
-![gRPC Client xDS Architecture Diagram](A75_graphics/grpc_client_architecture_aggregate.png)
+![gRPC Client xDS Architecture Diagram](graphics/A075/grpc_client_architecture_aggregate.png)
 
-[Link to SVG file](A75_graphics/grpc_client_architecture_aggregate.svg)
+[Link to SVG file](graphics/A075/grpc_client_architecture_aggregate.svg)
 
 One important consequence of this change is that we will no longer be
 getting the LB policy config from the aggregate cluster; instead, we

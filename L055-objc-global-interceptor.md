@@ -48,7 +48,7 @@ Users register a global interceptor with the `registerGloablInterceptor` method.
 Once a global interceptor is registered, the global interceptor will be inserted at the very end of the interceptor chain of all calls in the same process.
 
 <p align="center">
-  <img width="213" height="302" src="L55_graphics/global-interceptor-chain.png">
+  <img width="213" height="302" src="graphics/L055/global-interceptor-chain.png">
 </p>
 
 ## Rationale

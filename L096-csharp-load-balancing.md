@@ -24,7 +24,7 @@ grpc-dotnet currently doesn't support any form of load balancing in the client. 
 
 ## Proposal
 
-![Diagram](L96_graphics/diagram.png)
+![Diagram](graphics/L096/diagram.png)
 
 ### Initialization
 
