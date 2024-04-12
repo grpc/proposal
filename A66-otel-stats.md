@@ -273,6 +273,10 @@ func ServerOption(mo MetricsOptions) grpc.ServerOption {}
 
 #### Python
 
+Python provide `OpenTelemetryPlugin` as a base class which user can override to
+have the desired behavior, we also provide an example of how to use this: [gRPC
+Observability Example](https://github.com/grpc/grpc/tree/master/examples/python/observability#grpc-observability-example)
+
 ```python
 
 from opentelemetry.sdk.metrics import MeterProvider
@@ -298,7 +302,7 @@ class OpenTelemetryPlugin:
         self, target: str
     ) -> bool:
         """
-        If set, this will be called per channel to decide whether to record the
+        If overridden, this will be called per channel to decide whether to record the
         target attribute on client or to replace it with "other".
         This helps reduce the cardinality on metrics in cases where many channels
         are created with different targets in the same binary (which might happen
@@ -317,7 +321,7 @@ class OpenTelemetryPlugin:
         self, method: str
     ) -> bool:
         """
-        If set, this will be called with a generic method type to decide whether to
+        If overridden, this will be called with a generic method type to decide whether to
         record the method name or to replace it with "other".
 
         Note that pre-registered methods will always be recorded no matter what this
