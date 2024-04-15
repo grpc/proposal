@@ -30,11 +30,35 @@ Introduce a new LB policy, `random_subsetting`. This policy selects a subset of 
 * When the lb policy is initialized it also creates a random integer `seed`. 
 * After every resolver update the policy picks a new subset. It does this by implementing `rendezvous hashing` algorithm:
   * For every endpoint in the list compute 64-bit hash using `XXH64` function as deined in https://github.com/Cyan4973/xxHash with previosly generated seed.
-  * If an endpoint defines multiple addresses - use the first one.
+  * If an endpoint defines multiple addresses - use the first one as input to the hash function.
   * Sort all endpoints by hash.
   * Pick first `subset_size` values from the list.
 * Pass the resulting subset to the child LB policy.
 * If the number of endpoints is less than `subset_size` always use all available endpoints.
+
+Here is the implementation of this algorithm in pseudocode.
+
+```
+func filter_endpoints(endpoints, subset_size, seed)
+    endpoints_with_hash = []
+    foreach endpoint in endpoints {
+        // Use XXH64 function to compute hash for every endpoint.
+        hash = XXH64(endpoint.addresses[0], seed)
+        endpoints_with_hash.append({
+            hash: hash, 
+            endpoint: endpoint,
+        })
+    }
+
+    // Sort by hash.
+    endpoints_with_hash.sort(func(a, b) { return a.hash < b.hash })
+
+    // Convert endpoints_with_hash list back to the list of endpoints.
+    sorted_endpoints = endpoints_with_hash.map(func(a) { return a.endpoint })
+
+    // Select first subset_size elements.
+    return sorted_endpoints[:subset_size]
+```
 
 ### Characteristics of the selected algorithm
 
