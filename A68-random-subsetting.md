@@ -61,7 +61,7 @@ The graphs provided in the previous section prove this is the case in practice (
 
 The `random_subsetting` LB policy config will be as follows.
 
-```
+```proto
 message LoadBalancingConfig {
     oneof policy {
         RandomSubsettingLbConfig random_subsetting = 21 [json_name = "random_subsetting"];
