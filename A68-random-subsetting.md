@@ -94,7 +94,7 @@ Random subsetting LB won't depend on xDS in any way. People may choose to initia
 
 `random_subsetting` will be added as a new LB policy.
 
-```textproto
+```proto
 package envoy.extensions.load_balancing_policies.random_subsetting.v3;
 message RandomSubsetting {
   google.protobuf.UInt32Value subset_size = 1;
