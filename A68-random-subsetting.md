@@ -20,21 +20,21 @@ Currently, gRPC is lacking a way to select a subset of endpoints available from 
 
 ## Proposal
 
-Introduce a new LB policy, `random_subsetting`. This policy selects a subset of addresses and passes them to the child LB policy. It maintains 2 important properties:
+Introduce a new LB policy, `random_subsetting`. This policy selects a subset of endpoints and passes them to the child LB policy. It maintains 2 important properties:
 * The policy tries to distribute connections among servers as equally as possible. The higher `(N_clients*subset_size)/N_servers` ratio is, the closer the resulting server connection distribution is to uniform.
 * The policy minimizes the amount of connection churn generated during server scale-ups by using [rendezvous hashing](https://en.wikipedia.org/wiki/Rendezvous_hashing)
 
 ### Subsetting algorithm
 
 * The policy receives a single configuration parameter: `subset_size`, which must be configured by the user.
-* When the lb policy is initialized it also creates a random 32-byte long `salt` string. 
+* When the lb policy is initialized it also creates a random integer `seed`. 
 * After every resolver update the policy picks a new subset. It does this by implementing `rendezvous hashing` algorithm:
-  * Concatenate `salt` to each address in the list.
-  * For every resulting entity compute [MurmurHash3](https://en.wikipedia.org/wiki/MurmurHash) hash, which produces 128-byte output.
-  * Sort all entities by hash.
+  * For every endpoint in the list compute 64-bit hash using `XXH64` function as deined in https://github.com/Cyan4973/xxHash with previosly generated seed.
+  * If an endpoint defines multiple addresses - use the first one.
+  * Sort all endpoints by hash.
   * Pick first `subset_size` values from the list.
 * Pass the resulting subset to the child LB policy.
-* If the number of addresses is less than `subset_size` always use all available addresses.
+* If the number of endpoints is less than `subset_size` always use all available endpoints.
 
 ### Characteristics of the selected algorithm
 
@@ -55,7 +55,7 @@ Though it could be done, we don't provide any mathematical guaranties about the 
 
 #### Low connection churn during server rollouts
 
-The graphs provided in the previous section prove this is the case in practice (we rollout all servers in the middle of every test, and there is no visible increase in the number of connections per server) Low connection churn during server rollouts is the primary motivation why rendezvous hashing was used as the subsetting algorithm: it guaranties that if a single server is either added or removed to the IP address list, every client will update at most 1 entry in its subset. This is because the hashes for all unaffected servers remain the same, which guarantees that the order of the servers after sorting also remains stable. The same logic applies to the situation when multiple servers got updated. 
+The graphs provided in the previous section prove this is the case in practice (we rollout all servers in the middle of every test, and there is no visible increase in the number of connections per server) Low connection churn during server rollouts is the primary motivation why rendezvous hashing was used as the subsetting algorithm: it guaranties that if a single server is either added or removed to the endpoints list, every client will update at most 1 entry in its subset. This is because the hashes for all unaffected servers remain the same, which guarantees that the order of the servers after sorting also remains stable. The same logic applies to the situation when multiple servers got updated. 
 
 ### LB Policy Config and Parameters
 
@@ -80,7 +80,7 @@ message RandomSubsettingLbConfig {
 
 ### Handling Parent/Resolver Updates
 
-When the resolver updates the list of addresses, or the LB config changes, Random subsetting LB will run the subsetting algorithm, described above, to filter the endpoint list. Then it will create a new resolver state with the filtered list of the addresses and pass it to the child LB. Attributes and service config from the old resolver state will be copied to the new one. 
+When the resolver updates the list of endpoints, or the LB config changes, Random subsetting LB will run the subsetting algorithm, described above, to filter the endpoint list. Then it will create a new resolver state with the filtered list of the endpoints and pass it to the child LB. Attributes and service config from the old resolver state will be copied to the new one. 
 
 ### Handling Subchannel Connectivity State Notifications
 
