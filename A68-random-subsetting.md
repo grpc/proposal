@@ -4,7 +4,7 @@ A68: Random subsetting with rendezvous hashing LB policy.
 * Approver: 
 * Status: Draft
 * Implemented in: PoC in Go
-* Last updated: [Date]
+* Last updated: 2024-04-15
 * Discussion at: https://groups.google.com/g/grpc-io/c/oxNJT1GgjEg
 
 ## Abstract
@@ -61,7 +61,7 @@ The graphs provided in the previous section prove this is the case in practice (
 
 The `random_subsetting` LB policy config will be as follows.
 
-```
+```proto
 message LoadBalancingConfig {
     oneof policy {
         RandomSubsettingLbConfig random_subsetting = 21 [json_name = "random_subsetting"];
@@ -94,7 +94,7 @@ Random subsetting LB won't depend on xDS in any way. People may choose to initia
 
 `random_subsetting` will be added as a new LB policy.
 
-```textproto
+```proto
 package envoy.extensions.load_balancing_policies.random_subsetting.v3;
 message RandomSubsetting {
   google.protobuf.UInt32Value subset_size = 1;
