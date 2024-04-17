@@ -44,11 +44,13 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 	* `GPR_ASSERT(...)` with `CHECK(...)`
 	* `GPR_DEBUG_ASSERT(...)` with `DCHECK(...)`
 * `gpr_assertion_failed` with `CHECK(...)`
-* `gpr_set_log_function` - This function will be removed. Teams can consider usage of absl AddLogSink. 
+* `gpr_set_log_function` - This function will be removed. Teams can consider usage of LogSink and AddLogSink.
+	* LogSink https://github.com/abseil/abseil-cpp/blob/fa57bfc573453d57a38552eedcce894b0e2d9f5e/absl/log/log_sink.h
+	* AddLogSink https://github.com/abseil/abseil-cpp/blob/fa57bfc573453d57a38552eedcce894b0e2d9f5e/absl/log/log_sink_registry.h
 
-Functions that will be removed 
+### Functions that will be removed 
 * `gpr_log_severity_string` - This wont be needed anymore. 
 * `gpr_should_log` - This wont be needed anymore. 
 
-Functions that will work as before
+### Functions that will work as before
 * `gpr_set_log_verbosity` - This will set the absl verbosity internally. 
