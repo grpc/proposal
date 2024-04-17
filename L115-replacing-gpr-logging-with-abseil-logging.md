@@ -26,10 +26,10 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 
 ## Implementation
 
-### Reference
-* gpr logging header : https://github.com/grpc/grpc/blame/83a17ff4684dc1fb3493a151ac0b655b1c55e766/include/grpc/support/log.h
-* absl logging header : https://github.com/abseil/abseil-cpp/blob/master/absl/log/log.h
-* absl assert header : https://github.com/abseil/abseil-cpp/blob/master/absl/log/check.h
+### References
+* [gpr logging header](https://github.com/grpc/grpc/blame/83a17ff4684dc1fb3493a151ac0b655b1c55e766/include/grpc/support/log.h)
+* [absl logging header](https://github.com/abseil/abseil-cpp/blob/master/absl/log/log.h)
+* [absl assert header](https://github.com/abseil/abseil-cpp/blob/master/absl/log/check.h)
 
 ### Functions that will be removed, and their replacements
 * `gpr_log`
@@ -44,9 +44,7 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 	* `GPR_ASSERT(...)` with `CHECK(...)`
 	* `GPR_DEBUG_ASSERT(...)` with `DCHECK(...)`
 * `gpr_assertion_failed` with `CHECK(...)`
-* `gpr_set_log_function` - This function will be removed. Teams can consider usage of LogSink and AddLogSink.
-	* LogSink https://github.com/abseil/abseil-cpp/blob/fa57bfc573453d57a38552eedcce894b0e2d9f5e/absl/log/log_sink.h
-	* AddLogSink https://github.com/abseil/abseil-cpp/blob/fa57bfc573453d57a38552eedcce894b0e2d9f5e/absl/log/log_sink_registry.h
+* `gpr_set_log_function` - This function will be removed. Teams can consider usage of [LogSink](https://github.com/abseil/abseil-cpp/blob/fa57bfc573453d57a38552eedcce894b0e2d9f5e/absl/log/log_sink.h) and [AddLogSink](https://github.com/abseil/abseil-cpp/blob/fa57bfc573453d57a38552eedcce894b0e2d9f5e/absl/log/log_sink_registry.h).
 
 ### Functions that will be removed 
 * `gpr_log_severity_string` - This wont be needed anymore. 
