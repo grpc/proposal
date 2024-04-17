@@ -1,0 +1,54 @@
+L115: Replacing gpr logging with Abseil logging
+----
+
+* Author(s): tjagtap@google.com
+* Approver: roth@google.com , ctiller@google.com
+* Status: In Review 
+* Implemented in: gRPC C++
+* Last updated: April 18, 2024.
+* Discussion at: (filled after thread exists)
+
+## Abstract
+
+Replacing gpr logging and asserts with Abseil logging and asserts
+
+## Background & Rationale
+
+gRPC is currently maintaining its own version of the logging and assert APIs. The Abseil library released their logs and asserts too. We want to leverage the Abseil library and avoid maintaining our own logging code. Also, the current implementation of gpr_log uses format strings which are not type safe and have exploit potential. Moving to absl logging will eliminate this security risk.
+
+## Related Proposals:
+
+None.
+
+## Proposal
+
+We are proposing to remove all instances of gpr logging and asserts and replace them with their absl equivalents.
+
+## Implementation
+
+### Reference
+* gpr logging header : https://github.com/grpc/grpc/blame/83a17ff4684dc1fb3493a151ac0b655b1c55e766/include/grpc/support/log.h
+* absl logging header : https://github.com/abseil/abseil-cpp/blob/master/absl/log/log.h
+* absl assert header : https://github.com/abseil/abseil-cpp/blob/master/absl/log/check.h
+
+### Functions that will be removed, and their replacements
+* `gpr_log`
+	* `gpr_log(GPR_DEBUG,...)` with `VLOG(2) << ...`
+	* `gpr_log(GPR_INFO,...)` with `LOG(INFO) < ...`
+	* `gpr_log(GPR_ERROR,...)` with `LOG(ERROR) < ...`
+* `gpr_log_message`
+`	* `gpr_log_message(GPR_DEBUG,...)` with `VLOG(2) << ...`
+`	* `gpr_log_message(GPR_INFO,...)` with `LOG(INFO) < ...`
+`	* `gpr_log_message(GPR_ERROR,...)` with `LOG(ERROR) < ...`
+* Asserts
+	* `GPR_ASSERT(...)` with `CHECK(...)`
+	* `GPR_DEBUG_ASSERT(...)` with `DCHECK(...)`
+* `gpr_assertion_failed` with `CHECK(...)`
+* `gpr_set_log_function` - This function will be removed. Teams can consider usage of absl AddLogSink. 
+
+Functions that will be removed 
+* `gpr_log_severity_string` - This wont be needed anymore. 
+* `gpr_should_log` - This wont be needed anymore. 
+
+Functions that will work as before
+* `gpr_set_log_verbosity` - This will set the absl verbosity internally. 
