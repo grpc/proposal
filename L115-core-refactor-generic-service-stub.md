@@ -5,7 +5,7 @@ L115: C-Core Refactor generic service and generic stub
 * Status: Draft
 * Implemented in: C Core
 * Last updated: 2024/04/15
-* Discussion at: https://groups.google.com/g/grpc-io/c/TBA
+* Discussion at: https://groups.google.com/g/grpc-io/c/301w3zXYf8o
 
 ## Abstract
 
@@ -18,7 +18,7 @@ the callback based interfaces.
 This enables services to only depend on the callback based interfaces of the
 generic stub and generic service.
 
-### Related Proposals:
+### Related Proposals
 
 None.
 
