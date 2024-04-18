@@ -54,8 +54,8 @@ Each language will create an "XdsServer" API that will wrap the normal "Server"
 API. This will allow the implementation to see the listening ports, start event,
 stop event, and also allow it access to the server to change behavior (e.g., via
 an interceptor). Users will use the XdsServer API to construct the server
-instead of the existing API. XdsServer will not support ephemeral ports as part
-of this gRFC but may be enhanced in the future.
+instead of the existing API. XdsServer will not support ephemeral ports (binding
+port 0) as part of this gRFC but may be enhanced in the future.
 
 Credential configuration will be managed separately by providing
 XdsServerCredentials, similar to client-side. The user must pass the
@@ -127,6 +127,8 @@ of issues preventing startup progress.
 
 ### xDS Protocol
 
+#### Bootstrap Changes
+
 The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
 ```
 {
@@ -139,9 +141,9 @@ The `GRPC_XDS_BOOTSTRAP` file will be enhanced to have a new field:
 }
 ```
 
+#### Listener Resource Handling
+
 XdsServer will use the normal `XdsClient` to communicate with the xDS server.
-xDS v3 support is required. xDS v2 support is optional and may have lower
-quality standards when adhering to the specifics of v2 when they differ from v3.
 There is no default value for `server_listener_resource_name_template` so if it
 is not present in the bootstrap then server creation or start will fail or the
 XdsServer will become "not serving". XdsServer will perform the `%s` replacement
@@ -152,74 +154,20 @@ the template or its replacement is performed. For example, with an address of
 `[::]:80` and a template of `grpc/server?xds.resource.listening_address=%s`, the
 resource name would be `grpc/server?xds.resource.listening_address=[::]:80`.
 
+Rules for validating `Listener` messages can be found in the
+[Resource Validation section](#resource-validation).
+
 To be useful, the xDS-returned Listener must have an
 [`address`][Listener.address] that matches the listening address provided. The
 Listener's `address` would be a TCP `SocketAddress` with matching `address` and
 `port_value`. The XdsServer must be "not serving" if the address does not match.
 
-The xDS client must NACK the Listener resource if `Listener.listener_filters` is
-non-empty. It must also NACK the Listener resource if
-`Listener.use_original_dst` is present and `true`.
-
-The xDS client must NACK the Listener resource if any entry in
-[`filter_chains`][Listener.filter_chains] or `default_filter_chain` is invalid.
-`FilterChain`s are valid if all of their network `filters` are supported by the
-implementation, the network filters' configuration is valid, and the filter
-names are unique within the `filters` list. Additionally, the `FilterChain` is
-only valid if `filters` contains exactly one entry for the
+Resource validation rules guarantee that each entry in
+[`filter_chains`][Listener.filter_chains] and the `default_filter_chain` have a
+`filters` list with an entry for the
 `envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager`
-filter, HttpConnectionManager hereafter, as the last entry in the list.
-
-`Filter` types are the type contained in the
-[`typed_config`][Filter.typed_config] Any. If the type is
-`udpa.type.v1.TypedStruct`, then its [`type_url`][TypedStruct.type_url] is used
-instead. There is not an equivalent of `envoy.config.route.v3.FilterConfig` for
-network filters. Note that this disagrees with the current documentation in
-`listener_components.proto`, but that documentation is trailing a change to
-Envoy's behavior.
-
-HttpConnectionManager support is required. HttpConnectionManager must have valid
-`http_filters`, as defined by [A39: xDS HTTP Filter Support][A39].
-
-If the `envoy.extensions.filters.http.router.v3.Router` is not present in
-`http_filters`, A39 calls for inserting a special filter that fails all RPCs. If
-an XdsServer implementation does not use RouteConfiguration (as is expected
-today) and does not support any HTTP filters other than the hard-coded Router
-behavior called for in A39, then the special filter that fails all RPCs is not
-required. This is to allow implementations that only support L4 xDS features to
-avoid L7 plumbing and implementation. This has no impact on the resource
-validation and NACKing behavior called for in A39.
-
-If an XdsServer implementation uses RouteConfiguration or supports any HTTP
-filters other than the hard-coded Router, then
-`HttpConnectionManager.route_config` and `HttpConnectionManager.rds` must be
-supported and RouteConfigurations must be validated. RouteConfiguration
-validation logic inherits all previous validations made for client-side usage
-as RDS does not distinguish between client-side and server-side. That is
-predomenently defined in [gRFC A28][A28-validation], although note that
-configuration for all VirtualHosts have been validated on client-side since
-sharing the XdsClient was introduced, yet was not documented in a gRFC. The
-validation must be updated to allow [Route.non_forwarding_action][] as a valid
-`action`. The VirtualHost is selected on a per-RPC basis using the RPC's
-requested `:authority`. Routes are matched the same as on client-side.
-`Route.non_forwarding_action` is expected for all Routes used on server-side and
-`Route.route` continues to be expected for all Routes used on client-side; a
-Route with an inappropriate `action` causes RPCs matching that route and
-reaching the end of the filter chain to fail with UNAVAILABLE. If
-`HttpConnectionManager.rds` references a NACKed resource without a previous good
-version, an unavailable resource because of communication failures with control
-plane or a triggered loading timeout, or a non-existent resource, then all RPCs
-processed by that HttpConnectionManager will fail with UNAVAILABLE.
-
-There are situations when an XdsServer can clearly tell the configuration will
-cause errors, yet it still applies the configuration. In these situations the
-XdsServer should log a warning each time it receives updates for configuration
-in this state. This is known as "configuration error logging." If an XdsServer
-logs such a warning, then it should also log a single warning once there are no
-longer any such errors. Configuration error logging is currently limited to
-broken RDS resources and an unsupported Route `action` (i.e., is not
-`non_forwarding_action`), both of which cause RPCs to fail with UNAVAILABLE as
-described above.
+filter, HttpConnectionManager hereafter, as the last entry in the list. Currently,
+that is the only supported filter, so that will be the only entry in the list.
 
 [Like in Envoy][envoy lds], updates to a Listener cause all older connections on
 that Listener to be gracefully shut down (i.e., "drained") with a default grace
@@ -237,22 +185,75 @@ prevents replacing the Listener when nothing changes. The grace period should be
 adjustable when building the XdsServer and should be described as the "drain
 grace time."
 
+#### RouteConfiguration Resource Handling
+
+> [!NOTE]
+> If an XdsServer implementation does not use RouteConfiguration or support
+> any HTTP filters other than the hard-coded Router, then `RouteConfiguration`
+> handling can be skipped.
+
+For each `FilterChain`, if `HttpConnectionManager.route_config` is set, then
+its value should be used, otherwise if the `HttpConnectionManager.rds` field is
+set, an RDS request should be made for the corresponding `RouteConfiguration`
+resource. RouteConfiguration validation is described in the
+[Resource Validation section](#resource-validation).
+
+#### Configuration Error Logging
+
+There are situations when an XdsServer can clearly tell the configuration will
+cause errors, yet it still applies the configuration. In these situations the
+XdsServer should log a warning each time it receives updates for configuration
+in this state. This is known as "configuration error logging." If an XdsServer
+logs such a warning, then it should also log a single warning once there are no
+longer any such errors. Configuration error logging is currently limited to
+broken RDS resources and an unsupported Route `action` (i.e., is not
+`non_forwarding_action`), both of which cause RPCs to fail with UNAVAILABLE as
+described above.
+
 [Filter.typed_config]: https://github.com/envoyproxy/envoy/blob/928a62b7a12c4d87ce215a7c4ebd376f69c2e080/api/envoy/config/listener/v3/listener_components.proto#L40
 [TypedStruct.type_url]: https://github.com/cncf/udpa/blob/cc1b757b3eddccaaaf0743cbb107742bb7e3ee4f/udpa/type/v1/typed_struct.proto#L38
 [A28-validation]: A28-xds-traffic-splitting-and-routing.md#response-validation
 [Route.non_forwarding_action]: https://github.com/envoyproxy/envoy/blob/5963beae8842982803af1bef04fb5a2a0893c613/api/envoy/config/route/v3/route_components.proto#L242
 [envoy lds]: https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/lds
 
+### Connection and Request Handling
+
+When an XdsServer receives an incoming connection, it should do the following:
+
+ 1. If the state of the server is "not serving", close the connection.
+ 2. Find the most-specifically-matching `FilterChain` for the connection, as
+    described in [the FilterChainMatch section](#filterchainmatch). If nothing
+    matches, use `Listener.default_filter_chain` instead, or if there is no
+    `default_filter_chain`, close the connection.
+ 3. If TLS is supported (see [gRFC A29: xDS TLS Security][A29]), apply the
+    corresponding TLS configuration from the `FilterChain` to the connection.
+
+When the server receives a request on an active connection, it should do the
+following (implementations may reorder these operations):
+
+ 1. If `RouteConfiguration` is supported and if `HttpConnectionManager.rds`
+    references a NACKed resource without a previous good version, an
+    unavailable resource because of communication failures with control plane
+    or a triggered loading timeout, or a non-existent resource, fail the RPC
+    with the UNAVAILABLE status.
+ 2. If `RouteConfiguration` is supported, match the request to a Route using
+    the same rules as on the client. If no route matches or if the matched
+    route does not have the `non_forwarding_action` set, fail the RPC with the
+    UNAVAILABLE status.
+ 3. If any server-side HTTP filters are supported, apply the HTTP filters from
+    the `FilterChain` to the request.
+
 ### FilterChainMatch
 
-Although `FilterChain.filters`s will not be used as part of this gRFC, the
-`FilterChain` contains data that may be used like TLS configuration in
-`transport_socket`. When looking for a FilterChain, the standard matching logic
+When determining which FilterChain applies to a connection, the standard matching logic
 must be used. The [most specific `filter_chain_match`][matching logic] of the
 repeated [`filter_chains`][Listener.filter_chains] should be found for the
-specific connection and if one is not found, the `default_filter_chain` must be
-used if it is provided. If there is no `default_filter_chain` and no chain
-matches, then the connection should be closed without any bytes being sent.
+specific connection.
+
+When finding the most specific `filter_chain_match`, a matching CIDR range with
+a greater `prefix_len` is more specific than a matching CIDR range with a
+smaller `prefix_len`, and a `source_type` value of anything other than `ANY` is
+more specific than a `source_type` value of `ANY`.
 
 If the most-specific matching logic might not produce a unique result, then the
 Listener must be NACKed. This case can only occur if there are duplicate
@@ -334,6 +335,44 @@ connection, it must still be checked when verifying that the most-specific
 matching logic is guaranteed to produce a unique result during Listener
 validation.
 
+### Resource Validation
+
+The `Listener` proto validation rules are modified as follows:
+
+ - The `listener_filters` field must be empty.
+ - The `use_original_dst` field must not be set with the value `true`.
+ - For every entry in the `filter_chains` field:
+   - The `filter_chain_match` field must be normalized as described in the
+     [FilterChainMatch section](#filterchainmatch) and there must not be
+     duplication between any normalized matchers in the `Listener`.
+ - For the `default_filter_chain` field and every entry in the `filter_chains`
+   field:
+   - The `filters` field must have exactly one entry. Inside of it:
+     - The `type_url` field must have the value
+       `envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager`
+     - Inside the `value` field, decoded as a `HttpConnectionManager` message:
+       - The `http_filters` field must be validated as specified in
+         [A39: xDS HTTP Filter Support][A39].
+       - If any `RouteConfiguration` features are supported:
+         - Either the `route_config` field or the `rds` field must be set
+         - If the `route_config` field is set, its value must be validated
+           according to the `RouteConfiguration` validation rules.
+
+> [!NOTE]
+> Once other `Fitler` types are supported, the validation logic will need to
+> be expanded to accept other `Filter` types. `Filter` types are the type contained in the
+> [`typed_config`][Filter.typed_config] Any. If the type is
+> `udpa.type.v1.TypedStruct`, then its [`type_url`][TypedStruct.type_url] is used
+> instead. The `HttpConnectionManager` filter must always be present in the
+> last entry in each `filters` list.
+
+The `RouteConfiguration` proto validation rules (predomenently defined in [gRFC A28][A28-validation]) are modified as follows:
+
+ - Every entry of `virtual_hosts` is validated, not just the most specifically matching one.
+ - For each entry of `virtual_hosts`:
+   - For each entry of `routes`:
+     - The `action` field can now have the value `non_forwarding_action` in addition to other accepted values.
+
 ### Language-specifics
 
 The overall "wrapping" server API has many language-specific ramifications. We
@@ -346,7 +385,7 @@ reference" and "release a reference" on the shared instance, or similar
 behavior. Such sharing does not avoid the need of shutting down XdsClients when
 no longer in use; they are a resource and must not be leaked.
 
-### C-Core
+#### C-Core
 
 C-Core will expose a new opaque type `grpc_server_config_fetcher` and API to
 create a server config fetcher for xDS, and register it with a server
@@ -403,7 +442,7 @@ to invoke when the serving status of the server changes. A status code of
 `GRPC_STATUS_OK` signifies that the server is serving, and not-serving
 otherwise. The API does not provide any guarantees around duplicate updates.
 
-### C++
+#### C++
 
 C++ will expose a new type `XdsServerBuilder` that mirrors the `ServerBuilder`
 API. The `XdsServerBuilder` will use the C core API described above to configure
@@ -447,7 +486,7 @@ to a `Listener` are received.
 The support for ephemeral ports on an xDS-enabled server is based on the support
 provided by C-Core, and hence not supported at the moment.
 
-### Wrapped Languages
+#### Wrapped Languages
 
 This section is a sketch to convey the "feel" of the API. But details may vary.
 
@@ -465,7 +504,7 @@ based on `server.stop()`, but given C++ lacks this avenue the C API probably
 will not need this notification.
 
 
-### Java
+#### Java
 
 Create an `XdsServerBuilder` that extends `ServerBuilder` and delegates to a
 "real" builder. The server returned from `builder.build()` would be an xDS-aware
@@ -519,7 +558,7 @@ client-side, although with the added step of needing to process the
 FilterChainMatch for the specific connection.
 
 
-### Go
+#### Go
 
 Create an `xds.GRPCServer` struct that would internally contain an unexported
 `grpc.Server`. It would inject its own `StreamServerInterceptor` and
