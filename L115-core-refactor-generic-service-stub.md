@@ -25,16 +25,16 @@ None.
 ## Proposal
 
 We will move `CallbackGenericService` in `async_generic_service.h` to a new file
-`async_generic_service_callback.h` and make it a new public target
-`:generic_service_callback`. `async_generic_service.h` will include 
-`async_generic_service_callback.h` and existing dependencies will continue to
+`callback_generic_service.h` and make it a new public target
+`:callback_generic_service`. `async_generic_service.h` will include
+`callback_generic_service.h` and existing dependencies will continue to
 include both.
 
 We will also move move callback based interfaces of `TemplatedGenericStub` in
 `generic_stub.h` to a new class `TemplatedGenericStubCallback` in
 `generic_stub_callback.h` and make it a new public target
 `:generic_stub_callback`. `CallbackGenericService` will inherit
-`CallbackGenericServiceCallback` and existing dependencies will continue to
+`CallbackGenericService` and existing dependencies will continue to
 include both.
 
 ## Implementation
