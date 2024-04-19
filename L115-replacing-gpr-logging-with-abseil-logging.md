@@ -1,4 +1,4 @@
-L115: Replacing gpr logging with Abseil logging
+L116: Replacing gpr logging with Abseil logging
 ----
 
 * Author(s): tjagtap@google.com
@@ -50,6 +50,45 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 * `gpr_log_severity_string` - This wont be needed anymore. 
 * `gpr_should_log` - This wont be needed anymore. 
 
-### Will work as before
-* `GRPC_VERBOSITY` - environment variable will continue to work as before if it is set.
-* `gpr_set_log_verbosity` - This will set the absl verbosity internally. 
+### Will work similar to before
+* `gpr_set_log_verbosity` and GRPC_VERBOSITY will work as follows
+
+```
+void SomeInitFunctionCalledByGrpcInit() {
+	optional<string> verbosity = GetEnv("GRPC_VERBOSITY");
+	if (verbosity.has_value()) {
+		if (verbosity == "GPR_INFO" || verbosity == "INFO") {
+			SetMinLogLevel(INFO);
+		}
+		else if (verbosity == "GPR_ERROR" || verbosity == "ERROR") {
+			SetMinLogLevel(ERROR);
+		}
+		else if (verbosity == "WARNING") {
+			SetMinLogLevel(WARNING);
+		}
+		else if (verbosity == "GPR_DEBUG") {
+			SetGlobalVLogLevel(2);
+			SetMinLogLevel(INFO);
+		}
+		else {
+			LOG(ERROR) << "Unknown log verbosity: " << verbosity;
+		}
+	}
+}
+
+void gpr_set_log_verbosity(gpr_log_severity verbosity) {
+		if (verbosity == GPR_INFO) {
+			SetMinLogLevel(INFO);
+		}
+		else if (verbosity == GPR_ERROR) {
+			SetMinLogLevel(ERROR);
+		}
+		else if (verbosity == GPR_DEBUG) {
+			SetGlobalVLogLevel(2);
+			SetMinLogLevel(INFO);
+		}
+		else {
+			LOG(ERROR) << "Unknown log verbosity: " << verbosity;
+		}
+}
+```
