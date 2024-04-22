@@ -1,0 +1,62 @@
+A80: gRPC Metrics for TCP connection
+----
+* Author(s):  Yash Tibrewal (@yashykt), Nana Pang (@nanahpang), Yousuk Seung (@yousukseung)
+* Approver: Craig Tiller (@ctiller), Mark Roth (@markdroth)
+* Status: {Draft, In Review, Ready for Implementation, Implemented}
+* language: {...}
+* Last updated: 2024-04-18
+* Discussion at: {...}
+
+## Abstract
+
+This document proposes adding new TCP connection metrics to gRPC for improved network analysis and debugging.
+
+## Background
+
+To improve the network debugging capabilities for gRPC users, we propose adding per-connection TCP metrics in gRPC. The metrics will utilize the metrics framework outlined in  [A79].
+
+### Related Proposals: 
+* [A79]: gRPC Non-Per-Call Metrics Framework (pending)
+
+[A79]: https://github.com/grpc/proposal/pull/421
+
+## Proposal
+
+This document proposes changes to the following gRPC components.
+
+#### Per-Connection TCP Metrics
+
+We will provide the following metrics:
+- `grpc.tcp.min_rtt`
+- `grpc.tcp.delivery_rate`
+- `grpc.tcp.packets_sent`
+- `grpc.tcp.packets_retransmitted`
+- `grpc.tcp.packets_spurious_retransmitted`
+
+The metrics will have label:
+
+| Name        | Disposition | Description |
+| ----------- | ----------- | ----------- |
+| grpc.tcp.remote_peer_address | optional | Store the peer address info in the format as `ip:port`. |
+
+The metrics will be exported as:
+
+| Name          | Type  | Unit  | Labels  | Description |
+| ------------- | ----- | ----- | ------- | ----------- |
+| grpc.tcp.min_rtt | Distribution | s | grpc.tcp.remote_peer_string | Reports TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints. |
+| grpc.tcp.delivery_rate | Distribution | bit/s | grpc.tcp.remote_peer_string | Records the most recent non-app-limited throughput at the time that Fathom samples the connection statistics. |
+| grpc.tcp.packets_sent | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets TCP sends in the calculation period. |
+| grpc.tcp.packets_retransmitted | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
+| grpc.tcp.packets_spurious_retransmitted | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets spuriously retransmitted packets in the calculation period. |
+
+### Metric Stability
+
+All metrics added in this proposal will start as experimental. The long term goal will be to
+de-experimentalize them and have them be on by default, but the exact
+criteria for that change are TBD.
+
+### Temporary environment variable protection
+
+This proposal does not include any features enabled via external I/O, so
+it does not need environment variable protection.
+
