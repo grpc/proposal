@@ -198,6 +198,9 @@ set, an RDS request should be made for the corresponding `RouteConfiguration`
 resource. RouteConfiguration validation is described in the
 [Resource Validation section](#resource-validation).
 
+The server should enter the serving state only after every RDS watcher has
+received some kind of notification, including errors.
+
 #### Configuration Error Logging
 
 There are situations when an XdsServer can clearly tell the configuration will
