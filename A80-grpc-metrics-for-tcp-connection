@@ -47,7 +47,7 @@ The metrics will be exported as:
 | grpc.tcp.delivery_rate | Distribution | bit/s | grpc.tcp.remote_peer_string | Records the most recent non-app-limited throughput at the time that Fathom samples the connection statistics. |
 | grpc.tcp.packets_sent | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets TCP sends in the calculation period. |
 | grpc.tcp.packets_retransmitted | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
-| grpc.tcp.packets_spurious_retransmitted | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets spuriously retransmitted packets in the calculation period. |
+| grpc.tcp.packets_spurious_retransmitted | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
 
 ### Metric Stability
 
