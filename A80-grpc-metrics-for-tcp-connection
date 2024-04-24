@@ -43,8 +43,8 @@ The metrics will be exported as:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.tcp.min_rtt | Distribution | s | grpc.tcp.remote_peer_string | Reports TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints. |
-| grpc.tcp.delivery_rate | Distribution | bit/s | grpc.tcp.remote_peer_string | Records the most recent non-app-limited throughput at the time that Fathom samples the connection statistics. |
+| grpc.tcp.min_rtt | Distribution | s | grpc.tcp.remote_peer_string | Records TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints. |
+| grpc.tcp.delivery_rate | Distribution | bit/s | grpc.tcp.remote_peer_string | Records latest throughput measured of the TCP connection. |
 | grpc.tcp.packets_sent | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets TCP sends in the calculation period. |
 | grpc.tcp.packets_retransmitted | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
 | grpc.tcp.packets_spurious_retransmitted | Counter | {packet} | grpc.tcp.remote_peer_string | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
