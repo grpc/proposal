@@ -4,7 +4,7 @@ Transport Selection
 * Approver: roth, ejona86
 * Status: Draft
 * Implemented in: none
-* Last updated: 2023-11-07
+* Last updated: 2024-04-25
 * Discussion at: TODO: TBD
 
 ## Abstract
@@ -35,24 +35,6 @@ This proposal is for a standard way of selecting which transport to use in gRPC
 clients and servers. The exact details will be left up to gRPC implementations
 to decide; only the high-level method is included in this design.
 
-Some additional design goals of this proposal:
-
-1. Transport and stream APIs should expose gRPC semantics as defined in the
-   (pending) [Call Semantics
-   Specification](https://github.com/grpc/grpc/pull/15460) and hide HTTP/2
-   semantics and grpc's wire protocol semantics.
-1. Stream APIs should support object-based messages to facilitate an in-process
-   transport that avoids serializing and deserializing in order to transmit a
-   message.
-   * Note that some features, e.g. [client
-     retries](https://github.com/grpc/proposal/blob/master/A6-client-retries.md)
-     may require byte-based message support due to message caching. Such
-     features may be unsupported for transports that cannot also support
-     byte-based messages.
-1. The API for creating transports will encapsulate the logic for connecting to
-   addresses (e.g. net.Dial) as an implementation detail of the transport.
-   Similarly, credentials handshaking must happen within the transport.
-
 The following are the high level components of this design:
 
 * Client: Name Resolvers and LB policies specify an address _type_ for every
@@ -63,8 +45,7 @@ The following are the high level components of this design:
 * Client and Server: A registry is used to determine how to create transports
   for each address type.
 
-* Client and Server: Define an API for transports and streams. As mentioned
-  above, these APIs should expose gRPC semantics and not HTTP/2 semantics. The
+* Client and Server: Define requirements for transport and stream APIs.  The
   specifics of the APIs will be left up to the individual gRPC client library
   authors.
 
@@ -86,6 +67,24 @@ types, the listener's address type will be looked up in a registry to find a
 listener factory. The constructed listener will produce transports for new
 connections satisfying a common interface.
 
+### Client and Server Transports
+
+Transport and stream APIs should expose gRPC semantics as defined in the
+(pending) [Call Semantics
+Specification](https://github.com/grpc/grpc/pull/15460) and hide HTTP/2
+semantics and grpc's wire protocol semantics.
+
+Stream APIs should support object-based messages to facilitate an in-process
+transport based on copying message objects directly instead of serializing and
+deserializing for transmission.  Note that some features, e.g. [client
+retries](https://github.com/grpc/proposal/blob/master/A6-client-retries.md) may
+require byte-based message support due to message caching. Such features may be
+unsupported for transports that cannot also support byte-based messages.
+
+The API for creating transports should encapsulate the logic for connecting to
+addresses (e.g. net.Dial) as an implementation detail of the transport.
+Similarly, credentials handshaking should happen within the transport.
+
 ### Temporary environment variable protection
 
 Since all transport selection logic takes place in code and is not configured by
@@ -95,8 +94,8 @@ I/O, no environment variable is needed.
 
 Alternatives considered:
 
-* Hardcode other transports, like the in-memory transport. Example
-  `NewInMemoryChannel()`.
+* Hardcode support for all non-standard (non-HTTP/2) transports, like the
+  in-memory transport.  Example `NewInMemoryChannel()`.
 
   This does not allow as much flexibility and requires recompilation to change
   the way channels are created.
@@ -116,4 +115,4 @@ Alternatives considered:
 ## Implementation
 
 As this is a high-level, cross-language design, implementation design and
-details will be left up to the gRPC library authors.
+details will be left up to the gRPC library authors to handle independently.
