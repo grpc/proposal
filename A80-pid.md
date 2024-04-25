@@ -24,7 +24,6 @@ The `pid` balancer takes a different approach: instead of deterministically calc
 
 ### Related Proposals:
 * [gRFC A51][A51]
-* [gRFC A52][A52]
 * [gRFC A58][A58]
 * [gRFC A68][A68]
 
