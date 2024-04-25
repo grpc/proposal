@@ -3,7 +3,7 @@ L116: Replacing gpr logging with Abseil logging
 
 * Author(s): tjagtap@google.com
 * Approver: roth@google.com , ctiller@google.com
-* Status: In Review 
+* Status: Draft 
 * Implemented in: gRPC C++
 * Last updated: April 18, 2024.
 * Discussion at: (filled after thread exists)
