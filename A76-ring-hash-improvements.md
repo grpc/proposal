@@ -3,8 +3,8 @@ A76: Improvements to the Ring Hash LB Policy
 * Author(s): atollena
 * Approver: markdroth
 * Status: Draft
-* Implemented in: <language, ...>
-* Last updated: 2024-04-02
+* Implemented in: Go
+* Last updated: 2024-04-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/ZKI1RIF0e_s/m/oBXqOFb0AQAJ
 
 ## Abstract
@@ -221,7 +221,9 @@ considered the following alternative solutions:
 
 ## Implementation
 
-Will provide an implementation in Go.
+Implemented in Go:
+- Allow setting the request hash key: https://github.com/grpc/grpc-go/pull/7170
+- Make endpoint hash key configurable, and set it from EDS: https://github.com/grpc/grpc-go/pull/7161
 
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
