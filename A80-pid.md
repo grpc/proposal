@@ -104,35 +104,6 @@ pidController class {
 
 The `update` method is expected to be called on a regular basis, with `samplingInterval` being the duration since the last update. The return value is the control signal which, if applied to the system, should minimize the control error. In the next section, we'll discuss how this control signal is converted to `wrr` weight.
 
-
-Your explanation of the PID controller's implementation and pseudo-code looks good, but there are a few typographical errors and clarifications that could be made to improve readability and accuracy. Here's a revised version of your description and pseudo-code:
-
-A PID controller is a control loop feedback mechanism that continuously calculates an error value as the difference between a desired setpoint (referenceSignal) and a measured process variable (actualSignal). It then applies a correction based on proportional, integral, and derivative terms (denoted P, I, and D respectively), hence the name.
-
-In our implementation, we will not be using the integral part. The integral component is useful for speeding up convergence when the referenceSignal changes sharply. In our case, we will be converging the load on the subchannels to a mean value, which is mostly stable.
-
-Here is a sample implementation in pseudo-code:
-
-pseudo
-Copy code
-pidController class {
-  proportionalGain float
-  derivativeGain float
-
-  controlError float
-
-  update(referenceSignal float, actualSignal float, samplingInterval duration) float {
-    previousError = this.controlError
-    // Save last controlError so we can use it to calculate derivative during next update
-    this.controlError = referenceSignal - actualSignal
-    controlErrorDerivative = (this.controlError - previousError) / samplingInterval.Seconds()
-    controlSignal = this.proportionalGain * this.controlError +
-                    this.derivativeGain * controlErrorDerivative
-    return controlSignal
-  }
-}
-The update method is expected to be called on a regular basis, with samplingInterval being the duration since the last update. The return value is the control signal which, if applied to the system, should minimize the control error. In the next section, we'll discuss how this control signal is converted to wrr weight.
-
 The `proportionalGain` and `derivativeGain` parameters are taken from the LB config. `proportionalGain` should be scaled by the `WeightUpdatePeriod` value. This is necessary because `controlErrorDerivative` is inversely proportional to the sampling interval, which in turn is close to the `WeightUpdatePeriod` as we will be updating the PID state once per `WeightUpdatePeriod`. If `WeightUpdatePeriod` is too small, `controlErrorDerivative` becomes too large and dominates the resulting control error.
 
 ### Extending WRR balancer
