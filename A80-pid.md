@@ -227,10 +227,7 @@ func onEDFSchedulerUpdate(data callbackData) {
 }
 ```
 
-The proposal is to make `wrrCallbacks` public. Even though this introduces new public API there are a few reasons that can justify this decision:
-* The interface is concise and generic.
-* Besides PID there are other cases when people need to fork `wrr`. Spotify [uses](https://www.youtube.com/watch?v=8E5zVdEfwi0) ORCA based custom gRPC load balancer to reduce cross-zone traffic. We are also considering incorporating things like latency and cross-az penalty in our load balancing decisions. With the proposed `wrrCallbacks` interface use-cases like this can be covered easily, as users have full control over LB weights. At the same time users don't have to write their own EDF scheduler and handle details related to subchannel management and interactions with resolvers. 
-* Existing ORCA extensibility points don't cover such use-cases. We can have custom utilization metric, but what we need is the ability to combine server metrics with the client-side view to generate the resulting weight.
+The proposal is to make `wrrCallbacks` public. This has a number of significant benefits. Besides PID, there are other cases where one might need to extend `wrr`. For example, Spotify [demonstrates](https://www.youtube.com/watch?v=8E5zVdEfwi0) a gRPC load balancer to reduce cross-zone traffic – this can be implemented nicely in terms of `wrr` weights. We are also considering the same and incorporating things like latency into our load balancing decisions. Existing ORCA extension points don't cover these use cases. We leverage ORCA for custom server utilization metrics, but we also need the ability to combine server and client metrics to generate the resulting weight. The alternative is to write our own balancer with custom EDF scheduler and handle details related to subchannel management and interactions with resolvers. With this new API, use cases like this can be covered naturally, users have full control over the end-to-end definition of weights.
 
 ### Dealing with Oscillations
 
@@ -256,15 +253,17 @@ As outlined in the previous section, smoothing the utilization measurements in s
 func recordMetricXXX(value float) {
   // Ensure updates are atomic to avoid corruption of the circular buffer
   lock.Lock()
+  
+  if circularBufferForMetricXXX.isFull() {
+    sum -= circularBufferForMetricXXX.last()
+  }
+  sum += val
+  
   // Add the new value to the circular buffer, which automatically removes the oldest value if the buffer is full
   circularBufferForMetricXXX.add(value)
 
-  sum = 0
   // Calculate the average of the values in the circular buffer
-  foreach val in circularBufferForMetricXXX {
-    sum += val
-  }
-  metricXXXvalue = sum / circularBufferForMetricXXX.size()
+  cXXXvalue = sum / circularBufferForMetricXXX.size()
   lock.Unlock()
 }
 ```
