@@ -129,8 +129,9 @@ wrrCallbacks interface {
   // onEDFSchedulerUpdate is called after the wrr balancer recreates the EDF scheduler.
   onEDFSchedulerUpdate(data callbackData)
 }
-
-// Implementation for PID balancer
+```
+Here is how `pid` balancer implements this interface.
+```
 func onSubchannelAdded(subchannelID int, data callbackData) {
   // Do nothing
 }
