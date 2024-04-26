@@ -163,8 +163,8 @@ func onLoadReport(subchannelId int, load loadReport, data callbackData, conf cal
 
   // Ensure at least WeightUpdatePeriod has passed since the last update.
   // Prevents corruption of PID controller's internal state, which could happen in the following cases:
-	// - If 2 updates are very close to each other in time, samplingInterval ~= 0 and signal ~= infinity.
-	// - If multiple updates happened during a single WeightUpdatePeriod, the actual weights are not applied,
+	// 1. If 2 updates are very close to each other in time, samplingInterval ~= 0 and signal ~= infinity.
+	// 2. If multiple updates happened during a single WeightUpdatePeriod, the actual weights are not applied,
 	// but the PID controller keeps growing the weights and it may easily pass the balancing point.
 	if time.Since(lastApplied) < conf.WeightUpdatePeriod {
 		return -1
