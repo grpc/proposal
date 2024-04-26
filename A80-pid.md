@@ -4,8 +4,8 @@ A68: PID LB policy.
 * Approver: 
 * Status: Draft
 * Implemented in: PoC in Go
-* Last updated: 2024-04-18
-* Discussion at: 
+* Last updated: 2024-04-26
+* Discussion at: https://groups.google.com/g/grpc-io/c/eD2bE2JzQ2w
 
 ## Abstract
 
