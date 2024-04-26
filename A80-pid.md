@@ -163,54 +163,54 @@ func onLoadReport(subchannelId int, load loadReport, data callbackData, conf cal
 
   // Ensure at least WeightUpdatePeriod has passed since the last update.
   // Prevents corruption of PID controller's internal state, which could happen in the following cases:
-	// If 2 updates are very close to each other in time, samplingInterval ~= 0 and signal ~= infinity.
-	// If multiple updates happened during a single WeightUpdatePeriod, the actual weights are not applied,
-	// but the PID controller keeps growing the weights and it may easily pass the balancing point.
-	if time.Since(lastApplied) < conf.WeightUpdatePeriod {
-		return -1
-	}
+  // * If 2 updates are very close to each other in time, samplingInterval ~= 0 and signal ~= infinity.
+  // * If multiple updates happened during a single WeightUpdatePeriod, the actual weights are not applied,
+  // but the PID controller keeps growing the weights and it may easily pass the balancing point.
+  if time.Since(lastApplied) < conf.WeightUpdatePeriod {
+    return -1
+  }
 
   // use value calculated in the onEDFSchedulerUpdate method
-	meanUtilization = data.meanUtilization
+  meanUtilization = data.meanUtilization
 
   // call the PID controller to get the value of the control signal.
-	controlSignal = data.pidController.update({
-		referenceSignal:  meanUtilization,
-		actualSignal:     utilization,
-		samplingInterval: time.Since(lastApplied),
-	})
+  controlSignal = data.pidController.update({
+    referenceSignal:  meanUtilization,
+    actualSignal:     utilization,
+    samplingInterval: time.Since(lastApplied),
+  })
 
-	// Normalize the signal.
-	// If meanUtilization ~= 0 the signal will be ~= 0 as well, and convergence will become painfully slow.
-	// If, meanUtilization >> 1 the signal may become very high, which could lead to oscillations.
-	if meanUtilization > 0 {
-		controlSignal *= 1 / meanUtilization
-	}
+  // Normalize the signal.
+  // If meanUtilization ~= 0 the signal will be ~= 0 as well, and convergence will become painfully slow.
+  // If, meanUtilization >> 1 the signal may become very high, which could lead to oscillations.
+  if meanUtilization > 0 {
+    controlSignal *= 1 / meanUtilization
+  }
 
   lastAppliedWeight = data.lastAppliedWeightPerSubchannel[subchannelID]
 
   // Use controlSignal to adjust the weight.
   // First calculate a multiplier that will be used to determine how much weight should be changed.
   // The higher is the absolute value of the controlSignal the more we need to adjust the weight.
-	if controlSignal >= 0 {
+  if controlSignal >= 0 {
     // in this case mult should belong to the [1,inf) interval, so we will be increasing the weight.
-		mult = 1.0 + controlSignal
-	} else {
+    mult = 1.0 + controlSignal
+  } else {
     // in this case mult should belong to (0, 1) interval, so we will be decreasing the weight.
-		mult = -1.0 / (controlSignal - 1.0)
-	}
-	weight = lastAppliedWeight * mult
+    mult = -1.0 / (controlSignal - 1.0)
+  }
+  weight = lastAppliedWeight * mult
 
   // Clamp weight
-	if weight > conf.MaxWeight {
-		weight = conf.MaxWeight
-	}
-	if weight < conf.MinWeight {
-		weight = conf.MinWeight
-	}
+  if weight > conf.MaxWeight {
+    weight = conf.MaxWeight
+  }
+  if weight < conf.MinWeight {
+    weight = conf.MinWeight
+  }
 
   // Save resulting utilization and weight.
-	data.utilizationPerSubchannel[subchannelId] = utilization
+  data.utilizationPerSubchannel[subchannelId] = utilization
   data.lastAppliedWeightPerSubchannel[subchannelID] = weight
 
   return weight
