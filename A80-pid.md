@@ -13,7 +13,7 @@ This document proposes a design for a new load balancing policy called pid. The 
 
 ## Background
 
-The `wrr` policy uses the following formula to calculate subchannel weights, which is desribed in more details in the "Subchannel Weights" section of [gRFC A58][A58]:
+The `wrr` policy uses the following formula to calculate subchannel weights, which is described in more details in the "Subchannel Weights" section of [gRFC A58][A58]:
 
 $$weight = \dfrac{qps}{utilization + \dfrac{eps}{qps} * error\\_utilization\\_penalty}$$
 
@@ -23,9 +23,9 @@ The `pid` balancer takes a different approach: instead of deterministically calc
 
 
 ### Related Proposals:
-* [gRFC A51][A51]
-* [gRFC A58][A58]
-* [gRFC A68][A68]
+* [gRFC A51: Custom Backend Metrics Support][A51]
+* [gRFC A58: `weighted_round_robin` LB policy][A58]
+* [gRFC A68: Random subsetting with rendezvous hashing LB policy.][A68]
 
 ## Proposal
 
@@ -104,39 +104,41 @@ pidController class {
 
 The `update` method is expected to be called on a regular basis, with `samplingInterval` being the duration since the last update. The return value is the control signal which, if applied to the system, should minimize the control error. In the next section, we'll discuss how this control signal is converted to `wrr` weight.
 
-The `proportionalGain` and `derivativeGain` parameters are taken from the LB config. `proportionalGain` should be scaled by the `WeightUpdatePeriod` value. This is necessary because `controlErrorDerivative` is inversely proportional to the sampling interval, which in turn is close to the `WeightUpdatePeriod` as we will be updating the PID state once per `WeightUpdatePeriod`. If `WeightUpdatePeriod` is too small, `controlErrorDerivative` becomes too large and dominates the resulting control error.
+The `proportionalGain` and `derivativeGain` parameters are taken from the LB config. `proportionalGain` should be additionally scaled by the `WeightUpdatePeriod` value. This is necessary because derivative error is calculated like `controlErrorDerivative = (this.controlError - previousError) / samplingInterval.Seconds()` and dividing by a very small `samplingInterval` value makes the result too big. `WeightUpdatePeriod` is roughly equal to `samplingInterval` as we will be updating the PID state once per `WeightUpdatePeriod`.
 
 ### Extending WRR balancer
 
-The `pid` balancer reuses 90% of the wrr code. The proposal is to refactor the `wrr` codebase and introduce several hooks that allow other balancers, like `pid`, to reuse the code efficiently without the need for duplication. Initially, these hooks will remain internal to avoid prematurely establishing a new public API. This approach is mostly language-specific, but the general plan is as follows:
+The `pid` balancer reuses 90% of the wrr code. The proposal is to refactor the `wrr` codebase and introduce several hooks that allow other balancers, like `pid`, to reuse the code efficiently without the need for duplication. This approach is mostly language-specific, but the general plan is as follows:
 
 * Add a `callbacks` object to the `wrr` balancer: This object will contain a series of callback functions that wrr will invoke at various stages of its lifecycle.
 * Introduce a `callbackData` object: This will be utilized by the callbacks to store any data that is reused across different callback functions. The `wrr` balancer will pass this object to all callbacks and treat it as an opaque blob of data.
+* Add `callbackConfig` object to the `wrr` balancer: This object will contain the PID specific part of the user provided config as defined in the `LB Policy Config and Parameters` section. The `wrr` balancer will pass this object to all callbacks and treat it as an opaque blob of data.
 
 The `callbacks` object, which is to be provided by the balancer builder, will implement the following interface (expressed in pseudo-code):
 
 ```
 wrrCallbacks interface {
-  onSubchannelAdded(subchannelID int, data callbackData)
-  onSubchannelRemoved(subchannelID int, data callbackData)
+  onSubchannelAdded(subchannelID int, data callbackData, conf callbackConfig)
+  onSubchannelRemoved(subchannelID int, data callbackData, conf callbackConfig)
 
   // onLoadReport is called when a new load report is received for a given subchannel. 
   // This function returns the new weight for a subchannel. If the returned value is -1,
   // the subchannel should keep using the old value.
   // onLoadReport won't be called during the blackout period.
-  onLoadReport(subchannelId int, data callbackData, conf lbConfig, report loadReport) float
+  onLoadReport(subchannelId int, report loadReport, data callbackData, conf callbackConfig) float
 
   // onEDFSchedulerUpdate is called after the wrr balancer recreates the EDF scheduler.
-  onEDFSchedulerUpdate(data callbackData)
+  onEDFSchedulerUpdate(data callbackData, conf callbackConfig)
 }
 ```
-Here is how `pid` balancer implements this interface.
+
+Here is how `pid` balancer implements `wrrCallbacks` interface.
 ```
-func onSubchannelAdded(subchannelID int, data callbackData) {
+func onSubchannelAdded(subchannelID int, data callbackData, conf callbackConfig) {
   // Do nothing
 }
 
-func onSubchannelRemoved(subchannelID int, data callbackData) {
+func onSubchannelRemoved(subchannelID int, data callbackData, conf callbackConfig) {
   // Remove subchannelID from two maps that store the value of last utilization
   // and last applied weight per subchannel
   delete(data.utilizationPerSubchannel, subchannelID)
@@ -144,7 +146,7 @@ func onSubchannelRemoved(subchannelID int, data callbackData) {
 }
 
 
-func onLoadReport(subchannelId int, data callbackData, conf lbConfig, load loadReport, lastApplied time) float {
+func onLoadReport(subchannelId int, load loadReport, data callbackData, conf callbackConfig) float {
   utilization = load.ApplicationUtilization
   if utilization == 0 {
     utilization = load.CpuUtilization
@@ -163,7 +165,7 @@ func onLoadReport(subchannelId int, data callbackData, conf lbConfig, load loadR
   // Prevents corruption of PID controller's internal state, which could happen in the following cases:
 	// * If 2 updates are very close to each other in time, samplingInterval ~= 0 and signal ~= infinity.
 	// * If multiple updates happened during a single WeightUpdatePeriod, the actual weights are not applied,
-	// but PID controller keep growing the weight and it may easily pass the balancing point.
+	// but the PID controller keeps growing the weights and it may easily pass the balancing point.
 	if time.Since(lastApplied) < conf.WeightUpdatePeriod {
 		return -1
 	}
@@ -171,7 +173,7 @@ func onLoadReport(subchannelId int, data callbackData, conf lbConfig, load loadR
   // use value calculated in the onEDFSchedulerUpdate method
 	meanUtilization = data.meanUtilization
 
-  // call PID controlelr to get the value of the control signal.
+  // call the PID controller to get the value of the control signal.
 	controlSignal = data.pidController.update({
 		referenceSignal:  meanUtilization,
 		actualSignal:     utilization,
@@ -179,7 +181,7 @@ func onLoadReport(subchannelId int, data callbackData, conf lbConfig, load loadR
 	})
 
 	// Normalize the signal.
-	// If meanUtilization ~= 0 the signal will be ~= 0 as well, and convergence will becoma painfully slow.
+	// If meanUtilization ~= 0 the signal will be ~= 0 as well, and convergence will become painfully slow.
 	// If, meanUtilization >> 1 the signal may become very high, which could lead to oscillations.
 	if meanUtilization > 0 {
 		controlSignal *= 1 / meanUtilization
@@ -188,10 +190,10 @@ func onLoadReport(subchannelId int, data callbackData, conf lbConfig, load loadR
   lastAppliedWeight = data.lastAppliedWeightPerSubchannel[subchannelID]
 
   // Use controlSignal to adjust the weight.
-  // First caclulate multiplier that will be used to determine how much weight should be changed.
+  // First calculate a multiplier that will be used to determine how much weight should be changed.
   // The higher is the absolute value of the controlSignal the more we need to adjust the weight.
 	if controlSignal >= 0 {
-    // in this case mult should belong to [1,inf) interval, so we will be increasing the weight.
+    // in this case mult should belong to the [1,inf) interval, so we will be increasing the weight.
 		mult = 1.0 + controlSignal
 	} else {
     // in this case mult should belong to (0, 1) interval, so we will be decreasing the weight.
@@ -225,6 +227,11 @@ func onEDFSchedulerUpdate(data callbackData) {
 }
 ```
 
+The proposal is to make `wrrCallbacks` public. Even though this introduces new public API there are a few reasons that can justify this decision:
+* The interface is concise and generic.
+* Besides PID there are other cases when people need to fork `wrr`. Spotify [uses](https://www.youtube.com/watch?v=8E5zVdEfwi0) ORCA based custom gRPC load balancer to reduce cross-zone traffic. We are also considering incorporating things like latency and cross-az penalty in our load balancing decisions. With the proposed `wrrCallbacks` interface use-cases like this can be covered easily, as users have full control over LB weights. At the same time users don't have to write their own EDF scheduler and handle details related to subchannel management and interactions with resolvers. 
+* Existing ORCA extensibility points don't cover such use-cases. We can have custom utilization metric, but what we need is the ability to combine server metrics with the client-side view to generate the resulting weight.
+
 ### Dealing with Oscillations
 
 One of the main challenges with the pid balancer is the potential for oscillations. Several factors influence this likelihood:
@@ -233,7 +240,7 @@ One of the main challenges with the pid balancer is the potential for oscillatio
   * **Direct Load Reporting**: Here, the delay depends on the request frequency and the `WeightUpdatePeriod` setting. Typically, with the default `WeightUpdatePeriod` of 1 second, propagation is very fast, making this the preferred option when using the pid balancer.
   * **OOB Load Reporting**: Users can control the delay by adjusting the `OobReportingPeriod` setting. While the delay is usually larger compared to direct reporting, achieving perfect convergence with OOB reporting is still possible on workloads with stable loads.
 2. **Proportional Gain:**
-  * A high `ProportionalGain` can lead to significant weight adjustments, potentially overshooting the balancing point. The default value of 0.1 generally allows for fast convergence (typically faster than 30 seconds—on workloads that are not spiky) while not generating oscillations.
+  * A high `ProportionalGain` can lead to significant weight adjustments, potentially overshooting the balancing point. The default value of 0.1 generally allows for fast convergence (typically faster than 30 seconds on workloads that are not spiky) while not generating oscillations.
 3. **Stability of Server Load:**
   * The pid balancer struggles with servers that exhibit spiky loads because the mean utilization is not stable, which disrupts the convergence direction for all subchannels. Unfortunately, this is one aspect users cannot directly control from the client side. To address this, the proposal includes implementing an "average window" mechanism on the server, which will be discussed in the next section.
 4. **Number of Subchannels:**
@@ -269,7 +276,7 @@ This modification allows for more stable load reporting by averaging fluctuation
 ## Rationale
 ### Alternatives Considered:
 
-The main driver for this propsal was the need to implement subsetting. We explored the possibility of using deterministic subsetting in https://github.com/grpc/proposal/pull/383  and got push-back on this for the reasons explained [here](https://github.com/grpc/proposal/pull/383#discussion_r1334587561)
+The main driver for this proposal was the need to implement subsetting. We explored the possibility of using deterministic subsetting in https://github.com/grpc/proposal/pull/383  and got push-back on this for the reasons explained [here](https://github.com/grpc/proposal/pull/383#discussion_r1334587561)
 
 Additionally, we considered the "scaled wrr" approach, which would adjust the imbalance created by random subsetting by multiplying the server utilization by the number of connections a server receives. Feedback on this approach suggested that it might be more beneficial to pursue more generic solutions that focus on achieving load convergence rather than attempting to tailor the `wrr` method specifically to fit subsetting use cases.
 
