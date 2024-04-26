@@ -3,9 +3,9 @@
 *   Author: Yash Tibrewal (@yashykt)
 *   Approver: Mark Roth (@markdroth), Craig Tiller (@ctiller)
 *   Status: Draft
-*   Implemented in: [grpc/grpc#36374](https://github.com/grpc/grpc/pull/36374)
+*   Implemented in:
 *   Last updated: 2024-04-25
-*   Discussion at:
+*   Discussion at: https://groups.google.com/g/grpc-io/c/X_iApPGvwmo
 
 ## Abstract
 
