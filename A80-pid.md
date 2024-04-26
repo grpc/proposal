@@ -13,7 +13,7 @@ This document proposes a design for a new load balancing policy called pid. The 
 
 ## Background
 
-The `wrr` policy uses the following formula to calculate subchannel weights::
+The `wrr` policy uses the following formula to calculate subchannel weights, which is desribed in more details in the "Subchannel Weights" section of [gRFC A58][A58]:
 
 $$weight = \dfrac{qps}{utilization + \dfrac{eps}{qps} * error\\_utilization\\_penalty}$$
 
