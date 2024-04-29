@@ -34,12 +34,12 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 ### Functions that will be removed, and their replacements
 * `gpr_log`
 	* `gpr_log(GPR_DEBUG,...)` with `VLOG(2) << ...`
-	* `gpr_log(GPR_INFO,...)` with `LOG(INFO) < ...`
-	* `gpr_log(GPR_ERROR,...)` with `LOG(ERROR) < ...`
+	* `gpr_log(GPR_INFO,...)` with `LOG(INFO) << ...`
+	* `gpr_log(GPR_ERROR,...)` with `LOG(ERROR) << ...`
 * `gpr_log_message`
 	* `gpr_log_message(GPR_DEBUG,...)` with `VLOG(2) << ...`
-	* `gpr_log_message(GPR_INFO,...)` with `LOG(INFO) < ...`
-	* `gpr_log_message(GPR_ERROR,...)` with `LOG(ERROR) < ...`
+	* `gpr_log_message(GPR_INFO,...)` with `LOG(INFO) << ...`
+	* `gpr_log_message(GPR_ERROR,...)` with `LOG(ERROR) << ...`
 * Asserts
 	* `GPR_ASSERT(...)` with `CHECK(...)`
 	* `GPR_DEBUG_ASSERT(...)` with `DCHECK(...)`
