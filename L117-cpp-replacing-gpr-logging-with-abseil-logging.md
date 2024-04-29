@@ -1,4 +1,4 @@
-L117: Replacing gpr logging with Abseil logging
+Replacing gpr logging with Abseil logging
 ----
 
 * Author(s): tjagtap@google.com
