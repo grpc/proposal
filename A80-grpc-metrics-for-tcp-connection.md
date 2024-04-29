@@ -63,6 +63,6 @@ it does not need environment variable protection.
 
 ## Implementation
 
-Will be implemented in C-core, but currently have no plans to implement in other languages.
+Will be implemented in C-core, and currently have no plans to implement in other languages.
 
 
