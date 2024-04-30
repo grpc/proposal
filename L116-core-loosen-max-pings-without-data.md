@@ -20,23 +20,29 @@ pings have been sent without data/header frames being sent.
 use of HTTP2 pings as a keepalive mechanism in gRPC. In gRPC C++-Core, the
 following channel arguments implement keepalives. (Refer
 [Keepalive User Guide for gRPC Core](https://github.com/grpc/grpc/blob/master/doc/keepalive.md)
-for details.) - * `GRPC_ARG_KEEPALIVE_TIME_MS` - Period after which a keepalive
-ping is sent. * `GRPC_ARG_KEEPALIVE_TIMEOUT_MS` - Period after which sender of
-keepalive pings closes transport if it does not receive an acknowledgement of
-the ping. * `GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS` - Allows keepalive pings
-to be sent even if there are no calls in flight. *
-`GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS` - Minimum allowed time
-between a server receiving successive ping frames without sending data/header
-frames. * `GRPC_ARG_HTTP2_MAX_PING_STRIKES` - Number of bad pings server will
-tolerate before closing the connection.
+for details.) -
+
+*   `GRPC_ARG_KEEPALIVE_TIME_MS` - Period after which a keepalive ping is sent.
+*   `GRPC_ARG_KEEPALIVE_TIMEOUT_MS` - Period after which sender of keepalive
+    pings closes transport if it does not receive an acknowledgement of the
+    ping.
+*   `GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS` - Allows keepalive pings to be
+    sent even if there are no calls in flight.
+*   `GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS` - Minimum allowed
+    time between a server receiving successive ping frames without sending
+    data/header frames.
+*   `GRPC_ARG_HTTP2_MAX_PING_STRIKES` - Number of bad pings server will tolerate
+    before closing the connection.
 
 In addition to these channel arguments, the following channel arguments were
 introduced in gRPC C++-Core to play nicely with proxies that break connections
-that send too many pings. *
-`GRPC_ARG_HTTP2_MIN_SENT_PING_INTERVAL_WITHOUT_DATA_MS` - Minimum time sender of
-a ping would wait between consecutive ping frames without receiving a
-data/header frame. * `GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA` - Maximum number of
-pings that can be sent without a data/header frame.
+that send too many pings.
+
+*   `GRPC_ARG_HTTP2_MIN_SENT_PING_INTERVAL_WITHOUT_DATA_MS` - Minimum time
+    sender of a ping would wait between consecutive ping frames without
+    receiving a data/header frame.
+*   `GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA` - Maximum number of pings that can
+    be sent without a data/header frame.
 
 These two additional channel arguments have historically caused a lot of pain
 and confusion among users of gRPC C++-Core and dependent languages when
