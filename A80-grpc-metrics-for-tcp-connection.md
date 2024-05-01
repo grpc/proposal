@@ -44,11 +44,11 @@ The metrics will be exported as:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.tcp.min_rtt | Histogram | s | grpc.tcp.peer_address, grpc.tcp.local_address | Records TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints. |
-| grpc.tcp.delivery_rate | Histogram | bit/s | grpc.tcp.peer_address, grpc.tcp.local_address | Records latest throughput measured of the TCP connection. |
-| grpc.tcp.packets_sent | Counter | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets TCP sends in the calculation period. |
-| grpc.tcp.packets_retransmitted | Counter | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
-| grpc.tcp.packets_spurious_retransmitted | Counter | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
+| grpc.tcp.min_rtt | Histogram (double) | s | grpc.tcp.peer_address, grpc.tcp.local_address | Records TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints. |
+| grpc.tcp.delivery_rate | Histogram (double) | bit/s | grpc.tcp.peer_address, grpc.tcp.local_address | Records latest throughput measured of the TCP connection. |
+| grpc.tcp.packets_sent | Counter (int64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets TCP sends in the calculation period. |
+| grpc.tcp.packets_retransmitted | Counter (int64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
+| grpc.tcp.packets_spurious_retransmitted | Counter (int64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
 
 ### Metric Stability
 
