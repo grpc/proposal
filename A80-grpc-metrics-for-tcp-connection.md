@@ -50,7 +50,7 @@ The metrics will be exported as:
 | grpc.tcp.packets_retransmitted | Counter (int64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
 | grpc.tcp.packets_spurious_retransmitted | Counter (int64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
 
-The TCP metrics are collected by enabling `SO_TIMESTAMPING` in kernel TCP through `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))`. The kernel TCP then wil capture packet timestamps on transmission. 
+The metrics are acquired by enabling the `SO_TIMESTAMPING` option in the kernel's TCP stack via the `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))` system call. This configuration allows the kernel to capture packet timestamps during transmission and subsequently provide relevant socket information when `getsockopt(TCP_INFO)` is invoked.
 
 #### Reference: 
 * Fathom: https://dl.acm.org/doi/pdf/10.1145/3603269.3604815
