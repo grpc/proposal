@@ -10,7 +10,7 @@ L46: C-core: New TLS Credentials API
 
 This proposal aims to provide the following features in a new TLS credential API:
 1. credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without shutting down
-1. custom authorization check: perform a user-specified check at the end of authentication, and allow the client side to disable certificate verification and hostname verification check    
+1. custom verification check: perform a user-specified check at the end of authentication, and allow the client side to disable certificate verification and hostname verification check    
 1. TLS version configuration: optionally configure the minimum and maximum of the TLS version that will be used in the handshake
 
 ## Background
@@ -31,7 +31,7 @@ Beisdes requests from Open Source Community, with the growth of GCP, we've seen 
 
 Hence we propose an API that will meet the following requirements:  
 
-1. Flexible enough to support multiple use cases. Users should be able to write their own reloading or authorization logic if the provided ones doesn't fit their needs
+1. Flexible enough to support multiple use cases. Users should be able to write their own reloading or verification logic if the provided ones doesn't fit their needs
 1. The credentials reloading should be efficient. We shall reload only when needed rather than reloading per TLS connection
 1. C core API needs to be simple enough, so that most of existing SSL credentials in wrapped languages can migrate to call this new API
 
@@ -348,126 +348,92 @@ class MyCertificateProvider: public grpc::CertificateProviderInterface {
 };
 
 ```
-### Custom Authorization
-```c
-typedef struct grpc_tls_authorization_check_arg  grpc_tls_authorization_check_arg;
-typedef struct grpc_tls_authorization_check_config  grpc_tls_authorization_check_config;
+### Custom Verification
+```c++
+// Contains the verification-related information associated with a connection
+// request. Users should not directly create or destroy this request object, but
+// shall interact with it through CertificateVerifier's Verify() and Cancel().
+class TlsCustomVerificationCheckRequest {
+ public:
+  explicit TlsCustomVerificationCheckRequest(
+      grpc_tls_custom_verification_check_request* request);
+  ~TlsCustomVerificationCheckRequest() {}
 
-GRPCAPI int grpc_tls_credentials_options_set_authorization_check_config(
-    grpc_tls_credentials_options* options,
-    grpc_tls_authorization_check_config* config);
+  grpc::string_ref target_name() const;
+  grpc::string_ref peer_cert() const;
+  grpc::string_ref peer_cert_full_chain() const;
+  grpc::string_ref common_name() const;
+  // The subject name of the root certificate used to verify the peer chain
+  // If verification fails or the peer cert is self-signed, this will be an
+  // empty string. If verification is successful, it is a comma-separated list,
+  // where the entries are of the form "FIELD_ABBREVIATION=string"
+  // ex: "CN=testca,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU"
+  // ex: "CN=GTS Root R1,O=Google Trust Services LLC,C=US"
+  grpc::string_ref verified_root_cert_subject() const;
+  std::vector<grpc::string_ref> uri_names() const;
+  std::vector<grpc::string_ref> dns_names() const;
+  std::vector<grpc::string_ref> email_names() const;
+  std::vector<grpc::string_ref> ip_names() const;
 
-// TODO(gtcooke94) This is really custom verification, not authorization? Change it all?
-/** ------------------------------------ Authorization Check ------------------------------------ */
+}
 
-/** callback function provided by gRPC used to handle the result of server
-    authorization check. It is used when schedule API is implemented
-    asynchronously, and serves to bring the control back to gRPC C core.  */
-typedef void (*grpc_tls_on_authorization_check_done_cb)(
-    grpc_tls_authorization_check_arg* arg);
+// The base class of all internal verifier implementations, and the ultimate
+// class that all external verifiers will eventually be transformed into.
+// To implement a custom verifier, do not extend this class; instead,
+// implement a subclass of ExternalCertificateVerifier. Note that custom
+// verifier implementations can compose their functionality with existing
+// implementations of this interface, such as HostnameVerifier, by delegating
+// to an instance of that class.
+class CertificateVerifier {
+ public:
+  ~CertificateVerifier();
 
-/** A struct containing all information necessary to schedule/cancel a server
-    authorization check request.
-    - cb and cb_user_data represent a gRPC-provided callback and an argument
-      passed to it.
-    - success will store the result of server authorization check. That is,
-      if success returns a non-zero value, it means the authorization check
-      passes and if returning zero, it means the check fails.
-   - target_name is the name of an endpoint the channel is connecting to.
-   - peer_cert represents a complete certificate chain including both
-     signing and leaf certificates.
-   - status and error_details contain information
-     about errors occurred when a server authorization check request is
-     scheduled/cancelled.
-   - config is a pointer to the unique
-     grpc_tls_authorization_check_config instance that this argument
-     corresponds to.
-   - context is a pointer to a wrapped language implementation of this
-     grpc_tls_authorization_check_arg instance.
-   - destroy_context is a pointer to a caller-provided method that cleans
-      up any data associated with the context pointer.
-*/
-struct grpc_tls_authorization_check_arg {
-  grpc_tls_on_authorization_check_done_cb cb;
-  void* cb_user_data;
-  int success;
-  const char* target_name;
-  const char* peer_cert;
-  const char* peer_cert_full_chain;
-  grpc_status_code status;
-  grpc_tls_error_details* error_details;
-  grpc_tls_authorization_check_config* config;
-  void* context;
-  void (*destroy_context)(void* ctx);
+  // Verifies a connection request. The check on each internal verifier could be
+  // either synchronous or asynchronous, and we will need to use return value to
+  // know.
+  //
+  // request: the verification information associated with this request
+  // callback: This will only take effect if the verifier is asynchronous.
+  //           The function that gRPC will invoke when the verifier has already
+  //           completed its asynchronous check. Callers can use this function
+  //           to perform any additional checks. The input parameter of the
+  //           std::function indicates the status of the verifier check.
+  // sync_status: This will only be useful if the verifier is synchronous.
+  //              The status of the verifier as it has already done it's
+  //              synchronous check.
+  // return: return true if executed synchronously, otherwise return false
+  bool Verify(TlsCustomVerificationCheckRequest* request,
+              std::function<void(grpc::Status)> callback,
+              grpc::Status* sync_status);
+
+  // Cancels a verification request previously started via Verify().
+  // Used when the connection attempt times out or is cancelled while an async
+  // verification request is pending.
+  //
+  // request: the verification information associated with this request
+  void Cancel(TlsCustomVerificationCheckRequest* request);
 };
 
-/** Create a grpc_tls_authorization_check_config instance.
-    - config_user_data is config-specific, read-only user data
-      that works for all channels created with a credential using the config.
-    - schedule is a pointer to an application-provided callback used to invoke
-      server authorization check API. The implementation of this method has to
-      be non-blocking, but can be performed synchronously or asynchronously.
-      1)If processing occurs synchronously, it populates arg->result,
-      arg->status, and arg->error_details and returns zero.
-      2) If processing occurs asynchronously, it returns a non-zero value. The
-      application then invokes arg->cb when processing is completed. Note that
-      arg->cb cannot be invoked before schedule API returns.
-    - cancel is a pointer to an application-provided callback used to cancel a
-      server authorization check request scheduled via an asynchronous schedule
-      API. arg is used to pinpoint an exact check request to be cancelled. The
-      operation may not have any effect if the request has already been
-      processed.
-    - destruct is a pointer to an application-provided callback used to clean up
-      any data associated with the config.
-*/
-GRPCAPI grpc_tls_authorization_check_config*
-grpc_tls_authorization_check_config_create(
-    const void* config_user_data,
-    int (*schedule)(void* config_user_data,
-                    grpc_tls_authorization_check_arg* arg),
-    void (*cancel)(void* config_user_data,
-                   grpc_tls_authorization_check_arg* arg),
-    void (*destruct)(void* config_user_data));
+// A CertificateVerifier that doesn't perform any additional checks other than
+// certificate verification, if specified.
+// Note: using this solely without any other authentication mechanisms on the
+// peer identity will leave your applications to the MITM(Man-In-The-Middle)
+// attacks. Users should avoid doing so in production environments.
+class NoOpCertificateVerifier : public CertificateVerifier {
+ public:
+  NoOpCertificateVerifier();
+};
+
+// A CertificateVerifier that will perform hostname verification, to see if the
+// target name set from the client side matches the identity information
+// specified on the server's certificate.
+class HostNameCertificateVerifier : public CertificateVerifier {
+ public:
+  HostNameCertificateVerifier();
+};
 ```
-Custom authorization can be performed either synchronously or asynchronously.
-Here is an example of how it could be done synchronously:
-```c
-int TlsAuthorizationCheckSchedule(
-    void* /*config_user_data*/, grpc_tls_authorization_check_arg* arg) {
-  if (arg->target_name == "google.com") {
-    arg->status = GRPC_STATUS_OK;
-    arg->success = 1;
-    return 0;
-  }
-  arg->status = GRPC_STATUS_CANCELLED;
-  arg->success = 0;
-  return 0;
-}
-grpc_tls_authorization_check_config* config = grpc_tls_authorization_check_config_create(nullptr, 
-    &TlsAuthorizationCheckSchedule, nullptr, nullptr);
-grpc_tls_credentials_options_set_authorization_check_config(options, config);
-```
-And example for asynchronous check:
-```c
-void TimeConsumingOperation(grpc_tls_authorization_check_arg* arg) {
-  // ... Some time-consuming operations ...
-  if (arg->target_name == "google.com") {
-    arg->status = GRPC_STATUS_OK;
-    arg->success = 1;
-    (*arg->cb)(arg);
-  } else {
-    arg->status = GRPC_STATUS_CANCELLED;
-    arg->success = 0;
-    (*arg->cb)(arg);
-  }
-}
-int TlsAuthorizationCheckSchedule(
-    void* /*config_user_data*/, grpc_tls_authorization_check_arg* arg) {
-  pthread_t thread;
-  pthread_create(&thread, NULL, TimeConsumingOperation, arg);
-  return 1;
-}
-grpc_tls_authorization_check_config* config = grpc_tls_authorization_check_config_create(nullptr, 
-    &TlsAuthorizationCheckSchedule, nullptr, nullptr);
-grpc_tls_credentials_options_set_authorization_check_config(options, config);
-```
+
+
+
+
+
