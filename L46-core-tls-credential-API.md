@@ -1,6 +1,6 @@
 L46: C-core: New TLS Credentials API
 ----
-* Author(s): ZhenLian, gtcooke94
+* Author(s): gtcooke94, ZhenLian
 * Approver: 
 * Status: Draft
 * Implemented in:
@@ -27,7 +27,7 @@ For example, it's becoming more and more popular to use SPIFFE ID as the identit
 
 Another requirement is to reload the root and identity credentials without shutting down the server, because certificates will eventually expire and the ability to rotate the certificates is essential to a cloud application.
 
-Beisdes requests from Open Source Community, with the growth of GCP, we've seen more and more internal use cases of these features.   
+Besides requests from Open Source Community, with the growth of GCP, we've seen more and more internal use cases of these features.   
 
 Hence we propose an API that will meet the following requirements:  
 
@@ -43,86 +43,94 @@ Hence we propose an API that will meet the following requirements:
 ## Proposal
 
 ### TLS credentials and TLS Options
-This part of the proposal introduces `grpc_tls_credentials_options` and TLS credentials. Users use `grpc_tls_credentials_options` to configure the specific security properties they want, and build the client/server credential by passing in `grpc_tls_credentials_options`.
+This part of the proposal introduces `TlsCredentialsOptions` and TLS credentials. Users use `TlsCredentialsOptions` to configure the specific security properties they want, and build the client/server credential by passing in `TlsCredentialsOptions`.
 This section only covers the configuration not related to credential reloading and custom verification. Configurations related to those two topics are explained in the latter sections.
 
-```c
-/** --- TLS channel/server credentials ---
- * It is used for experimental purpose for now and subject to change. */
+```c++
+// Base class of configurable options specified by users to configure their
+// certain security features supported in TLS. It is used for experimental
+// purposes for now and it is subject to change.
+class TlsCredentialsOptions {
+ public:
+  // Constructor for base class TlsCredentialsOptions.
+  //
+  // @param certificate_provider the provider which fetches TLS credentials that
+  // will be used in the TLS handshake
+  TlsCredentialsOptions();
+  ~TlsCredentialsOptions();
 
-typedef struct grpc_tls_credentials_options grpc_tls_credentials_options;
+  // Copy constructor does a deep copy of the underlying pointer. No assignment
+  // permitted
+  TlsCredentialsOptions(const TlsCredentialsOptions& other);
+  TlsCredentialsOptions& operator=(const TlsCredentialsOptions& other) = delete;
 
-GRPCAPI grpc_tls_credentials_options* grpc_tls_credentials_options_create(void);
+  // ---- Setters for member fields ----
+  // Sets the certificate provider used to store root certs and identity certs.
+  void set_certificate_provider(
+      std::shared_ptr<CertificateProviderInterface> certificate_provider);
+  // Watches the updates of root certificates with name |root_cert_name|.
+  // If used in TLS credentials, setting this field is optional for both the
+  // client side and the server side.
+  // If this is not set on the client side, we will use the root certificates
+  // stored in the default system location, since client side must provide root
+  // certificates in TLS(no matter single-side TLS or mutual TLS).
+  // If this is not set on the server side, we will not watch any root
+  // certificate updates, and assume no root certificates needed for the server
+  // (in the one-side TLS scenario, the server is not required to provide root
+  // certs). We don't support default root certs on server side.
+  void watch_root_certs();
+  // Sets the name of root certificates being watched, if |watch_root_certs| is
+  // called. If not set, an empty string will be used as the name.
+  //
+  // @param root_cert_name the name of root certs being set.
+  void set_root_cert_name(const std::string& root_cert_name);
+  // Watches the updates of identity key-cert pairs with name
+  // |identity_cert_name|. If used in TLS credentials, it is required to be set
+  // on the server side, and optional for the client side(in the one-side
+  // TLS scenario, the client is not required to provide identity certs).
+  void watch_identity_key_cert_pairs();
+  // Sets the name of identity key-cert pairs being watched, if
+  // |watch_identity_key_cert_pairs| is called. If not set, an empty string will
+  // be used as the name.
+  //
+  // @param identity_cert_name the name of identity key-cert pairs being set.
+  void set_identity_cert_name(const std::string& identity_cert_name);
+  // Sets the Tls session key logging configuration. If not set, tls
+  // session key logging is disabled. Note that this should be used only for
+  // debugging purposes. It should never be used in a production environment
+  // due to security concerns.
+  //
+  // @param tls_session_key_log_file_path: Path where tls session keys would
+  // be logged.
+  void set_tls_session_key_log_file_path(
+      const std::string& tls_session_key_log_file_path);
+  // Sets the certificate verifier used to perform post-handshake peer identity
+  // checks.
+  void set_certificate_verifier(
+      std::shared_ptr<CertificateVerifier> certificate_verifier);
 
-/**
- * Set grpc_ssl_client_certificate_request_type in credentials options.
- * If not set, we will use the default value GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE.
- */
-GRPCAPI void grpc_tls_credentials_options_set_cert_request_type(
-    grpc_tls_credentials_options* options,
-    grpc_ssl_client_certificate_request_type type);
+  // Sets the crl provider, see CrlProvider for more details.
+  void set_crl_provider(std::shared_ptr<CrlProvider> crl_provider);
 
-/**
- * Sets the options of whether to verify server certs on the client side.
- * Passing in a non-zero value indicates verifying the certs.
- */
-GRPCAPI void grpc_tls_credentials_options_set_verify_server_cert(
-    grpc_tls_credentials_options* options, int verify_server_cert);
-
-/**
- * Sets whether or not a TLS server should send a list of CA names in the
- * ServerHello. This list of CA names is read from the server's trust bundle, so
- * that the client can use this list as a hint to know which certificate it
- * should send to the server.
- *
- * WARNING: This API is extremely dangerous and should not be used. If the
- * server's trust bundle is too large, then the TLS server will be unable to
- * form a ServerHello, and hence will be unusable. The definition of "too large"
- * depends on the underlying SSL library being used and on the size of the CN
- * fields of the certificates in the trust bundle.
- */
-GRPCAPI void grpc_tls_credentials_options_set_send_client_ca_list(
-    grpc_tls_credentials_options* options, bool send_client_ca_list);
-
-/**
- * Sets the minimum TLS version that will be negotiated during the TLS
- * handshake. If not set, the underlying SSL library will set it to TLS v1.2.
- */
-GRPCAPI void grpc_tls_credentials_options_set_min_tls_version(
-    grpc_tls_credentials_options* options, grpc_tls_version min_tls_version);
-
-/**
- * Sets the maximum TLS version that will be negotiated during the TLS
- * handshake. If not set, the underlying SSL library will set it to TLS v1.3.
- */
-GRPCAPI void grpc_tls_credentials_options_set_max_tls_version(
-    grpc_tls_credentials_options* options, grpc_tls_version max_tls_version);
-
-/**
- * Creates a TLS channel credential object based on the
- * grpc_tls_credentials_options specified by callers. The
- * grpc_channel_credentials will take the ownership of the |options|. The
- * security level of the resulting connection is GRPC_PRIVACY_AND_INTEGRITY.
- */
-grpc_channel_credentials* grpc_tls_credentials_create(
-    grpc_tls_credentials_options* options);
-
-/**
- * Creates a TLS server credential object based on the
- * grpc_tls_credentials_options specified by callers. The
- * grpc_server_credentials will take the ownership of the |options|.
- */
-grpc_server_credentials* grpc_tls_server_credentials_create(
-    grpc_tls_credentials_options* options);
+  // Sets the minimum TLS version that will be negotiated during the TLS
+  // handshake. If not set, the underlying SSL library will use TLS v1.2.
+  // @param tls_version: The minimum TLS version.
+  void set_min_tls_version(grpc_tls_version tls_version);
+  // Sets the maximum TLS version that will be negotiated during the TLS
+  // handshake. If not set, the underlying SSL library will use TLS v1.3.
+  // @param tls_version: The maximum TLS version.
+  void set_max_tls_version(grpc_tls_version tls_version);
 ```
 
 Here is an example of how to use this API:
-```c
+```c++
 /* Create option and set basic security primitives. */
-grpc_tls_credentials_options* options = grpc_tls_credentials_options_create();
-grpc_tls_credentials_options_set_verify_server_cert(options, 1);
-grpc_tls_server_credentials_set_min_tls_version(options, TLS1_2);
-grpc_tls_server_credentials_set_max_tls_version(options, TLS1_3);
+TlsCredentialsOptions options = TlsCredentialsOptions();
+options.set_verify_server_cert(true);
+options.set_min_tls_version(TLS1_2);
+options.set_max_tls_version(TLS1_3);
+
+//TODO(gtcooke94 C++ify)
 /* Create TLS channel credentials. */
 grpc_channel_credentials* creds = grpc_tls_credentials_create(options);
 ```
