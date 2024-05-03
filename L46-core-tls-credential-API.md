@@ -310,88 +310,23 @@ GRPCAPI void grpc_tls_certificate_distributor_set_watch_status_callback(
     grpc_tls_certificate_distributor* distributor,
     grpc_tls_certificate_watch_status_cb cb, void* user_data);
 ```
-If only the already implemented providers are needed, e.g. file-watcher provider or static-cert provider, those provider implementations can be directly passed in without caring about `Distributor`. 
-In that case, How to wrap it should be straightforward. 
-The Core API will be called like this: 
-```c
-grpc_tls_credentials_options* options = grpc_tls_credentials_options_create();
-// Use the file-based provider for reloading certificates.
-grpc_tls_certificate_provider* file_provider = grpc_tls_certificate_provider_file_watcher_create(...);
-grpc_tls_credentials_options_set_certificate_provider(options, file_provider);
-```
 
-Each wrap language is free to choose the design suitable for its language characteristics, but consider some general advices first:
+If only the already implemented providers are needed, e.g. file-watcher provider or static-cert provider, those provider implementations can be directly passed in without caring about `Distributor`. 
+In that case, how to wrap it should be straightforward. 
+
+Each wrap language is free to choose the design suitable for its language characteristics, but consider some general advice first:
 1. create an interface-like class `ProviderInterface` which contains two functions GetDistributor() and Destroy()
 2. create a concrete class `FileCertificateProvider` that implements `ProviderInterface` and wraps the provider created by `grpc_tls_certificate_provider_file_watcher_create`
 3. create a concrete class `StaticCertificateProvider` that implements `ProviderInterface` and wraps the provider created by `grpc_tls_certificate_provider_file_static_create`
 4. create an interface-like class `CertificateProvider` that implements `ProviderInterface`, and exposes several APIs in the distributor to users, such as `grpc_tls_certificate_distributor_set_key_materials`, etc
 5. users could extend `CertificateProvider` to define their own provider implementations
 
-// TODO(gtcooke94) we can directly use C++ APIs, remove external stuff from the below definitions
-As a reference, here is how `CertificateProvider` might be defined in C++:
+// TODO(gtcooke94) we can directly use C++ APIs, remove external stuff from the below definitions, and C++ will just alias the C-core
+
+An example of custom provider implementation in C++:
+// TODO(gtcooke94) precise semantics
 ```cpp
-namespace grpc {
-
-template <class Subclass>
-class CertificateProvider {
- public:
-  CertificateProvider()
-      : distributor_(grpc_tls_certificate_distributor_create()) {
-    base.get_distributor = GetDistributor;
-    base.destroy = Destroy;
-    grpc_tls_certificate_distributor_set_watch_status_callback(
-        OnWatchStatusChangedCallback, this);
-  }
-
-  virtual ~CertificateProvider() {
-    grpc_tls_certificate_distributor_destroy(distributor_);
-  }
-
-
-  virtual void OnWatchStatusChanged(
-      const std::string& cert_name, bool watching_root,
-      bool watching_identity) = 0;
-
-  void SetRootCert(const std::string& cert_name,
-                   const std::string& contents) {
-    grpc_tls_certificate_distributor_set_root_certs(
-        distributor_, cert_name.c_str(), contents.c_str());
-  }
-
-  // ...similar functions for SetCertKeyPairs() and SetKeyMaterials()...
-
- private:
-  static grpc_tls_certificate_distributor* GetDistributor(
-      grpc_tls_certificate_provider_external* external_provider) {
-    auto* provider = static_cast<Subclass*>(external_provider);
-    return provider->distributor_;
-  }
-
-  static void Destroy(
-      grpc_tls_certificate_provider_external* external_provider) {
-    auto* provider = static_cast<Subclass*>(external_provider);
-    delete provider;
-  }
-
-  static void OnWatchStatusChangedCallback(
-      void* arg, const std::string& cert_name, bool watching_root,
-      bool watching_identity) {
-    auto* provider = static_cast<Subclass*>(arg);
-    provider->OnWatchStatusChanged(cert_name, watching_root,
-                                   watching_identity);
-  }
-
-  // First data element to simulate inheritance.
-  grpc_tls_certificate_provider_external base_;
-
-  grpc_tls_certificate_distributor* distributor_;
-};
-
-}  // namespace grpc
-```
-and an example of custom provider implementation in C++:
-```cpp
-class MyCertificateProvider: public grpc::CertificateProvider<MyCertificateProvider> {
+class MyCertificateProvider: public grpc::CertificateProviderInterface {
  public:
   void OnWatchStatusChanged(
       const std::string& cert_name, bool watching_root,
@@ -411,6 +346,7 @@ class MyCertificateProvider: public grpc::CertificateProvider<MyCertificateProvi
   };
   std::map<std::string /*cert_name*/, CertsWatching> certs_watching_;
 };
+
 ```
 ### Custom Authorization
 ```c
