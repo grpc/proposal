@@ -132,20 +132,14 @@ The credential reloading API basically consists of two parts: the top-level `Pro
 The `Distributor` is the actual component for caching and distributing the credentials to the underlying transport connections(security connectors).
 The `Provider` offers a general interface for different implementations to interact with the `Distributor`. 
 ```c
-/* Opaque type. */
-typedef struct grpc_tls_certificate_provider grpc_tls_certificate_provider;
-typedef struct grpc_tls_certificate_distributor grpc_tls_certificate_distributor;
-/**
- * A struct that stores the credential data presented to the peer in handshake
- * to show local identity.
- */
-typedef struct grpc_tls_identity_pairs grpc_tls_identity_pairs;
-
-/**
- * Creates a grpc_tls_identity_pairs that stores a list of identity credential
- * data, including identity private key and identity certificate chain.
- */
-GRPCAPI grpc_tls_identity_pairs* grpc_tls_identity_pairs_create();
+/* Opaque types. */
+// A struct that stores the credential data presented to the peer in handshake
+// to show local identity. The private_key and certificate_chain should always
+// match.
+struct GRPCXX_DLL IdentityKeyCertPair {
+  std::string private_key;
+  std::string certificate_chain;
+};
 
 /**
  * Sets the name of the root certificates being used in the distributor. 
@@ -195,19 +189,71 @@ GRPCAPI void grpc_tls_credentials_options_watch_identity_key_cert_pairs(
     grpc_tls_credentials_options* options);
 
 /** ------------------------------------ Provider ------------------------------------ */
+/** Interface for a class that handles the process to fetch credential data.
+* Implementations should be a wrapper class of an internal provider
+* implementation.
+*/
+class CertificateProviderInterface {
+ public:
+  virtual ~CertificateProviderInterface() = default;
+};
 
-/* Factory function for file-watcher provider (implemented inside core). */
-GRPCAPI grpc_tls_certificate_provider*
-grpc_tls_certificate_provider_file_watcher_create(
-    const char* private_key_path, const char* identity_certificate_path,
-    const char* root_cert_path, unsigned int refresh_interval_sec);
+// A basic CertificateProviderInterface implementation that will load credential
+// data from static string during initialization. This provider will always
+// return the same cert data for all cert names, and reloading is not supported.
+class StaticDataCertificateProvider
+    : public CertificateProviderInterface {
+ public:
+  StaticDataCertificateProvider(
+      const std::string& root_certificate,
+      const std::vector<IdentityKeyCertPair>& identity_key_cert_pairs);
 
-/* Factory function for static file provider (implemented inside core). */
-GRPCAPI grpc_tls_certificate_provider*
-grpc_tls_certificate_provider_static_data_create(
-    const char* root_certificate, grpc_tls_identity_pairs* pem_key_cert_pairs);
+  explicit StaticDataCertificateProvider(const std::string& root_certificate);
 
-// TODO(gtcooke94) Approach to distributor, it's not currently exposed, none of these APIs exist publicly. None of this is how it got implemented. There is also no `ExternalCertificateProvider`.
+  explicit StaticDataCertificateProvider(
+      const std::vector<IdentityKeyCertPair>& identity_key_cert_pairs);
+    }
+
+// A CertificateProviderInterface implementation that will watch the credential
+// changes on the file system. This provider will always return the up-to-date
+// cert data for all the cert names callers set through |TlsCredentialsOptions|.
+// Several things to note:
+// 1. This API only supports one key-cert file and hence one set of identity
+// key-cert pair, so SNI(Server Name Indication) is not supported.
+// 2. The private key and identity certificate should always match. This API
+// guarantees atomic read, and it is the callers' responsibility to do atomic
+// updates. There are many ways to atomically update the key and certs in the
+// file system. To name a few:
+//   1)  creating a new directory, renaming the old directory to a new name, and
+//   then renaming the new directory to the original name of the old directory.
+//   2)  using a symlink for the directory. When need to change, put new
+//   credential data in a new directory, and change symlink.
+class GRPCXX_DLL FileWatcherCertificateProvider final
+    : public CertificateProviderInterface {
+ public:
+  // Constructor to get credential updates from root and identity file paths.
+  //
+  // @param private_key_path is the file path of the private key.
+  // @param identity_certificate_path is the file path of the identity
+  // certificate chain.
+  // @param root_cert_path is the file path to the root certificate bundle.
+  // @param refresh_interval_sec is the refreshing interval that we will check
+  // the files for updates.
+  FileWatcherCertificateProvider(const std::string& private_key_path,
+                                 const std::string& identity_certificate_path,
+                                 const std::string& root_cert_path,
+                                 unsigned int refresh_interval_sec);
+  // Constructor to get credential updates from identity file paths only.
+  FileWatcherCertificateProvider(const std::string& private_key_path,
+                                 const std::string& identity_certificate_path,
+                                 unsigned int refresh_interval_sec);
+
+  // Constructor to get credential updates from root file path only.
+  FileWatcherCertificateProvider(const std::string& root_cert_path,
+                                 unsigned int refresh_interval_sec);
+    }
+
+// TODO(gtcooke94) C++ify 
 /** ------------------------------------ Distributor ------------------------------------ */
 /* Creates a TLS certificate distributor object. This object is ref-counted. */
 GRPCAPI grpc_tls_certificate_distributor* grpc_tls_certificate_distributor_create();
