@@ -51,8 +51,6 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 ### Will work similar to before
 * `gpr_set_log_verbosity` and GRPC_VERBOSITY will work as follows
 
-## Implementation
-
 ```
 void SomeInitFunctionCalledByGrpcInit() {
 	optional<string> verbosity = GetEnv("GRPC_VERBOSITY");
@@ -92,3 +90,9 @@ void gpr_set_log_verbosity(gpr_log_severity verbosity) {
 		}
 }
 ```
+
+## Implementation
+
+
+*	[GPR_ASSERT and GPR_DEBUG_ASSERT removal](https://github.com/grpc/grpc/pulls?q=%22%5Bgrpc%5D%5BGpr_To_Absl_Logging%5D+Migrating+from+gpr+to+absl+logging+GPR_ASSERT%22+)
+*	[gpr_log removal](https://github.com/grpc/grpc/pulls?q=%22%5Bgrpc%5D%5BGpr_To_Absl_Logging%5D+Migrating+from+gpr+to+absl+logging+-+gpr_log%22+)
