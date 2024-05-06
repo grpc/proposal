@@ -1,12 +1,12 @@
-L117-Replacing gpr logging with Abseil logging
+L117: C-core: Replace gpr Logging with absl Logging
 ----
 
-* Author(s): tjagtap@google.com
-* Approver: roth@google.com , ctiller@google.com
+* Author(s): @tanvi-jagtap
+* Approver: @markdroth , @ctiller
 * Status: In Review 
 * Implemented in: gRPC C++
-* Last updated: April 29, 2024.
-* Discussion at: (filled after thread exists)
+* Last updated: 2024-05-06.
+* Discussion at: https://groups.google.com/g/grpc-io/c/Jg7bvHqAyCU
 
 ## Abstract
 
@@ -16,6 +16,11 @@ Replacing gpr logging and asserts with Abseil logging and asserts
 
 gRPC is currently maintaining its own version of the logging and assert APIs. The Abseil library released their logs and asserts too. We want to leverage the Abseil library and avoid maintaining our own logging code. Also, the current implementation of gpr_log uses format strings which are not type safe and have exploit potential. Moving to absl logging will eliminate this security risk.
 
+### References
+* [gpr logging header](https://github.com/grpc/grpc/blame/83a17ff4684dc1fb3493a151ac0b655b1c55e766/include/grpc/support/log.h)
+* [absl logging header](https://github.com/abseil/abseil-cpp/blob/master/absl/log/log.h)
+* [absl assert header](https://github.com/abseil/abseil-cpp/blob/master/absl/log/check.h)
+
 ## Related Proposals:
 
 None.
@@ -23,13 +28,6 @@ None.
 ## Proposal
 
 We are proposing to remove all instances of gpr logging and asserts and replace them with their absl equivalents.
-
-## Implementation
-
-### References
-* [gpr logging header](https://github.com/grpc/grpc/blame/83a17ff4684dc1fb3493a151ac0b655b1c55e766/include/grpc/support/log.h)
-* [absl logging header](https://github.com/abseil/abseil-cpp/blob/master/absl/log/log.h)
-* [absl assert header](https://github.com/abseil/abseil-cpp/blob/master/absl/log/check.h)
 
 ### Functions that will be removed, and their replacements
 * `gpr_log`
@@ -52,6 +50,8 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 
 ### Will work similar to before
 * `gpr_set_log_verbosity` and GRPC_VERBOSITY will work as follows
+
+## Implementation
 
 ```
 void SomeInitFunctionCalledByGrpcInit() {
