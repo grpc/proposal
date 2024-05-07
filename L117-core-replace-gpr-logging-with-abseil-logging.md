@@ -5,18 +5,19 @@ L117: C-core: Replace gpr Logging with absl Logging
 * Approver: @markdroth , @ctiller
 * Status: In Review 
 * Implemented in: gRPC C++
-* Last updated: 2024-05-06.
+* Last updated: 2024-05-07.
 * Discussion at: https://groups.google.com/g/grpc-io/c/Jg7bvHqAyCU
 
 ## Abstract
 
 Replacing gpr logging and asserts with Abseil logging and asserts
 
-## Background & Rationale
+## Background
 
 gRPC is currently maintaining its own version of the logging and assert APIs. The Abseil library released their logs and asserts too. We want to leverage the Abseil library and avoid maintaining our own logging code. Also, the current implementation of gpr_log uses format strings which are not type safe and have exploit potential. Moving to absl logging will eliminate this security risk.
 
 ### References
+
 * [gpr logging header](https://github.com/grpc/grpc/blame/83a17ff4684dc1fb3493a151ac0b655b1c55e766/include/grpc/support/log.h)
 * [absl logging header](https://github.com/abseil/abseil-cpp/blob/master/absl/log/log.h)
 * [absl assert header](https://github.com/abseil/abseil-cpp/blob/master/absl/log/check.h)
@@ -91,8 +92,13 @@ void gpr_set_log_verbosity(gpr_log_severity verbosity) {
 }
 ```
 
-## Implementation
+## Rationale
 
+*	Format specifiers are not type-safe. We want to avoid these.
+*	We want to avoid maintaining platform specific gpr APIS when absl is providing them.
+*	Abseil provides a range of APIs such as PLOG, VLOG, DVLOG with specific logging frequencies such as LOG_IF, LOG_EVERY_N, LOG_EVERY_POW_2 etc.
+
+## Implementation
 
 *	[GPR_ASSERT and GPR_DEBUG_ASSERT removal](https://github.com/grpc/grpc/pulls?q=%22%5Bgrpc%5D%5BGpr_To_Absl_Logging%5D+Migrating+from+gpr+to+absl+logging+GPR_ASSERT%22+)
 *	[gpr_log removal](https://github.com/grpc/grpc/pulls?q=%22%5Bgrpc%5D%5BGpr_To_Absl_Logging%5D+Migrating+from+gpr+to+absl+logging+-+gpr_log%22+)
