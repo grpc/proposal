@@ -94,9 +94,16 @@ void gpr_set_log_verbosity(gpr_log_severity verbosity) {
 
 ## Rationale
 
+### Advantages 
+
 *	Format specifiers are not type-safe. We want to avoid these.
 *	We want to avoid maintaining platform specific gpr APIS when absl is providing them.
 *	Abseil provides a range of APIs such as PLOG, VLOG, DVLOG with specific logging frequencies such as LOG_IF, LOG_EVERY_N, LOG_EVERY_POW_2 etc.
+
+### Action Items
+
+*	Coding using the above APIs will need to migrate to the newer APIs.
+*	The application will need to call absl::InitializeLog() itself, or else there will be a log message indicating that logging is happening before absl logging is initialized. If in the future absl fixes [#1656](https://github.com/abseil/abseil-cpp/issues/1656), then we could consider initializing absl logging in gRPC init.
 
 ## Implementation
 
