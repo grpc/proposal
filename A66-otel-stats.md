@@ -1,6 +1,7 @@
 # OpenTelemetry Metrics
 
-*   Author: Yash Tibrewal (@yashykt), Zach Reyes (@zasweq), Vindhya Ningegowda (@DNVindhya), Xuan Wang (@XuanWang-Amos)
+*   Author: Yash Tibrewal (@yashykt), Zach Reyes (@zasweq), Vindhya Ningegowda
+    (@DNVindhya), Xuan Wang (@XuanWang-Amos)
 *   Approver: Mark Roth (@markdroth)
 *   Status: Final
 *   Implemented in: <language, ...>
@@ -148,14 +149,6 @@ class OpenTelemetryPluginBuilder {
   // If `SetMeterProvider()` is not called, no metrics are collected.
   OpenTelemetryPluginBuilder& SetMeterProvider(
       std::shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
-  // If set, \a target_attribute_filter is called per channel to decide whether
-  // to record the target attribute on client or to replace it with "other".
-  // This helps reduce the cardinality on metrics in cases where many channels
-  // are created with different targets in the same binary (which might happen
-  // for example, if the channel target string uses IP addresses directly).
-  OpenTelemetryPluginBuilder& SetTargetAttributeFilter(
-      absl::AnyInvocable<bool(absl::string_view /*target*/) const>
-          target_attribute_filter);
   // If set, \a generic_method_attribute_filter is called per call with a
   // generic method type to decide whether to record the method name or to
   // replace it with "other". Non-generic or pre-registered methods remain
@@ -211,10 +204,6 @@ public static class OpenTelemetryModuleBuilder {
      */
     public OpenTelemetryModuleBuilder openTelemetry(OpenTelemetry openTelemetry);
 
-    /* If targetFilter is set, and returns true for a target, target is recorded as is. Records "other" on false.
-    If targetFilter is not set, target is recorded as is. */
-    public OpenTelemetryBuilder targetFilter(Predicate<String> targetFilter);
-
     public OpenTelemetryModule build();
 }
 ```
@@ -243,10 +232,6 @@ type MetricsOptions struct {
   // to Named Meter instances to instrument an application. To enable metrics
   // collection, set a meter provider. If unset, no metrics will be recorded.
   MeterProvider metric.MeterProvider
-  // TargetAttributeFilter is a callback that takes the target string and
-  // returns a bool representing whether to use target as a label value or use
-  // the string "other". If unset, will use the target string as is.
-  TargetAttributeFilter func(string) bool
   // MethodAttributeFilter is a callback that takes the method string and
   // returns a bool representing whether to use method as a label value or use
   // the string "other". If unset, will use the method string as is. This is
@@ -293,25 +278,6 @@ class OpenTelemetryPlugin:
             means no metrics will be collected.
         """
         return None
-
-    def target_attribute_filter(
-        self, target: str
-    ) -> bool:
-        """
-        If set, this will be called per channel to decide whether to record the
-        target attribute on client or to replace it with "other".
-        This helps reduce the cardinality on metrics in cases where many channels
-        are created with different targets in the same binary (which might happen
-        for example, if the channel target string uses IP addresses directly).
-
-        Args:
-            target: The target for the RPC.
-
-        Returns:
-            bool: True means the original target string will be used, False means target string
-            will be replaced with "other".
-        """
-        return True
 
     def generic_method_attribute_filter(
         self, method: str
@@ -396,10 +362,9 @@ the data.
     didn't mention the scheme (`scheme://[authority]/path`). For channels such
     as inprocess channels where a target URI is not available, implementations
     can synthesize a target URI. It is possible for some channels to use IP
-    addresses as target strings and this might again blow up the cardinality.
-    Implementations should provide the option to override recorded target names
-    with "other" instead of the actual target. If no such override is provided,
-    the default behavior will be to record the target as is.
+    addresses as target strings and this might again blow up the cardinality. In
+    the future, we can consider adding the ability to override recorded target
+    names to avoid this.
 
 #### Client Per-Attempt Instruments
 
