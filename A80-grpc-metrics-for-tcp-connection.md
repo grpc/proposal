@@ -16,7 +16,7 @@ This document proposes adding new TCP connection metrics to gRPC for improved ne
 To improve the network debugging capabilities for gRPC users, we propose adding per-connection TCP metrics in gRPC. The metrics will utilize the metrics framework outlined in  [A79].
 
 ### Related Proposals: 
-* [A79]: gRPC Non-Per-Call Metrics Framework (pending)
+* [A79]: gRPC Non-Per-Call Metrics Framework
 
 [A79]: https://github.com/grpc/proposal/pull/421
 
@@ -46,9 +46,9 @@ The metrics will be exported as:
 | ------------- | ----- | ----- | ------- | ----------- |
 | grpc.tcp.min_rtt | Histogram (double) | s | grpc.tcp.peer_address, grpc.tcp.local_address | Records TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints.  |
 | grpc.tcp.delivery_rate | Histogram (double) | bit/s | grpc.tcp.peer_address, grpc.tcp.local_address | Records latest throughput measured of the TCP connection. |
-| grpc.tcp.packets_sent | Counter (int64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets TCP sends in the calculation period. |
-| grpc.tcp.packets_retransmitted | Counter (int64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
-| grpc.tcp.packets_spurious_retransmitted | Counter (int64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
+| grpc.tcp.packets_sent | Counter (uint64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets TCP sends in the calculation period. |
+| grpc.tcp.packets_retransmitted | Counter (uint64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
+| grpc.tcp.packets_spurious_retransmitted | Counter (uint64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
 
 The metrics are acquired by enabling the `SO_TIMESTAMPING` option in the kernel's TCP stack via the `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))` system call. This configuration allows the kernel to capture packet timestamps during transmission and subsequently provide relevant socket information when `getsockopt(TCP_INFO)` is invoked.
 
