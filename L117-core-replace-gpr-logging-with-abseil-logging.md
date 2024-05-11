@@ -97,7 +97,7 @@ void gpr_set_log_verbosity(gpr_log_severity verbosity) {
 ### Advantages 
 
 *	Format specifiers are not type-safe. We want to avoid these.
-*	We want to avoid maintaining platform specific gpr APIS when absl is providing them.
+*	We want to avoid maintaining platform specific gpr APIs when absl is providing them.
 *	Abseil provides a range of APIs such as PLOG, VLOG, DVLOG with specific logging frequencies such as LOG_IF, LOG_EVERY_N, LOG_EVERY_POW_2 etc.
 
 ### Action Items
