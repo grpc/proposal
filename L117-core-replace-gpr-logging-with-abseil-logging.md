@@ -56,16 +56,16 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 void SomeInitFunctionCalledByGrpcInit() {
 	optional<string> verbosity = GetEnv("GRPC_VERBOSITY");
 	if (verbosity.has_value()) {
-		if (verbosity == "GPR_INFO" || verbosity == "INFO") {
+		if (verbosity == "INFO") {
 			SetMinLogLevel(INFO);
 		}
-		else if (verbosity == "GPR_ERROR" || verbosity == "ERROR") {
+		else if (verbosity == "ERROR") {
 			SetMinLogLevel(ERROR);
 		}
 		else if (verbosity == "WARNING") {
 			SetMinLogLevel(WARNING);
 		}
-		else if (verbosity == "GPR_DEBUG") {
+		else if (verbosity == "DEBUG") {
 			SetGlobalVLogLevel(2);
 			SetMinLogLevel(INFO);
 		}
