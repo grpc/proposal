@@ -76,13 +76,13 @@ void SomeInitFunctionCalledByGrpcInit() {
 }
 
 void gpr_set_log_verbosity(gpr_log_severity verbosity) {
-		if (verbosity == GPR_INFO) {
+		if (verbosity == GPR_LOG_SEVERITY_INFO) {
 			SetMinLogLevel(INFO);
 		}
-		else if (verbosity == GPR_ERROR) {
+		else if (verbosity == GPR_LOG_SEVERITY_ERROR) {
 			SetMinLogLevel(ERROR);
 		}
-		else if (verbosity == GPR_DEBUG) {
+		else if (verbosity == GPR_LOG_SEVERITY_DEBUG) {
 			SetGlobalVLogLevel(2);
 			SetMinLogLevel(INFO);
 		}
