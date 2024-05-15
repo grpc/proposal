@@ -18,7 +18,7 @@ To improve the network debugging capabilities for gRPC users, we propose adding 
 ### Related Proposals: 
 * [A79]: gRPC Non-Per-Call Metrics Framework
 
-[A79]: https://github.com/grpc/proposal/pull/421
+[A79]: https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md
 
 ## Proposal
 
