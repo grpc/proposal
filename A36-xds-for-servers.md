@@ -239,10 +239,11 @@ following (implementations may reorder these operations):
     unavailable resource because of communication failures with control plane
     or a triggered loading timeout, or a non-existent resource, fail the RPC
     with the UNAVAILABLE status.
- 2. If `RouteConfiguration` is supported, match the request to a Route using
-    the same rules as on the client. If no route matches or if the matched
-    route does not have the `non_forwarding_action` set, fail the RPC with the
-    UNAVAILABLE status.
+ 2. If `RouteConfiguration` is supported, select the most specifically-matching
+    VirtualHost using the RPC's requested `:authority` match the request to a
+    Route using the same rules as on the client. If no route matches or if the
+    matched route does not have the `non_forwarding_action` set, fail the RPC
+    with the UNAVAILABLE status.
  3. If any server-side HTTP filters are supported, apply the HTTP filters from
     the `FilterChain` to the request.
 
