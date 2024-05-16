@@ -10,8 +10,9 @@ L46: C-core: New TLS Credentials API
 
 This proposal aims to provide the following features in a new TLS credential API:
 1. credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without shutting down
-1. custom verification check: perform a user-specified check at the end of authentication, and allow the client side to disable certificate verification and hostname verification check    
+1. custom verification behaviors: performing a user-specified check at the end of normal authentication and separately giving the ability to fully customize chain building and verification.
 1. TLS version configuration: optionally configure the minimum and maximum of the TLS version that will be used in the handshake
+1. support for certificate revocation via Certificate Revocation Lists (CRLs)
 
 ## Background
 
@@ -160,15 +161,15 @@ class CertificateProviderInterface {
  public:
   virtual ~CertificateProviderInterface() = default;
   // Provider implementations MUST provide a WatchStatusCallback that will be
-  // set on the distributor.  Sets the TLS certificate watch status callback
-  // function.  This will be invoked when a new certificate name is watched by a
-  // newly registered watcher, or when a certificate name is no longer watched
-  // by any watchers.  Note that when the callback shows a cert is no longer
-  // being watched, corresponding certificate data will be deleted from the
-  // internal cache, and any corresponding errors will be cleared, if there are
-  // any. This means that if the callback subsequently says the same cert is now
-  // being watched again, the provider must re-provide the credentials or
-  // re-invoke the errors to indicate a successful or failed reloading.
+  // called by the internal stack. This will be invoked when a new certificate
+  // name is watched by a newly registered watcher, or when a certificate name
+  // is no longer watched by any watchers.  Note that when the callback shows a
+  // cert is no longer being watched, corresponding certificate data will be
+  // deleted from the internal cache, and any corresponding errors will be
+  // cleared, if there are any. This means that if the callback subsequently
+  // says the same cert is now being watched again, the provider must re-provide
+  // the credentials or re-invoke the errors to indicate a successful or failed
+  // reloading.
   //
   // For the parameters in the callback function:
   // cert_name The name of the certificates being watched.
