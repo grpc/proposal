@@ -54,25 +54,24 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 
 ```
 void SomeInitFunctionCalledByGrpcInit() {
-	optional<string> verbosity = GetEnv("GRPC_VERBOSITY");
-	if (verbosity.has_value()) {
-		if (verbosity == "INFO") {
-			SetMinLogLevel(INFO);
-		}
-		else if (verbosity == "ERROR") {
-			SetMinLogLevel(ERROR);
-		}
-		else if (verbosity == "WARNING") {
-			SetMinLogLevel(WARNING);
-		}
-		else if (verbosity == "DEBUG") {
-			SetGlobalVLogLevel(2);
-			SetMinLogLevel(INFO);
-		}
-		else {
-			LOG(ERROR) << "Unknown log verbosity: " << verbosity;
-		}
-	}
+  absl::optional<std::string> verbosity = grpc_core::GetEnv("GRPC_VERBOSITY");
+  if (verbosity.has_value()) {
+    VLOG(2) << "Log verbosity: " << verbosity.value();
+    if (absl::EqualsIgnoreCase(verbosity.value(), "INFO")) {
+      absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
+    } else if (absl::EqualsIgnoreCase(verbosity.value(), "ERROR")) {
+      absl::SetMinLogLevel(absl::LogSeverityAtLeast::kError);
+    } else if (absl::EqualsIgnoreCase(verbosity.value(), "WARNING")) {
+      absl::SetMinLogLevel(absl::LogSeverityAtLeast::kWarning);
+    } else if (absl::EqualsIgnoreCase(verbosity.value(), "DEBUG")) {
+      absl::SetGlobalVLogLevel(2);
+      absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
+    } else {
+      LOG(ERROR) << "Unknown log verbosity: " << verbosity.value();
+    }
+  } else {
+    VLOG(2) << "No verbosity set. Default will be used.";
+  }
 }
 
 ## Rationale
