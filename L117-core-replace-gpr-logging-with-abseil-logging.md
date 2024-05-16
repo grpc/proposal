@@ -50,7 +50,7 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 * `gpr_should_log` - This wont be needed anymore. 
 
 ### Will work similar to before
-* `gpr_set_log_verbosity` and GRPC_VERBOSITY will work as follows
+* `GRPC_VERBOSITY` will work as follows
 
 ```
 void SomeInitFunctionCalledByGrpcInit() {
@@ -74,23 +74,6 @@ void SomeInitFunctionCalledByGrpcInit() {
 		}
 	}
 }
-
-void gpr_set_log_verbosity(gpr_log_severity verbosity) {
-		if (verbosity == GPR_LOG_SEVERITY_INFO) {
-			SetMinLogLevel(INFO);
-		}
-		else if (verbosity == GPR_LOG_SEVERITY_ERROR) {
-			SetMinLogLevel(ERROR);
-		}
-		else if (verbosity == GPR_LOG_SEVERITY_DEBUG) {
-			SetGlobalVLogLevel(2);
-			SetMinLogLevel(INFO);
-		}
-		else {
-			LOG(ERROR) << "Unknown log verbosity: " << verbosity;
-		}
-}
-```
 
 ## Rationale
 
