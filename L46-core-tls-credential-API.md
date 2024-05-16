@@ -120,6 +120,9 @@ class TlsCredentialsOptions {
   // handshake. If not set, the underlying SSL library will use TLS v1.3.
   // @param tls_version: The maximum TLS version.
   void set_max_tls_version(grpc_tls_version tls_version);
+
+  // Sets a custom chain builder implementation that replaces the default chain building from the underlying SSL library.
+  void set_custom_chain_builder(std::shared_ptr<CustomChainBuilder> chain_builder);
 ```
 
 Here is an example of how to use this API:
@@ -255,6 +258,8 @@ class GRPCXX_DLL FileWatcherCertificateProvider final
 
 ```
 ### Custom Verification
+We aim to provide distinct interfaces for chain building customization and for additional validation of an already built chain. These two features have distinctly different expected users. Doing some extra validation based on the contents of the peer certificate chain is an operation that anyone doing (m)TLS might be interested in, and it should not and does not require any deep X.509 expertise. Replacing how chain building works is a relatively rare requirement and it does require deep X.509 expertise to do correctly. We want extra validation to be easy and clear for users to add without worrying about interacting with chain building itself. On the other hand, chain building is complex to implement, and we suspect that most users will stay with the default behavior. However, to enable advanced use, such as dynamic selection of the trust bundle based on the peer certificate (e.g. SPIFFE federation), this is needed. 
+#### Post Handshake Verification
 ```c++
 // Contains the verification-related information associated with a connection
 // request. Users should not directly create or destroy this request object, but
@@ -265,21 +270,21 @@ class TlsCustomVerificationCheckRequest {
       grpc_tls_custom_verification_check_request* request);
   ~TlsCustomVerificationCheckRequest() {}
 
-  grpc::string_ref target_name() const;
-  grpc::string_ref peer_cert() const;
-  grpc::string_ref peer_cert_full_chain() const;
-  grpc::string_ref common_name() const;
+  absl::string_view target_name() const;
+  absl::string_view peer_cert() const;
+  absl::string_view peer_cert_full_chain() const;
+  absl::string_view common_name() const;
   // The subject name of the root certificate used to verify the peer chain
   // If verification fails or the peer cert is self-signed, this will be an
   // empty string. If verification is successful, it is a comma-separated list,
   // where the entries are of the form "FIELD_ABBREVIATION=string"
   // ex: "CN=testca,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU"
   // ex: "CN=GTS Root R1,O=Google Trust Services LLC,C=US"
-  grpc::string_ref verified_root_cert_subject() const;
-  std::vector<grpc::string_ref> uri_names() const;
-  std::vector<grpc::string_ref> dns_names() const;
-  std::vector<grpc::string_ref> email_names() const;
-  std::vector<grpc::string_ref> ip_names() const;
+  absl::string_view verified_root_cert_subject() const;
+  std::vector<absl::string_view> uri_names() const;
+  std::vector<absl::string_view> dns_names() const;
+  std::vector<absl::string_view> email_names() const;
+  std::vector<absl::string_view> ip_names() const;
 
 }
 
@@ -339,7 +344,14 @@ class HostNameCertificateVerifier : public CertificateVerifier {
 };
 ```
 
+#### Custom Chain Building
+```c++
+class CustomChainBuilder {
+public:
+ virtual absl::StatusOr<std::vector<absl::string_view>> BuildAndVerifyChain(const std::vector<absl::string_view>& peer_cert_chain_der) = 0;
+}
+```
 
-
-
-
+The default behavior for chain building is based on the underlying SSL library. For example, [X509_verify_cert](https://www.openssl.org/docs/man1.1.1/man3/X509_verify_cert.html) is the implementation in OpenSSL that builds and verifies a certificate chain.
+gRPC calls that function by default [here](https://github.com/grpc/grpc/blob/2d2d5a3c411a2bade319a08085e55821cf2d5ed9/src/core/tsi/ssl_transport_security.cc#L1150).
+Once the `CustomChainBuilder` is implemented, this will be where it is used. The `X509_verify_cert` call will be replaced by the `CustomChainBuilder's BuildAndVerifyChain` that fully replaces chain building.
