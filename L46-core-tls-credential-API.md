@@ -140,15 +140,16 @@ grpc_channel_credentials* creds = grpc_tls_credentials_create(options);
 ```
 
 ### Credential Reloading
-The credential reloading API basically consists of two parts: the top-level `Provider` and the low-level `Distributor`.
-The `Distributor` is the actual component for caching and distributing the credentials to the underlying transport connections(security connectors).
-The `Provider` offers a general interface for different implementations to interact with the `Distributor`. 
+Credential reloading will be implemented via a `CertificateProvider`. This provider is responsible for sourcing key material and supplying it to the internal stack via `SetKeyMaterials`.
+We provide a `StaticDataCertificateProvider` and a `FileWatcherCertificateProvider` that should cover many use cases.
+If these providers do not support the intricacies for a specific use case, a user can provide their own implementations of the `CertificateProviderInterface`.
+
 ```c
 /* Opaque types. */
 // A struct that stores the credential data presented to the peer in handshake
 // to show local identity. The private_key and certificate_chain should always
 // match.
-struct GRPCXX_DLL IdentityKeyCertPair {
+struct IdentityKeyCertPair {
   std::string private_key;
   std::string certificate_chain;
 };
@@ -231,7 +232,7 @@ class StaticDataCertificateProvider
 //   then renaming the new directory to the original name of the old directory.
 //   2)  using a symlink for the directory. When need to change, put new
 //   credential data in a new directory, and change symlink.
-class GRPCXX_DLL FileWatcherCertificateProvider final
+class FileWatcherCertificateProvider final
     : public CertificateProviderInterface {
  public:
   // Constructor to get credential updates from root and identity file paths.
