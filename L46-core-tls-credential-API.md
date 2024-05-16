@@ -130,7 +130,7 @@ options.set_verify_server_cert(true);
 options.set_min_tls_version(TLS1_2);
 options.set_max_tls_version(TLS1_3);
 
-//TODO(gtcooke94 C++ify)
+// The core credentials APIs are still C, so this is still a grpc_channel_credential
 /* Create TLS channel credentials. */
 grpc_channel_credentials* creds = grpc_tls_credentials_create(options);
 ```
@@ -149,61 +149,52 @@ struct GRPCXX_DLL IdentityKeyCertPair {
   std::string certificate_chain;
 };
 
-/**
- * Sets the name of the root certificates being used in the distributor. 
- * Most users don't need to set this value.
- * If not set, we will use the default name, which is an empty string.
- */
-GRPCAPI void grpc_tls_credentials_options_set_root_cert_name(
-    grpc_tls_credentials_options* options,
-    const char* root_cert_name);
-
-/**
- * Sets the name of the identity certificates being used in the distributor. 
- * Most users don't need to set this value.
- * If not set, we will use the default name, which is an empty string.
- */
-GRPCAPI void grpc_tls_credentials_options_set_identity_cert_name(
-    grpc_tls_credentials_options* options,
-    const char* identity_cert_name);
-
-/** Sets the credential provider.
- * Sets the credential provider in the options.
- * The |options| will implicitly take a new ref to the |provider|.
- */
-GRPCAPI void grpc_tls_credentials_options_set_certificate_provider(
-    grpc_tls_credentials_options* options,
-    grpc_tls_certificate_provider* provider);
-
-/**
- * If set, gRPC stack will keep watching the root certificates with
- * name |root_cert_name|.
- * If this is not set on the client side, we will use the root certificates
- * stored in the default system location, since client side must provide root
- * certificates in TLS.
- * If this is not set on the server side, we will not watch any root certificate
- * updates, and assume no root certificates needed for the server(single-side
- * TLS). Default root certs on the server side is not supported.
- */
-GRPCAPI void grpc_tls_credentials_options_watch_root_certs(
-    grpc_tls_credentials_options* options);
-
-/**
- * If set, gRPC stack will keep watching the identity key-cert pairs
- * with name |identity_cert_name|.
- * This is required on the server side, and optional on the client side.
- */
-GRPCAPI void grpc_tls_credentials_options_watch_identity_key_cert_pairs(
-    grpc_tls_credentials_options* options);
 
 /** ------------------------------------ Provider ------------------------------------ */
 /** Interface for a class that handles the process to fetch credential data.
-* Implementations should be a wrapper class of an internal provider
-* implementation.
 */
 class CertificateProviderInterface {
  public:
   virtual ~CertificateProviderInterface() = default;
+  // Provider implementations MUST provide a WatchStatusCallback that will be
+  // set on the distributor.  Sets the TLS certificate watch status callback
+  // function.  This will be invoked when a new certificate name is watched by a
+  // newly registered watcher, or when a certificate name is no longer watched
+  // by any watchers.  Note that when the callback shows a cert is no longer
+  // being watched, corresponding certificate data will be deleted from the
+  // internal cache, and any corresponding errors will be cleared, if there are
+  // any. This means that if the callback subsequently says the same cert is now
+  // being watched again, the provider must re-provide the credentials or
+  // re-invoke the errors to indicate a successful or failed reloading.
+  //
+  // For the parameters in the callback function:
+  // cert_name The name of the certificates being watched.
+  // root_being_watched If the root certificates with the specific name are being
+  // watched.
+  // identity_being-Watched If the identity certificates with the specific name
+  // are being watched.
+  virtual void WatchStatusCallback(string cert_name, bool root_being_watched, bool identity_being_watched) = 0;
+  // Sets the key materials based on their certificate name.
+  // @param cert_name The name of the certificates being updated.
+  // @param pem_root_certs The content of root certificates.
+  // @param pem_key_cert_pairs The content of identity key-cert pairs.
+  void SetKeyMaterials(
+      const std::string& cert_name, absl::optional<std::string> pem_root_certs,
+      absl::optional<grpc_core::PemKeyCertPairList> pem_key_cert_pairs);
+  // Propagates an error encountered in the provider layer to the internal TLS stack.
+  //
+  // @param cert_name The watching cert name that the caller
+  // wants to notify about when encountering error.
+  // @param root_cert_error The error that the caller encounters when reloading
+  // root certs.
+  // @param identity_cert_error The error that the caller encounters when
+  // reloading identity certs.
+  void SetErrorForCert(const std::string& cert_name,
+                       absl::Status root_cert_error,
+                       absl::Status identity_cert_error);
+
+ private:
+  std::unique_ptr<TlsCertificateDistributor> distributor_;
 };
 
 // A basic CertificateProviderInterface implementation that will load credential
@@ -261,99 +252,6 @@ class GRPCXX_DLL FileWatcherCertificateProvider final
                                  unsigned int refresh_interval_sec);
     }
 
-// TODO(gtcooke94) C++ify 
-/** ------------------------------------ Distributor ------------------------------------ */
-/* Creates a TLS certificate distributor object. This object is ref-counted. */
-GRPCAPI grpc_tls_certificate_distributor* grpc_tls_certificate_distributor_create();
-
-/* Unrefs a TLS certificate distributor object. */
-GRPCAPI void grpc_tls_certificate_distributor_unref(grpc_tls_certificate_distributor* distributor);
-
-/* Sets root certificates and key and certificate chain pairs. The Ownerships of
-   cert_name, pem_root_certs and pem_key_cert_pairs are not transferred. */
-GRPCAPI int grpc_tls_certificate_distributor_set_key_materials(
-  grpc_tls_certificate_distributor* distributor,
-  const char* cert_name,
-  const char* pem_root_certs,
-  const grpc_ssl_pem_key_cert_pair** pem_key_cert_pairs, size_t num_key_cert_pairs);
-
-/* Sets root certificates. The Ownership of cert_name and pem_root_certs are not transferred. */
-GRPCAPI int grpc_tls_certificate_distributor_set_root_certs(
-  grpc_tls_certificate_distributor* distributor, const char* cert_name,
-  const char* pem_root_certs);
-
-/* Sets key and certificate chain pairs. The Ownership of cert_name, and pem_key_cert_pairs are not transferred. */
-GRPCAPI int grpc_tls_certificate_distributor_set_key_cert_pairs(
-  grpc_tls_certificate_distributor* distributor, 
-  const char* cert_name,
-  const grpc_ssl_pem_key_cert_pair** pem_key_cert_pairs, size_t num_key_cert_pairs);
-
-/* Sets errors for both the root and the identity certificates of name |cert_name|. 
-   At least one of root_cert_error and identity_cert_error must be set. */
-GRPCAPI int grpc_tls_certificate_distributor_set_error_for_key_materials(
-  grpc_tls_certificate_distributor* distributor,
-  const char* cert_name,
-  grpc_tls_error_details* root_cert_error,
-  grpc_tls_error_details* identity_cert_error);
-
-/* Callback function to be called by the TLS certificate distributor to inform
-   the TLS certificate provider when the watch status changed.
-   - user_data is the opaque pointer that was passed to TLS certificate distributor
-   - watching_root_certs is a boolean value indicating that root certificates are
-     being watched.
-   - watching_key_cert_pairs is a boolean value indicating that the key certificate
-     pairs are being watched. 
-   - cert_name is the name of the certificates being watched.
-*/
-typedef void (*grpc_tls_certificate_watch_status_cb)(
-    void* user_data, const char* cert_name, bool watching_root_certs, bool watching_key_cert_pairs);
-
-/* Sets the watch status callback on the distributor.
-   Callbacks are invoked synchronously. The user_data parameter will be passed
-   to the callback when it is invoked.
-   The callback can be set to null to disable callbacks.  Callers should generally
-   set it to null before they unref the distributor, to ensure that no subsequent
-   callbacks are invoked. */
-GRPCAPI void grpc_tls_certificate_distributor_set_watch_status_callback(
-    grpc_tls_certificate_distributor* distributor,
-    grpc_tls_certificate_watch_status_cb cb, void* user_data);
-```
-
-If only the already implemented providers are needed, e.g. file-watcher provider or static-cert provider, those provider implementations can be directly passed in without caring about `Distributor`. 
-In that case, how to wrap it should be straightforward. 
-
-Each wrap language is free to choose the design suitable for its language characteristics, but consider some general advice first:
-1. create an interface-like class `ProviderInterface` which contains two functions GetDistributor() and Destroy()
-2. create a concrete class `FileCertificateProvider` that implements `ProviderInterface` and wraps the provider created by `grpc_tls_certificate_provider_file_watcher_create`
-3. create a concrete class `StaticCertificateProvider` that implements `ProviderInterface` and wraps the provider created by `grpc_tls_certificate_provider_file_static_create`
-4. create an interface-like class `CertificateProvider` that implements `ProviderInterface`, and exposes several APIs in the distributor to users, such as `grpc_tls_certificate_distributor_set_key_materials`, etc
-5. users could extend `CertificateProvider` to define their own provider implementations
-
-// TODO(gtcooke94) we can directly use C++ APIs, remove external stuff from the below definitions, and C++ will just alias the C-core
-
-An example of custom provider implementation in C++:
-// TODO(gtcooke94) precise semantics
-```cpp
-class MyCertificateProvider: public grpc::CertificateProviderInterface {
- public:
-  void OnWatchStatusChanged(
-      const std::string& cert_name, bool watching_root,
-      bool watching_identity) override {
-    if (!watching_root && !watching_identity) {
-      certs_watching_.erase(cert_name);
-    } else {
-      certs_watching_[cert_name] = {watching_root, watching_identity};
-      // ...start or stop watching as needed...
-    }
-  }
-
- private:
-  struct CertsWatching {
-    bool watching_root = false;
-    bool watching_identity = false;
-  };
-  std::map<std::string /*cert_name*/, CertsWatching> certs_watching_;
-};
 
 ```
 ### Custom Verification
