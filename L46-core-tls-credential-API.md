@@ -122,8 +122,18 @@ class TlsCredentialsOptions {
   // @param tls_version: The maximum TLS version.
   void set_max_tls_version(grpc_tls_version tls_version);
 
-  // Sets a custom chain builder implementation that replaces the default chain building from the underlying SSL library.
-  void set_custom_chain_builder(std::shared_ptr<CustomChainBuilder> chain_builder);
+  // Sets a custom chain builder implementation that replaces the default chain
+  // building from the underlying SSL library.
+  void set_custom_chain_builder(std::shared_ptr<CustomChainBuilder>
+  chain_builder);
+
+  // Configures if the client should verify the server cert (mTLS). Is a no-op
+  // if using these options to create a server credential.
+  void set_verify_server_cert(bool verify_server_cert);
+
+ // Sets the options of whether to request and/or verify client certs. This
+ // is a no-op if using these options to create a client credential.
+void set_cert_request_type(grpc_ssl_client_certificate_request_type type);
 ```
 
 Here is an example of how to use this API:
