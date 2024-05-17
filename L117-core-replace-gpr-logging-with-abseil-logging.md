@@ -3,7 +3,7 @@ L117: C-core: Replace gpr Logging with absl Logging
 
 * Author(s): @tanvi-jagtap
 * Approver: @markdroth , @ctiller
-* Status: In Review 
+* Status: Final
 * Implemented in: gRPC C++
 * Last updated: 2024-05-07.
 * Discussion at: https://groups.google.com/g/grpc-io/c/Jg7bvHqAyCU
