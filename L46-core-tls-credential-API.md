@@ -8,7 +8,7 @@ L46: C-core: New TLS Credentials API
 
 ## Abstract
 
-This proposal aims to provide the following features in a new TLS credential API:
+This proposal aims to provide a new TLS credentials API with the following features:
 1. credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without shutting down
 1. custom verification behaviors: performing a user-specified check at the end of normal authentication and separately giving the ability to fully customize chain building and verification.
 1. TLS version configuration: optionally configure the minimum and maximum of the TLS version that will be used in the handshake
