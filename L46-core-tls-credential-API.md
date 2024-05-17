@@ -9,32 +9,24 @@ L46: C-core: New TLS Credentials API
 ## Abstract
 
 This proposal aims to provide a new TLS credentials API with the following features:
-1. credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without shutting down
-1. custom verification behaviors: performing a user-specified check at the end of normal authentication and separately giving the ability to fully customize chain building and verification.
-1. TLS version configuration: optionally configure the minimum and maximum of the TLS version that will be used in the handshake
-1. support for certificate revocation via Certificate Revocation Lists (CRLs)
+1. Credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without shutting down.
+1. Customizable verification of the peer certificate: perform custom validation checks on the peer's certificate chain after it has been verified to chain up to a root of trust, or fully customize path building and cryptographic verification.
+1. TLS version configuration: optionally configure the minimum and maximum of the TLS versions to be negotiated during the handshake.
+1. Support for certificate revocation via Certificate Revocation Lists (CRLs).
 
 ## Background
 
-The current TLS implementation in gRPC C core has some restrictions:
-1. lack of the credential reloading support. Once an application starts, it can never reload its identity key/cert-chain and root certificates without shutting down
-1. inflexibility in the peer verification. In a mutual TLS scenario, servers would always perform certificate verification, and clients would always perform certificate verification as well as default hostname check. No customized checks can be introduced.
-1. inability to choose the maximum/minimum TLS version supported in OpenSSL/BoringSSL for use
+The current TLS implementation (the SSL credentials API) in gRPC C core has some restrictions:
+1. Lack of the credential reloading support. Once an application starts, it can never reload its identity key/cert-chain and root certificates without shutting down.
+1. Inflexibility in the peer verification. There is no API to add additional custom verification checks.
+1. Inability to choose the maximum/minimum TLS version to be negotiated during the TLS handshake.
+1. No support for certificate revocation.
 
-There have always been some ad hoc requests on GitHub Issue Page for supporting these features. The demands for a more flexible and configurable API have increased with the emerging needs in the cloud platform.
+We propose an API that will meet the following requirements:  
 
-One common requirement is to skip the hostname verification check if a client has a different way of validating the server's identity in different platforms. 
-For example, it's becoming more and more popular to use SPIFFE ID as the identity format, but a valid certificate using SPIFFE ID doesn't necessarily contain the dnsName in the SAN field, which might cause hostname verification to fail.
-
-Another requirement is to reload the root and identity credentials without shutting down the server, because certificates will eventually expire and the ability to rotate the certificates is essential to a cloud application.
-
-Besides requests from Open Source Community, with the growth of GCP, we've seen more and more internal use cases of these features.   
-
-Hence we propose an API that will meet the following requirements:  
-
-1. Flexible enough to support multiple use cases. Users should be able to write their own reloading or verification logic if the provided ones doesn't fit their needs
-1. The credentials reloading should be efficient. We shall reload only when needed rather than reloading per TLS connection
-1. C core API needs to be simple enough, so that most of existing SSL credentials in wrapped languages can migrate to call this new API
+1. Flexible enough to support multiple use cases. Users should be able to write their own reloading or verification logic if the provided ones do not fit their needs.
+1. The credential reloading should be efficient. We shall reload only when needed rather than reloading per TLS connection.
+1. C core API needs to be simple enough, so that most of existing SSL credentials in wrapped languages can migrate to call this new API.
 
 ### Related Proposals:
 
@@ -44,8 +36,7 @@ Hence we propose an API that will meet the following requirements:
 ## Proposal
 
 ### TLS credentials and TLS Options
-This part of the proposal introduces `TlsCredentialsOptions` and TLS credentials. Users use `TlsCredentialsOptions` to configure the specific security properties they want, and build the client/server credential by passing in `TlsCredentialsOptions`.
-This section only covers the configuration not related to credential reloading and custom verification. Configurations related to those two topics are explained in the latter sections.
+This part of the proposal introduces `TlsCredentialsOptions` and TLS credentials. Users use `TlsChannelCredentialsOptions` and `TlsServerCredentialsOptions` to configure the specific security properties they want, and build the client/server credential by passing in those options.
 
 ```c++
 // Base class of configurable options specified by users to configure their
@@ -126,27 +117,57 @@ class TlsCredentialsOptions {
   // building from the underlying SSL library.
   void set_custom_chain_builder(std::shared_ptr<CustomChainBuilder>
   chain_builder);
+}
 
-  // Configures if the client should verify the server cert (mTLS). Is a no-op
-  // if using these options to create a server credential.
-  void set_verify_server_cert(bool verify_server_cert);
+// Contains configurable options on the server side.
+class TlsServerCredentialsOptions final : public TlsCredentialsOptions {
+ public:
+  // Server side is required to use a provider, because server always needs to
+  // use identity certs.
+  explicit TlsServerCredentialsOptions(
+      std::shared_ptr<CertificateProviderInterface> certificate_provider)
+      : TlsCredentialsOptions() {
+    set_certificate_provider(certificate_provider);
+  }
 
- // Sets the options of whether to request and/or verify client certs. This
- // is a no-op if using these options to create a client credential.
-void set_cert_request_type(grpc_ssl_client_certificate_request_type type);
+
+  // Sets option to request the certificates from the client.
+  // The default is GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE.
+  void set_cert_request_type(
+      grpc_ssl_client_certificate_request_type cert_request_type);
+}
+
+// Contains configurable options on the client side.
+// Client side doesn't need to always use certificate provider. When the
+// certificate provider is not set, we will use the root certificates stored
+// in the system default locations, and assume client won't provide any
+// identity certificates(single side TLS).
+class TlsChannelCredentialsOptions final : public TlsCredentialsOptions {
+ public:
+  // Sets the decision of whether to do a crypto check on the server certs.
+  // The default is true.
+  void set_verify_server_certs(bool verify_server_certs);
+
+// Builds TLS Credentials given TLS options.
+std::shared_ptr<ChannelCredentials> TlsCredentials(
+    const TlsChannelCredentialsOptions& options);
+}
+
+std::shared_ptr<ServerCredentials> TlsServerCredentials(
+    const grpc::experimental::TlsServerCredentialsOptions& options);
 ```
 
 Here is an example of how to use this API:
 ```c++
 /* Create option and set basic security primitives. */
-TlsCredentialsOptions options = TlsCredentialsOptions();
+TlsChannelCredentialsOptions options = TlsChannelCredentialsOptions();
 options.set_verify_server_cert(true);
 options.set_min_tls_version(TLS1_2);
 options.set_max_tls_version(TLS1_3);
 
 // The core credentials APIs are still C, so this is still a grpc_channel_credential
 /* Create TLS channel credentials. */
-grpc_channel_credentials* creds = grpc_tls_credentials_create(options);
+std::shared_ptr<ChannelCredentials> creds = TlsCredentials(options);
 ```
 
 ### Credential Reloading
@@ -157,8 +178,8 @@ If these providers do not support the intricacies for a specific use case, a use
 ```c
 /* Opaque types. */
 // A struct that stores the credential data presented to the peer in handshake
-// to show local identity. The private_key and certificate_chain should always
-// match.
+// to show local identity. The private_key and certificate_chain must be PEM
+// encoded and should always match.
 struct IdentityKeyCertPair {
   std::string private_key;
   std::string certificate_chain;
@@ -188,7 +209,7 @@ class CertificateProviderInterface {
   // watched.
   // identity_being-Watched If the identity certificates with the specific name
   // are being watched.
-  virtual void WatchStatusCallback(string cert_name, bool root_being_watched, bool identity_being_watched) = 0;
+  virtual void WatchStatusCallback(std::string cert_name, bool root_being_watched, bool identity_being_watched) = 0;
   // Sets the key materials based on their certificate name.
   // @param cert_name The name of the certificates being updated.
   // @param pem_root_certs The content of root certificates.
