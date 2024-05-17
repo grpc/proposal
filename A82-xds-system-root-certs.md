@@ -32,10 +32,10 @@ provider config in the xDS bootstrap file.
 
 ## Proposal
 
-We will add boolean a field to the xDS `CertificateValidationContext` message
-called `use_system_root_certs`.  If this field is true and the
-`ca_certificate_provider_instance` field is unset, system root
-certificates will be used for validation.
+We will add boolean a field to the xDS `CertificateValidationContext`
+message called `use_system_root_certs` (see envoyproxy/envoy#34235).
+If this field is true and the `ca_certificate_provider_instance` field
+is unset, system root certificates will be used for validation.
 
 ### xDS Resource Validation
 
