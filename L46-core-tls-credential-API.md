@@ -39,8 +39,7 @@ We propose an API that supports the above features and meets the following requi
 This part of the proposal introduces the base options class, called `TlsCredentialsOptions`, that has a large set of options for configuring TLS connections. There are 2 derived classes of `TlsCredentialsOptions`, called `TlsChannelCredentialsOptions` and `TlsServerCredentialsOptions`, that users create and can use to build channel credentials or server credentials instances, respectively. The API for building these channel/server credentials instances are called `TlsCredentials`/`TlsServerCredentials` respectively.
 
 ```c++
-// Base class of configurable options specified by users to configure their
-// certain security features supported in TLS.
+// Base class of TLS options.
 class TlsCredentialsOptions {
  public:
   ~TlsCredentialsOptions();
@@ -91,11 +90,14 @@ class TlsCredentialsOptions {
   // @param identity_cert_name the name of identity key-certificate pairs being set.
   void set_identity_cert_name(const std::string& identity_cert_name);
 
+  // WARNING: EXPERT USE ONLY. MISUSE CAN LEAD TO SIGNIFICANT SECURITY DEGRADATION.
+  // 
   // Sets the TLS session key logging file path. If not set, TLS
   // session key logging is disabled. Note that this should be used only for
   // debugging purposes. It should never be used in a production environment
-  // due to security concerns.
-  //
+  // due to security concerns - anyone who can obtain the (logged) session key
+  // can decrypt all traffic on a connection.
+  // 
   // @param tls_session_key_log_file_path: Path where TLS session keys should
   // be logged.
   void set_tls_session_key_log_file_path(
@@ -120,6 +122,8 @@ class TlsCredentialsOptions {
   // @param tls_version: The maximum TLS version.
   void set_max_tls_version(grpc_tls_version tls_version);
 
+  // WARNING: EXPERT USE ONLY. MISUSE CAN LEAD TO SIGNIFICANT SECURITY DEGRADATION.
+  //
   // Sets a custom chain builder implementation that replaces the default chain
   // building from the underlying SSL library. Fully replacing and implementing
   // chain building is a complex task and has dangerous security implications if
@@ -143,8 +147,9 @@ class TlsServerCredentialsOptions final : public TlsCredentialsOptions {
 
 
   // Sets requirements for if client certificates are requested, if they
-  // are required, and if the client certificate must be trusted.  The
-  // default is GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE.
+  // are required, and if the client certificate must be trusted. The
+  // default is GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE, which represents
+  // normal TLS.
   void set_cert_request_type(
       grpc_ssl_client_certificate_request_type cert_request_type);
 }
@@ -175,29 +180,19 @@ std::shared_ptr<ServerCredentials> TlsServerCredentials(
     const TlsServerCredentialsOptions& options);
 ```
 
-Here is an example of how to configure channel credentials:
-```c++
-/* Create option and set basic security primitives. */
-TlsChannelCredentialsOptions options = TlsChannelCredentialsOptions();
-options.set_verify_server_cert(true);
-options.set_min_tls_version(TLS1_2);
-options.set_max_tls_version(TLS1_3);
-
-/* Create TLS channel credentials. */
-std::shared_ptr<ChannelCredentials> creds = TlsCredentials(options);
-```
-
 ### Credential Reloading
 Credential reloading will be implemented via a `CertificateProviderInterface`.
-This provider is responsible for sourcing key material and supplying it to the
+Note that there is a naming mismatch here - there exist credentials beyond
+certificates that this _could_ theoretically support.  This provider is
+responsible for sourcing key material and supplying it to the
 internal stack via the `CertificateProvider`'s `SetKeyMaterials` API.  Two
 reference implementations of the `CertificateProviderInterface` are provided -
 `StaticDataCertificateProvider` and `FileWatcherCertificateProvider`. The
 `StaticDataCertificateProvider` provides certificates from raw string data. The
 `FileWatcherCertificateProvider` will periodically and asynchronously refresh
 certificate data from a file, allowing changes to certificates without
-restarting the client/server. More detail about these reference implementations
-is provided below. These implementations should cover many use cases.  If these
+restarting the process. More details about these reference implementations
+are provided below. These implementations should cover many use cases.  If these
 providers do not support the intricacies for a specific use case, a user can
 provide their own implementations of the `CertificateProviderInterface`.
 
