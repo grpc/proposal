@@ -258,6 +258,49 @@ class CertificateProviderInterface {
   std::unique_ptr<TlsCertificateDistributor> distributor_;
 };
 
+/** ------------------------------------ Provider ------------------------------------ */
+/** Provides identity credentials and root certificates.
+*/
+// This represents a potential decoupling of roots and identity chains, with
+// further extension points for something like SPIFFE bundles
+class CertificateProviderInterface {
+ public:
+  virtual ~CertificateProviderInterface() = default;
+  // Provider implementations MUST provide a LoadAndSetCredentialsCallback that
+  // will be called by the internal stack. This will be invoked when a new
+  // certificate name is starting to be used internally, or when a certificate
+  // name is no longer being used internally. When being invoked for a new
+  // certificate, this callback should call SetRootCertificates or
+  // SetIdentityChainAndPrivateKey to do the initial population the certificate
+  // data in the internal stack.
+  // 
+  // For the parameters in the callback function: cert_name The name of the
+  // certificates being watched.  type The type of certificates being watched.
+  virtual void LoadAndSetCredentialsCallback(std::string name, TODOType type) = 0;
+
+  // Must be called after the constructor.
+  // Does important internal setup steps.
+  virtual void Init() final;
+
+  enum TODOType {
+    RootCertificates,
+    IdentityChainAndPrivateKey
+  }
+
+protected:
+  // Sets the root certificates based on their name.
+  virtual void SetRootCertificates(const std::string& name, std::string pem_root_certificates) final;
+
+  // Sets the identity chain and private key based on their name.
+  virtual void SetIdentityChainAndPrivateKey(const std::string& name, grpc_core::PemKeyCertPairList pem_key_cert_pairs) final;
+
+  // Propagates an error encountered in the provider layer to the internal TLS stack.
+  virtual void SetError(const std::string& name, TODOType type, absl::Status error) final;
+
+ private:
+  std::unique_ptr<TlsCertificateDistributor> distributor_;
+};
+
 // A basic CertificateProviderInterface implementation that will load credential
 // data from static string during initialization. This provider will always
 // return the same certificate data for all cert names, and reloading is not supported.
