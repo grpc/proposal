@@ -36,7 +36,7 @@ We propose an API that supports the above features and meets the following requi
 
 ## Proposal
 
-### TLS credentials and TLS Options
+### TLS Credentials and TLS Options
 This part of the proposal introduces the base options class, called `TlsCredentialsOptions`, that has a large set of options for configuring TLS connections. There are 2 derived classes of `TlsCredentialsOptions`, called `TlsChannelCredentialsOptions` and `TlsServerCredentialsOptions`, that users create and can use to build channel credentials or server credentials instances, respectively. The API for building these channel/server credentials instances are called `TlsCredentials`/`TlsServerCredentials` respectively.
 
 ```c++
@@ -181,26 +181,24 @@ std::shared_ptr<ServerCredentials> TlsServerCredentials(
     const TlsServerCredentialsOptions& options);
 ```
 
-To make migration from the `SslCredentials` stack to the `TlsCredentials` stack easier,
-we will also have a constructor for `TlsChannelCredentialsOptions` and
-`TlsServerCredentialsOptions` that accept their corresponding `SslOptions`
-structs.
+To make migration from the `SslCredentials` API to the `TlsCredentials` API easier, we will also have a constructor for `TlsChannelCredentialsOptions` that accepts the `SslCredentialsOptions`
+struct. Similarly for `TlsServerCredentialsOptions`.
 
 ### Credential Reloading
 Credential reloading will be implemented via a `CertificateProviderInterface`.
 Note that there is a naming mismatch here - there exist credentials beyond
 certificates that this _could_ theoretically support.  This provider is
-responsible for sourcing key material and supplying it to the
-internal stack via the `CertificateProvider`'s `SetKeyMaterials` API.  Two
-reference implementations of the `CertificateProviderInterface` are provided -
+responsible for sourcing key material and supplying it to the internal stack via
+the `CertificateProvider`'s `SetKeyMaterials` API.  Two reference
+implementations of the `CertificateProviderInterface` are provided -
 `StaticDataCertificateProvider` and `FileWatcherCertificateProvider`. The
 `StaticDataCertificateProvider` provides certificates from raw string data. The
 `FileWatcherCertificateProvider` will periodically and asynchronously refresh
 certificate data from a file, allowing changes to certificates without
-restarting the process. More details about these reference implementations
-are provided below. These implementations should cover many use cases.  If these
-providers do not support the intricacies for a specific use case, a user can
-provide their own implementations of the `CertificateProviderInterface`.
+restarting the process. More details about these reference implementations are
+provided below. These implementations should cover many common use cases.  If
+these providers do not support the intricacies for a specific use case, a user
+can provide their own implementations of the `CertificateProviderInterface`.
 
 ```c
 /* Opaque types. */
@@ -216,7 +214,11 @@ struct IdentityKeyCertPair {
 
 /** ------------------------------------ Provider ------------------------------------ */
 /** Provides identity credentials and root certificates.
-*/
+/* To enable the provider to manage multiple sets of credentials of each type,
+ * each set of credentials must be given a "name". The "name" is an opaque
+ * user-defined label, and the provider will reference this "name" e.g. in logs
+ * and error messages.
+ */
 class CertificateProviderInterface {
  public:
   virtual ~CertificateProviderInterface() = default;
@@ -278,13 +280,13 @@ class CertificateProviderInterface {
   // 
   // For the parameters in the callback function: cert_name The name of the
   // certificates being watched.  type The type of certificates being watched.
-  virtual void LoadAndSetCredentialsCallback(std::string name, TODOType type) = 0;
+  virtual void LoadAndSetCredentialsCallback(std::string name, CredentialType type) = 0;
 
   // Must be called after the constructor.
   // Does important internal setup steps.
   virtual void Init() final;
 
-  enum TODOType {
+  enum CredentialType {
     RootCertificates,
     IdentityChainAndPrivateKey
   }
@@ -297,7 +299,7 @@ protected:
   virtual void SetIdentityChainAndPrivateKey(const std::string& name, grpc_core::PemKeyCertPairList pem_key_cert_pairs) final;
 
   // Propagates an error encountered in the provider layer to the internal TLS stack.
-  virtual void SetError(const std::string& name, TODOType type, absl::Status error) final;
+  virtual void SetError(const std::string& name, CredentialType type, absl::Status error) final;
 
  private:
   std::unique_ptr<TlsCertificateDistributor> distributor_;
@@ -375,10 +377,7 @@ The next sections explain these interfaces in more detail.
 ```c++
 // Contains the information from the (verified) peer certificate chain that can
 // be used to perform custom validation checks. Users should not directly
-// create or destroy this request object, but shall interact with it through
-// CertificateVerifier's Verify() and Cancel().
-// TODO(gtcooke94) Add expected
-// formats for all string values here.
+// create or destroy this request object.
 class TlsCustomVerificationCheckRequest {
  public:
   // The target hostname that is expected to appear in the server leaf
@@ -423,15 +422,18 @@ class TlsCustomVerificationCheckRequest {
 
 // The base class of all verifier implementations. Note that custom
 // verifier implementations can compose their functionality with existing
-// implementations of this interface, such as HostnameVerifier, by delegating
+// implementations of this interface, such as HostNameVerifier, by delegating
 // to an instance of that class.
-class CertificateVerifier {
+class CertificateVerifierInterface {
  public:
-  virtual ~CertificateVerifier() = default;
+  virtual ~CertificateVerifierInterface() = default;
 
-  // Verifies a connection request. The check on each internal verifier could be
-  // either synchronous or asynchronous, and we will need to use return value to
-  // know.
+  // Performs a custom verification check.
+  // Returns true if verification occurs synchronously, in which case the
+  // verification result is populated in the sync_status output parameter.
+  // Returns false if verification occurs asynchronously, in which case the
+  // callback must be called when verification is complete and the verification
+  // result must be populated in the sync_status output parameter.
   //
   // request: the verification information associated with this request
   // callback: This will only take effect if the verifier is asynchronous.
@@ -443,16 +445,16 @@ class CertificateVerifier {
   //              The status of the verifier as it has already done it's
   //              synchronous check.
   // return: return true if executed synchronously, otherwise return false
-  bool Verify(TlsCustomVerificationCheckRequest* request,
+  virtual bool Verify(TlsCustomVerificationCheckRequest* request,
               std::function<void(Status)> callback,
-              Status* sync_status);
+              Status* sync_status) = 0;
 
   // Cancels a verification request previously started via Verify().
   // Used when the connection attempt times out or is cancelled while an async
   // verification request is pending.
   //
   // request: the verification information associated with this request
-  void Cancel(TlsCustomVerificationCheckRequest* request);
+  virtual void Cancel(TlsCustomVerificationCheckRequest* request) = 0;
 };
 
 // A CertificateVerifier that doesn't perform any additional checks other than
@@ -460,7 +462,7 @@ class CertificateVerifier {
 // Note: using this solely without any other authentication mechanisms on the
 // peer identity will leave your applications to the MITM(Man-In-The-Middle)
 // attacks. Users should avoid doing so in production environments.
-class NoOpCertificateVerifier : public CertificateVerifier {
+class NoOpCertificateVerifier : public CertificateVerifierInterface {
  public:
   NoOpCertificateVerifier();
 };
@@ -468,7 +470,9 @@ class NoOpCertificateVerifier : public CertificateVerifier {
 // A CertificateVerifier that will perform hostname verification, to see if the
 // target name set from the client side matches the identity information
 // specified on the server's certificate.
-class HostNameCertificateVerifier : public CertificateVerifier {
+// This will be used as the default verifier if no verification is otherwise
+// set.
+class HostNameCertificateVerifier : public CertificateVerifierInterface {
  public:
   HostNameCertificateVerifier();
 };
@@ -488,14 +492,13 @@ public:
 ```
 
 The default behavior for chain building is to defer to the underlying SSL library, which has a built-in chain building API that has been hardened over many years of use with the web PKI. For example, [X509_verify_cert](https://www.openssl.org/docs/man1.1.1/man3/X509_verify_cert.html) is the implementation in OpenSSL that builds a chain and verifies that it is trusted by one of the root certificates.
+One use case for the custom chain building feature is to enable SPIFFE federation (TODO: ref the SPIFFE spec), where the set of root certificates to use is determined based on the SPIFFE trust domain in the peer's leaf certificate.
 
 ```c++
-class SPIFFEFederationChainBuilder : public CustomChainBuilderInterface {
-public:
- ~SPIFFEFederationChainBuilder() override;
-
  // Builds a trusted and validated certificate chain based on SPIFFE trust maps
  // rather than the standard X509 approach.
- absl::StatusOr<std::vector<absl::string_view>> BuildAndVerifyChain(const std::vector<absl::string_view>& peer_cert_chain_der) override;
+class SpiffeFederationChainBuilder : public CustomChainBuilderInterface {
+public:
+ ~SpiffeFederationChainBuilder() override;
 }
 ```
