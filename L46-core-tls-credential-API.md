@@ -9,7 +9,7 @@ L46: C-core: New TLS Credentials API
 ## Abstract
 
 This proposal aims to provide a new TLS credentials API with the following features:
-1. Credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without shutting down.
+1. Credential reloading: reload transport credentials periodically from various sources, e.g. from credential files, or users' customized Provider implementations, without restarting the process.
 1. Customizable verification of the peer certificate: perform custom validation checks on the peer's certificate chain after it has been verified to chain up to a root of trust, or fully customize path building and cryptographic verification.
 1. TLS version configuration: optionally configure the minimum and maximum of the TLS versions to be negotiated during the handshake.
 1. Support for certificate revocation via Certificate Revocation Lists (CRLs).
@@ -50,9 +50,9 @@ class TlsCredentialsOptions {
   TlsCredentialsOptions& operator=(const TlsCredentialsOptions& other) = delete;
 
   // ---- Setters for member fields ----
-  // Sets the certificate provider used to store root certificates and the
-  // certificate chain conveying the application's identity and corresponding
-  // private key.
+  // Sets the certificate provider which is used to store: 
+  // 1. The root certificates used to (cryptographically) verify peer certificate chains.
+  // 2. The certificate chain conveying the application's identity and the corresponding private key.
   void set_certificate_provider(
       std::shared_ptr<CertificateProviderInterface> certificate_provider);
 
@@ -180,6 +180,11 @@ std::shared_ptr<ServerCredentials> TlsServerCredentials(
     const TlsServerCredentialsOptions& options);
 ```
 
+To make migration from the `SslCredentials` stack to the `TlsCredentials` stack easier,
+we will also have a constructor for `TlsChannelCredentialsOptions` and
+`TlsServerCredentialsOptions` that accept their corresponding `SslOptions`
+structs.
+
 ### Credential Reloading
 Credential reloading will be implemented via a `CertificateProviderInterface`.
 Note that there is a naming mismatch here - there exist credentials beyond
@@ -199,7 +204,7 @@ provide their own implementations of the `CertificateProviderInterface`.
 ```c
 /* Opaque types. */
 // A struct that stores the credential data presented to the peer in handshake
-// to show local identity. The private_key and certificate_chain must be PEM
+// to show local identity. The private key and certificate chain must be PEM
 // encoded and the public key in the leaf certificate must correspond to the
 // given private key.
 struct IdentityKeyCertPair {
@@ -214,6 +219,7 @@ struct IdentityKeyCertPair {
 class CertificateProviderInterface {
  public:
   virtual ~CertificateProviderInterface() = default;
+
   // Provider implementations MUST provide a WatchStatusCallback that will be
   // called by the internal stack. This will be invoked when a new certificate
   // name is starting to be used internally, or when a certificate name is no
@@ -354,24 +360,41 @@ class FileWatcherCertificateProvider final
 
 
 ```
-### Custom Verification
-We aim to provide distinct interfaces for chain building customization and for additional validation of an already built chain. These two features have distinctly different expected users. Doing some extra validation based on the contents of the peer certificate chain is an operation that anyone doing (m)TLS might be interested in, and it should not and does not require any deep X.509 expertise. Replacing how chain building works is a relatively rare requirement and it does require deep X.509 expertise to do correctly. We want extra validation to be easy and clear for users to add without worrying about interacting with chain building itself. On the other hand, chain building is complex to implement, and we suspect that most users will stay with the default behavior. However, to enable advanced use, such as dynamic selection of the trust bundle based on the peer certificate (e.g. SPIFFE federation), this is needed. 
-#### Post Handshake Verification
+### Customizable Verification of the Peer Certificate
+
+Users should be able to customize verification of the peer certificate, and we provide two distinct interfaces for how this can be done:
+
+1. Allow users to perform custom validation checks on the peer's certificate chain after it has been verified to chain up to a root of trust, but before the TLS handshake completes. This is a common customization that might be needed whenever a private PKI is involved, and does not require the user to have any significant domain knowledge.
+
+2. Allow users to fully customize path building and cryptographic verification. This is a relatively rare requirement from users and requires deep X.509 expertise to do correctly and without introducing significant security vulnerabilities. However, it is unavoidable in order to unblock some advanced use cases, e.g. SPIFFE federation.
+
+The next sections explain these interfaces in more detail.
+
+#### Custom Validation Checks on the Peer Certificate Chain
 ```c++
-// Contains the verification-related information associated with a connection
-// request. Users should not directly create or destroy this request object, but
-// shall interact with it through CertificateVerifier's Verify() and Cancel().
-// TODO(gtcooke94) Add expected formats for all string values here.
+// Contains the information from the (verified) peer certificate chain that can
+// be used to perform custom validation checks. Users should not directly
+// create or destroy this request object, but shall interact with it through
+// CertificateVerifier's Verify() and Cancel().
+// TODO(gtcooke94) Add expected
+// formats for all string values here.
 class TlsCustomVerificationCheckRequest {
  public:
-  explicit TlsCustomVerificationCheckRequest(
-      grpc_tls_custom_verification_check_request* request);
-  ~TlsCustomVerificationCheckRequest() {}
-
+  // The target hostname that is expected to appear in the server leaf
+  // certicate, e.g. github.com. Empty on the server-side.
   absl::string_view target_name() const;
+
+  // The PEM-encoded leaf cert.
   absl::string_view peer_cert() const;
+
+  // The PEM-encoded unverified peer cert chain, ordered from leaf to root, but
+  // not including the root.
   absl::string_view peer_cert_full_chain() const;
+
+  // The common name string from the Subject extension in the peer's leaf
+  // certificate.
   absl::string_view common_name() const;
+
   // The subject name of the root certificate used to verify the peer chain
   // If verification fails or the peer certificate is self-signed, this will be an
   // empty string. If verification is successful, it is a comma-separated list,
@@ -379,23 +402,31 @@ class TlsCustomVerificationCheckRequest {
   // ex: "CN=testca,O=Internet Widgits Pty Ltd,ST=Some-State,C=AU"
   // ex: "CN=GTS Root R1,O=Google Trust Services LLC,C=US"
   absl::string_view verified_root_cert_subject() const;
-  std::vector<absl::string_view> uri_names() const;
-  std::vector<absl::string_view> dns_names() const;
-  std::vector<absl::string_view> email_names() const;
-  std::vector<absl::string_view> ip_names() const;
 
+  // The (possibly empty) list of URI names from the Subject Alternative Name
+  // extension in the peer's leaf certificate.
+  std::vector<absl::string_view> uri_names() const;
+
+  // The (possibly empty) list of DNS names from the Subject Alternative Name
+  // extension in the peer's leaf certificate.
+  std::vector<absl::string_view> dns_names() const;
+
+  // The (possibly empty) list of email names from the Subject Alternative Name
+  // extension in the peer's leaf certificate.
+  std::vector<absl::string_view> email_names() const;
+
+  // The (possibly empty) list of IP names from the Subject Alternative Name
+  // extension in the peer's leaf certificate.
+  std::vector<absl::string_view> ip_names() const;
 }
 
-// The base class of all internal verifier implementations, and the ultimate
-// class that all external verifiers will eventually be transformed into.
-// To implement a custom verifier, do not extend this class; instead,
-// implement a subclass of ExternalCertificateVerifier. Note that custom
+// The base class of all verifier implementations. Note that custom
 // verifier implementations can compose their functionality with existing
 // implementations of this interface, such as HostnameVerifier, by delegating
 // to an instance of that class.
 class CertificateVerifier {
  public:
-  ~CertificateVerifier();
+  virtual ~CertificateVerifier() = default;
 
   // Verifies a connection request. The check on each internal verifier could be
   // either synchronous or asynchronous, and we will need to use return value to
@@ -446,18 +477,24 @@ class HostNameCertificateVerifier : public CertificateVerifier {
 ```c++
 class CustomChainBuilderInterface {
 public:
- // TODO(gtcooke94) - more detail here on output specifics.
- // The output chain should consist of DER encoded certs ordered in the same way
- // that Open/BoringSSL build chains in `X509_verify_cert` including the root of
- // the trusted chain.
- virtual absl::StatusOr<std::vector<absl::string_view>>
- BuildAndVerifyChain(const std::vector<absl::string_view>& peer_cert_chain_der)
- = 0;
- virtual ~CustomChainBuilderInterface() = 0;
+ virtual ~CustomChainBuilderInterface() = default;
+
+ // Returns the verified DER-encoded certificate chain, ordered from leaf to
+ // root. Both the leaf and the root are included. Returns an error status if
+ // verification fails for any reason.
+ virtual absl::StatusOr<std::vector<absl::string_view>> BuildAndVerifyChain(const std::vector<absl::string_view>& peer_cert_chain_der) = 0;
 }
 ```
 
-The default behavior for chain building is based on the underlying SSL library. For example, [X509_verify_cert](https://www.openssl.org/docs/man1.1.1/man3/X509_verify_cert.html) is the implementation in OpenSSL that builds and verifies a certificate chain.
-gRPC calls that function by default [here](https://github.com/grpc/grpc/blob/2d2d5a3c411a2bade319a08085e55821cf2d5ed9/src/core/tsi/ssl_transport_security.cc#L1150).
-Once the `CustomChainBuilder` is implemented, this will be where it is used. The `X509_verify_cert` call will be replaced by the `CustomChainBuilder's BuildAndVerifyChain` that fully replaces chain building.
-Replacing chain building is very complex and can open dangerous security holes if done wrong. Most users should not expect to use this API. However, there exist use cases for such behavior - for example, building chains from SPIFFE IDs and trust maps.
+The default behavior for chain building is to defer to the underlying SSL library, which has a built-in chain building API that has been hardened over many years of use with the web PKI. For example, [X509_verify_cert](https://www.openssl.org/docs/man1.1.1/man3/X509_verify_cert.html) is the implementation in OpenSSL that builds a chain and verifies that it is trusted by one of the root certificates.
+
+```c++
+class SPIFFEFederationChainBuilder : public CustomChainBuilderInterface {
+public:
+ ~SPIFFEFederationChainBuilder() override;
+
+ // Builds a trusted and validated certificate chain based on SPIFFE trust maps
+ // rather than the standard X509 approach.
+ absl::StatusOr<std::vector<absl::string_view>> BuildAndVerifyChain(const std::vector<absl::string_view>& peer_cert_chain_der) override;
+}
+```
