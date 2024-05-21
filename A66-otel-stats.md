@@ -184,7 +184,12 @@ for a particular channel or server builder.
 #### Java
 
 ```java
-public static class OpenTelemetryModuleBuilder {
+public final class GrpcOpenTelemetry {
+  
+  /**
+   * Builder for configuring GrpcOpenTelemetry.
+   */
+  public static class Builder {
     /**
      * OpenTelemetry instance is used to configure metrics settings.
      *
@@ -199,21 +204,61 @@ public static class OpenTelemetryModuleBuilder {
      *         .setMeterProvider(sdkMeterProvider)
      *         .build();
      *
+     *     GrpcOpenTelemetry grpcOpenTelemetry = GrpcOpenTelemetry.newBuilder()
+     *         .sdk(openTelemetry)
+     *         .build();
+     *
      * If MeterProvider is not configured, no-op meterProvider will be used by default.
      * It provides meters which do not record or emit.
      */
-    public OpenTelemetryModuleBuilder openTelemetry(OpenTelemetry openTelemetry);
+    public Builder sdk(OpenTelemetry openTelemetry);
 
-    public OpenTelemetryModule build();
+    public GrpcOpenTelemetry build();
+  }
+
+  /**
+   * Creates an empty builder.
+   */
+  public static Builder newBuilder();
+
+  /**
+   * Establishes GrpcOpenTelemetry instance as the global instrumentation provider for gRPC opentelemetry,
+   * automatically applying its configuration to all gRPC channels and servers created after this call.
+   *
+   * Sample
+   *    GrpcOpenTelemetry grpcOpenTelemetry = GrpcOpenTelemetry.newBuilder()
+   *         .sdk(openTelemetry)
+   *         .build();
+   *
+   *    grpcOpenTelemetry.registerGlobal();
+   *
+   * <p> Note: Only one of GrpcOpenTelemetry instance can be registered globally. Any subsequent call to
+   * registerGlobal() will throw an IllegalStateException.
+   */
+  public void registerGlobal();
+
+  /**
+   * Configures the given ManagedChannelBuilder with OpenTelemetry metrics instrumentation.
+   */
+  public void configureChannelBuilder(ManagedChannelBuilder<?> builder);
+
+  /**
+   * Configures the given ServerBuilder with OpenTelemetry metrics instrumentation.
+   */
+  public void configureServerBuilder(ServerBuilder<?> serverBuilder);
 }
 ```
 
-Note: For non-generated methods, method names are recorded as "other" for
+Note:
+- For non-generated methods, method names are recorded as "other" for
 `grpc.method` attribute. If you are interested in recording the method names for
 these methods, set
 [`isSampledToLocalTracing`](https://grpc.github.io/grpc-java/javadoc/io/grpc/MethodDescriptor.html#isSampledToLocalTracing\(\))
 to `true` while defining your methods in
 [`HandlerRegistry`](https://grpc.github.io/grpc-java/javadoc/io/grpc/HandlerRegistry.html).
+- A single `GrpcOpenTelemetry` instance can be registered either globally or on a
+per-channel and/or per-server basis. Avoid registering the same instance
+multiple ways, as this may result in unexpected behavior.
 
 #### Go
 
