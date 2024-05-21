@@ -50,11 +50,19 @@ The metrics will be exported as:
 | grpc.tcp.packets_retransmitted | Counter (uint64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
 | grpc.tcp.packets_spurious_retransmitted | Counter (uint64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
 
-The metrics are acquired by enabling the `SO_TIMESTAMPING` option in the kernel's TCP stack via the `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))` system call. This configuration allows the kernel to capture packet timestamps during transmission and subsequently provide relevant socket information when `getsockopt(TCP_INFO)` is invoked.
+
+#### Metric Collection Design
+
+A high-level approach to collecting TCP metrics is as follows:
+1) **Collect Network Timestamps for Metric Calculation:** On Linux, this is achieved by enabling the `SO_TIMESTAMPING` option in the kernel's TCP stack through the `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))` system call. This enables the kernel to capture packet timestamps during transmission and provide this information through `getsockopt(TCP_INFO)`.
+2) **Calculate Time Deltas from Timestamps:** For example, the `delivery_rate` metric estimates the goodput—the rate of useful data transmitted—for the most recent group of outbound data packets within a single flow. This involves calculating the time difference between when a data packet was sent and when it was acknowledged.
+3) **Periodically Collect Statistics:** At a specified time interval (e.g., every 10 seconds), gRPC aggregates the calculated metrics and updates the corresponding statistics records.
+
 
 #### Reference: 
 * Fathom: https://dl.acm.org/doi/pdf/10.1145/3603269.3604815
 * Kernel TCP Timestamping: https://www.kernel.org/doc/Documentation/networking/timestamping.rst
+* Delivery Rate: https://datatracker.ietf.org/doc/html/draft-cheng-iccrg-delivery-rate-estimation#name-delivery-rate
 
 ### Metric Stability
 
@@ -70,5 +78,3 @@ it does not need environment variable protection.
 ## Implementation
 
 Will be implemented in C-core, and currently have no plans to implement in other languages.
-
-
