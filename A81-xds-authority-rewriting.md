@@ -4,7 +4,7 @@ A81: xDS Authority Rewriting
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-05-17
+* Last updated: 2024-05-21
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -13,10 +13,15 @@ gRPC will add support for xDS-based authority rewriting.
 
 ## Background
 
-gRPC supports getting routing configuration from an xDS server, as described
-in gRFCs [A27] and [A28].  The xDS configuration can configure the
-client to rewrite the authority header on requests, although gRPC does
-not yet support this feature.
+gRPC supports getting routing configuration from an xDS server, as
+described in gRFCs [A27] and [A28].  The xDS configuration can configure
+the client to rewrite the authority header on requests, although gRPC does
+not yet support this feature.  This functionality can be useful in cases
+where the server is using the authority header to make decisions about
+how to process the request, such as when multiple hosts are handled via
+a reverse proxy.  Note that this feature is solely about rewriting the
+authority header on data plane RPCs; it does not affect the authority
+used in the TLS handshake.
 
 As mentioned in [gRFC A29][A29], there are use-cases for gRPC
 that prohibit trusting the xDS server to control security-centric
