@@ -185,7 +185,7 @@ for a particular channel or server builder.
 
 ```java
 public final class GrpcOpenTelemetry {
-  
+
   /**
    * Builder for configuring GrpcOpenTelemetry.
    */
@@ -257,8 +257,8 @@ these methods, set
 to `true` while defining your methods in
 [`HandlerRegistry`](https://grpc.github.io/grpc-java/javadoc/io/grpc/HandlerRegistry.html).
 - A single `GrpcOpenTelemetry` instance can be registered either globally or on a
-per-channel and/or per-server basis. Avoid registering the same instance
-multiple ways, as this may result in unexpected behavior.
+per-channel and/or per-server basis. Registering the same instance more than
+once may lead to duplicated data.
 
 #### Go
 
