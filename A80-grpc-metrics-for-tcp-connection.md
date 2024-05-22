@@ -44,8 +44,8 @@ The metrics will be exported as:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.tcp.min_rtt | Histogram (double) | s | grpc.tcp.peer_address, grpc.tcp.local_address | Records TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints. RTT: packet acked timestamp - packet sent timestamp. |
-| grpc.tcp.delivery_rate | Histogram (double) | bit/s | grpc.tcp.peer_address, grpc.tcp.local_address | Records latest goodput measured of the TCP connection. Elapse time = packet acked timestamp - last packet acked timestamp. Delivery rate = packet acked bytes / elapse time. |
+| grpc.tcp.min_rtt | Histogram (double) | s | grpc.tcp.peer_address, grpc.tcp.local_address | Records TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints.<br /> RTT = packet acked timestamp - packet sent timestamp. |
+| grpc.tcp.delivery_rate | Histogram (double) | bit/s | grpc.tcp.peer_address, grpc.tcp.local_address | Records latest goodput measured of the TCP connection. <br /> Elapsed time = packet acked timestamp - last packet acked timestamp. <br /> Delivery rate = packet acked bytes / elapsed time. |
 | grpc.tcp.packets_sent | Counter (uint64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets TCP sends in the calculation period. |
 | grpc.tcp.packets_retransmitted | Counter (uint64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
 | grpc.tcp.packets_spurious_retransmitted | Counter (uint64) | {packet} | grpc.tcp.peer_address, grpc.tcp.local_address | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
@@ -53,10 +53,10 @@ The metrics will be exported as:
 
 #### Metric Collection Design
 
-A high-level approach to collecting TCP metrics is as follows:
-1) **Collect Network Timestamps for Metric Calculation:** On Linux, this is achieved by enabling the `SO_TIMESTAMPING` option in the kernel's TCP stack through the `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))` system call. This enables the kernel to capture packet timestamps during transmission and provide this information through `getsockopt(TCP_INFO)`.
-2) **Calculate Time Deltas from Timestamps:** For example, the `delivery_rate` metric estimates the goodput—the rate of useful data transmitted—for the most recent group of outbound data packets within a single flow. This involves calculating the (packet bytes / elapse time between last acked data packet and the latest acked data packet).
-3) **Periodically Collect Statistics:** At a specified time interval (e.g., every 10 seconds), gRPC aggregates the calculated metrics and updates the corresponding statistics records.
+A high-level approach to collecting TCP metrics (on Linux) is as follows:
+1) **Enable Network Timestamps for Metric Calculation:** Enable the `SO_TIMESTAMPING` option in the kernel's TCP stack through the `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))` system call. This enables the kernel to capture packet timestamps during transmission.
+2) **Calculate Metrics from Timestamps:**  Linux kernel calculates TCP connection metrics based on the captured packet timestamps. These metrics can be retrieved using the `getsockopt(TCP_INFO)` system call. For example, the delivery_rate metric estimates the goodput—the rate of useful data transmitted—for the most recent group of outbound data packets within a single flow ([code](https://elixir.bootlin.com/linux/v5.11.1/source/net/ipv4/tcp.c#L391)).
+3) **Periodically Collect Statistics:** At a specified time interval (e.g., every 5 minutes), gRPC aggregates the calculated metrics and updates the corresponding statistics records.
 
 
 #### Reference: 
