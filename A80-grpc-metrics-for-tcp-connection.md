@@ -55,7 +55,7 @@ The metrics will be exported as:
 
 A high-level approach to collecting TCP metrics is as follows:
 1) **Collect Network Timestamps for Metric Calculation:** On Linux, this is achieved by enabling the `SO_TIMESTAMPING` option in the kernel's TCP stack through the `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))` system call. This enables the kernel to capture packet timestamps during transmission and provide this information through `getsockopt(TCP_INFO)`.
-2) **Calculate Time Deltas from Timestamps:** For example, the `delivery_rate` metric estimates the goodput—the rate of useful data transmitted—for the most recent group of outbound data packets within a single flow. This involves calculating the (byte difference / time difference) between last acked data packet and the latest acked data packet.
+2) **Calculate Time Deltas from Timestamps:** For example, the `delivery_rate` metric estimates the goodput—the rate of useful data transmitted—for the most recent group of outbound data packets within a single flow. This involves calculating the (packet bytes / elapse time between last acked data packet and the latest acked data packet).
 3) **Periodically Collect Statistics:** At a specified time interval (e.g., every 10 seconds), gRPC aggregates the calculated metrics and updates the corresponding statistics records.
 
 
