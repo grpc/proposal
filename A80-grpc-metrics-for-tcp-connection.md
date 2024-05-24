@@ -24,7 +24,7 @@ To improve the network debugging capabilities for gRPC users, we propose adding 
 
 This document proposes changes to the following gRPC components.
 
-#### Per-Connection TCP Metrics
+### Per-Connection TCP Metrics
 
 We will provide the following metrics:
 - `grpc.tcp.min_rtt`
@@ -43,14 +43,12 @@ The metrics will be exported as:
 | grpc.tcp.packets_retransmitted | Counter (uint64) | {packet} | None | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
 | grpc.tcp.packets_spurious_retransmitted | Counter (uint64) | {packet} | None | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
 
-
 #### Metric Collection Design
 
 A high-level approach to collecting TCP metrics (on Linux) is as follows:
 1) **Enable Network Timestamps for Metric Calculation:** Enable the `SO_TIMESTAMPING` option in the kernel's TCP stack through the `setsocketopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &val, sizeof(val))` system call. This enables the kernel to capture packet timestamps during transmission.
 2) **Calculate Metrics from Timestamps:**  Linux kernel calculates TCP connection metrics based on the captured packet timestamps. These metrics can be retrieved using the `getsockopt(TCP_INFO)` system call. For example, the delivery_rate metric estimates the goodput—the rate of useful data transmitted—for the most recent group of outbound data packets within a single flow ([code](https://elixir.bootlin.com/linux/v5.11.1/source/net/ipv4/tcp.c#L391)).
-3) **Periodically Collect Statistics:** At a specified time interval (e.g., every 5 minutes), gRPC aggregates the calculated metrics and updates the corresponding statistics records.
-
+3) **Periodically Collect Statistics:** At a specified time interval (e.g., every 5 minutes), gRPC aggregates the calculated metrics and updates the corresponding statistics records. A detailed explanation of the design can be found in the Fathom documentation.
 
 #### Reference: 
 * Fathom: https://dl.acm.org/doi/pdf/10.1145/3603269.3604815
