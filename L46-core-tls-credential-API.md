@@ -284,12 +284,12 @@ class StaticDataCertificateProvider
  public:
   StaticDataCertificateProvider(
       absl::string_view root_certificate,
-      const std::vector<IdentityKeyCertPair>& identity_key_cert_pairs);
+      const absl::Span<IdentityKeyCertPair>& identity_key_cert_pairs);
 
   explicit StaticDataCertificateProvider(absl::string_view root_certificate);
 
   explicit StaticDataCertificateProvider(
-      const std::vector<IdentityKeyCertPair>& identity_key_cert_pairs);
+      const absl::Span<IdentityKeyCertPair>& identity_key_cert_pairs);
     }
 
 // A CertificateProviderInterface implementation that will watch the credential
@@ -376,19 +376,19 @@ class TlsCustomVerificationCheckRequest {
 
   // The (possibly empty) list of URI names from the Subject Alternative Name
   // extension in the peer's leaf certificate.
-  std::vector<absl::string_view> uri_names() const;
+  absl::Span<absl::string_view> uri_names() const;
 
   // The (possibly empty) list of DNS names from the Subject Alternative Name
   // extension in the peer's leaf certificate.
-  std::vector<absl::string_view> dns_names() const;
+  absl::Span<absl::string_view> dns_names() const;
 
   // The (possibly empty) list of email names from the Subject Alternative Name
   // extension in the peer's leaf certificate.
-  std::vector<absl::string_view> email_names() const;
+  absl::Span<absl::string_view> email_names() const;
 
   // The (possibly empty) list of IP names from the Subject Alternative Name
   // extension in the peer's leaf certificate.
-  std::vector<absl::string_view> ip_names() const;
+  absl::Span<absl::string_view> ip_names() const;
 }
 
 // The base class of all verifier implementations. Note that custom
@@ -458,7 +458,7 @@ public:
  // Returns the verified DER-encoded certificate chain, ordered from leaf to
  // root. Both the leaf and the root are included. Returns an error status if
  // verification fails for any reason.
- virtual absl::StatusOr<std::vector<absl::string_view>> BuildAndVerifyChain(const std::vector<absl::string_view>& peer_cert_chain_der) = 0;
+ virtual absl::StatusOr<absl::Span<absl::string_view>> BuildAndVerifyChain(const std::vector<absl::string_view>& peer_cert_chain_der) = 0;
 }
 ```
 
