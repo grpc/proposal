@@ -37,11 +37,11 @@ The metrics will be exported as:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.tcp.min_rtt | Histogram (double) | s | None | Records TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints.<br /> RTT = packet acked timestamp - packet sent timestamp. |
-| grpc.tcp.delivery_rate | Histogram (double) | bit/s | None | Records latest goodput measured of the TCP connection. <br /> Elapsed time = packet acked timestamp - last packet acked timestamp. <br /> Delivery rate = packet acked bytes / elapsed time. |
-| grpc.tcp.packets_sent | Counter (uint64) | {packet} | None | Records total packets TCP sends in the calculation period. |
-| grpc.tcp.packets_retransmitted | Counter (uint64) | {packet} | None | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
-| grpc.tcp.packets_spurious_retransmitted | Counter (uint64) | {packet} | None | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
+| grpc.tcp.min_rtt | Histogram (floating-point) | s | None | Records TCP's current estimate of minimum round trip time (RTT), typically used as an indication of the network health between two endpoints.<br /> RTT = packet acked timestamp - packet sent timestamp. |
+| grpc.tcp.delivery_rate | Histogram (floating-point) | bit/s | None | Records latest goodput measured of the TCP connection. <br /> Elapsed time = packet acked timestamp - last packet acked timestamp. <br /> Delivery rate = packet acked bytes / elapsed time. |
+| grpc.tcp.packets_sent | Counter (integer) | {packet} | None | Records total packets TCP sends in the calculation period. |
+| grpc.tcp.packets_retransmitted | Counter (integer) | {packet} | None | Records total packets lost in the calculation period, including lost or spuriously retransmitted packets. |
+| grpc.tcp.packets_spurious_retransmitted | Counter (integer) | {packet} | None | Records total packets spuriously retransmitted packets in the calculation period. These are retransmissions that TCP later discovered unnecessary.|
 
 #### Metric Collection Design
 
