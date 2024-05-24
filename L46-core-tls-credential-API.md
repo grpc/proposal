@@ -1,4 +1,4 @@
-L46: C-core: New TLS Credentials API
+L46: C++: New TLS Credentials API
 ----
 * Author(s): gtcooke94, ZhenLian
 * Approver: 
@@ -35,6 +35,7 @@ We propose an API that supports the above features and meets the following requi
 1. [A69: Crl Providers](https://github.com/grpc/proposal/pull/382)
 
 ## Proposal
+Until recently, C-Core needed to be written in C89, then we had C++ wrappers of those APIs in `grpcpp`. Requirements have changed such that we can use C++ directly in Core. The rest of this proposal is written as C++ that will be implemented in core, and simple aliases to everything will be written in the `grpcpp`.
 
 ### TLS Credentials and TLS Options
 This part of the proposal introduces the base options class, called `TlsCredentialsOptions`, that has a large set of options for configuring TLS connections. There are 2 derived classes of `TlsCredentialsOptions`, called `TlsChannelCredentialsOptions` and `TlsServerCredentialsOptions`, that users create and can use to build channel credentials or server credentials instances, respectively. The API for building these channel/server credentials instances are called `TlsCredentials`/`TlsServerCredentials` respectively.
@@ -76,7 +77,7 @@ class TlsCredentialsOptions {
   // differentiate between different root certificates.
   // 
   // @param root_cert_name the name of root certificates being set.
-  void set_root_cert_name(const std::string& root_cert_name);
+  void set_root_cert_name(absl::string_view root_cert_name);
 
   // Watches the updates of identity key-certificate pairs with name
   // |identity_cert_name|. If used in TLS credentials, it is required to be set
@@ -89,7 +90,7 @@ class TlsCredentialsOptions {
   // be used as the name.
   //
   // @param identity_cert_name the name of identity key-certificate pairs being set.
-  void set_identity_cert_name(const std::string& identity_cert_name);
+  void set_identity_cert_name(absl::string_view identity_cert_name);
 
   // WARNING: EXPERT USE ONLY. MISUSE CAN LEAD TO SIGNIFICANT SECURITY DEGRADATION.
   // 
@@ -102,7 +103,7 @@ class TlsCredentialsOptions {
   // @param tls_session_key_log_file_path: Path where TLS session keys should
   // be logged.
   void set_tls_session_key_log_file_path(
-      const std::string& tls_session_key_log_file_path);
+      absl::string_view tls_session_key_log_file_path);
 
   // Sets the certificate verifier. The certificate verifier performs checks on
   // the peer certificate chain after the chain has been (cryptographically)
@@ -129,7 +130,7 @@ class TlsCredentialsOptions {
   // building from the underlying SSL library. Fully replacing and implementing
   // chain building is a complex task and has dangerous security implications if
   // done wrong, thus this API is inteded for expert use only.
-  void set_custom_chain_builder(std::shared_ptr<CustomChainBuilder>
+  void set_custom_chain_builder(std::shared_ptr<CustomChainBuilderInterface>
   chain_builder);
 }
 
@@ -181,8 +182,12 @@ std::shared_ptr<ServerCredentials> TlsServerCredentials(
     const TlsServerCredentialsOptions& options);
 ```
 
-To make migration from the `SslCredentials` API to the `TlsCredentials` API easier, we will also have a constructor for `TlsChannelCredentialsOptions` that accepts the `SslCredentialsOptions`
-struct. Similarly for `TlsServerCredentialsOptions`.
+`TlsCredentials` features should represent a superset of `SslCredentials`
+features, so we anticipate `TlsCredentials` being the API of choice now.  To
+make migration from the `SslCredentials` API to the `TlsCredentials` API easier,
+we will also have a method on `SslCredentialsOptions` that creates a
+`TlsChannelCredentialsOptions` with the same settings. We will do similarly for
+`TlsServerCredentialsOptions`.
 
 ### Credential Reloading
 Credential reloading will be implemented via a `CertificateProviderInterface`.
@@ -211,57 +216,6 @@ struct IdentityKeyCertPair {
   std::string certificate_chain_pem;
 };
 
-
-/** ------------------------------------ Provider ------------------------------------ */
-/** Provides identity credentials and root certificates.
-/* To enable the provider to manage multiple sets of credentials of each type,
- * each set of credentials must be given a "name". The "name" is an opaque
- * user-defined label, and the provider will reference this "name" e.g. in logs
- * and error messages.
- */
-class CertificateProviderInterface {
- public:
-  virtual ~CertificateProviderInterface() = default;
-
-  // Provider implementations MUST provide a WatchStatusCallback that will be
-  // called by the internal stack. This will be invoked when a new certificate
-  // name is starting to be used internally, or when a certificate name is no
-  // longer being used internally. When being invoked for a new certificate,
-  // this callback should call `SetKeyMaterials` to do the initial population
-  // the certificate data in the internal stack.
-  // 
-  // For the parameters in the callback function:
-  // cert_name The name of the certificates being watched.
-  // root_being_watched If the root certificates with the specific name are being
-  // watched.
-  // identity_being-Watched If the identity certificates with the specific name
-  // are being watched.
-  virtual void WatchStatusCallback(std::string cert_name, bool root_being_watched, bool identity_being_watched) = 0;
-
-  // Sets the key materials based on their certificate name.
-  // @param cert_name The name of the certificates being updated.
-  // @param pem_root_certificates The content of root certificates.
-  // @param pem_key_cert_pairs The content of identity key-certificate pairs.
-  void SetKeyMaterials(
-      const std::string& cert_name, absl::optional<std::string> pem_root_certificates,
-      absl::optional<grpc_core::PemKeyCertPairList> pem_key_cert_pairs);
-
-  // Propagates an error encountered in the provider layer to the internal TLS stack.
-  //
-  // @param cert_name The watching certificate name that the caller
-  // wants to notify about when encountering error.
-  // @param root_cert_error The error that the caller encounters when reloading
-  // root certificates.
-  // @param identity_cert_error The error that the caller encounters when
-  // reloading identity certificates.
-  void SetErrorForCert(const std::string& cert_name,
-                       absl::Status root_cert_error,
-                       absl::Status identity_cert_error);
-
- private:
-  std::unique_ptr<TlsCertificateDistributor> distributor_;
-};
-
 /** ------------------------------------ Provider ------------------------------------ */
 /** Provides identity credentials and root certificates.
 */
@@ -270,6 +224,19 @@ class CertificateProviderInterface {
 class CertificateProviderInterface {
  public:
   virtual ~CertificateProviderInterface() = default;
+
+  // Must be called after the constructor.
+  // Does important internal setup steps.
+  void Start();
+
+  // The case of a SPIFFE trust bundle still falls into RootCertificates, it's
+  // just another way of representing root information
+  enum CredentialType {
+    RootCertificates,
+    IdentityChainAndPrivateKey
+  }
+
+protected:
   // Provider implementations MUST provide a LoadAndSetCredentialsCallback that
   // will be called by the internal stack. This will be invoked when a new
   // certificate name is starting to be used internally, or when a certificate
@@ -280,26 +247,30 @@ class CertificateProviderInterface {
   // 
   // For the parameters in the callback function: cert_name The name of the
   // certificates being watched.  type The type of certificates being watched.
+  // TODO(gtcooke94) adjust naming of functionality of this method to match previous WatchStatusCallback, it needs to handle both beginning to watch and ending watching.
   virtual void LoadAndSetCredentialsCallback(std::string name, CredentialType type) = 0;
 
-  // Must be called after the constructor.
-  // Does important internal setup steps.
-  virtual void Init() final;
-
-  enum CredentialType {
-    RootCertificates,
-    IdentityChainAndPrivateKey
-  }
-
-protected:
   // Sets the root certificates based on their name.
-  virtual void SetRootCertificates(const std::string& name, std::string pem_root_certificates) final;
+  // This value is layered and represents the following.
+  // The top level `absl::StatusOr` represents setting an error or a value. If
+  // the input is a status, it will be propagated across the internal stack as
+  // an error.
+  // The next layer is an `absl::optional`. This allows the user to set a value
+  // or `absl::nullopt`, with `absl::nullopt` representing a deletion/un-setting
+  // of the root certificate data.
+  // The last layer is an `absl::variant`. This is an extension point for us to
+  // add other kinds of root information, for example SPIFFE trust bundles.
+  void SetRootCertificates(absl::string_view name, absl::StatusOr<absl::optional<absl::variant<std::string, SpiffeTrustMap>>> root_data);
 
   // Sets the identity chain and private key based on their name.
-  virtual void SetIdentityChainAndPrivateKey(const std::string& name, grpc_core::PemKeyCertPairList pem_key_cert_pairs) final;
-
-  // Propagates an error encountered in the provider layer to the internal TLS stack.
-  virtual void SetError(const std::string& name, CredentialType type, absl::Status error) final;
+  // This value is layered and represents the following.
+  // The top level `absl::StatusOr` represents setting an error or a value. If
+  // the input is a status, it will be propagated across the internal stack as
+  // an error.
+  // The next layer is an `absl::optional`. This allows the user to set a value
+  // or `absl::nullopt`, with `absl::nullopt` representing a deletion/un-setting
+  // of the identity chain and private key data.
+  void SetIdentityChainAndPrivateKey(absl::string_view name, grpc_core::PemKeyCertPairList pem_key_cert_pairs);
 
  private:
   std::unique_ptr<TlsCertificateDistributor> distributor_;
@@ -312,10 +283,10 @@ class StaticDataCertificateProvider
     : public CertificateProviderInterface {
  public:
   StaticDataCertificateProvider(
-      const std::string& root_certificate,
+      absl::string_view root_certificate,
       const std::vector<IdentityKeyCertPair>& identity_key_cert_pairs);
 
-  explicit StaticDataCertificateProvider(const std::string& root_certificate);
+  explicit StaticDataCertificateProvider(absl::string_view root_certificate);
 
   explicit StaticDataCertificateProvider(
       const std::vector<IdentityKeyCertPair>& identity_key_cert_pairs);
@@ -346,18 +317,18 @@ class FileWatcherCertificateProvider final
   // @param root_cert_path is the file path to the root certificate bundle.
   // @param refresh_interval_sec is the refreshing interval that we will check
   // the files for updates.
-  FileWatcherCertificateProvider(const std::string& private_key_path,
-                                 const std::string& identity_certificate_path,
-                                 const std::string& root_cert_path,
+  FileWatcherCertificateProvider(absl::string_view private_key_path,
+                                 absl::string_view identity_certificate_path,
+                                 absl::string_view root_cert_path,
                                  unsigned int refresh_interval_sec);
 
   // Constructor to get credential updates from identity file paths only.
-  FileWatcherCertificateProvider(const std::string& private_key_path,
-                                 const std::string& identity_certificate_path,
+  FileWatcherCertificateProvider(absl::string_view private_key_path,
+                                 absl::string_view identity_certificate_path,
                                  unsigned int refresh_interval_sec);
 
   // Constructor to get credential updates from root file path only.
-  FileWatcherCertificateProvider(const std::string& root_cert_path,
+  FileWatcherCertificateProvider(absl::string_view root_cert_path,
                                  unsigned int refresh_interval_sec);
     }
 
