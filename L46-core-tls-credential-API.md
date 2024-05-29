@@ -237,18 +237,22 @@ class CertificateProviderInterface {
   }
 
 protected:
-  // Provider implementations MUST provide a LoadAndSetCredentialsCallback that
-  // will be called by the internal stack. This will be invoked when a new
-  // certificate name is starting to be used internally, or when a certificate
-  // name is no longer being used internally. When being invoked for a new
-  // certificate, this callback should call SetRootCertificates or
+  // Provider implementations MUST provide a OnWatchStarted callback that will
+  // be called by the internal stack. This will be invoked when a new
+  // certificate name is starting to be used internally. When being invoked for
+  // a new certificate, this callback should call SetRootCertificates or
   // SetIdentityChainAndPrivateKey to do the initial population the certificate
   // data in the internal stack.
-  // 
-  // For the parameters in the callback function: cert_name The name of the
-  // certificates being watched.  type The type of certificates being watched.
-  // TODO(gtcooke94) adjust naming of functionality of this method to match previous WatchStatusCallback, it needs to handle both beginning to watch and ending watching.
-  virtual void LoadAndSetCredentialsCallback(std::string name, CredentialType type) = 0;
+  // cert_name The name of the certificates being watched.
+  // type The type of certificates being watched.
+  virtual void OnWatchStarted(std::string name, CredentialType type) = 0;
+
+  // Provider implementations MUST provide a OnWatchStarted callback that will
+  // be called by the internal stack. This will be invoked when a certificate
+  // name is no longer being used internally. 
+  // cert_name The name of the certificates being watched.
+  // type The type of certificates being watched.
+  virtual void OnWatchStopped(std::string name, CredentialType type) = 0;
 
   // Sets the root certificates based on their name.
   // This value is layered and represents the following.
@@ -417,8 +421,8 @@ class CertificateVerifierInterface {
   //              synchronous check.
   // return: return true if executed synchronously, otherwise return false
   virtual bool Verify(TlsCustomVerificationCheckRequest* request,
-              std::function<void(Status)> callback,
-              Status* sync_status) = 0;
+              absl::AnyInvocable<void(absl::Status)> callback,
+              absl::Status* sync_status) = 0;
 
   // Cancels a verification request previously started via Verify().
   // Used when the connection attempt times out or is cancelled while an async
@@ -426,16 +430,6 @@ class CertificateVerifierInterface {
   //
   // request: the verification information associated with this request
   virtual void Cancel(TlsCustomVerificationCheckRequest* request) = 0;
-};
-
-// A CertificateVerifier that doesn't perform any additional checks other than
-// certificate verification, if specified.
-// Note: using this solely without any other authentication mechanisms on the
-// peer identity will leave your applications to the MITM(Man-In-The-Middle)
-// attacks. Users should avoid doing so in production environments.
-class NoOpCertificateVerifier : public CertificateVerifierInterface {
- public:
-  NoOpCertificateVerifier();
 };
 
 // A CertificateVerifier that will perform hostname verification, to see if the
