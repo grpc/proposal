@@ -60,14 +60,14 @@ class TlsCredentialsOptions {
 
   // Watches the updates of root certificates with name |root_cert_name| (set by
   // the user via set_root_cert_name).  If used in TLS credentials, setting this
-  // field is optional for both the client side and the server side.
-  // If this is not set on the client side, we will use the root certificates
-  // stored in the default system location, since client side must provide root
-  // certificates in TLS (no matter single-side TLS or mutual TLS).
-  // If this is not set on the server side, we will not watch any root
-  // certificate updates, and assume no root certificates needed for the server
-  // (in the one-side TLS scenario, the server is not required to provide root
-  // certificates). We don't support default root certs on server side.
+  // field is optional for both the client side and the server side.  If this is
+  // not set on the client side, we will use the root certificates stored in the
+  // default system location, since client side must provide root certificates
+  // in TLS (no matter single-side TLS or mutual TLS).  If this is not set on
+  // the server side, we will not watch any root certificate updates, and assume
+  // no root certificates is needed for the server (in the one-side TLS
+  // scenario, the server is not required to provide root certificates). We
+  // don't support default root certs on server side.
   void watch_root_certificates();
 
   // Sets the name of root certificates being watched, if |watch_root_certificates| is
@@ -102,12 +102,14 @@ class TlsCredentialsOptions {
   // 
   // @param tls_session_key_log_file_path: Path where TLS session keys should
   // be logged.
-  void set_tls_session_key_log_file_path(
+  void set_tls_session_key_log_file_path_dangerous(
       absl::string_view tls_session_key_log_file_path);
 
   // Sets the certificate verifier. The certificate verifier performs checks on
   // the peer certificate chain after the chain has been (cryptographically)
   // verified to chain up to a trusted root.
+  // If unset, this will default to the `HostNameCertificateVerifier` detailed
+  // below.
   void set_certificate_verifier(
       std::shared_ptr<CertificateVerifier> certificate_verifier);
 
@@ -130,7 +132,7 @@ class TlsCredentialsOptions {
   // building from the underlying SSL library. Fully replacing and implementing
   // chain building is a complex task and has dangerous security implications if
   // done wrong, thus this API is inteded for expert use only.
-  void set_custom_chain_builder(std::shared_ptr<CustomChainBuilderInterface>
+  void set_custom_chain_builder_dangerous(std::shared_ptr<CustomChainBuilderInterface>
   chain_builder);
 }
 
@@ -353,7 +355,7 @@ The next sections explain these interfaces in more detail.
 // Contains the information from the (verified) peer certificate chain that can
 // be used to perform custom validation checks. Users should not directly
 // create or destroy this request object.
-class TlsCustomVerificationCheckRequest {
+class VerifiedPeerCertificateChainInfo {
  public:
   // The target hostname that is expected to appear in the server leaf
   // certicate, e.g. github.com. Empty on the server-side.
@@ -420,7 +422,7 @@ class CertificateVerifierInterface {
   //              The status of the verifier as it has already done it's
   //              synchronous check.
   // return: return true if executed synchronously, otherwise return false
-  virtual bool Verify(TlsCustomVerificationCheckRequest* request,
+  virtual bool Verify(VerifiedPeerCertificateChainInfo* request,
               absl::AnyInvocable<void(absl::Status)> callback,
               absl::Status* sync_status) = 0;
 
@@ -429,7 +431,7 @@ class CertificateVerifierInterface {
   // verification request is pending.
   //
   // request: the verification information associated with this request
-  virtual void Cancel(TlsCustomVerificationCheckRequest* request) = 0;
+  virtual void Cancel(VerifiedPeerCertificateChainInfo* request) = 0;
 };
 
 // A CertificateVerifier that will perform hostname verification, to see if the
