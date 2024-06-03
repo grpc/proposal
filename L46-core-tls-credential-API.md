@@ -35,7 +35,7 @@ We propose an API that supports the above features and meets the following requi
 1. [A69: Crl Providers](https://github.com/grpc/proposal/pull/382)
 
 ## Proposal
-Until recently, C-Core needed to be written in C89, then we had C++ wrappers of those APIs in `grpcpp`. Requirements have changed such that we can use C++ directly in Core. The rest of this proposal is written as C++ that will be implemented in core, and simple aliases to everything will be written in the `grpcpp`.
+Until recently, the C-Core boundary APIs needed to be written in C89, then we had C++ wrappers of those APIs in `grpcpp`. Requirements have changed such that we can use C++ directly in Core. The rest of this proposal is written as C++ that will be implemented in core, and simple aliases to everything will be written in the `grpcpp`.
 
 ### TLS Credentials and TLS Options
 This part of the proposal introduces the base options class, called `TlsCredentialsOptions`, that has a large set of options for configuring TLS connections. There are 2 derived classes of `TlsCredentialsOptions`, called `TlsChannelCredentialsOptions` and `TlsServerCredentialsOptions`, that users create and can use to build channel credentials or server credentials instances, respectively. The API for building these channel/server credentials instances are called `TlsCredentials`/`TlsServerCredentials` respectively.
@@ -65,9 +65,8 @@ class TlsCredentialsOptions {
   // default system location, since client side must provide root certificates
   // in TLS (no matter single-side TLS or mutual TLS).  If this is not set on
   // the server side, we will not watch any root certificate updates, and assume
-  // no root certificates is needed for the server (in the one-side TLS
-  // scenario, the server is not required to provide root certificates). We
-  // don't support default root certs on server side.
+  // no root certificates are needed for the server (in the one-side TLS
+  // scenario, the server is not required to provide root certificates).
   void watch_root_certificates();
 
   // Sets the name of root certificates being watched, if |watch_root_certificates| is
@@ -185,27 +184,28 @@ std::shared_ptr<ServerCredentials> TlsServerCredentials(
 ```
 
 `TlsCredentials` features should represent a superset of `SslCredentials`
-features, so we anticipate `TlsCredentials` being the API of choice now.  To
-make migration from the `SslCredentials` API to the `TlsCredentials` API easier,
-we will also have a method on `SslCredentialsOptions` that creates a
-`TlsChannelCredentialsOptions` with the same settings. We will do similarly for
-`TlsServerCredentialsOptions`.
+features, so we anticipate `TlsCredentials` being the API of choice now going
+forward.  To make migration from the `SslCredentials` API to the
+`TlsCredentials` API easier, we will also have a method that takes
+`SslCredentialsOptions` and creates a `TlsChannelCredentialsOptions` with the
+same settings. We will do similarly for `TlsServerCredentialsOptions`.
 
 ### Credential Reloading
-Credential reloading will be implemented via a `CertificateProviderInterface`.
+Credential reloading will be implemented via the `CertificateProviderInterface`.
 Note that there is a naming mismatch here - there exist credentials beyond
 certificates that this _could_ theoretically support.  This provider is
-responsible for sourcing key material and supplying it to the internal stack via
-the `CertificateProvider`'s `SetKeyMaterials` API.  Two reference
-implementations of the `CertificateProviderInterface` are provided -
-`StaticDataCertificateProvider` and `FileWatcherCertificateProvider`. The
-`StaticDataCertificateProvider` provides certificates from raw string data. The
-`FileWatcherCertificateProvider` will periodically and asynchronously refresh
-certificate data from a file, allowing changes to certificates without
-restarting the process. More details about these reference implementations are
-provided below. These implementations should cover many common use cases.  If
-these providers do not support the intricacies for a specific use case, a user
-can provide their own implementations of the `CertificateProviderInterface`.
+responsible for sourcing credential material and supplying it to the internal
+stack via the `CertificateProvider`'s `SetRootCertificates` and
+`SetIdentityChainAndPrivateKey` APIs.  Two reference implementations of the
+`CertificateProviderInterface` are provided - `StaticDataCertificateProvider`
+and `FileWatcherCertificateProvider`. The `StaticDataCertificateProvider`
+provides certificates from raw string data. The `FileWatcherCertificateProvider`
+will periodically and asynchronously refresh certificate data from a file,
+allowing changes to certificates without restarting the process. More details
+about these reference implementations are provided below. These implementations
+handle many common use cases. If these providers do not support the intricacies
+for a specific use case, a user can provide their own implementations of the
+`CertificateProviderInterface`.
 
 ```c
 /* Opaque types. */
@@ -276,7 +276,7 @@ protected:
   // The next layer is an `absl::optional`. This allows the user to set a value
   // or `absl::nullopt`, with `absl::nullopt` representing a deletion/un-setting
   // of the identity chain and private key data.
-  void SetIdentityChainAndPrivateKey(absl::string_view name, grpc_core::PemKeyCertPairList pem_key_cert_pairs);
+  void SetIdentityChainAndPrivateKey(absl::string_view name, absl::StatusOr<absl::optional<absl::span<IdentityKeyCertPair>>> pem_key_cert_pairs);
 
  private:
   std::unique_ptr<TlsCertificateDistributor> distributor_;
@@ -418,13 +418,12 @@ class CertificateVerifierInterface {
   //           completed its asynchronous check. Callers can use this function
   //           to perform any additional checks. The input parameter of the
   //           std::function indicates the status of the verifier check.
-  // sync_status: This will only be useful if the verifier is synchronous.
-  //              The status of the verifier as it has already done it's
-  //              synchronous check.
-  // return: return true if executed synchronously, otherwise return false
-  virtual bool Verify(VerifiedPeerCertificateChainInfo* request,
-              absl::AnyInvocable<void(absl::Status)> callback,
-              absl::Status* sync_status) = 0;
+  // return: 
+  // If error status, failed synchronously.
+  // If OK status and true, succeeded synchronously.
+  // If OK status and false, verification is still in progress asynchronously.
+  virtual absl::StatusOr<bool> Verify(VerifiedPeerCertificateChainInfo* request,
+              absl::AnyInvocable<void(absl::Status)> callback) = 0;
 
   // Cancels a verification request previously started via Verify().
   // Used when the connection attempt times out or is cancelled while an async
@@ -466,6 +465,6 @@ One use case for the custom chain building feature is to enable SPIFFE federatio
  // rather than the standard X509 approach.
 class SpiffeFederationChainBuilder : public CustomChainBuilderInterface {
 public:
- ~SpiffeFederationChainBuilder() override;
+ SpiffeFederationChainBuilder();
 }
 ```
