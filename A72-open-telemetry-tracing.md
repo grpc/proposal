@@ -1,6 +1,6 @@
 A72: OpenTelemetry Tracing 
 ----
-* Author(s): [Yifei Zhuang](https://github.com/YifeiZhuang), [Yash Tibrewal](https://github.com/yashykt)
+* Author(s): [Yifei Zhuang](https://github.com/YifeiZhuang), [Yash Tibrewal](https://github.com/yashykt), [Xuan Wang](https://github.com/XuanWang-Amos)
 * Approver: [Eric Anderson](https://github.com/ejona86)
 * Reviewers: [Mark Roth](https://github.com/markdroth), [Doug Fawley](https://github.com/dfawley),
 [Feng Li](https://github.com/fengli79)
@@ -96,6 +96,26 @@ class OpenTelemetryPluginBuilder {
       std::unique_ptr<opentelemetry::context::propagation::TextMapPropagator>
           text_map_propagator);
 };
+```
+
+### Python
+The following new fields will be added in `OpenTelemetryPlugin`.
+
+```Python
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+class OpenTelemetryPlugin:
+    """
+    If `tracer_provider` is None, no traces are collected.
+    """
+
+    def __init__(
+        self,
+        *,
+        tracer_provider: Optional[TracerProvider] = None,
+        text_map_propagator: [TraceContextTextMapPropagator] = None,
+    ):
 ```
 
 ### Go
@@ -219,7 +239,8 @@ implement Getter and Setter corresponding to the propagator type.
 Currently, OpenTelemetry propagator API only supports `TextMapPropagator`,
 that is to send string key/value pairs between the client and server.
 Therefore, adding Getter and Setter is to implement the TextMap carrier interface:
-`TextMapCarrier` (For C++/Go), or `TextMapGetter`/`TextMapSetter` (For Java). (see
+`TextMapCarrier` (For C++/Go), `opentelemetry.propagators.textmap.Getter/Setter` (For Python)
+or `TextMapGetter`/`TextMapSetter` (For Java). (see
 pseudocode in section [Migration to OpenTelemetry: Cross-process Networking Concerns](#migration-to-opentelemetry--cross-process-networking-concerns)).
 
 ## Migration from OpenCensus to OpenTelemetry
