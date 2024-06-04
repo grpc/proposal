@@ -53,57 +53,32 @@ languages due to different underlying infrastructures.
 
 ### Java
 In Java, it will be part of global interceptors, so that the interceptors are
-managed in a more sustainable way and user-friendly. As a prerequisite, the stream
-tracer factory API will be stabilized. OpenTelemetryModule will be created with
-an OpenTelemetry API instance passing in for necessary configurations.
+managed in a more sustainable way and user-friendly. Currently `GrpcOpenTelemetry` is constructed
+with OpenTelemetry API instance passing in for necessary configurations.
 Users can also rely on SDK autoconfig extension that configures the sdk object
-through environmental variables or Java system properties, then pass the 
+through environment variables or Java system properties, then pass the 
 obtained sdk object to gRPC.
 
-The following methods will be added to OpenTelemetryModule.
+There are no changes to the Java API. Users would configure `TraceProvider` to the
+OpenTelemetry API instance for constructing `GrpcOpenTelemetry` like below.
 
 ```Java
-// A module that hosts OpenTelemetry tracing/metrics infrastructures. Module 
-// implementation may change as OpenTelemetry evolves.
-public class OpenTelemetryModule {
-  /**
-   * OpenTelemetry instance is used to configure metrics and traces settings.
-   * Build a module by passing in an OpenTelemetry instance. Then get interceptor
-   * and ServerStreamTracerFactory from the module and install to the GlobalInterceptors. 
-   * 
-   * Sample:
-   * Construct a TraceProvider that will be used to provide traces during instrumentation.
-   *    
-   *    SdkTracerProvider sdkTracerProvider = SdkTracerProvider.builder()
-   *         .addSpanProcessor(
-   *             BatchSpanProcessor.builder(exporter).build())
-   *         .build();
-   *
-   * Construct OpenTelemetry to be passed to gRPC OpenTelemetry module for
-   * traces and metrics configurations.
-   * 
-   *    OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
-   *         .setTracerProvider(sdkTracerProvider)
-   *         .setMeterProvider(...)
-   *         .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
-   *         .build();
-   *    OpenTelemetryModule otModule = OpenTelemetryModule.newBuilder().sdk(openTelemetry).build();
-   * 
-   *     
-   * Add interceptors and StreamTracerFactory obtained from the module to GlobalInterceptors.    
-   * 
-   *    GlobalInterceptors.setInterceptors(
-   *      Arrays.asList(otModule.getClientTracingInterceptor()),
-   *      Arrays.asList(otModule.getServerTracerFactory()));        
-   */
-  
-  // Return the client interceptor to be installed by users to generate trace information.
-  public ClientInterceptor getClientTracingInterceptor();
+// Construct a TraceProvider that will be used to provide traces during instrumentation.
+SdkTracerProvider sdkTracerProvider = SdkTracerProvider.builder()
+     .addSpanProcessor(
+         BatchSpanProcessor.builder(exporter).build())
+     .build();
+// Construct OpenTelemetry to be passed to gRPC OpenTelemetry module for
+// traces and metrics configurations.
+OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+     .setTracerProvider(sdkTracerProvider)
+     .setMeterProvider(...)
+     .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+     .build();
+GrpcOpenTelemetry otModule = GrpcOpenTelemetry.newBuilder().sdk(openTelemetry).build();
 
-  // Return the ServerStreamTracerFactory to be installed by users to generate trace information.
-  public ServerStreamTracerFactory getServerTracerFactory();
-}
-
+// Add interceptors and StreamTracerFactory obtained from the module globally.
+otModule.registerGlobal();
 ```
 
 ### C++
@@ -124,44 +99,23 @@ class OpenTelemetryPluginBuilder {
 ```
 
 ### Go
-The following methods will be added to the opentelemetry package.
+The following `TraceOptions` field will be added to the `opentelemetry` Options struct.
 ```go
 import (
   "go.opentelemetry.io/otel/trace"
 )
+
+type Options struct {
+  // Existing field in opentelemetry package
+  MetricsOptions MetricsOptions
+  TraceOptions TraceOptions
+}
 
 // TraceOptions are the trace options for OpenTelemetry instrumentation.
 type TraceOptions struct {
   TraceProvider trace.TraceProvider
 }
 
-// DialOption returns a dial option which enables OpenTelemetry instrumentation
-// code for a grpc.ClientConn.
-//
-// Client applications interested in instrumenting their grpc.ClientConn should
-// pass the dial option returned from this function as a dial option to
-// grpc.Dial().
-//
-// Using this option will always lead to instrumentation, however in order to
-// use the data a SpanExporter must be registered with the TraceProvider in the
-// TraceOption. Client side has retries, so a Unary and Streaming Interceptor are
-// registered to handle per RPC traces, and a Stats Handler is registered to handle
-// per RPC attempt trace. These three components registered work together in
-// conjunction, and do not work standalone.
-func DialOption(to TraceOptions) grpc.DialOption {}
-
-// ServerOption returns a server option which enables OpenTelemetry
-// instrumentation code for a grpc.Server.
-//
-// Server applications interested in instrumenting their grpc.Server should pass
-// the server option returned from this function as an argument to
-// grpc.NewServer().
-//
-// Using this option will always lead to instrumentation, however in order to
-// use the data a SpanExporter must be registered with the TraceProvider option.
-// Server side does not have retries, so a registered Stats Handler is the only
-// option that is returned.
-func ServerOption(to TraceOptions) grpc.ServerOption {}
 ```
 
 ## Tracing Information
@@ -190,15 +144,14 @@ On attempt span:
   (it depends on implementation whether there is a single event or an additional 
   separate event with name "Outbound message compressed" for compressed message size) 
   with name "Outbound message sent" and the following attributes:
-  * key `message.event.type` with string value "SENT".
-  * key `message.message.id` with integer value of the seq no. The seq no. indicates
+  * key `sequence-number` with integer value of the seq no. The seq no. indicates
     the order of the sent messages on the attempt (i.e., it starts at 0 and is 
     incremented by 1 for each message sent), the same below.
-  * key named `message.event.size.uncompressed` if the message needs compression,
-    otherwise named `message.event.size`, with integer value of uncompressed
+  * key named `message-size-uncompressed` if the message needs compression,
+    otherwise named `message-size`, with integer value of uncompressed
     message size. The size is the total attempt message bytes without encryption,
     not including grpc or transport framing bytes, the same below.
-  * If compression needed, add key `message.event.size.compressed` with integer 
+  * If compression needed, add key `message-size-compressed` with integer 
     value of compressed message size. If this is reported as a separate event in 
     an implementation, the event name is "Outbound message compressed" and the 
     order of the event must be after the first event that reports the message size.
@@ -206,13 +159,12 @@ On attempt span:
   implementation whether there is a single event or an additional separate event
   with name "Inbound message uncompressed" for uncompressed message size) with name 
   "Inbound message read" and the following attributes:
-  * key `message.event.type` with string value "RECEIVED".
-  * key `message.message.id` with integer value of the seq no. The seq no. indicates
+  * key `sequence-number` with integer value of the seq no. The seq no. indicates
     the order of the received messages on the attempt (i.e., it starts at 0 and is
     incremented by 1 for each message received), the same below.
-  * key named `message.event.size.compressed` if the message needs decompression,
-    otherwise named `message.event.size`, with integer value of wire message size.
-  * If the message needs decompression, add key `message.event.size.uncompressed`
+  * key named `message-size-compressed` if the message needs decompression,
+    otherwise named `message-size`, with integer value of wire message size.
+  * If the message needs decompression, add key `message-size-uncompressed`
     with integer value of uncompressed message size. If this is reported as a 
     separate event in an implementation, the event name is "Inbound message uncompressed"
     and the order of the event must be after the first event that reports the wire message size.
@@ -223,12 +175,11 @@ At the server:
   (it depends on implementation whether there is a single event or an additional
   separate event with name "Outbound message compressed" for compressed message size)
   with name "Outbound message sent" and the following attributes:
-  * key `message.event.type` with string value "SENT".
-  * key `message.message.id` with integer value of the seq no.
-  * key named `message.event.size.uncompressed` if the message needs compression,
-    otherwise named `message.event.size`, with integer value of uncompressed
+  * key `sequence-number` with integer value of the seq no.
+  * key named `message-size-uncompressed` if the message needs compression,
+    otherwise named `message-size`, with integer value of uncompressed
     message size.
-  * If compression needed, add key `message.event.size.compressed` with integer
+  * If compression needed, add key `message-size-compressed` with integer
     value of compressed message size. If this is reported as a separate event in
     an implementation, the event name is "Outbound message compressed" and the
     order of the event must be after the first event that reports the message size.
@@ -236,11 +187,10 @@ At the server:
   implementation whether there is a single event or an additional separate event
   with name "Inbound message uncompressed" for uncompressed message size) with name
   "Inbound message read" and the following attributes:
-  * key `message.event.type` with string value "RECEIVED".
-  * key `message.message.id` with integer value of the seq no.
-  * key named `message.event.size.compressed` if the message needs decompression,
-    otherwise named `message.event.size`, with integer value of wire message size.
-  * If the message needs decompression, add key `message.event.size.uncompressed`
+  * key `sequence-number` with integer value of the seq no.
+  * key named `message-size-compressed` if the message needs decompression,
+    otherwise named `message-size`, with integer value of wire message size.
+  * If the message needs decompression, add key `message-size-uncompressed`
     with integer value of uncompressed message size. If this is reported as a
     separate event in an implementation, the event name is "Inbound message uncompressed"
     and the order of the event must be after the first event that reports the wire message size.
