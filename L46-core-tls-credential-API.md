@@ -109,6 +109,8 @@ class TlsCredentialsOptions {
   // verified to chain up to a trusted root.
   // If unset, this will default to the `HostNameCertificateVerifier` detailed
   // below.
+  // If set to nulltpr, this will overwrite the host name verifier and lead you
+  // to not doing any checks (aside from the cryptographic ones).
   void set_certificate_verifier(
       std::shared_ptr<CertificateVerifier> certificate_verifier);
 
@@ -227,13 +229,15 @@ class CertificateProviderInterface {
  public:
   virtual ~CertificateProviderInterface() = default;
 
-  // Must be called after the constructor.
-  // Does important internal setup steps.
+  // Starts the provider. Must be called before the provider is used for any TLS
+  // handshakes. Does important internal setup steps.
   void Start();
 
-  // The case of a SPIFFE trust bundle still falls into RootCertificates, it's
-  // just another way of representing root information
+  // CredentialType represents the different types of credentials that the
+  // provider can provide.
   enum CredentialType {
+    // The case of a SPIFFE trust bundle still falls into RootCertificates, it's
+    // just another way of representing root information
     RootCertificates,
     IdentityChainAndPrivateKey
   }
@@ -422,7 +426,7 @@ class CertificateVerifierInterface {
   // If error status, failed synchronously.
   // If OK status and true, succeeded synchronously.
   // If OK status and false, verification is still in progress asynchronously.
-  virtual absl::StatusOr<bool> Verify(VerifiedPeerCertificateChainInfo* request,
+  virtual absl::StatusOr<bool> Verify(VerifiedPeerCertificateChainInfo* verified_chain_info,
               absl::AnyInvocable<void(absl::Status)> callback) = 0;
 
   // Cancels a verification request previously started via Verify().
@@ -430,7 +434,7 @@ class CertificateVerifierInterface {
   // verification request is pending.
   //
   // request: the verification information associated with this request
-  virtual void Cancel(VerifiedPeerCertificateChainInfo* request) = 0;
+  virtual void Cancel(VerifiedPeerCertificateChainInfo* verified_chain_info) = 0;
 };
 
 // A CertificateVerifier that will perform hostname verification, to see if the
