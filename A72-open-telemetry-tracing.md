@@ -167,7 +167,7 @@ On attempt span:
   * key `sequence-number` with integer value of the seq no. The seq no. indicates
     the order of the sent messages on the attempt (i.e., it starts at 0 and is 
     incremented by 1 for each message sent), the same below.
-  * key named `message-size-uncompressed` if the message needs compression,
+  * key named `message-size-uncompressed` if the implementation knows the message needs compression,
     otherwise named `message-size`, with integer value of uncompressed
     message size. The size is the total attempt message bytes without encryption,
     not including grpc or transport framing bytes, the same below.
@@ -182,7 +182,7 @@ On attempt span:
   * key `sequence-number` with integer value of the seq no. The seq no. indicates
     the order of the received messages on the attempt (i.e., it starts at 0 and is
     incremented by 1 for each message received), the same below.
-  * key named `message-size-compressed` if the message needs decompression,
+  * key named `message-size-compressed` if the implementation knows the message needs decompression,
     otherwise named `message-size`, with integer value of wire message size.
   * If the message needs decompression, add key `message-size-uncompressed`
     with integer value of uncompressed message size. If this is reported as a 
