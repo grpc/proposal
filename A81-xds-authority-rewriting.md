@@ -5,7 +5,7 @@ A81: xDS Authority Rewriting
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2024-06-06
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/ZFoyzcbknaM
 
 ## Abstract
 
