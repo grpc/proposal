@@ -4,7 +4,7 @@ A81: xDS Authority Rewriting
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-05-21
+* Last updated: 2024-06-06
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -71,9 +71,11 @@ be the string `allow_authority_rewriting`.
 
 When validating an RDS resource, we will look at the
 [`RouteAction.auto_host_rewrite`
-field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/route/v3/route_components.proto#L1173).
-The boolean value of this field will be included in the parsed resource
-struct that is passed to the XdsClient watcher.
+field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/route/v3/route_components.proto#L1173)
+and
+[`RouteAction.append_x_forwarded_host`](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/route/v3/route_components.proto#L1222)
+fields.  The boolean values of these fields will be included in the parsed
+resource struct that is passed to the XdsClient watcher.
 
 When validting an EDS resource, we will look at the [`Endpoint.hostname`
 field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/endpoint/v3/endpoint_components.proto#L89).
@@ -88,17 +90,15 @@ For Logical DNS clusters, the same `hostname` resolver attribute will
 be added to all endpoints.  It will be set to the name that is resolved
 for the Logical DNS cluster.
 
-TODO: do we need to support the [`RouteAction.append_x_forwarded_host`
-field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/route/v3/route_components.proto#L1222)?
-
 ### xDS ConfigSelector Changes
 
-When the xDS ConfigSelector performs routing, if the chosen route has
-`auto_host_rewrite` set to true, then the ConfigSelector will add a call
-attribute to indicate that authority rewriting is enabled.  This call
-attribute will be passed to the LB picker using the same mechanism
-introduced in [A31] to pass the cluster name to the xds_cluster_manager
-LB policy.
+When the xDS ConfigSelector performs routing, if the chosen route
+has `auto_host_rewrite` set to true, then the ConfigSelector will
+add a call attribute to indicate that authority rewriting is enabled.
+The call attribute will also indicate whether `append_x_forwarded_host`
+is enabled.  This call attribute will be passed to the LB picker using
+the same mechanism introduced in [A31] to pass the cluster name to the
+xds_cluster_manager LB policy.
 
 ### xds_cluster_impl LB Policy Changes
 
@@ -107,11 +107,25 @@ attribute in the subchannel wrapper when its child policy creates a
 subchannel.  In the xds_cluster_impl picker, if the `auto_host_rewrite`
 call option is enabled and the `hostname` attribute on the subchannel
 wrapper is non-empty, the picker will set the `:authority` header
-to the value of the `hostname` attribute.
+to the value of the `hostname` attribute.  If `append_x_forwarded_host`
+was also enabled, then the original value of the `:authority` header
+will be added to the `x-forwarded-host` header.
 
-Note that we do not want to expose a general-purpose API for the LB
-policy to be able to set the `:authority` header.  Instead, the
-xds_cluster_impl picker will use an internal API for this.
+To support this, we will add an API to allow the LB picker to explicitly
+set the `:authority` header for the RPC.  Note that the resulting
+`:authority` header will still be subject to any configured secure
+naming check -- e.g., if TLS channel credentials are used, then by
+default there is a per-RPC check that verifies that the RPC's
+`:authority` header matches the name in the server's SSL cert.
+
+Note that this authority rewriting will modify the default authority for
+the subchannel, which would otherwise be set from the resolver factory,
+a channel option, or a per-address attribute returned by the resolver
+(i.e., the xDS authority rewriting will take precedence over any of those
+settings).  However, if the implementation allows the application to
+explicitly set the authority on a per-RPC basis (currently only C-core
+does this), then that value would take precedence over the xDS
+authority rewriting.
 
 ### Temporary environment variable protection
 
