@@ -4,7 +4,7 @@ L46: C++: New TLS Credentials API
 * Approver: 
 * Status: Draft
 * Implemented in:
-* Last updated: May 16, 2024
+* Last updated: June 11, 2024
 
 ## Abstract
 
