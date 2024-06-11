@@ -58,38 +58,27 @@ class TlsCredentialsBuilder {
   void set_certificate_provider(
       std::shared_ptr<CertificateProviderInterface> certificate_provider);
 
-  // Watches the updates of root certificates with name |root_cert_name| (set by
-  // the user via set_root_cert_name).  If used in TLS credentials, setting this
-  // field is optional for both the client side and the server side.  If this is
-  // not set on the client side, we will use the root certificates stored in the
-  // default system location, since client side must provide root certificates
-  // in TLS (no matter single-side TLS or mutual TLS).  If this is not set on
-  // the server side, we will not watch any root certificate updates, and assume
-  // no root certificates are needed for the server (in the one-side TLS
-  // scenario, the server is not required to provide root certificates).
-  void watch_root_certificates();
-
-  // Sets the name of root certificates being watched, if |watch_root_certificates| is
-  // called. If not set, an empty string will be used as the name. For simple
-  // use cases this is not needed, but a certificate provider could be
-  // implemented that watches many sets of certificates. This allows the user to
-  // differentiate between different root certificates.
+  // Watches the updates of root certificates with name |name|. If used in TLS
+  // credentials, setting this field is optional for both the client side and
+  // the server side. If this is not set on the client side, we will use the
+  // root certificates stored in the default system location, since client side
+  // must provide root certificates in TLS (no matter single-side TLS or mutual
+  // TLS). If this is not set on the server side, we will not watch any root
+  // certificate updates, and assume no root certificates are needed for the
+  // server (in the one-side TLS scenario, the server is not required to provide
+  // root certificates).
   // 
-  // @param root_cert_name the name of root certificates being set.
-  void set_root_cert_name(absl::string_view root_cert_name);
+  // @param name the name of root certificates being set.
+  void watch_root_certificates(absl::string_view name);
+
 
   // Watches the updates of identity key-certificate pairs with name
-  // |identity_cert_name|. If used in TLS credentials, it is required to be set
+  // |name|. If used in TLS credentials, it is required to be set
   // on the server side, and optional for the client side(in the one-side
   // TLS scenario, the client is not required to provide identity certificates).
-  void watch_identity_key_cert_pairs();
 
-  // Sets the name of identity key-certificate pairs being watched, if
-  // |watch_identity_key_cert_pairs| is called. If not set, an empty string will
-  // be used as the name.
-  //
-  // @param identity_cert_name the name of identity key-certificate pairs being set.
-  void set_identity_cert_name(absl::string_view identity_cert_name);
+  // @param name the name of the identity key cert pairs to watch.
+  void watch_identity_key_cert_pairs(absl::string_view name);
 
   // WARNING: EXPERT USE ONLY. MISUSE CAN LEAD TO SIGNIFICANT SECURITY DEGRADATION.
   // 
@@ -409,23 +398,17 @@ class CertificateVerifierInterface {
   virtual ~CertificateVerifierInterface() = default;
 
   // Performs a custom verification check.
-  // Returns true if verification occurs synchronously, in which case the
-  // verification result is populated in the sync_status output parameter.
-  // Returns false if verification occurs asynchronously, in which case the
-  // callback must be called when verification is complete and the verification
-  // result must be populated in the sync_status output parameter.
+  // Verification occurs asynchronously. gRPC calls `Verify` on this interface.
+  // The callback must be called when verification is complete and the
+  // verification result must be populated in the output parameter of the
+  // callback function.
   //
   // request: the verification information associated with this request
-  // callback: This will only take effect if the verifier is asynchronous.
-  //           The function that gRPC will invoke when the verifier has already
+  // callback: The function that gRPC will invoke when the verifier has already
   //           completed its asynchronous check. Callers can use this function
   //           to perform any additional checks. The input parameter of the
-  //           std::function indicates the status of the verifier check.
-  // return: 
-  // If error status, failed synchronously.
-  // If OK status and true, succeeded synchronously.
-  // If OK status and false, verification is still in progress asynchronously.
-  virtual absl::StatusOr<bool> Verify(VerifiedPeerCertificateChainInfo* verified_chain_info,
+  //           any::Invocable indicates the status of the verifier check.
+  virtual void Verify(std::shared_ptr<VerifiedPeerCertificateChainInfo> verified_chain_info,
               absl::AnyInvocable<void(absl::Status)> callback) = 0;
 
   // Cancels a verification request previously started via Verify().
@@ -433,7 +416,7 @@ class CertificateVerifierInterface {
   // verification request is pending.
   //
   // request: the verification information associated with this request
-  virtual void Cancel(VerifiedPeerCertificateChainInfo* verified_chain_info) = 0;
+  virtual void Cancel(std::shared_ptr<VerifiedPeerCertificateChainInfo> verified_chain_info) = 0;
 };
 
 // A CertificateVerifier that will perform hostname verification, to see if the
@@ -449,14 +432,30 @@ class HostNameCertificateVerifier : public CertificateVerifierInterface {
 
 #### Custom Chain Building
 ```c++
+
+
+class UnverifiedPeerChain {
+  std::vector<absl::string_view> peer_cert_chain_der;
+}
+
+
 class CustomChainBuilderInterface {
 public:
  virtual ~CustomChainBuilderInterface() = default;
 
- // Returns the verified DER-encoded certificate chain, ordered from leaf to
- // root. Both the leaf and the root are included. Returns an error status if
- // verification fails for any reason.
- virtual absl::StatusOr<absl::Span<absl::string_view>> BuildAndVerifyChain(const std::vector<absl::string_view>& peer_cert_chain_der) = 0;
+ // Performs custom chain building. gRPC invokes this function. When Chain
+ // building is complete, the implementer must invoke the callback.  The output
+ // parameter of the callback must be populated with the verified DER-encoded
+ // certificate chain, ordered from leaf to root. Both the leaf and the root
+ // must be included.
+ virtual void BuildAndVerifyChain(std::shared_ptr<UnverifiedPeerChain> peer_chain, absl::AnyInvocable<void(absl::StatusOr<absl::Span<absl::string_view>>> callback)) = 0;
+
+ // Cancels a chain building request request previously started via
+ // BuildAndVerifyChain().  Used when the connection attempt times out or is
+ // cancelled while an async request is pending.
+ //
+ // request: the verification information associated with this request
+ virtual void Cancel(std::shared_ptr<UnverifiedPeerChain> peer_chain) = 0;
 }
 ```
 
