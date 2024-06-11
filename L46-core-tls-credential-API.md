@@ -37,19 +37,19 @@ We propose an API that supports the above features and meets the following requi
 ## Proposal
 Until recently, the C-Core boundary APIs needed to be written in C89, then we had C++ wrappers of those APIs in `grpcpp`. Requirements have changed such that we can use C++ directly in Core. The rest of this proposal is written as C++ that will be implemented in core, and simple aliases to everything will be written in the `grpcpp`.
 
-### TLS Credentials and TLS Options
-This part of the proposal introduces the base options class, called `TlsCredentialsOptions`, that has a large set of options for configuring TLS connections. There are 2 derived classes of `TlsCredentialsOptions`, called `TlsChannelCredentialsOptions` and `TlsServerCredentialsOptions`, that users create and can use to build channel credentials or server credentials instances, respectively. The API for building these channel/server credentials instances are called `TlsCredentials`/`TlsServerCredentials` respectively.
+### TLS Credentials and TLS Builder
+This part of the proposal introduces the base builder class, called `TlsCredentialsBuilder`, that has a large set of options for configuring TLS connections. There are 2 derived classes of `TlsCredentialsBuilder`, called `TlsChannelCredentialsBuilder` and `TlsServerCredentialsBuilder`, that users create and can use to build channel credentials or server credentials instances, respectively. The API for building these channel/server credentials instances are called `TlsCredentials`/`TlsServerCredentials` respectively.
 
 ```c++
-// Base class of TLS options.
-class TlsCredentialsOptions {
+// Base class of TLS credentials builder.
+class TlsCredentialsBuilder {
  public:
-  ~TlsCredentialsOptions();
+  ~TlsCredentialsBuilder();
 
   // Copy constructor does a deep copy. No assignment permitted.
-  TlsCredentialsOptions(const TlsCredentialsOptions& other);
+  TlsCredentialsBuilder(const TlsCredentialsBuilder& other);
 
-  TlsCredentialsOptions& operator=(const TlsCredentialsOptions& other) = delete;
+  TlsCredentialsBuilder& operator=(const TlsCredentialsBuilder& other) = delete;
 
   // ---- Setters for member fields ----
   // Sets the certificate provider which is used to store: 
@@ -138,17 +138,21 @@ class TlsCredentialsOptions {
 }
 
 // Server-specific options for configuring TLS.
-class TlsServerCredentialsOptions final : public TlsCredentialsOptions {
+class TlsServerCredentialsBuilder final : public TlsCredentialsBuilder {
  public:
   // A certificate provider that provides identity credentials is required,
   // because a server must always present identity credentials during any TLS
   // handshake. The certificate provider may optionally provide root
   // certificates, in case the server requests client certificates.
-  explicit TlsServerCredentialsOptions(
+  explicit TlsServerCredentialsBuilder(
       std::shared_ptr<CertificateProviderInterface> certificate_provider)
-      : TlsCredentialsOptions() {
+      : TlsCredentialsBuilder() {
     set_certificate_provider(certificate_provider);
   }
+
+  // Builds a ServerCredentials instance that establishes TLS connections in the manner specified by options.
+  std::shared_ptr<ServerCredentials> TlsServerCredentials(
+      const TlsServerCredentialsBuilder& options);
 
 
   // Sets requirements for if client certificates are requested, if they
@@ -168,29 +172,24 @@ class TlsServerCredentialsOptions final : public TlsCredentialsOptions {
 // will be used.
 // If a certificate provider is set and it provides identity credentials those
 // identity credentials will be used.
-class TlsChannelCredentialsOptions final : public TlsCredentialsOptions {
+class TlsChannelCredentialsBuilder final : public TlsCredentialsBuilder {
  public:
   // Sets the decision of whether to do a crypto check on the server certificates.
   // The default is true.
   void set_verify_server_certificates(bool verify_server_certs);
+
+  // Builds a ChannelCredentials instance that establishes TLS connections in the manner specified by options.
+  std::shared_ptr<ChannelCredentials> BuildTlsCredentials();
 }
 
-// Builds a ChannelCredentials instance that establishes TLS connections in the manner specified by options.
-std::shared_ptr<ChannelCredentials> TlsCredentials(
-    const TlsChannelCredentialsOptions& options);
-}
-
-// Builds a ServerCredentials instance that establishes TLS connections in the manner specified by options.
-std::shared_ptr<ServerCredentials> TlsServerCredentials(
-    const TlsServerCredentialsOptions& options);
 ```
 
 `TlsCredentials` features should represent a superset of `SslCredentials`
 features, so we anticipate `TlsCredentials` being the API of choice now going
 forward.  To make migration from the `SslCredentials` API to the
 `TlsCredentials` API easier, we will also have a method that takes
-`SslCredentialsOptions` and creates a `TlsChannelCredentialsOptions` with the
-same settings. We will do similarly for `TlsServerCredentialsOptions`.
+`SslCredentialsOptions` and creates a `TlsChannelCredentialsBuilder` with the
+same settings. We will do similarly for `TlsServerCredentialsBuilder`.
 
 ### Credential Reloading
 Credential reloading will be implemented via the `CertificateProviderInterface`.
@@ -304,7 +303,7 @@ class StaticDataCertificateProvider
 
 // A CertificateProviderInterface implementation that will watch the credential
 // changes on the file system. This provider will always return the up-to-date
-// certificate data for all the cert names callers set through |TlsCredentialsOptions|.
+// certificate data for all the cert names callers set through |TlsCredentialsBuilder|.
 // Several things to note:
 // 1. This API only supports one key-certificate file and hence one set of identity
 // key-certificate pair, so SNI(Server Name Indication) is not supported.
