@@ -71,13 +71,14 @@ be the string `allow_authority_rewriting`.
 
 ### xDS Resource Validation
 
-When validating an RDS resource, we will look at the
-[`RouteAction.auto_host_rewrite`
+When validating an RDS resource, if the `allow_authority_rewriting`
+server option is present for this xDS server in the
+bootstrap config, we will look at the [`RouteAction.auto_host_rewrite`
 field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/route/v3/route_components.proto#L1173)
 and
 [`RouteAction.append_x_forwarded_host`](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/route/v3/route_components.proto#L1222)
-fields.  The boolean values of these fields will be included in the parsed
-resource struct that is passed to the XdsClient watcher.
+fields.  The boolean values of these fields will be included in the
+parsed resource struct that is passed to the XdsClient watcher.
 
 When validting an EDS resource, we will look at the [`Endpoint.hostname`
 field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/endpoint/v3/endpoint_components.proto#L89).
