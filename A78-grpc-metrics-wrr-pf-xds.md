@@ -98,7 +98,7 @@ The following metrics will be exported:
 | grpc.lb.wrr.rr_fallback | Counter | {update} | grpc.target, grpc.lb.locality | Number of scheduler updates in which there were not enough endpoints with valid weight, which caused the WRR policy to fall back to RR behavior. |
 | grpc.lb.wrr.endpoint_weight_not_yet_usable | Counter | {endpoint} | grpc.target, grpc.lb.locality | Number of endpoints from each scheduler update that don't yet have usable weight information (i.e., either the load report has not yet been received, or it is within the blackout period). |
 | grpc.lb.wrr.endpoint_weight_stale | Counter | {endpoint} | grpc.target, grpc.lb.locality | Number of endpoints from each scheduler update whose latest weight is older than the expiration period. |
-| grpc.lb.wrr.endpoint_weights | Histogram | {weight} | grpc.target, grpc.lb.locality | The histogram buckets will be endpoint weight ranges.  Each bucket will be a counter that is incremented once for every endpoint whose weight is within that range.  Note that endpoints without usable weights will have weight 0. |
+| grpc.lb.wrr.endpoint_weights | Histogram | {weight} | grpc.target, grpc.lb.locality | Weight of each endpoint, recorded on every scheduler update. Endpoints without usable weights will be recorded as weight 0. |
 
 ### Pick First LB Policy
 
