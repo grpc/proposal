@@ -4,7 +4,7 @@ A81: xDS Authority Rewriting
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-06-06
+* Last updated: 2024-06-14
 * Discussion at: https://groups.google.com/g/grpc-io/c/ZFoyzcbknaM
 
 ## Abstract
@@ -36,6 +36,7 @@ these security-sensitive use-cases.
 * [gRFC A29: xDS mTLS Security][A29]
 * [gRFC A30: xDS v3 Support][A30]
 * [gRFC A31: xDS Timeout Support and Config Selector][A31]
+* [gRFC A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
 * [gRFC A14: Channelz][A14]
 
 [A27]: A27-xds-global-load-balancing.md
@@ -43,6 +44,7 @@ these security-sensitive use-cases.
 [A29]: A29-xds-tls-security.md
 [A30]: A30-xds-v3.md
 [A31]: A31-xds-timeout-support-and-config-selector.md
+[A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
 [A14]: A14-channelz.md
 
 ## Proposal
@@ -92,24 +94,25 @@ for the Logical DNS cluster.
 
 ### xDS ConfigSelector Changes
 
-When the xDS ConfigSelector performs routing, if the chosen route
-has `auto_host_rewrite` set to true, then the ConfigSelector will
-add a call attribute to indicate that authority rewriting is enabled.
-The call attribute will also indicate whether `append_x_forwarded_host`
-is enabled.  This call attribute will be passed to the LB picker using
-the same mechanism introduced in [A31] to pass the cluster name to the
-xds_cluster_manager LB policy.
+When the xDS ConfigSelector performs routing, it will need to pass the
+values of the route's `auto_host_rewrite` and `append_x_forwarded_host`
+fields to the LB picker.  This data will be passed using the same
+mechanism introduced in [A31] to pass the cluster name to the
+xds_cluster_manager LB policy.  Note that if the implementation is
+already passing along all of the information about the selected route
+as per [A60], then no changes may be needed here.
 
 ### xds_cluster_impl LB Policy Changes
 
 The xds_cluster_impl policy will store the value of the `hostname`
 attribute in the subchannel wrapper when its child policy creates a
 subchannel.  In the xds_cluster_impl picker, if the `auto_host_rewrite`
-call option is enabled and the `hostname` attribute on the subchannel
-wrapper is non-empty, the picker will set the `:authority` header
-to the value of the `hostname` attribute.  If `append_x_forwarded_host`
-was also enabled, then the original value of the `:authority` header
-will be added to the `x-forwarded-host` header.
+option is enabled in the route (passed from the ConfigSelector as
+described above) and the `hostname` attribute on the subchannel wrapper
+is non-empty, the picker will set the `:authority` header to the value of
+the `hostname` attribute.  If `append_x_forwarded_host` was also enabled
+in the route, then the original value of the `:authority` header will
+be added to the `x-forwarded-host` header.
 
 To support this, we will add an API to allow the LB picker to explicitly
 set the `:authority` header for the RPC.  Note that the resulting
