@@ -152,17 +152,20 @@ use of authority rewriting:
   to also enable authority rewriting.  This was deemed too complicated
   to implement in some languages, since we would have needed to provide
   a way to determine what channel credentials were used from the xDS
-  routing code.
+  routing code.  Also would have enabled the feature per channel instead
+  of per control plane.
 - Providing a channel option.  This would have required too much work on
   the part of applications to enable it on every individual channel.
   There were also some implementation challenges in some languages.  And
   it would not have provided a clean way to enforce disabling the
-  setting in environments where that is required.
+  setting in environments where that is required.  Also would have
+  enabled the feature per channel instead of per control plane.
 - Providing an environment variable.  This would also require
   applications to do work, although it would be in the deployment
   instead of in the application code.  And it would still not provide a
   clean way to enforce disabling the setting in environments where that
-  is required.
+  is required.  Also would have enabled the feature per process instead
+  of per control plane.
 
 ## Implementation
 
