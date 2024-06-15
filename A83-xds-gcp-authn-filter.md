@@ -4,15 +4,15 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-05-21
+* Last updated: 2024-06-14
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
 
 In service mesh environments, there are cases where intermediate proxies
 make it impossible to rely on mTLS for end-to-end authentication.  These
-cases can be addressed instead by the use of JWT identity tokens.  The
-xDS [GCP Authentication
+cases can be addressed instead by the use of service account identity
+JWT tokens.  The xDS [GCP Authentication
 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/gcp_authn_filter)
 provides a mechanism for attaching such JWT tokens as gRPC call
 credentials on GCP.  We will add support for this filter in gRPC.
@@ -35,6 +35,42 @@ this framework.
 ## Proposal
 
 We will support the GCP Authentication xDS HTTP filter in the gRPC client.
+
+### Call Credentials
+
+gRPC should support a GcpServiceAccountIdentityCallCredentials call
+credentials type, which is not xDS-specific.  This credential type
+will be instantiated with the following parameters:
+
+- Audience string.  Required.
+- URI template string to fetch the token from, where the substring
+  "[AUDIENCE]" will be replaced with the audience.  Optional; defaults to
+  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]".
+- Request timeout for token fetch requests.  Optional; defaults to 10 seconds.
+- Token header name.  Optional; defaults to "authorization".
+- Token header value prefix.  Optional; defaults to "Bearer " (note
+  trailing space).
+
+When the credential is asked for a token for an RPC, if the token is
+not cached, the credential will send an HTTP request to the specified
+URI to fetch the token.  The HTTP request will include the header
+`Metadata-Flavor: Google`.  The HTTP request will have a deadline set
+from the timeout parameter that the credential was instantiated with.
+
+If the HTTP request succeeds, the body of the response will contain the
+JWT token, which the client will both cache and add to the data plane
+RPC's headers.  The client does not need to do full [RFC-7519] validation
+of the token (that is the responsibility of the server side), but it
+does need to extract the `nbf` and `exp` fields for caching purposes.
+
+If the HTTP request fails or times out, or if the JWT token is invalid
+(i.e., the client fails to extract the `nbf` or `exp` fields), the data
+plane RPC will be sent without the JWT token and will then fail on the
+destination server if authentication was required.
+
+If the JWT token is either already cached or is obtained from an HTTP
+request, it will be added to the RPC headers.  The token header name and
+value prefix will be as specified when the credential was instantiated.
 
 ### xDS HTTP Filter Configuration
 
@@ -139,6 +175,13 @@ cluster.
 
 ### Filter Behavior
 
+The filter will maintain a cache of
+GcpServiceAccountIdentityCallCredentials instances, one for each
+audience, along with a last-used timestamp for each one.  The maximum
+number of entries in the cache is bounded by the config field
+`cache_config.cache_size`; if the cache exceeds that size, then the
+entry with the oldest last-used timestamp will be removed.
+
 When the filter processes the RPC's initial metadata, it will first
 attempt to determine the audience for the request by looking at the
 cluster metadata key corresponding to the filter instance name, which
@@ -146,34 +189,19 @@ must be of type `extensions.filters.http.gcp_authn.v3.Audience`.  If the
 cluster has no such metadata key, the filter is a no-op.  Otherwise, the
 audience is the value of the `url` field in the `Audience` proto.
 
-The filter will then check to see if it already has a cached JWT token
-for the specified audience.  If so, it will add the token to the RPC's
-headers as described below.
+The filter will then check to see if it already has a cached
+GcpServiceAccountIdentityCallCredentials instance for the specified
+audience.  If it does not, it will create a new instance, adding it to
+its cache, removing the least recently used entry from the cache if the
+cache is already at its max size.  It will then add that credential to
+the RPC.
 
-If the JWT token is not cached, then the filter will send an HTTP request
-to fetch the JWT token.  The URI of the request will come from the filter
-config's `http_uri.uri` field, substituting the string `[AUDIENCE]` with
-the actual audience.  The HTTP request will include the header
-`Metadata-Flavor: Google`.  The HTTP request will have a deadline set
-from the `http_uri.timeout` field in the filter config.
-
-If the HTTP request succeeds, the body of the response will contain
-the JWT token, which the client will both add to its cache and add
-to the data plane RPC's headers.  The client does not need to do full
-[RFC-7519] validation of the token (that is the responsibility of the
-server side), but it does need to extract the `nbf` and `exp` fields
-for caching purposes.
-
-If the HTTP request fails or times out, or if the JWT token is invalid
-(i.e., the client fails to extract the `nbf` or `exp` fields), the data
-plane RPC will be sent without the JWT token and will then fail on the
-destination server if authentication was required.
-
-If a JWT token is obtained either from the cache or from an HTTP
-request, it will be added to the RPC headers.  If the filter config has
-no `token_header` field, then the header name will be `authorization`
-and the value prefix will be `Bearer ` (note trailing space); otherwise,
-the header name and value prefix from `token_header` will be used.
+When instantiating a new GcpServiceAccountIdentityCallCredentials
+instance, the filter will carefully map its config parameters to the
+semantics of GcpServiceAccountIdentityCallCredentials.  Specifically,
+note the weird semantics for the `token_header` field, where if the
+field is present to overhead the header name, the default for the header
+prefix also goes away.
 
 ### Temporary environment variable protection
 
@@ -190,6 +218,15 @@ supports only GCP, so that's what we're initially focusing on, for
 compatibility with Envoy.  We would be open to future contributions from
 the OSS communicate to provide similar functionality for other cloud
 providers, in both gRPC and Envoy.
+
+Note that having the filter cache
+GcpServiceAccountIdentityCallCredentials instances instead of directly
+caching JWT tokens means that the cache semantics will be slightly
+different than Envoy: cache expiration will be based solely on
+last-recently-used time for each audience, not on the actual expiration
+time for the individual underlying JWT tokens.  This is not expected to
+make much difference in practice, but it allows far cleaner code reuse
+in this design.
 
 ## Implementation
 
