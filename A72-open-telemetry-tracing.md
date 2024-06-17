@@ -152,7 +152,7 @@ At the client, on parent span:
 * When the call is closed, set RPC status and end the parent span. gRPC status "OK" 
   is recorded with status "OK", while other gRPC statuses are marked as "ERROR". 
   Non-"OK" statuses include their code as a description, the same below.
-  For example, a span status description might be "UNAVAILABLE, unable to resolve host",
+  For example, a span status description might be "UNAVAILABLE, unable to resolve host".
 
 On attempt span:
 * When span is created, set the attribute with key `previous-rpc-attempts` and an 
@@ -169,7 +169,7 @@ On attempt span:
     the order of the sent messages on the attempt (i.e., it starts at 0 and is 
     incremented by 1 for each message sent), the same below.
   * key named `message-size`, with integer value of message size, 
-    or uncompressed message size if message needs a compression. 
+    or uncompressed message size if message needs compression.
     The size is the total attempt message bytes without encryption,
     not including grpc or transport framing bytes, the same below.
   * If compression needed, add key `message-size-compressed` with integer 
@@ -198,7 +198,7 @@ At the server:
   with name "Outbound message sent" and the following attributes:
   * key `sequence-number` with integer value of the seq no.
   * key named `message-size`, with integer value of message size,
-    or uncompressed message size if message needs a compression.
+    or uncompressed message size if message needs compression.
   * If compression needed, add key `message-size-compressed` with integer
     value of compressed message size. If this is reported as a separate event in
     an implementation, the event name is "Outbound message compressed" and the
