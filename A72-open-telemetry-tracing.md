@@ -152,6 +152,7 @@ At the client, on parent span:
 * When the call is closed, set RPC status and end the parent span. gRPC status "OK" 
   is recorded with status "OK", while other gRPC statuses are marked as "ERROR". 
   Non-"OK" statuses include their code as a description, the same below.
+  For example, a span status description might be "UNAVAILABLE, unable to resolve host",
 
 On attempt span:
 * When span is created, set the attribute with key `previous-rpc-attempts` and an 
@@ -167,9 +168,9 @@ On attempt span:
   * key `sequence-number` with integer value of the seq no. The seq no. indicates
     the order of the sent messages on the attempt (i.e., it starts at 0 and is 
     incremented by 1 for each message sent), the same below.
-  * key named `message-size-uncompressed` if the implementation knows the message needs compression,
-    otherwise named `message-size`, with integer value of uncompressed
-    message size. The size is the total attempt message bytes without encryption,
+  * key named `message-size`, with integer value of message size, 
+    or uncompressed message size if message needs a compression. 
+    The size is the total attempt message bytes without encryption,
     not including grpc or transport framing bytes, the same below.
   * If compression needed, add key `message-size-compressed` with integer 
     value of compressed message size. If this is reported as a separate event in 
@@ -177,17 +178,17 @@ On attempt span:
     order of the event must be after the first event that reports the message size.
 * When an inbound message has been received, add Event(s) (it depends on 
   implementation whether there is a single event or an additional separate event
-  with name "Inbound message uncompressed" for uncompressed message size) with name 
-  "Inbound message read" and the following attributes:
+  with name "Inbound compressed message" for compressed message size) with name 
+  "Inbound message received" and the following attributes:
   * key `sequence-number` with integer value of the seq no. The seq no. indicates
     the order of the received messages on the attempt (i.e., it starts at 0 and is
     incremented by 1 for each message received), the same below.
-  * key named `message-size-compressed` if the implementation knows the message needs decompression,
-    otherwise named `message-size`, with integer value of wire message size.
-  * If the message needs decompression, add key `message-size-uncompressed`
-    with integer value of uncompressed message size. If this is reported as a 
-    separate event in an implementation, the event name is "Inbound message uncompressed"
-    and the order of the event must be after the first event that reports the wire message size.
+  * key named `message-size` with integer value of wire message size, or decompressed 
+    message size of the message needs decompression.
+  * If the message needs decompression, add key `message-size-compressed`
+    with integer value of compressed message size. If this is reported as a 
+    separate event in an implementation, the event name is "Inbound compressed message"
+    and the order of the event must be before the first event that reports the wire message size.
 * When the stream is closed, set RPC status and end the attempt span.
 
 At the server:
@@ -196,25 +197,69 @@ At the server:
   separate event with name "Outbound message compressed" for compressed message size)
   with name "Outbound message sent" and the following attributes:
   * key `sequence-number` with integer value of the seq no.
-  * key named `message-size-uncompressed` if the message needs compression,
-    otherwise named `message-size`, with integer value of uncompressed
-    message size.
+  * key named `message-size`, with integer value of message size,
+    or uncompressed message size if message needs a compression.
   * If compression needed, add key `message-size-compressed` with integer
     value of compressed message size. If this is reported as a separate event in
     an implementation, the event name is "Outbound message compressed" and the
     order of the event must be after the first event that reports the message size.
 * When an inbound message has been received, add Event(s) (it depends on
   implementation whether there is a single event or an additional separate event
-  with name "Inbound message uncompressed" for uncompressed message size) with name
-  "Inbound message read" and the following attributes:
+  with name "Inbound compressed message" for compressed message size) with name
+  "Inbound message received" and the following attributes:
   * key `sequence-number` with integer value of the seq no.
-  * key named `message-size-compressed` if the message needs decompression,
-    otherwise named `message-size`, with integer value of wire message size.
-  * If the message needs decompression, add key `message-size-uncompressed`
-    with integer value of uncompressed message size. If this is reported as a
-    separate event in an implementation, the event name is "Inbound message uncompressed"
-    and the order of the event must be after the first event that reports the wire message size.
+  * key named `message-size` with integer value of wire message size, or decompressed
+    message size of the message needs decompression.
+  * If the message needs decompression, add key `message-size-compressed`
+    with integer value of compressed message size. If this is reported as a
+    separate event in an implementation, the event name is "Inbound compressed message"
+    and the order of the event must be before the first event that reports the wire message size.
 * When the stream is closed, set the RPC status and end the span.
+
+A few examples of what message events (w/ and w/o message compression) look like in different implementations:
+```agsl
+An example trace with message compression (Java): 
+
+Sending:
+|-- Event 'Outbound message sent', attributes('sequence-numer' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
+
+Receiving:
+|-- Event 'Inbound compressed message', attributes('sequence-numer' = 0, 'message-size-compressed' = 5493 ) ----|
+|-- Event 'Inbound message received', attributes('message-size' = 7854) ----|
+```
+
+```agsl
+An example trace with message compression (Go): 
+
+Sending:
+|-- Event 'Outbound message sent', attributes('sequence-numer' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
+
+Receiving:
+|-- Event 'Inbound message received', attributes('sequence-numer' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
+```
+
+```agsl
+An example trace with message compression (C++): 
+
+Sending:
+|-- Event 'Outbound message sent', attributes('sequence-numer' = 0, 'message-size' = 7854) ----|
+|-- Event 'Outbound message compressed', attributes('message-size-compressed' = 5493) ----|
+
+Receiving:
+|-- Event 'Inbound compressed message', attributes('message-size-compressed' = 5493 ) ----|
+|-- Event 'Inbound message received', attributes('message-size' = 7854) ----|
+
+```
+
+```agsl
+An example trace with no message compression (Java/Go/C++): 
+
+Sending:
+|-- Event 'Outbound message sent', attributes('sequence-numer' = 0, 'message-size' = 7854) ----|
+
+Receiving:
+|-- Event 'Inbound message received', attributes('sequence-numer' = 0, 'message-size' = 7854) ----|
+```
 
 ### Limitations
 The timestamp information on the Events that report compressed/uncompressed message
