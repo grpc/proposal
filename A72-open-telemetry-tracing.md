@@ -175,7 +175,7 @@ On attempt span:
   * If compression needed, add key `message-size-compressed` with integer 
     value of compressed message size. If this is reported as a separate event in 
     an implementation, the event name is "Outbound message compressed" and the 
-    order of the event must be after the first event that reports the message size.
+    order of the event must be after the "Outbound message sent" event.
 * When an inbound message has been received, add Event(s) (it depends on 
   implementation whether there is a single event or an additional separate event
   with name "Inbound compressed message" for compressed message size) with name 
@@ -184,11 +184,11 @@ On attempt span:
     the order of the received messages on the attempt (i.e., it starts at 0 and is
     incremented by 1 for each message received), the same below.
   * key named `message-size` with integer value of wire message size, or decompressed 
-    message size of the message needs decompression.
+    message size if the message needs decompression.
   * If the message needs decompression, add key `message-size-compressed`
     with integer value of compressed message size. If this is reported as a 
     separate event in an implementation, the event name is "Inbound compressed message"
-    and the order of the event must be before the first event that reports the wire message size.
+    and the order of the event must be before the "Inbound message received" event.
 * When the stream is closed, set RPC status and end the attempt span.
 
 At the server:
@@ -202,18 +202,18 @@ At the server:
   * If compression needed, add key `message-size-compressed` with integer
     value of compressed message size. If this is reported as a separate event in
     an implementation, the event name is "Outbound message compressed" and the
-    order of the event must be after the first event that reports the message size.
+    order of the event must be after the "Outbound message sent" event.
 * When an inbound message has been received, add Event(s) (it depends on
   implementation whether there is a single event or an additional separate event
   with name "Inbound compressed message" for compressed message size) with name
   "Inbound message received" and the following attributes:
   * key `sequence-number` with integer value of the seq no.
   * key named `message-size` with integer value of wire message size, or decompressed
-    message size of the message needs decompression.
+    message size if the message needs decompression.
   * If the message needs decompression, add key `message-size-compressed`
     with integer value of compressed message size. If this is reported as a
     separate event in an implementation, the event name is "Inbound compressed message"
-    and the order of the event must be before the first event that reports the wire message size.
+    and the order of the event must be before the "Inbound message received" event.
 * When the stream is closed, set the RPC status and end the span.
 
 A few examples of what message events (w/ and w/o message compression) look like in different implementations:
@@ -246,7 +246,7 @@ Sending:
 |-- Event 'Outbound message compressed', attributes('message-size-compressed' = 5493) ----|
 
 Receiving:
-|-- Event 'Inbound compressed message', attributes('message-size-compressed' = 5493 ) ----|
+|-- Event 'Inbound compressed message', attributes('sequence-numer' = 0, 'message-size-compressed' = 5493 ) ----|
 |-- Event 'Inbound message received', attributes('message-size' = 7854) ----|
 
 ```
@@ -630,23 +630,23 @@ gRPC is generating similar tracing information for OpenTelemetry compared with O
 but due to API differences between those two libraries, the
 trace information is represented slightly differently.
 In the new OpenTelemetry plugin, the client will add `Event`s (name:
-`Outbound message sent` and `Inbound message read`) with corresponding attributes,
+`Outbound message sent` and `Inbound message received`) with corresponding attributes,
 mapped from OpenCensus `MessageEvent` fields:
 
 | OpenCensus Trace Message Event Fields | OpenTelemetry Trace Event Attribute Key |
 |---------------------------------------|-----------------------------------------|
-| `Type`                                | `message.event.type`                    |
-| `Message Id`                          | `message.message.id`                    |
-| `Uncompressed message size`           | `message.event.size.uncompressed`       |
-| `Compressed message size`             | `message.event.size.compressed`         |
+| `Type`                                | NA                                      |
+| `Message Id`                          | `sequence-number`                       |
+| `Uncompressed message size`           | `message-size`                          |
+| `Compressed message size`             | `message-size-compressed`               |
 
 OpenCensus span annotation description maps to OpenTelemetry event name, and
 annotation attributes keys are mapped to event attributes keys:
 
 | OpenCensus Trace Annotation Attribute Key | OpenTelemetry Trace Event Attribute Key |
 |-------------------------------------------|-----------------------------------------|
-| `type`                                    | `message.event.type`                    |
-| `id`                                      | `message.message.id`                    |
+| `type`                                    | NA                                      |
+| `id`                                      | `sequence-number`                       |
 
 ## Rationale
 C++ will not have the optimization path in its `GrpcTraceBinPropagator` API. We
