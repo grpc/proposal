@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-06-14
+* Last updated: 2024-06-17
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -26,10 +26,12 @@ this framework.
 ### Related Proposals: 
 * [gRFC A39: xDS HTTP Filters][A39]
 * [gRFC A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
+* [gRFC A74: xDS Config Tears][A74]
 * [RFC-7519: JSON Web Token (JWT)][RFC-7519]
 
 [A39]: A39-xds-http-filters.md
 [A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
+[A74]: A74-xds-config-tears.md
 [RFC-7519]: https://datatracker.ietf.org/doc/html/rfc7519
 
 ## Proposal
@@ -167,11 +169,14 @@ instance name from the [`HttpFilter.name`
 field](https://github.com/envoyproxy/envoy/blob/7436690884f70b5550b6953988d05818bae3d087/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L1149).
 We will implement that behavior in gRPC.
 
+### xDS ConfigSelector Behavior
+
 As per [gRFC A60][A60], we currently pass the selected cluster name via
 a call attribute for access in filters.  We will now also pass the CDS
 resource for the cluster in a separate call attribute, so that the GCP
 Authentication filter can access the cluster metadata for the selected
-cluster.
+cluster.  Note that this will require implementing [A74], so that the
+CDS resource is available at xDS routing time.
 
 ### Filter Behavior
 
