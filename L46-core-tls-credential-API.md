@@ -164,8 +164,10 @@ class TlsServerCredentialsBuilder final : public TlsCredentialsBuilder {
 class TlsChannelCredentialsBuilder final : public TlsCredentialsBuilder {
  public:
   // Sets the decision of whether to do a crypto check on the server certificates.
+  // Setting this to false is potentially dangerous as in most TLS setups the
+  // client verifies the server.
   // The default is true.
-  void set_verify_server_certificates(bool verify_server_certs);
+  void set_verify_server_certificates_dangerous(bool verify_server_certs);
 
   // Builds a ChannelCredentials instance that establishes TLS connections in the manner specified by options.
   std::shared_ptr<ChannelCredentials> BuildTlsCredentials();
@@ -318,16 +320,16 @@ class FileWatcherCertificateProvider final
   FileWatcherCertificateProvider(absl::string_view private_key_path,
                                  absl::string_view identity_certificate_path,
                                  absl::string_view root_cert_path,
-                                 unsigned int refresh_interval_sec);
+                                 absl::Duration refresh_interval_sec);
 
   // Constructor to get credential updates from identity file paths only.
   FileWatcherCertificateProvider(absl::string_view private_key_path,
                                  absl::string_view identity_certificate_path,
-                                 unsigned int refresh_interval_sec);
+                                 absl::Duration refresh_interval_sec);
 
   // Constructor to get credential updates from root file path only.
   FileWatcherCertificateProvider(absl::string_view root_cert_path,
-                                 unsigned int refresh_interval_sec);
+                                 absl::Duration refresh_interval_sec);
     }
 
 
@@ -434,8 +436,8 @@ class HostNameCertificateVerifier : public CertificateVerifierInterface {
 ```c++
 
 
-class UnverifiedPeerChain {
-  std::vector<absl::string_view> peer_cert_chain_der;
+class UnverifiedPeerCertificateChain {
+  absl::Span<absl::string_view> peer_cert_chain_der;
 }
 
 
@@ -443,24 +445,23 @@ class CustomChainBuilderInterface {
 public:
  virtual ~CustomChainBuilderInterface() = default;
 
- // Performs custom chain building. gRPC invokes this function. When Chain
- // building is complete, the implementer must invoke the callback.  The output
- // parameter of the callback must be populated with the verified DER-encoded
- // certificate chain, ordered from leaf to root. Both the leaf and the root
- // must be included.
- virtual void BuildAndVerifyChain(std::shared_ptr<UnverifiedPeerChain> peer_chain, absl::AnyInvocable<void(absl::StatusOr<absl::Span<absl::string_view>>> callback)) = 0;
+ // Performs custom chain building. When chain building is complete, the
+ // implementer must invoke the callback.  The output parameter of the callback
+ // must be populated with the verified DER-encoded certificate chain, ordered
+ // from leaf to root. Both the leaf and the root must be included.
+ virtual void BuildAndVerifyChain(std::shared_ptr<UnverifiedPeerCertificateChain> peer_chain, absl::AnyInvocable<void(absl::StatusOr<absl::Span<absl::string_view>>> callback)) = 0;
 
  // Cancels a chain building request request previously started via
  // BuildAndVerifyChain().  Used when the connection attempt times out or is
  // cancelled while an async request is pending.
  //
  // request: the verification information associated with this request
- virtual void Cancel(std::shared_ptr<UnverifiedPeerChain> peer_chain) = 0;
+ virtual void Cancel(std::shared_ptr<UnverifiedPeerCertificateChain> peer_chain) = 0;
 }
 ```
 
 The default behavior for chain building is to defer to the underlying SSL library, which has a built-in chain building API that has been hardened over many years of use with the web PKI. For example, [X509_verify_cert](https://www.openssl.org/docs/man1.1.1/man3/X509_verify_cert.html) is the implementation in OpenSSL that builds a chain and verifies that it is trusted by one of the root certificates.
-One use case for the custom chain building feature is to enable SPIFFE federation (TODO: ref the SPIFFE spec), where the set of root certificates to use is determined based on the SPIFFE trust domain in the peer's leaf certificate.
+One use case for the custom chain building feature is to enable [SPIFFE federation](https://spiffe.io/), where the set of root certificates to use is determined based on the SPIFFE trust domain in the peer's leaf certificate.
 
 ```c++
  // Builds a trusted and validated certificate chain based on SPIFFE trust maps
