@@ -96,8 +96,9 @@ class TlsCredentialsBuilder {
   // Sets the certificate verifier. The certificate verifier performs checks on
   // the peer certificate chain after the chain has been (cryptographically)
   // verified to chain up to a trusted root.
-  // If unset, this will default to the `HostNameCertificateVerifier` detailed
-  // below.
+  // If unset on the client-side, this will default to the
+  // `HostNameCertificateVerifier` detailed below.
+  // If unset on the server-side, this will default to a nullptr.
   // If set to nulltpr, this will overwrite the host name verifier and lead you
   // to not doing any checks (aside from the cryptographic ones).
   void set_certificate_verifier(
@@ -163,6 +164,8 @@ class TlsServerCredentialsBuilder final : public TlsCredentialsBuilder {
 // identity credentials will be used.
 class TlsChannelCredentialsBuilder final : public TlsCredentialsBuilder {
  public:
+  // WARNING: EXPERT USE ONLY. MISUSE CAN LEAD TO SIGNIFICANT SECURITY DEGRADATION.
+  //
   // Sets the decision of whether to do a crypto check on the server certificates.
   // Setting this to false is potentially dangerous as in most TLS setups the
   // client verifies the server.
