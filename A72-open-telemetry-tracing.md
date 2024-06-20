@@ -338,6 +338,22 @@ A `grpc-trace-bin` formatter implementation for OpenTelemetry is
 needed in each language, which can be similar to the OpenCensus implementation.
 Go already has community support for that.
 
+With gRPC OpenTelemetry API, users can provide a single composite propagator that
+combines one or multiple `TextMapPropagator` for their client and server separately.
+OpenTelemetry and its extension packages support multiple text map propagators.
+gRPC puts all the propagator data into the wire through metadata, and receives all the
+data specified from the propagator configuration.
+Users can define their own migration path for context propagators in distributed components.
+Configuring gRPC OpenTelemetry with this propagator when dealing with
+cross-process concerns during migration is straightforward and recommended.
+In the long term, community standardized propagators, e.g. W3C is more encouraged than `GrpcTraceBinPropagator`.
+This also allows users to easily migrate a group of applications with an old propagator to
+a new propagator. An example migration path can be:
+1. Configure server to accept both old and new propagators.
+2. Configure the client with the desired new propagators and to drop the old propagator.
+3. Make the server only accept the new propagators and complete the migration.
+
+
 #### GrpcTraceBinPropagator and TextMapGetter/Setter in Java/Go
 The pseudocode below demonstrates `GrpcTraceBinPropagator` and the corresponding
 gRPC Getter/Setter with an optimization path.
@@ -572,20 +588,6 @@ MakeGrpcTraceBinTextMapPropagator() {
 
 ```
 
-With gRPC OpenTelemetry API, users can provide a single composite propagator that 
-combines one or multiple `TextMapPropagator` for their client and server separately.
-OpenTelemetry and its extension packages support multiple text map propagators.
-gRPC puts all the propagator data into the wire through metadata, and receives all the
-data specified from the propagator configuration.
-Users can define their own migration path for context propagators in distributed components.
-Configuring gRPC OpenTelemetry with this propagator when dealing with 
-cross-process concerns during migration is straightforward and recommended. 
-In the long term, community standardized propagators, e.g. W3C is more encouraged than `GrpcTraceBinPropagator`.
-This also allows users to easily migrate a group of applications with an old propagator to 
-a new propagator. An example migration path can be:
-1. Configure server to accept both old and new propagators.
-2. Configure the client with the desired new propagators and to drop the old propagator.
-3. Make the server only accept the new propagators and complete the migration.
 
 ### Migration to OpenTelemetry: In Binary
 The OpenCensus [shim](https://github.com/open-telemetry/opentelemetry-java/tree/main/opencensus-shim)
