@@ -49,6 +49,7 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 ### Functions that will be removed 
 * `gpr_log_severity_string` - This wont be needed anymore. 
 * `gpr_should_log` - This wont be needed anymore. 
+* `GRPC_STACKTRACE_MINLOGLEVEL` - This will not be needed anymore.
 
 ### Will work similar to before
 * `GRPC_VERBOSITY` will work as follows
