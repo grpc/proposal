@@ -77,7 +77,8 @@ void SomeInitFunctionCalledByGrpcInit() {
   } else {
     VLOG(2) << "No verbosity set.";
   }
-}```
+}
+```
 
 ## Rationale
 
