@@ -55,27 +55,29 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 * `GRPC_VERBOSITY` will work as follows
 
 ```
-void gpr_log_verbosity_init() {
-  absl::string_view verbosity = grpc_core::ConfigVars::Get().Verbosity();
-  if (absl::EqualsIgnoreCase(verbosity, "INFO")) {
-    absl::SetVLogLevel("*grpc*/*", -1);
-    absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
-  } else if (absl::EqualsIgnoreCase(verbosity, "DEBUG")) {
-    absl::SetVLogLevel("*grpc*/*", 2);
-    absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
-  } else if (absl::EqualsIgnoreCase(verbosity, "ERROR")) {
-    absl::SetVLogLevel("*grpc*/*", -1);
-    absl::SetMinLogLevel(absl::LogSeverityAtLeast::kError);
-  } else if (absl::EqualsIgnoreCase(verbosity, "NONE")) {
-    absl::SetVLogLevel("*grpc*/*", -1);
-    absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfinity);
-  } else if (verbosity.empty()) {
-    // Do not alter absl settings if GRPC_VERBOSITY flag is not set.
+void SomeInitFunctionCalledByGrpcInit() {
+  absl::optional<std::string> verbosity = grpc_core::GetEnv("GRPC_VERBOSITY");
+  if (verbosity.has_value()) {
+    VLOG(2) << "Log verbosity: " << verbosity.value();
+    if (absl::EqualsIgnoreCase(verbosity.value(), "INFO")) {
+      absl::SetVLogLevel("*grpc*/*", -1);
+      absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
+    } else if (absl::EqualsIgnoreCase(verbosity.value(), "ERROR")) {
+      absl::SetVLogLevel("*grpc*/*", -1);
+      absl::SetMinLogLevel(absl::LogSeverityAtLeast::kError);
+    } else if (absl::EqualsIgnoreCase(verbosity.value(), "WARNING")) {
+      absl::SetVLogLevel("*grpc*/*", -1);
+      absl::SetMinLogLevel(absl::LogSeverityAtLeast::kWarning);
+    } else if (absl::EqualsIgnoreCase(verbosity.value(), "DEBUG")) {
+      absl::SetGlobalVLogLevel(2);
+      absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
+    } else {
+      // Do not alter absl settings if GRPC_VERBOSITY flag is not set.
+    }
   } else {
-    LOG(ERROR) << "Unknown log verbosity: " << verbosity;
+    VLOG(2) << "No verbosity set.";
   }
-}
-```
+}```
 
 ## Rationale
 
