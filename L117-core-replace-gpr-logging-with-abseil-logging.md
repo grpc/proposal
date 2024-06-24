@@ -46,9 +46,10 @@ We are proposing to remove all instances of gpr logging and asserts and replace 
 * `gpr_set_log_function` - This function will be removed. Teams can consider usage of [LogSink](https://github.com/abseil/abseil-cpp/blob/fa57bfc573453d57a38552eedcce894b0e2d9f5e/absl/log/log_sink.h) and [AddLogSink](https://github.com/abseil/abseil-cpp/blob/fa57bfc573453d57a38552eedcce894b0e2d9f5e/absl/log/log_sink_registry.h).
 * `gpr_set_log_verbosity` will be removed. 
 
-### Functions that will be removed 
+### Flags and Functions that will be removed 
 * `gpr_log_severity_string` - This wont be needed anymore. 
 * `gpr_should_log` - This wont be needed anymore. 
+* `GRPC_STACKTRACE_MINLOGLEVEL` - This will not be needed anymore.
 
 ### Will work similar to before
 * `GRPC_VERBOSITY` will work as follows
@@ -59,19 +60,22 @@ void SomeInitFunctionCalledByGrpcInit() {
   if (verbosity.has_value()) {
     VLOG(2) << "Log verbosity: " << verbosity.value();
     if (absl::EqualsIgnoreCase(verbosity.value(), "INFO")) {
+      absl::SetVLogLevel("*grpc*/*", -1);
       absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
     } else if (absl::EqualsIgnoreCase(verbosity.value(), "ERROR")) {
+      absl::SetVLogLevel("*grpc*/*", -1);
       absl::SetMinLogLevel(absl::LogSeverityAtLeast::kError);
     } else if (absl::EqualsIgnoreCase(verbosity.value(), "WARNING")) {
+      absl::SetVLogLevel("*grpc*/*", -1);
       absl::SetMinLogLevel(absl::LogSeverityAtLeast::kWarning);
     } else if (absl::EqualsIgnoreCase(verbosity.value(), "DEBUG")) {
       absl::SetGlobalVLogLevel(2);
       absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
     } else {
-      LOG(ERROR) << "Unknown log verbosity: " << verbosity.value();
+      // Do not alter absl settings if GRPC_VERBOSITY flag is not set.
     }
   } else {
-    VLOG(2) << "No verbosity set. Default will be used.";
+    VLOG(2) << "No verbosity set.";
   }
 }
 ```
