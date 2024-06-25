@@ -53,7 +53,7 @@ gRPC first gets an address picked by the balancer. Balancer picks the address ba
 
 #### The balancing policy needs to be changed on service config updates 
 
-Upon service config updating, gRPC will look at the LoadBalancingPolicy field and decide which balancing policy to use. If the LoadBalancingPolicy specified by the service config is different from what's currently being used, gRPC should be able to change the policy. Refer to go/grpc-service-config for more details on this.
+Upon service config updating, gRPC will look at the LoadBalancingPolicy field and decide which balancing policy to use. If the LoadBalancingPolicy specified by the service config is different from what's currently being used, gRPC should be able to change the policy.
 
 Right now, there's no API to notify balancer of service config changes, so to change the balancing policy, the balancer needs to be swapped out. But swapping out the balancer and at the same time keeping the old resolver and address pool is not feasible because of the v1 structure.
 
