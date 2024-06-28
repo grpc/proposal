@@ -4,7 +4,7 @@ A81: xDS Authority Rewriting
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-06-14
+* Last updated: 2024-06-27
 * Discussion at: https://groups.google.com/g/grpc-io/c/ZFoyzcbknaM
 
 ## Abstract
@@ -67,18 +67,18 @@ In order to address use-cases where authority rewriting may not be
 acceptable from a security perspective, we will add a new server feature
 to the bootstrap config.  The server feature will be specfied via the
 `server_features` field described in [gRFC A30][A30].  The feature will
-be the string `allow_authority_rewriting`.
+be the string `trusted_xds_server`.  (Note that the name is intentionally
+fairly general, since it may be used to trigger other functionality in
+the future.)
 
 ### xDS Resource Validation
 
-When validating an RDS resource, if the `allow_authority_rewriting`
+When validating an RDS resource, if the `trusted_xds_server`
 server option is present for this xDS server in the
 bootstrap config, we will look at the [`RouteAction.auto_host_rewrite`
 field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/route/v3/route_components.proto#L1173)
-and
-[`RouteAction.append_x_forwarded_host`](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/route/v3/route_components.proto#L1222)
-fields.  The boolean values of these fields will be included in the
-parsed resource struct that is passed to the XdsClient watcher.
+field.  The boolean value of this field will be included in the parsed
+resource struct that is passed to the XdsClient watcher.
 
 When validting an EDS resource, we will look at the [`Endpoint.hostname`
 field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/endpoint/v3/endpoint_components.proto#L89).
@@ -95,13 +95,12 @@ for the Logical DNS cluster.
 
 ### xDS ConfigSelector Changes
 
-When the xDS ConfigSelector performs routing, it will need to pass the
-values of the route's `auto_host_rewrite` and `append_x_forwarded_host`
-fields to the LB picker.  This data will be passed using the same
-mechanism introduced in [A31] to pass the cluster name to the
-xds_cluster_manager LB policy.  Note that if the implementation is
-already passing along all of the information about the selected route
-as per [A60], then no changes may be needed here.
+When the xDS ConfigSelector performs routing, it will need to pass
+the values of the route's `auto_host_rewrite` field to the LB picker.
+This data will be passed using the same mechanism introduced in [A31] to
+pass the cluster name to the xds_cluster_manager LB policy.  Note that
+if the implementation is already passing along all of the information
+about the selected route as per [A60], then no changes may be needed here.
 
 ### xds_cluster_impl LB Policy Changes
 
@@ -111,9 +110,7 @@ subchannel.  In the xds_cluster_impl picker, if the `auto_host_rewrite`
 option is enabled in the route (passed from the ConfigSelector as
 described above) and the `hostname` attribute on the subchannel wrapper
 is non-empty, the picker will set the `:authority` header to the value of
-the `hostname` attribute.  If `append_x_forwarded_host` was also enabled
-in the route, then the original value of the `:authority` header will
-be added to the `x-forwarded-host` header.
+the `hostname` attribute.
 
 To support this, we will add an API to allow the LB picker to explicitly
 set the `:authority` header for the RPC.  Note that the resulting
