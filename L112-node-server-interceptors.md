@@ -83,6 +83,10 @@ class ServerInterceptingCall {
    * Return the call deadline set by the client. The value is Infinity if there is no deadline.
    */
   getDeadline(): Deadline;
+  /**
+   * Return the host requested by the client in the ":authority" header.
+   */
+  getHost(): string;
 }
 ```
 
