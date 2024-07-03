@@ -4,7 +4,7 @@ A81: xDS Authority Rewriting
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-06-27
+* Last updated: 2024-07-03
 * Discussion at: https://groups.google.com/g/grpc-io/c/ZFoyzcbknaM
 
 ## Abstract
@@ -167,4 +167,6 @@ use of authority rewriting:
 
 ## Implementation
 
-Will be implemented in C-core, Java, Go, and Node.
+C-core implementation in https://github.com/grpc/grpc/pull/37087.
+
+Will also be implemented in Java, Go, and Node.
