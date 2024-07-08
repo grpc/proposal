@@ -4,7 +4,7 @@ A82: xDS System Root Certificates
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-06-06
+* Last updated: 2024-07-08
 * Discussion at: https://groups.google.com/g/grpc-io/c/BgqeUU0q4fU
 
 ## Abstract
@@ -34,32 +34,29 @@ provider config in the xDS bootstrap file.
 
 We have added a [`system_root_certs`
 field](https://github.com/envoyproxy/envoy/blob/84d8fdd11e78013cd50596fa3b704e152512455e/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L399)
-to the xDS `CertificateValidationContext` message (see envoyproxy/envoy#34235).
-If this field is present and the `ca_certificate_provider_instance` field
-is unset, system root certificates will be used for validation.
+to the xDS `CertificateValidationContext` message (see
+envoyproxy/envoy#34235).  If this field is present and the
+`ca_certificate_provider_instance` field is unset in the gRPC client,
+system root certificates will be used for validation.
 
 ### xDS Resource Validation
 
-When processing a CDS or LDS resource, we will look at this new field
-if `ca_certificate_provider_instance` is unset.  The parsed CDS or LDS
-resource delivered to the XdsClient watcher will indicate if system root
-certs should be used.  If feasible, the parsed representation should be
+When processing a CDS resource, we will look at this new field if
+`ca_certificate_provider_instance` is unset.  The parsed CDS resource
+delivered to the XdsClient watcher will indicate if system root certs
+should be used.  If feasible, the parsed representation should be
 structured such that it is not possible to indicate both a certificate
 provider instance and using system root certs, since those options are
 mutually exclusive.
+
+Note that LDS validation will be unchanged.  The new `system_root_certs`
+field will be ignored on the gRPC server side.
 
 ### xds_cluster_impl LB Policy Changes
 
 The xds_cluster_impl LB policy sets the configuration for the XdsCreds
 functionality based on the CDS resource.  We will modify it such that if
 the CDS resource indicates that system root certs are to be used, it
-will configure XdsCreds to use system root certs.
-
-### xDS-Enabled Server Changes
-
-The xDS-enabled server code sets the configuration for XdsCreds
-functionality based on the LDS resource.  We will modify it such that if
-the LDS resource indicates that system root certs are to be used, it
 will configure XdsCreds to use system root certs.
 
 ### XdsCredentials Changes
