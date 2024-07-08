@@ -78,4 +78,6 @@ cert provider impl.
 
 ## Implementation
 
-Will be implemented in C-core, Java, Go, and Node.
+C-core implementation in https://github.com/grpc/grpc/pull/37185.
+
+Will also be implemented in Java, Go, and Node.
