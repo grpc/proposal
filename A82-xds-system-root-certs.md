@@ -35,9 +35,9 @@ provider config in the xDS bootstrap file.
 We have added a [`system_root_certs`
 field](https://github.com/envoyproxy/envoy/blob/84d8fdd11e78013cd50596fa3b704e152512455e/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L399)
 to the xDS `CertificateValidationContext` message (see
-envoyproxy/envoy#34235).  If this field is present and the
-`ca_certificate_provider_instance` field is unset in the gRPC client,
-system root certificates will be used for validation.
+envoyproxy/envoy#34235).  In the gRPC client, if this field is present
+and the `ca_certificate_provider_instance` field is unset, system root
+certificates will be used for validation.
 
 ### xDS Resource Validation
 
