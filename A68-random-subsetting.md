@@ -1,7 +1,7 @@
 A68: Random subsetting with rendezvous hashing LB policy.
 ----
 * Author(s): @s-matyukevich
-* Approver: 
+* Approver: @markdroth
 * Status: Draft
 * Implemented in: PoC in Go
 * Last updated: 2024-04-15
@@ -16,13 +16,34 @@ Add support for the `random_subsetting` load balancing policy.
 Currently, gRPC is lacking a way to select a subset of endpoints available from the resolver and load-balance requests between them. Out of the box, users have the choice between two extremes: `pick_first` which sends all requests to one random backend, and `round_robin` which sends requests to all available backends. `pick_first` has poor connection balancing when the number of client is not much higher than the number of servers. The problem is exacerbated during rollouts because `pick_first` does not change endpoint on resolver updates if the current subchannel remains `READY`. `round_robin` results in every server having as many connections open as there are clients, which is unnecessarily costly when there are many clients, and makes local load balancing decisions (such as outlier detection) less precise.
 
 ### Related Proposals: 
-* [gRFC A27: A52: gRPC xDS Custom Load Balancer Configuration](https://github.com/grpc/proposal/blob/master/A52-xds-custom-lb-policies.md)
+* [gRFC A52: gRPC xDS Custom Load Balancer Configuration](https://github.com/grpc/proposal/blob/master/A52-xds-custom-lb-policies.md)
 
 ## Proposal
 
 Introduce a new LB policy, `random_subsetting`. This policy selects a subset of endpoints and passes them to the child LB policy. It maintains 2 important properties:
 * The policy tries to distribute connections among servers as equally as possible. The higher `(N_clients*subset_size)/N_servers` ratio is, the closer the resulting server connection distribution is to uniform.
 * The policy minimizes the amount of connection churn generated during server scale-ups by using [rendezvous hashing](https://en.wikipedia.org/wiki/Rendezvous_hashing)
+
+### LB Policy Config and Parameters
+
+The `random_subsetting` LB policy config will be as follows.
+
+```proto
+message LoadBalancingConfig {
+    oneof policy {
+        RandomSubsettingLbConfig random_subsetting = 21 [json_name = "random_subsetting"];
+    }
+}
+message RandomSubsettingLbConfig {
+    // subset_size indicates how many backends every client will be connected to.
+    // The value is required and must be greater than 0.
+    uint32 subset_size = 1;
+
+    // The config for the child policy.
+    // The value is required.
+    LoadBalancingConfig child_policy = 2;
+}
+```
 
 ### Subsetting algorithm
 
@@ -81,30 +102,10 @@ Though it could be done, we don't provide any mathematical guaranties about the 
 
 The graphs provided in the previous section prove this is the case in practice (we rollout all servers in the middle of every test, and there is no visible increase in the number of connections per server) Low connection churn during server rollouts is the primary motivation why rendezvous hashing was used as the subsetting algorithm: it guaranties that if a single server is either added or removed to the endpoints list, every client will update at most 1 entry in its subset. This is because the hashes for all unaffected servers remain the same, which guarantees that the order of the servers after sorting also remains stable. The same logic applies to the situation when multiple servers got updated. 
 
-### LB Policy Config and Parameters
-
-The `random_subsetting` LB policy config will be as follows.
-
-```proto
-message LoadBalancingConfig {
-    oneof policy {
-        RandomSubsettingLbConfig random_subsetting = 21 [json_name = "random_subsetting"];
-    }
-}
-message RandomSubsettingLbConfig {
-    // subset_size indicates how many backends every client will be connected to.
-    // Default is 20.
-    google.protobuf.UInt32Value subset_size = 1;
-
-    // The config for the child policy.
-    repeated LoadBalancingConfig child_policy = 2;
-}
-```
-
 
 ### Handling Parent/Resolver Updates
 
-When the resolver updates the list of endpoints, or the LB config changes, Random subsetting LB will run the subsetting algorithm, described above, to filter the endpoint list. Then it will create a new resolver state with the filtered list of the endpoints and pass it to the child LB. Attributes and service config from the old resolver state will be copied to the new one. 
+When the resolver updates the list of endpoints, or the LB config changes, Random subsetting LB will run the subsetting algorithm, described above, to filter the endpoint list. Then it will create a new resolver state with the filtered list of the endpoints and pass it to the child LB. Attributes and service config from the parent resolver state will be passed down with each resolver update. 
 
 ### Handling Subchannel Connectivity State Notifications
 
@@ -121,8 +122,13 @@ Random subsetting LB won't depend on xDS in any way. People may choose to initia
 ```proto
 package envoy.extensions.load_balancing_policies.random_subsetting.v3;
 message RandomSubsetting {
-  google.protobuf.UInt32Value subset_size = 1;
-  repeated LoadBalancingConfig child_policy = 2;
+    // subset_size indicates how many backends every client will be connected to.
+    // The value must be greater than 0.
+    uint32 subset_size = 1;
+
+    // The config for the child policy.
+    // The value is required.
+    config.cluster.v3.LoadBalancingPolicy child_policy = 2;
 }
 ```
 
