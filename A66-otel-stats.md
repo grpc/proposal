@@ -1,6 +1,7 @@
 # OpenTelemetry Metrics
 
-*   Author: Yash Tibrewal (@yashykt), Zach Reyes (@zasweq), Vindhya Ningegowda (@DNVindhya), Xuan Wang (@XuanWang-Amos)
+*   Author: Yash Tibrewal (@yashykt), Zach Reyes (@zasweq), Vindhya Ningegowda
+    (@DNVindhya), Xuan Wang (@XuanWang-Amos)
 *   Approver: Mark Roth (@markdroth)
 *   Status: Final
 *   Implemented in: <language, ...>
@@ -148,14 +149,6 @@ class OpenTelemetryPluginBuilder {
   // If `SetMeterProvider()` is not called, no metrics are collected.
   OpenTelemetryPluginBuilder& SetMeterProvider(
       std::shared_ptr<opentelemetry::metrics::MeterProvider> meter_provider);
-  // If set, \a target_attribute_filter is called per channel to decide whether
-  // to record the target attribute on client or to replace it with "other".
-  // This helps reduce the cardinality on metrics in cases where many channels
-  // are created with different targets in the same binary (which might happen
-  // for example, if the channel target string uses IP addresses directly).
-  OpenTelemetryPluginBuilder& SetTargetAttributeFilter(
-      absl::AnyInvocable<bool(absl::string_view /*target*/) const>
-          target_attribute_filter);
   // If set, \a generic_method_attribute_filter is called per call with a
   // generic method type to decide whether to record the method name or to
   // replace it with "other". Non-generic or pre-registered methods remain
@@ -191,7 +184,12 @@ for a particular channel or server builder.
 #### Java
 
 ```java
-public static class OpenTelemetryModuleBuilder {
+public final class GrpcOpenTelemetry {
+
+  /**
+   * Builder for configuring GrpcOpenTelemetry.
+   */
+  public static class Builder {
     /**
      * OpenTelemetry instance is used to configure metrics settings.
      *
@@ -206,25 +204,61 @@ public static class OpenTelemetryModuleBuilder {
      *         .setMeterProvider(sdkMeterProvider)
      *         .build();
      *
+     *     GrpcOpenTelemetry grpcOpenTelemetry = GrpcOpenTelemetry.newBuilder()
+     *         .sdk(openTelemetry)
+     *         .build();
+     *
      * If MeterProvider is not configured, no-op meterProvider will be used by default.
      * It provides meters which do not record or emit.
      */
-    public OpenTelemetryModuleBuilder openTelemetry(OpenTelemetry openTelemetry);
+    public Builder sdk(OpenTelemetry openTelemetry);
 
-    /* If targetFilter is set, and returns true for a target, target is recorded as is. Records "other" on false.
-    If targetFilter is not set, target is recorded as is. */
-    public OpenTelemetryBuilder targetFilter(Predicate<String> targetFilter);
+    public GrpcOpenTelemetry build();
+  }
 
-    public OpenTelemetryModule build();
+  /**
+   * Creates an empty builder.
+   */
+  public static Builder newBuilder();
+
+  /**
+   * Establishes GrpcOpenTelemetry instance as the global instrumentation provider for gRPC opentelemetry,
+   * automatically applying its configuration to all gRPC channels and servers created after this call.
+   *
+   * Sample
+   *    GrpcOpenTelemetry grpcOpenTelemetry = GrpcOpenTelemetry.newBuilder()
+   *         .sdk(openTelemetry)
+   *         .build();
+   *
+   *    grpcOpenTelemetry.registerGlobal();
+   *
+   * <p> Note: Only one of GrpcOpenTelemetry instance can be registered globally. Any subsequent call to
+   * registerGlobal() will throw an IllegalStateException.
+   */
+  public void registerGlobal();
+
+  /**
+   * Configures the given ManagedChannelBuilder with OpenTelemetry metrics instrumentation.
+   */
+  public void configureChannelBuilder(ManagedChannelBuilder<?> builder);
+
+  /**
+   * Configures the given ServerBuilder with OpenTelemetry metrics instrumentation.
+   */
+  public void configureServerBuilder(ServerBuilder<?> serverBuilder);
 }
 ```
 
-Note: For non-generated methods, method names are recorded as "other" for
+Note:
+- For non-generated methods, method names are recorded as "other" for
 `grpc.method` attribute. If you are interested in recording the method names for
 these methods, set
 [`isSampledToLocalTracing`](https://grpc.github.io/grpc-java/javadoc/io/grpc/MethodDescriptor.html#isSampledToLocalTracing\(\))
 to `true` while defining your methods in
 [`HandlerRegistry`](https://grpc.github.io/grpc-java/javadoc/io/grpc/HandlerRegistry.html).
+- A single `GrpcOpenTelemetry` instance can be registered either globally or on a
+per-channel and/or per-server basis. Registering the same instance more than
+once may lead to duplicated data.
 
 #### Go
 
@@ -243,10 +277,6 @@ type MetricsOptions struct {
   // to Named Meter instances to instrument an application. To enable metrics
   // collection, set a meter provider. If unset, no metrics will be recorded.
   MeterProvider metric.MeterProvider
-  // TargetAttributeFilter is a callback that takes the target string and
-  // returns a bool representing whether to use target as a label value or use
-  // the string "other". If unset, will use the target string as is.
-  TargetAttributeFilter func(string) bool
   // MethodAttributeFilter is a callback that takes the method string and
   // returns a bool representing whether to use method as a label value or use
   // the string "other". If unset, will use the method string as is. This is
@@ -293,25 +323,6 @@ class OpenTelemetryPlugin:
             means no metrics will be collected.
         """
         return None
-
-    def target_attribute_filter(
-        self, target: str
-    ) -> bool:
-        """
-        If set, this will be called per channel to decide whether to record the
-        target attribute on client or to replace it with "other".
-        This helps reduce the cardinality on metrics in cases where many channels
-        are created with different targets in the same binary (which might happen
-        for example, if the channel target string uses IP addresses directly).
-
-        Args:
-            target: The target for the RPC.
-
-        Returns:
-            bool: True means the original target string will be used, False means target string
-            will be replaced with "other".
-        """
-        return True
 
     def generic_method_attribute_filter(
         self, method: str
@@ -396,10 +407,9 @@ the data.
     didn't mention the scheme (`scheme://[authority]/path`). For channels such
     as inprocess channels where a target URI is not available, implementations
     can synthesize a target URI. It is possible for some channels to use IP
-    addresses as target strings and this might again blow up the cardinality.
-    Implementations should provide the option to override recorded target names
-    with "other" instead of the actual target. If no such override is provided,
-    the default behavior will be to record the target as is.
+    addresses as target strings and this might again blow up the cardinality. In
+    the future, we can consider adding the ability to override recorded target
+    names to avoid this.
 
 #### Client Per-Attempt Instruments
 
