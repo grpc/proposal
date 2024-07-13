@@ -4,7 +4,7 @@ A74: xDS Config Tears
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2023-12-28
+* Last updated: 2024-07-12
 * Discussion at: https://groups.google.com/g/grpc-io/c/ifcC3DbopWM
 
 ## Abstract
@@ -131,6 +131,15 @@ watch for the required endpoint resource.  For logical DNS clusters
 obtain endpoint addresses.  For aggregate clusters (see [A37]), the
 XdsDependencyManager will resolve the dependency graph, starting watches
 for dependent clusters as needed.
+
+Note that because resolution of logical DNS clusters is moving into the
+xds resolver, the xds resolver will now need to handle re-resolution
+requests from LB policies.  When re-resolution is requested, the xds
+resolver will trigger re-resolution for all logical DNS clusters in
+the XdsDependencyManager.  Note that this does imply a behavior change,
+which is that whenever there is a re-resolution request for any one
+logical DNS cluster, we will trigger re-resolution for *all* logical
+DNS clusters in the config tree, but this is considered acceptable.
 
 The XdsDependencyManager will provide a watcher API similar to the one
 provided by the XdsClient, with a few key differences.  The watcher
@@ -336,7 +345,8 @@ have enough observability infrastructure to make that tractable.
 LB policy config fields are updated in
 https://github.com/grpc/grpc-proto/pull/140.
 
-Implemented in C-core in https://github.com/grpc/grpc/pull/35011.
+Implemented in C-core in https://github.com/grpc/grpc/pull/35011.  Fixed
+logical DNS re-resolution in https://github.com/grpc/grpc/pull/37211.
 
 Java, Go, and Node will implement this in the future.
 
