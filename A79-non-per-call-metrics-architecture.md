@@ -1,6 +1,6 @@
 ## A79: Non-per-call Metrics Architecture
 
-*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya)
+*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya), Yijie Ma (@yijiem)
 *   Approver: Mark Roth (@markdroth)
 *   Status: Final
 *   Implemented in: Core, C++
