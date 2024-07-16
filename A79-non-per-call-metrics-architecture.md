@@ -1,6 +1,6 @@
 ## A79: Non-per-call Metrics Architecture
 
-*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya)
+*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya), Yijie Ma (@yijiem)
 *   Approver: Mark Roth (@markdroth)
 *   Status: Final
 *   Implemented in: Core, C++
@@ -120,15 +120,37 @@ of the process.
 C++, Python and other wrapped languages will use this API.
 
 ```c++
-// A global registry of instruments(metrics). This API is designed to be used to
-// register instruments (Counter and Histogram) as part of program startup,
-// before the execution of the main function (during dynamic initialization
-// time). Using this API after the main function begins may result into missing
-// instruments. This API is thread-unsafe.
+// A global registry of instruments(metrics). This API is designed to be used
+// to register instruments (Counter, Histogram, and Gauge) as part of program
+// startup, before the execution of the main function (during dynamic
+// initialization time). Using this API after the main function begins may
+// result into missing instruments. This API is thread-unsafe.
+//
+// The registration of instruments is done through the templated
+// RegistrationBuilder API and gets back a handle with an opaque type. At
+// runtime, the handle should be used with the StatsPluginGroup API to record
+// metrics for the instruments.
+//
+// At dynamic initialization time:
+//   const auto kMetricHandle =
+//       GlobalInstrumentsRegistry::RegisterUInt64Counter(
+//           "name",
+//           "description",
+//           "unit", /*enable_by_default=*/false)
+//           .Labels(kLabel1, kLabel2, kLabel3)
+//           .OptionalLabels(kOptionalLabel1, kOptionalLabel2)
+//           .Build();
+//
+// At runtime time:
+//   stats_plugin_group.AddCounter(kMetricHandle, 1,
+//       {"label_value_1", "label_value_2", "label_value_3"},
+//       {"optional_label_value_1", "optional_label_value_2"});
+//
 class GlobalInstrumentsRegistry {
  public:
   enum class ValueType {
     kUndefined,
+    kInt64,
     kUInt64,
     kDouble,
   };
@@ -136,11 +158,13 @@ class GlobalInstrumentsRegistry {
     kUndefined,
     kCounter,
     kHistogram,
+    kCallbackGauge,
   };
+  using InstrumentID = uint32_t;
   struct GlobalInstrumentDescriptor {
     ValueType value_type;
     InstrumentType instrument_type;
-    uint32_t index;
+    InstrumentID index;
     bool enable_by_default;
     absl::string_view name;
     absl::string_view description;
@@ -149,24 +173,59 @@ class GlobalInstrumentsRegistry {
     std::vector<absl::string_view> optional_label_keys;
   };
   struct GlobalInstrumentHandle {
-    uint32_t index;
+    // This is the index for the corresponding registered instrument that
+    // StatsPlugins can use to uniquely identify an instrument in the current
+    // process. Though this is not guaranteed to be stable between different
+    // runs or between different versions.
+    InstrumentID index;
   };
-  struct GlobalUInt64CounterHandle : public GlobalInstrumentHandle {};
-  struct GlobalDoubleHistogramHandle : public GlobalInstrumentHandle {};
+
+  template <ValueType V, InstrumentType I, size_t M, size_t N>
+  struct TypedGlobalInstrumentHandle : public GlobalInstrumentHandle {};
+
+  template <ValueType V, InstrumentType I, std::size_t M, std::size_t N>
+  class RegistrationBuilder {
+   public:
+    template <typename... Args>
+    RegistrationBuilder<V, I, sizeof...(Args), N> Labels(Args&&... args);
+    template <typename... Args>
+    RegistrationBuilder<V, I, M, sizeof...(Args)> OptionalLabels(
+        Args&&... args);
+    TypedGlobalInstrumentHandle<V, I, M, N> Build();
+  };
 
   // Creates instrument in the GlobalInstrumentsRegistry.
-  static GlobalUInt64CounterHandle RegisterUInt64Counter(
-      absl::string_view name, absl::string_view description,
-      absl::string_view unit, absl::Span<const absl::string_view> label_keys,
-      absl::Span<const absl::string_view> optional_label_keys,
-      bool enable_by_default);
-  static GlobalDoubleHistogramHandle RegisterDoubleHistogram(
-      absl::string_view name, absl::string_view description,
-      absl::string_view unit, absl::Span<const absl::string_view> label_keys,
-      absl::Span<const absl::string_view> optional_label_keys,
-      bool enable_by_default);
+  static RegistrationBuilder<ValueType::kUInt64, InstrumentType::kCounter, 0, 0>
+  RegisterUInt64Counter(absl::string_view name, absl::string_view description,
+                        absl::string_view unit, bool enable_by_default);
+  static RegistrationBuilder<ValueType::kDouble, InstrumentType::kCounter, 0, 0>
+  RegisterDoubleCounter(absl::string_view name, absl::string_view description,
+                        absl::string_view unit, bool enable_by_default);
+  static RegistrationBuilder<ValueType::kUInt64, InstrumentType::kHistogram, 0,
+                             0>
+  RegisterUInt64Histogram(absl::string_view name, absl::string_view description,
+                          absl::string_view unit, bool enable_by_default);
+  static RegistrationBuilder<ValueType::kDouble, InstrumentType::kHistogram, 0,
+                             0>
+  RegisterDoubleHistogram(absl::string_view name, absl::string_view description,
+                          absl::string_view unit, bool enable_by_default);
+  static RegistrationBuilder<ValueType::kInt64, InstrumentType::kCallbackGauge,
+                             0, 0>
+  RegisterCallbackInt64Gauge(absl::string_view name,
+                             absl::string_view description,
+                             absl::string_view unit, bool enable_by_default);
+  static RegistrationBuilder<ValueType::kDouble, InstrumentType::kCallbackGauge,
+                             0, 0>
+  RegisterCallbackDoubleGauge(absl::string_view name,
+                              absl::string_view description,
+                              absl::string_view unit, bool enable_by_default);
+
   static void ForEach(
       absl::FunctionRef<void(const GlobalInstrumentDescriptor&)> f);
+  static const GlobalInstrumentDescriptor& GetInstrumentDescriptor(
+      GlobalInstrumentHandle handle);
+  static absl::optional<GlobalInstrumentsRegistry::GlobalInstrumentHandle>
+  FindInstrumentByName(absl::string_view name);
 };
 ```
 
@@ -285,73 +344,178 @@ Implementations can also choose to implement both approaches.
 ##### Core
 
 ```c++
-// Each stats plugin instance will be registered with the
-// GlobalStatsPluginRegistry. On creation, it should fetch the list of
-// instrument descriptors from the GlobalInstrumentsRegistry and create an
-// instrument for each relevant descriptor.
+// The StatsPlugin interface.
 class StatsPlugin {
-public:
- class ChannelScope {
-  public:
-   ChannelScope(absl::string_view target, absl::string_view authority)
-       : target_(target), authority_(authority) {}
-
-   absl::string_view target() const { return target_; }
-   absl::string_view authority() const { return authority_; }
-
-  private:
-   absl::string_view target_;
-   absl::string_view authority_;
- };
-
- virtual bool IsEnabledForChannel(const ChannelScope& scope);
- virtual bool IsEnabledForServer(ChannelArgs& args);
-
- virtual void AddCounter(
-     GlobalInstrumentsRegistry::GlobalUInt64CounterHandle handle,
-     uint64_t value, absl::Span<const absl::string_view> label_values,
-     absl::Span<const absl::string_view> optional_values) = 0;
- virtual void RecordHistogram(
-     GlobalInstrumentsRegistry::GlobalDoubleHistogramHandle handle,
-     double value, absl::Span<const absl::string_view> label_values,
-     absl::Span<const absl::string_view> optional_values) = 0;
-};
-
-class GlobalStatsPluginRegistry {
  public:
-  class StatsPluginGroup {
+  // A general-purpose way for stats plugin to store per-channel or per-server
+  // state.
+  class ScopeConfig {
    public:
-    // Use the stats plugin group object to record metrics
-    template <class T, class U>
-    void AddCounter(T handle, U value,
-                    absl::Span<const absl::string_view> label_values,
-                    absl::Span<const absl::string_view> optional_values) {
-      for (auto& plugin : plugins_) {
-        plugin->AddCounter(handle, value, label_values, optional_values);
-      }
-    }
-    template <class T, class U>
-    void RecordHistogram(T handle, U value,
-                         absl::Span<const absl::string_view> label_values,
-                         absl::Span<const absl::string_view> optional_values) {
-      for (auto& plugin : plugins_) {
-        plugin->RecordHistogram(handle, value, label_values, optional_values);
-      }
-    }
-
-    // Use the stats plugin to get a representation of label values that can be
-    // saved for multiple uses later.
-    RefCountedPtr<LabelValueSet> MakeLabelValueSet(
-        absl::Span<const absl::string_view> label_values);
+    virtual ~ScopeConfig() = default;
   };
 
+  virtual ~StatsPlugin() = default;
+
+  // Whether this stats plugin is enabled for the channel specified by \a scope.
+  // Returns true and a channel-specific ScopeConfig which may then be used to
+  // configure the ClientCallTracer in GetClientCallTracer().
+  virtual std::pair<bool, std::shared_ptr<ScopeConfig>> IsEnabledForChannel(
+      const experimental::StatsPluginChannelScope& scope) const = 0;
+  // Whether this stats plugin is enabled for the server specified by \a args.
+  // Returns true and a server-specific ScopeConfig which may then be used to
+  // configure the ServerCallTracer in GetServerCallTracer().
+  virtual std::pair<bool, std::shared_ptr<ScopeConfig>> IsEnabledForServer(
+      const ChannelArgs& args) const = 0;
+  // Gets a scope config for the client channel specified by \a scope. Note that
+  // the stats plugin should have been enabled for the channel.
+  virtual std::shared_ptr<StatsPlugin::ScopeConfig> GetChannelScopeConfig(
+      const experimental::StatsPluginChannelScope& scope) const = 0;
+  // Gets a scope config for the server specified by \a args. Note that the
+  // stats plugin should have been enabled for the server.
+  virtual std::shared_ptr<StatsPlugin::ScopeConfig> GetServerScopeConfig(
+      const ChannelArgs& args) const = 0;
+
+  // Adds \a value to the uint64 counter specified by \a handle. \a label_values
+  // and \a optional_label_values specify attributes that are associated with
+  // this measurement and must match with their corresponding keys in
+  // GlobalInstrumentsRegistry::RegisterUInt64Counter().
+  virtual void AddCounter(
+      GlobalInstrumentsRegistry::GlobalInstrumentHandle handle, uint64_t value,
+      absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_label_values) = 0;
+  // Adds \a value to the double counter specified by \a handle. \a label_values
+  // and \a optional_label_values specify attributes that are associated with
+  // this measurement and must match with their corresponding keys in
+  // GlobalInstrumentsRegistry::RegisterDoubleCounter().
+  virtual void AddCounter(
+      GlobalInstrumentsRegistry::GlobalInstrumentHandle handle, double value,
+      absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_label_values) = 0;
+  // Records a uint64 \a value to the histogram specified by \a handle. \a
+  // label_values and \a optional_label_values specify attributes that are
+  // associated with this measurement and must match with their corresponding
+  // keys in GlobalInstrumentsRegistry::RegisterUInt64Histogram().
+  virtual void RecordHistogram(
+      GlobalInstrumentsRegistry::GlobalInstrumentHandle handle, uint64_t value,
+      absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_label_values) = 0;
+  // Records a double \a value to the histogram specified by \a handle. \a
+  // label_values and \a optional_label_values specify attributes that are
+  // associated with this measurement and must match with their corresponding
+  // keys in GlobalInstrumentsRegistry::RegisterDoubleHistogram().
+  virtual void RecordHistogram(
+      GlobalInstrumentsRegistry::GlobalInstrumentHandle handle, double value,
+      absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_label_values) = 0;
+  // Adds a callback to be invoked when the stats plugin wants to
+  // populate the corresponding metrics (see callback->metrics() for list).
+  virtual void AddCallback(RegisteredMetricCallback* callback) = 0;
+  // Removes a callback previously added via AddCallback().  The stats
+  // plugin may not use the callback after this method returns.
+  virtual void RemoveCallback(RegisteredMetricCallback* callback) = 0;
+  // Returns true if instrument \a handle is enabled.
+  virtual bool IsInstrumentEnabled(
+      GlobalInstrumentsRegistry::GlobalInstrumentHandle handle) const = 0;
+
+  // Gets a ClientCallTracer associated with this stats plugin which can be used
+  // in a call.
+  virtual ClientCallTracer* GetClientCallTracer(
+      const Slice& path, bool registered_method,
+      std::shared_ptr<ScopeConfig> scope_config) = 0;
+  // Gets a ServerCallTracer associated with this stats plugin which can be used
+  // in a call.
+  virtual ServerCallTracer* GetServerCallTracer(
+      std::shared_ptr<ScopeConfig> scope_config) = 0;
+};
+
+// A global registry of stats plugins. It has shared ownership to the registered
+// stats plugins. This API is supposed to be used during runtime after the main
+// function begins. This API is thread-safe.
+class GlobalStatsPluginRegistry {
+ public:
+  // A stats plugin group object is how the code in gRPC normally interacts with
+  // stats plugins. They got a stats plugin group which contains all the stats
+  // plugins for a specific scope and all operations on the stats plugin group
+  // will be applied to all the stats plugins within the group.
+  class StatsPluginGroup {
+   public:
+    // Adds a stats plugin and a scope config (per-channel or per-server) to the
+    // group.
+    void AddStatsPlugin(std::shared_ptr<StatsPlugin> plugin,
+                        std::shared_ptr<StatsPlugin::ScopeConfig> config);
+    // Adds a counter in all stats plugins within the group. See the StatsPlugin
+    // interface for more documentation and valid types.
+    template <std::size_t M, std::size_t N>
+    void AddCounter(
+        GlobalInstrumentsRegistry::TypedGlobalInstrumentHandle<
+            GlobalInstrumentsRegistry::ValueType::kUInt64,
+            GlobalInstrumentsRegistry::InstrumentType::kCounter, M, N>
+            handle,
+        uint64_t value, std::array<absl::string_view, M> label_values,
+        std::array<absl::string_view, N> optional_values);
+    template <std::size_t M, std::size_t N>
+    void AddCounter(
+        GlobalInstrumentsRegistry::TypedGlobalInstrumentHandle<
+            GlobalInstrumentsRegistry::ValueType::kDouble,
+            GlobalInstrumentsRegistry::InstrumentType::kCounter, M, N>
+            handle,
+        double value, std::array<absl::string_view, M> label_values,
+        std::array<absl::string_view, N> optional_values);
+    // Records a value to a histogram in all stats plugins within the group. See
+    // the StatsPlugin interface for more documentation and valid types.
+    template <std::size_t M, std::size_t N>
+    void RecordHistogram(
+        GlobalInstrumentsRegistry::TypedGlobalInstrumentHandle<
+            GlobalInstrumentsRegistry::ValueType::kUInt64,
+            GlobalInstrumentsRegistry::InstrumentType::kHistogram, M, N>
+            handle,
+        uint64_t value, std::array<absl::string_view, M> label_values,
+        std::array<absl::string_view, N> optional_values);
+    template <std::size_t M, std::size_t N>
+    void RecordHistogram(
+        GlobalInstrumentsRegistry::TypedGlobalInstrumentHandle<
+            GlobalInstrumentsRegistry::ValueType::kDouble,
+            GlobalInstrumentsRegistry::InstrumentType::kHistogram, M, N>
+            handle,
+        double value, std::array<absl::string_view, M> label_values,
+        std::array<absl::string_view, N> optional_values);
+    // Returns true if any of the stats plugins in the group have enabled \a
+    // handle.
+    bool IsInstrumentEnabled(
+        GlobalInstrumentsRegistry::GlobalInstrumentHandle handle) const;
+
+    // Registers a callback to be used to populate callback metrics.
+    // The callback will update the specified metrics.  The callback
+    // will be invoked no more often than min_interval.  Multiple callbacks may
+    // be registered for the same metrics, as long as no two callbacks report
+    // data for the same set of labels in which case the behavior is undefined.
+    //
+    // The returned object is a handle that allows the caller to control
+    // the lifetime of the callback; when the returned object is
+    // destroyed, the callback is de-registered.  The returned object
+    // must not outlive the StatsPluginGroup object that created it.
+    template <typename... Args>
+    GRPC_MUST_USE_RESULT std::unique_ptr<RegisteredMetricCallback>
+    RegisterCallback(absl::AnyInvocable<void(CallbackMetricReporter&)> callback,
+                     Duration min_interval, Args... args);
+
+    // Adds all available client call tracers associated with the stats plugins
+    // within the group to \a call_context.
+    void AddClientCallTracers(const Slice& path, bool registered_method,
+                              Arena* arena);
+    // Adds all available server call tracers associated with the stats plugins
+    // within the group to \a call_context.
+    void AddServerCallTracers(Arena* arena);
+  };
+
+  // Registers a stats plugin with the global stats plugin registry.
   static void RegisterStatsPlugin(std::shared_ptr<StatsPlugin> plugin);
 
-  // Invoked to get a stats plugin list for a specified scope.
-  static StatsPluginGroup GetStatsPluginsForChannel(ChannelScope scope);
-
- private:
-  static NoDestruct<std::vector<std::shared_ptr<StatsPlugin>>> plugins_;
+  // The following functions can be invoked to get a StatsPluginGroup for
+  // a specified scope.
+  static StatsPluginGroup GetStatsPluginsForChannel(
+      const experimental::StatsPluginChannelScope& scope);
+  static StatsPluginGroup GetStatsPluginsForServer(const ChannelArgs& args);
 };
 ```
 
