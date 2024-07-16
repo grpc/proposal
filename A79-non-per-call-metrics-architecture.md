@@ -344,7 +344,10 @@ Implementations can also choose to implement both approaches.
 ##### Core
 
 ```c++
-// The StatsPlugin interface.
+// Each stats plugin instance will be registered with the
+// GlobalStatsPluginRegistry. On creation, it should fetch the list of
+// instrument descriptors from the GlobalInstrumentsRegistry and create an
+// instrument for each relevant descriptor.
 class StatsPlugin {
  public:
   // A general-purpose way for stats plugin to store per-channel or per-server
