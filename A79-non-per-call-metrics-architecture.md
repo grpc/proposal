@@ -301,6 +301,22 @@ Implementations can also choose to implement both approaches.
 ##### Core
 
 ```c++
+// An interface for implementing callback-style metrics.
+// To be implemented by stats plugins.
+class CallbackMetricReporter {
+ public:
+  virtual ~CallbackMetricReporter() = default;
+
+  virtual void Report(
+      GlobalInstrumentsRegistry::GlobalCallbackInt64GaugeHandle handle,
+      int64_t value, absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_values) = 0;
+  virtual void Report(
+      GlobalInstrumentsRegistry::GlobalCallbackDoubleGaugeHandle handle,
+      double value, absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_values) = 0;
+};
+
 // Each stats plugin instance will be registered with the
 // GlobalStatsPluginRegistry. On creation, it should fetch the list of
 // instrument descriptors from the GlobalInstrumentsRegistry and create an
@@ -386,37 +402,6 @@ class GlobalStatsPluginRegistry {
 
  private:
   static NoDestruct<std::vector<std::shared_ptr<StatsPlugin>>> plugins_;
-};
-
-// A metric callback that is registered with a stats plugin group.
-class RegisteredMetricCallback {
- public:
-  RegisteredMetricCallback(
-      GlobalStatsPluginRegistry::StatsPluginGroup& stats_plugin_group,
-      absl::AnyInvocable<void(CallbackMetricReporter&)> callback,
-      std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle> metrics,
-      Duration min_interval);
-
-  ~RegisteredMetricCallback();
-
-  // Invokes the callback.  The callback will report metric data via reporter.
-  void Run(CallbackMetricReporter& reporter) { callback_(reporter); }
-
-  // Returns the set of metrics that this callback will modify.
-  const std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle>& metrics()
-      const {
-    return metrics_;
-  }
-
-  // Returns the minimum interval at which a stats plugin may invoke the
-  // callback.
-  Duration min_interval() const { return min_interval_; }
-
- private:
-  GlobalStatsPluginRegistry::StatsPluginGroup& stats_plugin_group_;
-  absl::AnyInvocable<void(CallbackMetricReporter&)> callback_;
-  std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle> metrics_;
-  Duration min_interval_;
 };
 ```
 
