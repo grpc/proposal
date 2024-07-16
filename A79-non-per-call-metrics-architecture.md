@@ -129,6 +129,7 @@ class GlobalInstrumentsRegistry {
  public:
   enum class ValueType {
     kUndefined,
+    kInt64,
     kUInt64,
     kDouble,
   };
@@ -136,6 +137,7 @@ class GlobalInstrumentsRegistry {
     kUndefined,
     kCounter,
     kHistogram,
+    kCallbackGauge,
   };
   struct GlobalInstrumentDescriptor {
     ValueType value_type;
@@ -153,6 +155,7 @@ class GlobalInstrumentsRegistry {
   };
   struct GlobalUInt64CounterHandle : public GlobalInstrumentHandle {};
   struct GlobalDoubleHistogramHandle : public GlobalInstrumentHandle {};
+  struct GlobalCallbackInt64GaugeHandle : public GlobalInstrumentHandle {};
 
   // Creates instrument in the GlobalInstrumentsRegistry.
   static GlobalUInt64CounterHandle RegisterUInt64Counter(
@@ -161,6 +164,11 @@ class GlobalInstrumentsRegistry {
       absl::Span<const absl::string_view> optional_label_keys,
       bool enable_by_default);
   static GlobalDoubleHistogramHandle RegisterDoubleHistogram(
+      absl::string_view name, absl::string_view description,
+      absl::string_view unit, absl::Span<const absl::string_view> label_keys,
+      absl::Span<const absl::string_view> optional_label_keys,
+      bool enable_by_default);
+  static GlobalCallbackInt64GaugeHandle RegisterCallbackInt64Gauge(
       absl::string_view name, absl::string_view description,
       absl::string_view unit, absl::Span<const absl::string_view> label_keys,
       absl::Span<const absl::string_view> optional_label_keys,
@@ -285,6 +293,18 @@ Implementations can also choose to implement both approaches.
 ##### Core
 
 ```c++
+// An interface for implementing callback-style metrics.
+// To be implemented by stats plugins.
+class CallbackMetricReporter {
+ public:
+  virtual ~CallbackMetricReporter() = default;
+
+  virtual void Report(
+      GlobalInstrumentsRegistry::GlobalCallbackInt64GaugeHandle handle,
+      int64_t value, absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_values) = 0;
+};
+
 // Each stats plugin instance will be registered with the
 // GlobalStatsPluginRegistry. On creation, it should fetch the list of
 // instrument descriptors from the GlobalInstrumentsRegistry and create an
@@ -315,6 +335,8 @@ public:
      GlobalInstrumentsRegistry::GlobalDoubleHistogramHandle handle,
      double value, absl::Span<const absl::string_view> label_values,
      absl::Span<const absl::string_view> optional_values) = 0;
+  virtual void AddCallback(RegisteredMetricCallback* callback) = 0;
+  virtual void RemoveCallback(RegisteredMetricCallback* callback) = 0;
 };
 
 class GlobalStatsPluginRegistry {
@@ -338,7 +360,11 @@ class GlobalStatsPluginRegistry {
         plugin->RecordHistogram(handle, value, label_values, optional_values);
       }
     }
-
+    GRPC_MUST_USE_RESULT std::unique_ptr<RegisteredMetricCallback>
+    RegisterCallback(
+        absl::AnyInvocable<void(CallbackMetricReporter&)> callback,
+        std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle> metrics,
+        Duration min_interval = Duration::Seconds(5));
     // Use the stats plugin to get a representation of label values that can be
     // saved for multiple uses later.
     RefCountedPtr<LabelValueSet> MakeLabelValueSet(
@@ -352,6 +378,29 @@ class GlobalStatsPluginRegistry {
 
  private:
   static NoDestruct<std::vector<std::shared_ptr<StatsPlugin>>> plugins_;
+};
+
+// A metric callback that is registered with a stats plugin group.
+class RegisteredMetricCallback {
+ public:
+  RegisteredMetricCallback(
+      GlobalStatsPluginRegistry::StatsPluginGroup& stats_plugin_group,
+      absl::AnyInvocable<void(CallbackMetricReporter&)> callback,
+      std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle> metrics,
+      Duration min_interval);
+
+  ~RegisteredMetricCallback();
+
+  // Invokes the callback.  The callback will report metric data via reporter.
+  void Run(CallbackMetricReporter& reporter);
+
+  // Returns the set of metrics that this callback will modify.
+  const std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle>& metrics()
+      const;
+
+  // Returns the minimum interval at which a stats plugin may invoke the
+  // callback.
+  Duration min_interval() const;
 };
 ```
 
