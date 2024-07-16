@@ -301,22 +301,6 @@ Implementations can also choose to implement both approaches.
 ##### Core
 
 ```c++
-// An interface for implementing callback-style metrics.
-// To be implemented by stats plugins.
-class CallbackMetricReporter {
- public:
-  virtual ~CallbackMetricReporter() = default;
-
-  virtual void Report(
-      GlobalInstrumentsRegistry::GlobalCallbackInt64GaugeHandle handle,
-      int64_t value, absl::Span<const absl::string_view> label_values,
-      absl::Span<const absl::string_view> optional_values) = 0;
-  virtual void Report(
-      GlobalInstrumentsRegistry::GlobalCallbackDoubleGaugeHandle handle,
-      double value, absl::Span<const absl::string_view> label_values,
-      absl::Span<const absl::string_view> optional_values) = 0;
-};
-
 // Each stats plugin instance will be registered with the
 // GlobalStatsPluginRegistry. On creation, it should fetch the list of
 // instrument descriptors from the GlobalInstrumentsRegistry and create an
