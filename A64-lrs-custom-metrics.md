@@ -3,7 +3,7 @@ A64: xDS LRS Custom Metrics Support
 * Author: yousukseung
 * Approver(s): markdroth
 * Status: Implemented
-* Implemented in: C-core
+* Implemented in: C-core, Java, Go
 * Last updated: 2023-05-10
 * Discussion at: https://groups.google.com/g/grpc-io/c/Cs7ffkO1wUA
 
@@ -85,9 +85,13 @@ The `xds_cluster_impl` LB policy, which is already tracking call status for the 
 
 ## Implementation
 
-This is implemented in C-core with [#32690][PR_32690], and will be implemented in Java and Go.
+This is implemented in C-core with [#32690][PR_32690].
+This is implemented in Java with [#10282][PR_10282].
+This is implemented in Go with [#7027][PR_7027].
 
 [A27]: https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md
 [A51]: https://github.com/grpc/proposal/blob/master/A51-custom-backend-metrics.md
 [ORCA]: https://github.com/envoyproxy/envoy/issues/6614
 [PR_32690]: https://github.com/grpc/grpc/pull/32690
+[PR_10282]: https://github.com/grpc/grpc-java/pull/10282
+[PR_7027]: https://github.com/grpc/grpc-go/pull/7027
