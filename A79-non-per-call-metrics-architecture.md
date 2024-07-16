@@ -156,6 +156,9 @@ class GlobalInstrumentsRegistry {
   struct GlobalUInt64CounterHandle : public GlobalInstrumentHandle {};
   struct GlobalDoubleHistogramHandle : public GlobalInstrumentHandle {};
   struct GlobalCallbackInt64GaugeHandle : public GlobalInstrumentHandle {};
+  struct GlobalCallbackDoubleGaugeHandle : public GlobalInstrumentHandle {};
+  using GlobalCallbackHandle = absl::variant<GlobalCallbackInt64GaugeHandle,
+                                             GlobalCallbackDoubleGaugeHandle>;
 
   // Creates instrument in the GlobalInstrumentsRegistry.
   static GlobalUInt64CounterHandle RegisterUInt64Counter(
@@ -169,6 +172,11 @@ class GlobalInstrumentsRegistry {
       absl::Span<const absl::string_view> optional_label_keys,
       bool enable_by_default);
   static GlobalCallbackInt64GaugeHandle RegisterCallbackInt64Gauge(
+      absl::string_view name, absl::string_view description,
+      absl::string_view unit, absl::Span<const absl::string_view> label_keys,
+      absl::Span<const absl::string_view> optional_label_keys,
+      bool enable_by_default);
+  static GlobalCallbackDoubleGaugeHandle RegisterCallbackDoubleGauge(
       absl::string_view name, absl::string_view description,
       absl::string_view unit, absl::Span<const absl::string_view> label_keys,
       absl::Span<const absl::string_view> optional_label_keys,
@@ -303,6 +311,10 @@ class CallbackMetricReporter {
       GlobalInstrumentsRegistry::GlobalCallbackInt64GaugeHandle handle,
       int64_t value, absl::Span<const absl::string_view> label_values,
       absl::Span<const absl::string_view> optional_values) = 0;
+  virtual void Report(
+      GlobalInstrumentsRegistry::GlobalCallbackDoubleGaugeHandle handle,
+      double value, absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_values) = 0;
 };
 
 // Each stats plugin instance will be registered with the
@@ -360,11 +372,23 @@ class GlobalStatsPluginRegistry {
         plugin->RecordHistogram(handle, value, label_values, optional_values);
       }
     }
+
+    // Registers a callback to be used to populate callback metrics.
+    // The callback will update the specified metrics.  The callback
+    // will be invoked no more often than min_interval.  Multiple callbacks may
+    // be registered for the same metrics, as long as no two callbacks report
+    // data for the same set of labels in which case the behavior is undefined.
+    //
+    // The returned object is a handle that allows the caller to control
+    // the lifetime of the callback; when the returned object is
+    // destroyed, the callback is de-registered.  The returned object
+    // must not outlive the StatsPluginGroup object that created it.
     GRPC_MUST_USE_RESULT std::unique_ptr<RegisteredMetricCallback>
     RegisterCallback(
         absl::AnyInvocable<void(CallbackMetricReporter&)> callback,
         std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle> metrics,
         Duration min_interval = Duration::Seconds(5));
+
     // Use the stats plugin to get a representation of label values that can be
     // saved for multiple uses later.
     RefCountedPtr<LabelValueSet> MakeLabelValueSet(
@@ -392,15 +416,23 @@ class RegisteredMetricCallback {
   ~RegisteredMetricCallback();
 
   // Invokes the callback.  The callback will report metric data via reporter.
-  void Run(CallbackMetricReporter& reporter);
+  void Run(CallbackMetricReporter& reporter) { callback_(reporter); }
 
   // Returns the set of metrics that this callback will modify.
   const std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle>& metrics()
-      const;
+      const {
+    return metrics_;
+  }
 
   // Returns the minimum interval at which a stats plugin may invoke the
   // callback.
-  Duration min_interval() const;
+  Duration min_interval() const { return min_interval_; }
+
+ private:
+  GlobalStatsPluginRegistry::StatsPluginGroup& stats_plugin_group_;
+  absl::AnyInvocable<void(CallbackMetricReporter&)> callback_;
+  std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle> metrics_;
+  Duration min_interval_;
 };
 ```
 
