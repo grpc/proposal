@@ -51,7 +51,7 @@ message RandomSubsettingLbConfig {
 * The policy receives a single configuration parameter: `subset_size`, which must be configured by the user.
 * When the lb policy is initialized it also creates a random integer `seed`. 
 * After every resolver update the policy picks a new subset. It does this by implementing `rendezvous hashing` algorithm:
-  * For every endpoint in the list compute a hash with previosly generated seed. Any uniform hash function should work, but we suggest using `XXH64` function as deined in https://github.com/Cyan4973/xxHash since it is already used in [gRFC A42](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md). 
+  * For every endpoint in the list, compute a hash with previously generated seed. Any uniform hash function should work, but we suggest using `XXH64` function as deined in https://github.com/Cyan4973/xxHash since it is already used in [gRFC A42](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md). 
   * If an endpoint defines multiple addresses - use the first one as input to the hash function.
   * Sort all endpoints by hash.
   * Pick first `subset_size` values from the list.
