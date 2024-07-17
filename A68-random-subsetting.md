@@ -13,10 +13,11 @@ Add support for the `random_subsetting` load balancing policy.
 
 ## Background
 
-Currently, gRPC is lacking a way to select a subset of endpoints available from the resolver and load-balance requests between them. Out of the box, users have the choice between two extremes: `pick_first` which sends all requests to one random backend, and `round_robin` which sends requests to all available backends. `pick_first` has poor connection balancing when the number of client is not much higher than the number of servers. The problem is exacerbated during rollouts because `pick_first` does not change endpoint on resolver updates if the current subchannel remains `READY`. `round_robin` results in every server having as many connections open as there are clients, which is unnecessarily costly when there are many clients, and makes local load balancing decisions (such as outlier detection) less precise.
+Currently, gRPC is lacking a way to select a subset of endpoints available from the resolver and load-balance requests between them. Out of the box, users have the choice between two extremes: `pick_first` which sends all requests to one random backend, and `round_robin` which sends requests to all available backends. `pick_first` has poor connection balancing when the number of client is not much higher than the number of servers. `round_robin` results in every server having as many connections open as there are clients, which is unnecessarily costly when there are many clients, and makes local load balancing decisions (such as outlier detection) less precise.
 
 ### Related Proposals: 
 * [gRFC A52: gRPC xDS Custom Load Balancer Configuration](https://github.com/grpc/proposal/blob/master/A52-xds-custom-lb-policies.md)
+* [gRFC A42: xDS Ring Hash LB Policy](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md)
 
 ## Proposal
 
@@ -41,7 +42,7 @@ message RandomSubsettingLbConfig {
 
     // The config for the child policy.
     // The value is required.
-    LoadBalancingConfig child_policy = 2;
+    repeated LoadBalancingConfig child_policy = 2;
 }
 ```
 
@@ -50,7 +51,7 @@ message RandomSubsettingLbConfig {
 * The policy receives a single configuration parameter: `subset_size`, which must be configured by the user.
 * When the lb policy is initialized it also creates a random integer `seed`. 
 * After every resolver update the policy picks a new subset. It does this by implementing `rendezvous hashing` algorithm:
-  * For every endpoint in the list compute 64-bit hash using `XXH64` function as deined in https://github.com/Cyan4973/xxHash with previosly generated seed.
+  * For every endpoint in the list compute a hash with previosly generated seed. Any uniform hash function should work, but we suggest using `XXH64` function as deined in https://github.com/Cyan4973/xxHash since it is already used in [gRFC A42](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md). 
   * If an endpoint defines multiple addresses - use the first one as input to the hash function.
   * Sort all endpoints by hash.
   * Pick first `subset_size` values from the list.
