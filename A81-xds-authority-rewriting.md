@@ -4,7 +4,7 @@ A81: xDS Authority Rewriting
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-07-03
+* Last updated: 2024-07-18
 * Discussion at: https://groups.google.com/g/grpc-io/c/ZFoyzcbknaM
 
 ## Abstract
@@ -36,6 +36,7 @@ these security-sensitive use-cases.
 * [gRFC A29: xDS mTLS Security][A29]
 * [gRFC A30: xDS v3 Support][A30]
 * [gRFC A31: xDS Timeout Support and Config Selector][A31]
+* [gRFC A37: xDS Aggregate and Logical DNS Clusters][A37]
 * [gRFC A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
 * [gRFC A14: Channelz][A14]
 
@@ -44,6 +45,7 @@ these security-sensitive use-cases.
 [A29]: A29-xds-tls-security.md
 [A30]: A30-xds-v3.md
 [A31]: A31-xds-timeout-support-and-config-selector.md
+[A37]: A37-xds-aggregate-and-logical-dns-clusters.md
 [A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
 [A14]: A14-channelz.md
 
@@ -89,9 +91,9 @@ be a general-purpose one, not something specific to EDS; for example, in
 the future, we may want to use this same attribute to expose per-endpoint
 hostnames in channelz (see [gRFC A14][A14]).
 
-For Logical DNS clusters, the same `hostname` resolver attribute will
-be added to all endpoints.  It will be set to the name that is resolved
-for the Logical DNS cluster.
+For Logical DNS clusters (see [gRFC A37][A37]), the same `hostname`
+resolver attribute will be added to all endpoints.  It will be set to
+the name that is resolved for the Logical DNS cluster.
 
 ### xDS ConfigSelector Changes
 
