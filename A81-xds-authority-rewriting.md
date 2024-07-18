@@ -115,28 +115,25 @@ is non-empty, the picker will set the `:authority` header to the value of
 the `hostname` attribute.
 
 To support this, we will add an API to allow the LB picker to explicitly
-set the `:authority` header for the RPC.  Note that the resulting
-`:authority` header will still be subject to any configured secure
-naming check -- e.g., if TLS channel credentials are used, then by
-default there is a per-RPC check that verifies that the RPC's
-`:authority` header matches the name in the server's SSL cert.
+set the `:authority` header for the RPC.  Note that this authority
+rewriting will modify the default authority for the subchannel, which
+would otherwise be set from the resolver factory, a channel option,
+or a per-address attribute returned by the resolver (i.e., the xDS
+authority rewriting will take precedence over any of those settings).
+However, if the implementation allows the application to explicitly
+set the authority on a per-RPC basis (currently only C-core does this),
+then that value would take precedence over the xDS authority rewriting.
 
-Note that this authority rewriting will modify the default authority for
-the subchannel, which would otherwise be set from the resolver factory,
-a channel option, or a per-address attribute returned by the resolver
-(i.e., the xDS authority rewriting will take precedence over any of those
-settings).  However, if the implementation allows the application to
-explicitly set the authority on a per-RPC basis (currently only C-core
-does this), then that value would take precedence over the xDS
-authority rewriting.
-
-Also note that this authority rewriting is considered safe only if
-the channel credentials have the opportunity to verify the resulting
-`:authority` field against the server's identity.  However, in some cases,
-this may be a no-op (either because the channel creds impl doesn't support
-this check or because they have been configured to disable the check).
-(Java and Go currently have no such check, so they will need to add this
-functionality.)
+Note that the resulting `:authority` header must be subject to a secure
+naming check controlled by the ChannelCredentials, with appropriate
+defaults.  In particular, TlsCredentials must by default perform a
+per-RPC check that verifies that the RPC's `:authority` header matches
+the name in the server's SSL cert.  (C-core already has this check,
+but Java and Go will need to add it.)  Note that it is acceptable to
+allow the application to explicitly inhibit this check, either by using
+a ChannelCredentials implementation that doesn't support the check (e.g.,
+InsecureCredentials or XdsCredentials) or by using an option to disable it
+(e.g., TlsCredentials may expose an option to inhibit the check).
 
 ### Temporary environment variable protection
 
