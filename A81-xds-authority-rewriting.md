@@ -80,7 +80,7 @@ field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c97
 field.  The boolean value of this field will be included in the parsed
 resource struct that is passed to the XdsClient watcher.
 
-When validting an EDS resource, we will look at the [`Endpoint.hostname`
+When validating an EDS resource, we will look at the [`Endpoint.hostname`
 field](https://github.com/envoyproxy/envoy/blob/b65de1f56850326e1c6b74aa72cb1c9777441065/api/envoy/config/endpoint/v3/endpoint_components.proto#L89).
 The string value of this field will be included in a per-endpoint resolver
 `hostname` attribute in the parsed resource struct that is passed to the
