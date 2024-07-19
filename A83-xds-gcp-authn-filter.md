@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-06-17
+* Last updated: 2024-07-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -42,22 +42,15 @@ We will support the GCP Authentication xDS HTTP filter in the gRPC client.
 
 gRPC should support a GcpServiceAccountIdentityCallCredentials call
 credentials type, which is not xDS-specific.  This credential type
-will be instantiated with the following parameters:
+will be instantiated with one parameter, which is the audience to be
+encoded into the JWT token.
 
-- Audience string.  Required.
-- URI template string to fetch the token from, where the substring
-  "[AUDIENCE]" will be replaced with the audience.  Optional; defaults to
-  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]".
-- Request timeout for token fetch requests.  Optional; defaults to 10 seconds.
-- Token header name.  Optional; defaults to "authorization".
-- Token header value prefix.  Optional; defaults to "Bearer " (note
-  trailing space).
-
-When the credential is asked for a token for an RPC, if the token is
-not cached, the credential will send an HTTP request to the specified
-URI to fetch the token.  The HTTP request will include the header
-`Metadata-Flavor: Google`.  The HTTP request will have a deadline set
-from the timeout parameter that the credential was instantiated with.
+When the credential is asked for a token for an RPC, if
+the token is not cached, the credential will send an HTTP request to
+`http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]`,
+where `[AUDIENCE]` is replaced with the audience specified when the
+credential object was instantiated.  The HTTP request will include the
+header `Metadata-Flavor: Google`.
 
 If the HTTP request succeeds, the body of the response will contain the
 JWT token, which the client will both cache and add to the data plane
@@ -67,41 +60,27 @@ does need to extract the `nbf` and `exp` fields for caching purposes.
 
 If the HTTP request fails or times out, or if the JWT token is invalid
 (i.e., the client fails to extract the `nbf` or `exp` fields), the data
-plane RPC will be sent without the JWT token and will then fail on the
-destination server if authentication was required.
+plane RPC will be failed with status `UNAUTHENTICATED`.
 
 If the JWT token is either already cached or is obtained from an HTTP
-request, it will be added to the RPC headers.  The token header name and
-value prefix will be as specified when the credential was instantiated.
+request, it will be added to the RPC headers.  The header name will be
+`authorization`, and the value will be the string `Bearer ` (note
+trailing space) followed by the token value.
 
 ### xDS HTTP Filter Configuration
 
 The xDS HTTP filter will be configured via the
 [`extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig`
-message](https://github.com/envoyproxy/envoy/blob/7436690884f70b5550b6953988d05818bae3d087/api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L24).
+message](https://github.com/envoyproxy/envoy/blob/c16faca3619fb44c24b12d15aad8a797b9e210ab/api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L27).
 The fields will be interpretted as follows:
-- `http_uri`: Required.  If not present, the config will be NACKed.
-  Within this message:
-  - `uri`: Required.  If not present, the config will be NACKed.
-  - `timeout`: Required.  If not present, the config will be NACKed.
-    This field will be validated the same way as any
-    `google.protobuf.Duration` message in xDS; specifically:
-    - `seconds`: Must be from 0 to 315,576,000,000 inclusive.  If the
-      value is outside that range, the config will be NACKed.
-    - `nanos`: Must be from 0 to 999,999,999 inclusive.  If the value
-      is outside that range, the config will be NACKed.
-  - `cluster`: This field will be ignored by gRPC.  (This field is
-    required by Envoy, but gRPC will not use it.)
 - `cache_config`: Optional.  Within this message:
-  - `cache_size`: Must be between 0 and `INT64_MAX`.  0 disables the cache.
-- `token_header`: Optional.  Within this message:
-  - `name`: Required; if not present, the config will be NACKed.  The name
-    of the header to set.
-  - `value_prefix`: Optional.  The prefix to add before the JWT token in
-    the header value.
-- `retry_policy`: For now, we will not support this field, and there will
-  be no retries for HTTP requests.  If the lack of retries becomes a
-  problem, we can consider adding this later.
+  - `cache_size`: Optional.  If set, must be between 0 and `INT64_MAX`.
+    0 disables the cache.
+- `http_uri`: Ignored by gRPC.
+- `token_header`: Ignored by gRPC.
+- `retry_policy`: Ignored by gRPC.
+- `cluster`: Ignored by gRPC.
+- `timeout`: Ignored by gRPC.
 
 ### xDS Cluster Metadata
 
@@ -157,7 +136,7 @@ for key in all_keys:
 ```
 
 For now, the only registered metadata type we support is
-[`extensions.filters.http.gcp_authn.v3.Audience`](https://github.com/envoyproxy/envoy/blob/c10da96eae1be169a14772480a61a6316df12edd/api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L42).
+[`extensions.filters.http.gcp_authn.v3.Audience`](https://github.com/envoyproxy/envoy/blob/c16faca3619fb44c24b12d15aad8a797b9e210ab/api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L66).
 In this message, the `url` field must be non-empty; if empty, the
 resource will be NACKed.  The parsed representation of this message can
 be a simple string.
@@ -198,15 +177,16 @@ The filter will then check to see if it already has a cached
 GcpServiceAccountIdentityCallCredentials instance for the specified
 audience.  If it does not, it will create a new instance, adding it to
 its cache, removing the least recently used entry from the cache if the
-cache is already at its max size.  It will then add that credential to
-the RPC.
+cache is already at its max size.  It will then attach that
+GcpServiceAccountIdentityCallCredentials instance to the RPC.
 
-When instantiating a new GcpServiceAccountIdentityCallCredentials
-instance, the filter will carefully map its config parameters to the
-semantics of GcpServiceAccountIdentityCallCredentials.  Specifically,
-note the weird semantics for the `token_header` field, where if the
-field is present to overhead the header name, the default for the header
-prefix also goes away.
+Note that implementations must ensure that the token is not added to
+RPCs sent on insecure connections.  However, the GCP Authentication
+filter will run before load balancing has chosen a connection, so the
+filter cannot directly add the token to the RPC.  Instead, it must add
+the call credential to the RPC, and the call credential will do the work
+of adding the token to the RPC later, after load balancing has chosen a
+connection.
 
 ### Temporary environment variable protection
 
@@ -230,7 +210,7 @@ caching JWT tokens means that the cache semantics will be slightly
 different than Envoy: cache expiration will be based solely on
 last-recently-used time for each audience, not on the actual expiration
 time for the individual underlying JWT tokens.  This is not expected to
-make much difference in practice, but it allows far cleaner code reuse
+make much difference in practice, but it allows for cleaner code reuse
 in this design.
 
 ## Implementation
