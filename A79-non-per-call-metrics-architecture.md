@@ -1,6 +1,6 @@
 ## A79: Non-per-call Metrics Architecture
 
-*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya)
+*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya), Yijie Ma (@yijiem)
 *   Approver: Mark Roth (@markdroth)
 *   Status: Final
 *   Implemented in: Core, C++
@@ -129,6 +129,7 @@ class GlobalInstrumentsRegistry {
  public:
   enum class ValueType {
     kUndefined,
+    kInt64,
     kUInt64,
     kDouble,
   };
@@ -136,6 +137,7 @@ class GlobalInstrumentsRegistry {
     kUndefined,
     kCounter,
     kHistogram,
+    kCallbackGauge,
   };
   struct GlobalInstrumentDescriptor {
     ValueType value_type;
@@ -153,6 +155,10 @@ class GlobalInstrumentsRegistry {
   };
   struct GlobalUInt64CounterHandle : public GlobalInstrumentHandle {};
   struct GlobalDoubleHistogramHandle : public GlobalInstrumentHandle {};
+  struct GlobalCallbackInt64GaugeHandle : public GlobalInstrumentHandle {};
+  struct GlobalCallbackDoubleGaugeHandle : public GlobalInstrumentHandle {};
+  using GlobalCallbackHandle = absl::variant<GlobalCallbackInt64GaugeHandle,
+                                             GlobalCallbackDoubleGaugeHandle>;
 
   // Creates instrument in the GlobalInstrumentsRegistry.
   static GlobalUInt64CounterHandle RegisterUInt64Counter(
@@ -161,6 +167,16 @@ class GlobalInstrumentsRegistry {
       absl::Span<const absl::string_view> optional_label_keys,
       bool enable_by_default);
   static GlobalDoubleHistogramHandle RegisterDoubleHistogram(
+      absl::string_view name, absl::string_view description,
+      absl::string_view unit, absl::Span<const absl::string_view> label_keys,
+      absl::Span<const absl::string_view> optional_label_keys,
+      bool enable_by_default);
+  static GlobalCallbackInt64GaugeHandle RegisterCallbackInt64Gauge(
+      absl::string_view name, absl::string_view description,
+      absl::string_view unit, absl::Span<const absl::string_view> label_keys,
+      absl::Span<const absl::string_view> optional_label_keys,
+      bool enable_by_default);
+  static GlobalCallbackDoubleGaugeHandle RegisterCallbackDoubleGauge(
       absl::string_view name, absl::string_view description,
       absl::string_view unit, absl::Span<const absl::string_view> label_keys,
       absl::Span<const absl::string_view> optional_label_keys,
@@ -285,6 +301,22 @@ Implementations can also choose to implement both approaches.
 ##### Core
 
 ```c++
+// An interface for implementing callback-style metrics.
+// To be implemented by stats plugins.
+class CallbackMetricReporter {
+ public:
+  virtual ~CallbackMetricReporter() = default;
+
+  virtual void Report(
+      GlobalInstrumentsRegistry::GlobalCallbackInt64GaugeHandle handle,
+      int64_t value, absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_values) = 0;
+  virtual void Report(
+      GlobalInstrumentsRegistry::GlobalCallbackDoubleGaugeHandle handle,
+      double value, absl::Span<const absl::string_view> label_values,
+      absl::Span<const absl::string_view> optional_values) = 0;
+};
+
 // Each stats plugin instance will be registered with the
 // GlobalStatsPluginRegistry. On creation, it should fetch the list of
 // instrument descriptors from the GlobalInstrumentsRegistry and create an
@@ -315,6 +347,8 @@ public:
      GlobalInstrumentsRegistry::GlobalDoubleHistogramHandle handle,
      double value, absl::Span<const absl::string_view> label_values,
      absl::Span<const absl::string_view> optional_values) = 0;
+  virtual void AddCallback(RegisteredMetricCallback* callback) = 0;
+  virtual void RemoveCallback(RegisteredMetricCallback* callback) = 0;
 };
 
 class GlobalStatsPluginRegistry {
@@ -338,6 +372,22 @@ class GlobalStatsPluginRegistry {
         plugin->RecordHistogram(handle, value, label_values, optional_values);
       }
     }
+
+    // Registers a callback to be used to populate callback metrics.
+    // The callback will update the specified metrics.  The callback
+    // will be invoked no more often than min_interval.  Multiple callbacks may
+    // be registered for the same metrics, as long as no two callbacks report
+    // data for the same set of labels in which case the behavior is undefined.
+    //
+    // The returned object is a handle that allows the caller to control
+    // the lifetime of the callback; when the returned object is
+    // destroyed, the callback is de-registered.  The returned object
+    // must not outlive the StatsPluginGroup object that created it.
+    GRPC_MUST_USE_RESULT std::unique_ptr<RegisteredMetricCallback>
+    RegisterCallback(
+        absl::AnyInvocable<void(CallbackMetricReporter&)> callback,
+        std::vector<GlobalInstrumentsRegistry::GlobalCallbackHandle> metrics,
+        Duration min_interval = Duration::Seconds(5));
 
     // Use the stats plugin to get a representation of label values that can be
     // saved for multiple uses later.
