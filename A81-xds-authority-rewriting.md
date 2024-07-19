@@ -4,7 +4,7 @@ A81: xDS Authority Rewriting
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-07-18
+* Last updated: 2024-07-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/ZFoyzcbknaM
 
 ## Abstract
@@ -60,7 +60,7 @@ This proposal has several parts:
 - xDS ConfigSelector changes: We will change the xDS ConfigSelector to enable
   authority rewriting based on the chosen route.
 - xds_cluster_impl LB policy changes: We will change the xds_cluster_impl LB
-  policy to actually perform the authority rewriting was enabled by the
+  policy to actually perform the authority rewriting if it was enabled by the
   ConfigSelector.
 
 ### Server Feature in Bootstrap Config
@@ -70,8 +70,8 @@ acceptable from a security perspective, we will add a new server feature
 to the bootstrap config.  The server feature will be specfied via the
 `server_features` field described in [gRFC A30][A30].  The feature will
 be the string `trusted_xds_server`.  (Note that the name is intentionally
-fairly general, since it may be used to trigger other functionality in
-the future.)
+fairly general, since it may be used to trigger other security-sensitive
+functionality in the future.)
 
 ### xDS Resource Validation
 
@@ -116,7 +116,7 @@ the `hostname` attribute.
 
 To support this, we will add an API to allow the LB picker to explicitly
 set the `:authority` header for the RPC.  Note that this authority
-rewriting will modify the default authority for the subchannel, which
+rewriting will override the default authority for the subchannel, which
 would otherwise be set from the resolver factory, a channel option,
 or a per-address attribute returned by the resolver (i.e., the xDS
 authority rewriting will take precedence over any of those settings).
