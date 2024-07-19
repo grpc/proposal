@@ -5,7 +5,7 @@ A36: xDS-Enabled Servers
 * Approver: markdroth
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
-* Last updated: 2021-08-11
+* Last updated: 2024-07-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/CDjGypQi1J0
 
 ## Abstract
@@ -168,6 +168,9 @@ Resource validation rules guarantee that each entry in
 `envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager`
 filter, HttpConnectionManager hereafter, as the last entry in the list. Currently,
 that is the only supported filter, so that will be the only entry in the list.
+If the implementation supports HTTP filters, and that `HttpConnectionManager`
+message has the `rds` field set, the XdsServer will start an XdsClient watch on
+the value of that field for a `envoy.config.route.v3.RouteConfiguration` resource.
 
 [Like in Envoy][envoy lds], updates to a Listener cause all older connections on
 that Listener to be gracefully shut down (i.e., "drained") with a default grace
@@ -232,20 +235,20 @@ When an XdsServer receives an incoming connection, it should do the following:
     corresponding TLS configuration from the `FilterChain` to the connection.
 
 When the server receives a request on an active connection, it should do the
-following (implementations may reorder these operations):
+following if the implementation supports HTTP filters
+(implementations may reorder these operations):
 
- 1. If `RouteConfiguration` is supported and if `HttpConnectionManager.rds`
-    references a NACKed resource without a previous good version, an
-    unavailable resource because of communication failures with control plane
-    or a triggered loading timeout, or a non-existent resource, fail the RPC
-    with the UNAVAILABLE status.
- 2. If `RouteConfiguration` is supported, select the most specifically-matching
-    VirtualHost using the RPC's requested `:authority` match the request to a
-    Route using the same rules as on the client. If no route matches or if the
-    matched route does not have the `non_forwarding_action` set, fail the RPC
-    with the UNAVAILABLE status.
- 3. If any server-side HTTP filters are supported, apply the HTTP filters from
-    the `FilterChain` to the request.
+ 1. If `HttpConnectionManager.rds` references a NACKed resource without a
+    previous good version, an unavailable resource because of communication
+    failures with control plane or a triggered loading timeout, or a
+    non-existent resource, fail the RPC with the UNAVAILABLE status. The error
+    message should not include specific details about the failure.
+ 2. Select the most specifically-matching VirtualHost using the RPC's requested
+    `:authority` match the request to a Route using the same rules as on the
+    client. If no route matches or if the matched route does not have the
+    `non_forwarding_action` set, fail the RPC with the UNAVAILABLE status. The
+    error message should not include specific details about the failure.
+ 3. Apply the HTTP filters from the `FilterChain` to the request.
 
 ### FilterChainMatch
 
@@ -354,11 +357,12 @@ The `Listener` proto validation rules are modified as follows:
    - The `filters` field must have exactly one entry. Inside of it:
      - The `type_url` field must have the value
        `envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager`
-     - Inside the `value` field, decoded as a `HttpConnectionManager` message:
+     - The `value` field must contain a valid `HttpConnectionManager`. If the
+       implementation supports HTTP filters, the following must be validated
+       in that message:
        - The `http_filters` field must be validated as specified in
          [A39: xDS HTTP Filter Support][A39].
-       - If any `RouteConfiguration` features are supported:
-         - Either the `route_config` field or the `rds` field must be set
+       - Either the `route_config` field or the `rds` field must be set:
          - If the `route_config` field is set, its value must be validated
            according to the `RouteConfiguration` validation rules.
 
@@ -366,16 +370,17 @@ The `Listener` proto validation rules are modified as follows:
 > Once other `Fitler` types are supported, the validation logic will need to
 > be expanded to accept other `Filter` types. `Filter` types are the type contained in the
 > [`typed_config`][Filter.typed_config] Any. If the type is
-> `udpa.type.v1.TypedStruct`, then its [`type_url`][TypedStruct.type_url] is used
-> instead. The `HttpConnectionManager` filter must always be present in the
-> last entry in each `filters` list.
+> `udpa.type.v1.TypedStruct` or `xds.type.v3.TypedStruct`, then its
+> [`type_url`][TypedStruct.type_url] is used instead. The
+> `HttpConnectionManager` filter must always be present in the last entry in
+> each `filters` list.
 
 The `RouteConfiguration` proto validation rules (predomenently defined in [gRFC A28][A28-validation]) are modified as follows:
 
  - Every entry of `virtual_hosts` is validated, not just the most specifically matching one.
  - For each entry of `virtual_hosts`:
    - For each entry of `routes`:
-     - The `action` field can now have the value `non_forwarding_action` in addition to other accepted values.
+     - The `action` field can now have the value `non_forwarding_action` in addition to other accepted values (currently `route`).
 
 ### Language-specifics
 
