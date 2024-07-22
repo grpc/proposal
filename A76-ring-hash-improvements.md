@@ -99,13 +99,12 @@ then the request hash key will be set to this value. If the header contains
 multiple values, then values are joined with a comma `,` character before
 hashing.
 - If `request_hash_header` is not empty, and the request has no value associated
-with the header or its value is empty, then the picker will generate a random
-hash for the request. If the use of this random hash triggers a connection
-attempt (according to the rules described in [A42: Picker
-Behavior][A42-picker-behavior] and updated in [A61: Ring Hash][A61-ring-hash]),
-then before queuing the pick, the picker will scan forward searching for a
-subchannel in `READY` state. If it finds a subchannel in `READY` state, the
-picker returns it.
+with the header, then the picker will generate a random hash for the request. If
+the use of this random hash triggers a connection attempt (according to the
+rules described in [A42: Picker Behavior][A42-picker-behavior] and updated in
+[A61: Ring Hash][A61-ring-hash]), then before queuing the pick, the picker will
+scan forward searching for a subchannel in `READY` state. If it finds a
+subchannel in `READY` state, the picker returns it.
 
 The following pseudo code describes the updated picker logic:
 
@@ -168,16 +167,16 @@ if its `hash_key` endpoint attribute changes.
 The xDS resolver, described in [A74][A74], will be changed to set the `hash_key`
 endpoint attribute to the value of [LbEndpoint.Metadata][LbEndpoint.Metadata]
 `envoy.lb` `hash_key` field, as described in [Envoy's documentation for the ring
-hash load balancer][envoy-ring-hash].
+hash load balancer][envoy-ringhash].
 
 ### Temporary environment variable protection
 
-Explicitly setting the request hash key cannot possibly lead to problem with
-existing deployment because the new behavior requires setting a load balancing
-policy configuration field that did not exist before. Therefore, it is not gated
-behind an environment variable.
+Explicitly setting the request hash key will be gated by the
+`GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY` environment variable. This
+mechanism will be supported for a couple of gRPC releases but will be removed in
+the long run.
 
-Adding support for the hash_key in xDS endpoint metadata could potentially break
+Adding support for the `hash_key` in xDS endpoint metadata could potentially break
 existing clients whose control plane is setting this key, because upgrading the
 client to a new version of gRPC would automatically cause the key to start being
 used. We expect that this change will not cause problems for most users, but
@@ -221,9 +220,7 @@ considered the following alternative solutions:
 
 ## Implementation
 
-Implemented in Go:
-- Allow setting the request hash key: https://github.com/grpc/grpc-go/pull/7170
-- Make endpoint hash key configurable, and set it from EDS: https://github.com/grpc/grpc-go/pull/7161
+Will be implemented in Go first.
 
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
