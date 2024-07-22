@@ -59,7 +59,7 @@ one from the server.
 xDS API changes are needed because gRPC authorization is entirely based on [xDS RBAC policy][RBAC policy].
 As a feature on top of authorization, audit logging should not be independent
 from xDS and cause any divergence between gRPC authorization API and its xDS
-RBAC filter support. Moreoever, audit logging is a common feature that other
+RBAC filter support. Moreover, audit logging is a common feature that other
 xDS clients (namely Envoy) should benefit from as well.
 
 We will add an audit condition enum (see [PR#1](https://github.com/envoyproxy/envoy/pull/26001) and [PR#2](https://github.com/envoyproxy/envoy/pull/26415))
@@ -335,10 +335,10 @@ function itself returns promptly. For this reason, no error or status code will
 be returned from it.
 
 The logger factory (aka builder/provider) needs to implement a config parsing
-function for parsing and validation logger configs, and a build function to
+function for parsing and validating logger configs, and a build function to
 create loggers based on the parsed logger config. The former is needed to
 validate runtime configurations and reject them if needed before anything is
-acuated. The latter will be guaranteed to receive a validated config and must
+actuated. The latter will be guaranteed to receive a validated config and must
 always succeed in creating a logger instance.
 
 #### C++ APIs
@@ -379,7 +379,7 @@ class AuditLogger {
 
 // The base class for audit logger factory implementations.
 // Users should inherit this class and implement those declared virtual
-// funcitons.
+// functions.
 class AuditLoggerFactory {
  public:
   // The base class for the audit logger config that the factory parses.
@@ -549,7 +549,7 @@ For auditing purposes, users should not log every incoming RPCs. In other words,
 support special cases where logging everything is required.
 
 Regarding alternative design options, following are what we have considered in
-a number of othorgonal aspects.
+a number of orthogonal aspects.
 
 ### Utilizing the Access Log
 
@@ -557,7 +557,7 @@ The [information](https://github.com/envoyproxy/envoy/blob/main/api/envoy/data/a
 present in the existing access log is sufficient for audit purposes. However,
 access log does not happen till the response is sent and therefore does not
 fit the audit logging use case well. For example, for long-living RPCs, users
-would want to audit the event right after the authorization is enfoced but
+would want to audit the event right after the authorization is enforced but
 access log won't necessarily happen till hours later.
 
 Note that there has been ongoing effort in Envoy to support flushing access
@@ -600,7 +600,7 @@ Instead of having the audit log configuration delivered from the control plane,
 we could follow the xDS TLS certificate provider in [A29: xDS-Based Security for gRPC Clients and Servers](A29-xds-tls-security.md)
 where the configuration is placed in the gRPC bootstrap file.
 
-The advantage of that apporoach is the control plane would not need to know
+The advantage of that approach is the control plane would not need to know
 the platform-specific configuration options in the data plane, if any.
 But we concluded that in audit logging, the logger configuration should
 generally be uniform across the data plane and thus centralizing the configuration
