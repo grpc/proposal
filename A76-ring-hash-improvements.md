@@ -104,6 +104,11 @@ will walk the ring from this hash, and pick the first `READY` endpoint. If no
 endpoint is currently in `CONNECTING` state, it will trigger a connection
 attempt on at most one endpoint that is in `IDLE` state along the way.
 
+When a new picker is created, we will compute whether at least one of the
+endpoints is connecting, and store that information in the picker
+(`picker_has_a_child_connecting` in the pseudo code below). This avoids having
+to compute this information on every pick when using a random hash.
+
 The following pseudo code describes the updated picker logic:
 
 ```
