@@ -545,6 +545,7 @@ for (i = 0; i < ring.size(); ++i) {
     return PICK_QUEUE;
   }
 }
+return PICK_FAIL;
 ```
 
 As per [gRFC A42][A42], the ring_hash policy normally requires pick
@@ -562,7 +563,7 @@ restored.  However, with the sticky-TF behavior, it will not be possible
 to attempt to connect to only one endpoint at a time, because when a
 given pick_first child reports TRANSIENT_FAILURE, it will automatically
 try reconnecting after the backoff period without waiting for a connection
-to be requested.  Proposed psuedo-code for this logic is:
+to be requested.  Proposed pseudo-code for this logic is:
 
 ```
 if (in_transient_failure && endpoint_entered_transient_failure) {

@@ -99,12 +99,10 @@ then the request hash key will be set to this value. If the header contains
 multiple values, then values are joined with a comma `,` character before
 hashing.
 - If `request_hash_header` is not empty, and the request has no value associated
-with the header, then the picker will generate a random hash for the request. If
-the use of this random hash triggers a connection attempt (according to the
-rules described in [A42: Picker Behavior][A42-picker-behavior] and updated in
-[A61: Ring Hash][A61-ring-hash]), then before queuing the pick, the picker will
-scan forward searching for a subchannel in `READY` state. If it finds a
-subchannel in `READY` state, the picker returns it.
+with the header, then the picker will generate a random hash for the request. It
+will walk the ring from this hash, and pick the first `READY` endpoint. If no
+endpoint is currently in `CONNECTING` state, it will trigger a connection
+attempt on at most one endpoint that is in `IDLE` state along the way.
 
 The following pseudo code describes the updated picker logic:
 
@@ -123,36 +121,32 @@ if (config.request_hash_header.empty()) {
   }
 }
 
-// Do pick based on hash.
 first_index = ring.FindIndexForHash(request_hash);
-requested_connection = false;
+if !using_random_hash {
+    // Use the logic from A62 unchanged.
+    // ...
+}
+
+requested_connection = picker_has_a_child_connecting;
 for (i = 0; i < ring.size(); ++i) {
   index = (first_index + i) % ring.size();
   if (ring[index].state == READY) {
     return ring[index].picker->Pick(...);
   }
-  if (requested_connection) continue;
-  if (ring[index].state == IDLE) {
+  if (!requested_connection && ring[index].state == IDLE) {
     ring[index].endpoint.TriggerConnectionAttemptInControlPlane();
-    if (using_random_hash) {
-      requested_connection = true;
-      continue;
-    }
-    return PICK_QUEUE;
-  }
-  if (ring[index].state == CONNECTING) {
-    return PICK_QUEUE;
+    requested_connection = true;
   }
 }
 if (requested_connection) return PICK_QUEUE;
 return PICK_FAIL;
 ```
 
-This behavior ensures that a single request creates at most one new connection,
-and that a request missing the header does not add extra latency in the common
-case where there is already at least one subchannel in `READY` state. It
-converges to picking a random host, since each request may create a new
-connection to a random endpoint.
+This behavior ensures that a single RPC does not cause more than one endpoint to
+exit `IDLE` state at a time, and that a request missing the header does not
+incur extra latency in the common case where there is already at least one
+endpoint in `READY` state. It converges to picking a random endpoint, since each
+request may eventually cause a random endpoint to go from `IDLE` to `READY`.
 
 ### Explicitly setting the endpoint hash key
 
