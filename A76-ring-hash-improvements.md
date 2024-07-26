@@ -93,16 +93,19 @@ rejected. If the `request_hash_header` refers to a binary header (suffixed with
 At pick time:
 - If `request_hash_header` is empty, then the request hash key will be based on
 the xDS hash policy in RDS, which keeps the existing LB configuration for ring
-hash working as before with xDS.
+hash working as before with xDS. If the request hash key has not been set by
+xDS, then we will generate a random hash for the request.
 - If `request_hash_header` is not empty, and the header has a non-empty value,
 then the request hash key will be set to this value. If the header contains
 multiple values, then values are joined with a comma `,` character before
 hashing.
 - If `request_hash_header` is not empty, and the request has no value associated
-with the header, then the picker will generate a random hash for the request. It
-will walk the ring from this hash, and pick the first `READY` endpoint. If no
-endpoint is currently in `CONNECTING` state, it will trigger a connection
-attempt on at most one endpoint that is in `IDLE` state along the way.
+with the header, then the picker will generate a random hash for the request.
+
+If the picker has generated a random hash, it will walk the ring from this hash,
+and pick the first `READY` endpoint. If no endpoint is currently in `CONNECTING`
+state, it will trigger a connection attempt on at most one endpoint that is in
+`IDLE` state along the way.
 
 When a new picker is created, we will compute whether at least one of the
 endpoints is connecting, and store that information in the picker
@@ -115,7 +118,13 @@ The following pseudo code describes the updated picker logic:
 // Determine request hash.
 using_random_hash = false;
 if (config.request_hash_header.empty()) {
-  request_hash = call_attributes.hash;
+  if (call_attributes.hash.has_value()) {
+    // Set by the xDS config selector.
+    request_hash = call_attributes.hash;
+  } else {
+    using_random_hash = true;
+    request_hash = ComputeRandomHash();
+  }
 } else {
   header = headers.find(config.request_hash_header);
   if (header == null) {
@@ -128,7 +137,7 @@ if (config.request_hash_header.empty()) {
 
 first_index = ring.FindIndexForHash(request_hash);
 if !using_random_hash {
-    // Use the logic from A62 unchanged.
+    // Return based on A62 unchanged.
     // ...
 }
 
@@ -144,7 +153,8 @@ for (i = 0; i < ring.size(); ++i) {
   }
 }
 if (requested_connection) return PICK_QUEUE;
-return PICK_FAIL;
+// All children are in transient failure. Return the first failure.
+return ring[first_index].picker->Pick(...);
 ```
 
 This behavior ensures that a single RPC does not cause more than one endpoint to
@@ -171,20 +181,21 @@ hash load balancer][envoy-ringhash].
 ### Temporary environment variable protection
 
 Explicitly setting the request hash key will be gated by the
-`GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY` environment variable. This
-mechanism will be supported for a couple of gRPC releases but will be removed in
-the long run.
+`GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY` environment variable until
+sufficiently tested.
 
-Adding support for the `hash_key` in xDS endpoint metadata could potentially break
-existing clients whose control plane is setting this key, because upgrading the
-client to a new version of gRPC would automatically cause the key to start being
-used. We expect that this change will not cause problems for most users, but
-just in case there is a problem, we will provide a migration story by supporting
-a temporary mechanism to tell gRPC to ignore the `hash_key` endpoint
+Adding support for the `hash_key` in xDS endpoint metadata could potentially
+break existing clients whose control plane is setting this key, because
+upgrading the client to a new version of gRPC would automatically cause the key
+to start being used. We expect that this change will not cause problems for most
+users, but just in case there is a problem, we will provide a migration story by
+supporting a temporary mechanism to tell gRPC to ignore the `hash_key` endpoint
 metadata. This will be enabled by setting the
-`GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT` environment variable to true. This
-mechanism will be supported for a couple of gRPC releases but will be removed in
-the long run.
+`GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT` environment variable to `true`. The
+first release will have the environment variable assume `true` if not set. A
+subsequent release will set it to `false` if not set, enabling the new
+behavior. A final release will remove the opt-out environment variable and leave
+the new behavior enabled.
 
 ## Rationale
 

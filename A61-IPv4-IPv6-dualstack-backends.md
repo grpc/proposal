@@ -545,7 +545,8 @@ for (i = 0; i < ring.size(); ++i) {
     return PICK_QUEUE;
   }
 }
-return PICK_FAIL;
+// All children are in transient failure. Return the first failure.
+return ring[first_index].picker->Pick(...);
 ```
 
 As per [gRFC A42][A42], the ring_hash policy normally requires pick
