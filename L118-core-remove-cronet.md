@@ -27,6 +27,7 @@ Remove the Cronet transport, and related APIs in core and Objective-C:
 ## Rationale
 
 The Cronet team no longer maintains this code, so any bugs are going to be up to the gRPC team to fix, and gRPC does not have the expertise to maintain this stack.
+In addition, gRPC C++ team is currently revamping our transport interfaces, and this transport will either need to be rewritten or removed - and rewriting atop a deprecated engine does not seem to be the right way forward.
 
 ## Implementation
 
