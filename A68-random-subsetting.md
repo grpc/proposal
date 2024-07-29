@@ -62,6 +62,9 @@ Here is the implementation of this algorithm in pseudocode.
 
 ```
 func filter_endpoints(endpoints, subset_size, seed)
+    if subset_size >= len(endpoints) { 
+        return endpoints 
+    }
     endpoints_with_hash = []
     foreach endpoint in endpoints {
         // Use XXH64 function to compute hash for every endpoint.
