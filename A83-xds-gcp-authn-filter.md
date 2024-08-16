@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-07-19
+* Last updated: 2024-08-16
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -45,27 +45,50 @@ credentials type, which is not xDS-specific.  This credential type
 will be instantiated with one parameter, which is the audience to be
 encoded into the JWT token.
 
-When the credential is asked for a token for an RPC, if
-the token is not cached, the credential will send an HTTP request to
+When the credential is asked for a token for a data plane
+RPC, if the token is not cached or the cached token will
+expire within one minute, the credential will start an HTTP request to
 `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]`,
 where `[AUDIENCE]` is replaced with the audience specified when the
 credential object was instantiated.  The HTTP request will include the
 header `Metadata-Flavor: Google`.
 
+When a data plane RPC starts, if the token is cached and is not expired,
+the token will immediately be added to the RPC.  Otherwise
+(i.e., before the token is initially obtained or after the cached
+token has expired), the data plane RPC will be queued until the HTTP
+request completes.  When the HTTP request completes, the result (either
+success or failure, as described below) will be applied to all queued
+data plane RPCs.
+
+If the HTTP request fails, all queued data plane RPCs
+will be failed with the gRPC status associated with
+the returned HTTP status, as per [HTTP to gRPC Status Code
+Mapping](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
+If the request fails without an HTTP status (e.g., an I/O error), all
+queued data plane RPCs will be failed with `UNAVAILABLE` status.
+
 If the HTTP request succeeds, the body of the response will contain the
-JWT token, which the client will both cache and add to the data plane
-RPC's headers.  The client does not need to do full [RFC-7519] validation
-of the token (that is the responsibility of the server side), but it
-does need to extract the `nbf` and `exp` fields for caching purposes.
+JWT token. which the client will cache.  The client does not need to
+do full [RFC-7519] validation of the token (that is the responsibility
+of the server side), but it does need to extract the `exp` field for
+caching purposes.  If the `exp` field cannot be extracted (i.e., the JWT
+token is invalid), all queued data plane RPCs will be failed with status
+`UNAUTHENTICATED`.  Otherwise, the cache is updated, and the returned
+token is added to all queued data plane RPCs, which may then continue.
 
-If the HTTP request fails or times out, or if the JWT token is invalid
-(i.e., the client fails to extract the `nbf` or `exp` fields), the data
-plane RPC will be failed with status `UNAUTHENTICATED`.
+If the HTTP request does not result in the cache being updated (i.e.,
+if the HTTP request fails or if it returns an invalid JWT token),
+[backoff](https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md)
+must be applied before the next attempt may be started.  Any data plane
+RPC started while in backoff delay will be queued until the completion
+of the next HTTP request attempt.  Note that no attempt should be
+started unless a data plane RPC is started, since we do not want to
+unnecessarily retry if the channel is idle.
 
-If the JWT token is either already cached or is obtained from an HTTP
-request, it will be added to the RPC headers.  The header name will be
-`authorization`, and the value will be the string `Bearer ` (note
-trailing space) followed by the token value.
+To add the token to a data plane RPC, the call credential will add a
+header named `authorization`.  The header value will be the string
+`Bearer ` (note trailing space) followed by the token value.
 
 ### xDS HTTP Filter Configuration
 
@@ -104,34 +127,29 @@ The metadata field is a message that actually contains two maps:
   (e.g., a native struct).
 
 The value for a given metadata key will come from only one of the
-two maps; the value from `filter_config` will be used only if the
+two maps; the value from `filter_metadata` will be used only if the
 key is not present or is of an unknown protobuf message type in
-`typed_filter_config`.  In the resulting map in the parsed cluster
+`typed_filter_metadata`.  In the resulting map in the parsed cluster
 resource, the map value will be either JSON or the appropriate internal
 form, depending on which of the two maps the entry came from.
 
-To match Envoy, the logic to validate cluster metadata will look something
-like this (pseudo-code):
+The logic to validate cluster metadata will look something like this
+(pseudo-code):
 
 ```
 parsed_metadata = {}  # Value is either JSON or parsed object
-all_keys = (cluster_metadata.typed_filter_metadata.keys() +
-            cluster_metadata.filter_metadata.keys())
-for key in all_keys:
-  # First try typed_filter_metadata.
-  any_field = cluster_metadata.typed_filter_metadata[key]
-  if any_field is not None:
-    parser = metadata_registry.FindParser(any_field.type_url)
-    if parser is not None:
-      value = parser.Parse(any_field.value)
-      if value is None:
-        return NACK  # Parsing failed, reject resource
-      parsed_metadata[key] = value
-      continue
-    # If no parser registered for this type, ignore the entry.
-  # Didn't find it in typed_filter_metadata, so try filter_metadata.
-  struct_field = cluster_metadata.filter_metadata[key]
-  if struct_field is not None:
+# First process typed_filter_metadata.
+for key, any_field in cluster_metadata.typed_filter_metadata.items():
+  parser = metadata_registry.FindParser(any_field.type_url)
+  if parser is not None:
+    value = parser.Parse(any_field.value)
+    if value is None:
+      return NACK  # Parsing failed, reject resource
+    parsed_metadata[key] = value
+# Now process filter_metadata.  We look only at keys that were not
+# already added from typed_filter_metadata.
+for key, struct_field in cluster_metadata.filter_metadata.items():
+  if key not in parsed_metadata:
     parsed_metadata[key] = ConvertToJson(struct_field)
 ```
 
@@ -190,7 +208,9 @@ connection.
 
 ### Temporary environment variable protection
 
-Support for the GCP Authentication filter in LDS will be guarded by the
+Support for the GCP Authentication filter in the xDS HTTP filter
+registry and the `extensions.filters.http.gcp_authn.v3.Audience`
+entry in the metadata registry will be guarded by the
 `GRPC_EXPERIMENTAL_XDS_GCP_AUTHENTICATION_FILTER` env var.  The env var
 guard will be removed once the feature passes interop tests.
 
@@ -201,17 +221,25 @@ principle, it should be possible to support JWT identity tokens for any
 cloud provider.  However, at present, the existing xDS HTTP filter
 supports only GCP, so that's what we're initially focusing on, for
 compatibility with Envoy.  We would be open to future contributions from
-the OSS communicate to provide similar functionality for other cloud
+the OSS community to provide similar functionality for other cloud
 providers, in both gRPC and Envoy.
 
-Note that having the filter cache
-GcpServiceAccountIdentityCallCredentials instances instead of directly
-caching JWT tokens means that the cache semantics will be slightly
-different than Envoy: cache expiration will be based solely on
-last-recently-used time for each audience, not on the actual expiration
-time for the individual underlying JWT tokens.  This is not expected to
-make much difference in practice, but it allows for cleaner code reuse
-in this design.
+Note that the cache structure in this design is a bit different from
+Envoy's implementation.  In Envoy, the GCP Authentication filter directly
+maintains a single cache containing the tokens for each audience, with
+expiration based on the tokens' expiration times.  In contrast, gRPC
+will essentially have a two-level cache here: the filter will maintain a
+cache of GcpServiceAccountIdentityCallCredentials instances for each
+audience with expiration based on their respective last-used times,
+and each of those GcpServiceAccountIdentityCallCredentials instances
+will internally cache the token for its audience based on the token's
+expiration time.  In the majority of cases, this is expected to result
+in the same behavior, although it is conceivably possible for there to
+be edge cases where a given GcpServiceAccountIdentityCallCredentials
+instance is retained in the cache due to being used more recently even
+though it has actually been failing to obtain a token.  However, this
+approach allows for cleaner code and better reuse of existing call
+credentials implementations in some languages.
 
 ## Implementation
 
