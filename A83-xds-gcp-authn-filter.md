@@ -40,33 +40,48 @@ We will support the GCP Authentication xDS HTTP filter in the gRPC client.
 
 ### Call Credentials
 
+Note: This section is intended for gRPC implementations that need to
+implement a new call credential type for GCP service account identity
+tokens.  Implementations that already support this functionality (e.g.,
+by depending on an external Google Auth library) may continue to use
+their existing functionality, even if the behavior differs in small ways
+from what is described in this section.
+
 gRPC should support a GcpServiceAccountIdentityCallCredentials call
 credentials type, which is not xDS-specific.  This credential type
 will be instantiated with one parameter, which is the audience to be
-encoded into the JWT token.
+encoded into the JWT token.  The credential object will handle fetching
+the token on-demand and caching it based on the token's expiration
+period.
+
+To handle potential clock skew issues and to account for processing time
+on the server, the credential will set the cache expiration time to be
+30 seconds before the expiration time encoded in the token.  All logic
+in the call credential code will use this modified expiration time
+instead of the expiration time encoded in the token.
 
 When the credential is asked for a token for a data
-plane RPC, if the token is not cached or the cached
+plane RPC, if the token is not yet cached or the cached
 token will expire within some fixed refresh interval
-(typically 30-60 seconds), the credential will start an HTTP request to
+(typically 1 minute), the credential will start an HTTP request to
 `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]`,
 where `[AUDIENCE]` is replaced with the audience specified when the
 credential object was instantiated.  The HTTP request will include the
 header `Metadata-Flavor: Google`.
 
 When a data plane RPC starts, if the token is cached and is not expired,
-the token will immediately be added to the RPC.  Otherwise
-(i.e., before the token is initially obtained or after the cached
-token has expired), the data plane RPC will be queued until the HTTP
-request completes.  When the HTTP request completes, the result (either
-success or failure, as described below) will be applied to all queued
-data plane RPCs.
+the token will immediately be added to the RPC, and the RPC will continue.
+Otherwise (i.e., before the token is initially obtained or after the
+cached token has expired), the data plane RPC will be queued until the
+HTTP request completes.  When the HTTP request completes, the result
+(either success or failure, as described below) will be applied to all
+queued data plane RPCs.
 
-Note that when the token's expiration time is less than refresh interval
-in the future, a new data plane RPC being started will trigger a new HTTP
-request, but the cached token value will still be used for that data
-plane RPC.  This pre-emptive re-fetching is intended to avoid periodic
-latency spikes when refreshing the token.
+Note that when the token's expiration time is less than the refresh
+interval in the future, a new data plane RPC being started will trigger
+a new HTTP request, but the cached token value will still be used for
+that data plane RPC.  This pre-emptive re-fetching is intended to avoid
+periodic latency spikes when refreshing the token.
 
 If the HTTP request fails, all queued data plane RPCs
 will be failed with the gRPC status associated with
