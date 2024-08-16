@@ -48,11 +48,10 @@ their existing functionality, even if the behavior differs in small ways
 from what is described in this section.
 
 gRPC should support a GcpServiceAccountIdentityCallCredentials call
-credentials type, which is not xDS-specific.  This credential type
-will be instantiated with one parameter, which is the audience to be
-encoded into the JWT token.  The credential object will handle fetching
-the token on-demand and caching it based on the token's expiration
-period.
+credentials type, which is not xDS-specific.  This credential type will
+be instantiated with one parameter, which is the audience to be encoded
+into the JWT token.  The credential object will handle fetching the
+token on-demand and caching it based on the token's expiration time.
 
 To handle potential clock skew issues and to account for processing time
 on the server, the credential will set the cache expiration time to be
@@ -83,12 +82,14 @@ a new HTTP request, but the cached token value will still be used for
 that data plane RPC.  This pre-emptive re-fetching is intended to avoid
 periodic latency spikes when refreshing the token.
 
-If the HTTP request fails, all queued data plane RPCs
-will be failed with the gRPC status associated with
-the returned HTTP status, as per [HTTP to gRPC Status Code
-Mapping](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-If the request fails without an HTTP status (e.g., an I/O error), all
-queued data plane RPCs will be failed with `UNAVAILABLE` status.
+If the HTTP request fails, all queued data plane RPCs will be failed
+with a gRPC status determined based on the returned HTTP status.  If the
+returned HTTP status maps to `UNAVAILABLE` in [HTTP to gRPC Status Code
+Mapping](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md),
+then the data plane RPCs will be failed with status `UNAVAILABLE`;
+otherwise, they will be failed with status `UNAUTHENTICATED`.  If the
+request fails without an HTTP status (e.g., an I/O error), all queued
+data plane RPCs will be failed with `UNAVAILABLE` status.
 
 If the HTTP request succeeds, the body of the response will contain the
 JWT token. which the client will cache.  The client does not need to
