@@ -45,9 +45,10 @@ credentials type, which is not xDS-specific.  This credential type
 will be instantiated with one parameter, which is the audience to be
 encoded into the JWT token.
 
-When the credential is asked for a token for a data plane
-RPC, if the token is not cached or the cached token will
-expire within one minute, the credential will start an HTTP request to
+When the credential is asked for a token for a data
+plane RPC, if the token is not cached or the cached
+token will expire within some fixed refresh interval
+(typically 30-60 seconds), the credential will start an HTTP request to
 `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]`,
 where `[AUDIENCE]` is replaced with the audience specified when the
 credential object was instantiated.  The HTTP request will include the
@@ -61,11 +62,11 @@ request completes.  When the HTTP request completes, the result (either
 success or failure, as described below) will be applied to all queued
 data plane RPCs.
 
-Note that when the token's expiration time is less than one minute in the
-future, a new data plane RPC being started will trigger a new HTTP request,
-but the cached token value will still be used for that data plane RPC.
-This pre-emptive re-fetching is intended to avoid periodic latency
-spikes when refreshing the token.
+Note that when the token's expiration time is less than refresh interval
+in the future, a new data plane RPC being started will trigger a new HTTP
+request, but the cached token value will still be used for that data
+plane RPC.  This pre-emptive re-fetching is intended to avoid periodic
+latency spikes when refreshing the token.
 
 If the HTTP request fails, all queued data plane RPCs
 will be failed with the gRPC status associated with
