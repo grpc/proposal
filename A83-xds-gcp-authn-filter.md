@@ -61,6 +61,12 @@ request completes.  When the HTTP request completes, the result (either
 success or failure, as described below) will be applied to all queued
 data plane RPCs.
 
+Note that when the token's expiration time is less than one minute in the
+future, a new data plane RPC being started will trigger a new HTTP request,
+but the cached token value will still be used for that data plane RPC.
+This pre-emptive re-fetching is intended to avoid periodic latency
+spikes when refreshing the token.
+
 If the HTTP request fails, all queued data plane RPCs
 will be failed with the gRPC status associated with
 the returned HTTP status, as per [HTTP to gRPC Status Code
@@ -80,11 +86,12 @@ token is added to all queued data plane RPCs, which may then continue.
 If the HTTP request does not result in the cache being updated (i.e.,
 if the HTTP request fails or if it returns an invalid JWT token),
 [backoff](https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md)
-must be applied before the next attempt may be started.  Any data plane
-RPC started while in backoff delay will be queued until the completion
-of the next HTTP request attempt.  Note that no attempt should be
-started unless a data plane RPC is started, since we do not want to
-unnecessarily retry if the channel is idle.
+must be applied before the next attempt may be started.  If a data
+plane RPC is started when there is no cached token available and while
+in backoff delay, it will be queued until the completion of the next
+HTTP request attempt.  Note that no attempt should be started unless a
+data plane RPC is started, since we do not want to unnecessarily retry
+if the channel is idle.
 
 To add the token to a data plane RPC, the call credential will add a
 header named `authorization`.  The header value will be the string
