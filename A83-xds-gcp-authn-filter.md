@@ -129,6 +129,13 @@ The fields will be interpretted as follows:
 - `cluster`: Ignored by gRPC.
 - `timeout`: Ignored by gRPC.
 
+Note that this filter does not support having its config overridden in a
+`typed_per_filter_config` field on a per-route, per-virtualhost, or
+per-clusterweight basis.  If the filter's config message appears in a
+`typed_per_filter_config` field, it will be validated as part of the
+normal resource validation, but the configuration will not actually be
+used.
+
 ### xDS Cluster Metadata
 
 The GCP Authentication filter uses cluster metadata from the
