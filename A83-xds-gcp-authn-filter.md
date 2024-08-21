@@ -211,7 +211,7 @@ entry with the oldest last-used timestamp will be removed.
 
 When the filter processes the RPC's initial metadata, it will first
 attempt to determine the audience for the request by looking at the
-cluster metadata key corresponding to the filter instance name.
+cluster metadata key corresponding to the filter's instance name.
 Note that in Envoy, the cluster metadata keys must exactly match
 the legacy filter name (e.g., "envoy.filters.http.gcp_authn").
 However, as per envoyproxy/envoy#34251, it is desirable
@@ -219,12 +219,12 @@ to instead use the HTTP filter instance name from the [`HttpFilter.name`
 field](https://github.com/envoyproxy/envoy/blob/7436690884f70b5550b6953988d05818bae3d087/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L1149).
 We will implement that behavior in gRPC.
 
-The cluster metadata for this filter must be of type
-`extensions.filters.http.gcp_authn.v3.Audience`.  If the cluster has no
-such metadata key, the filter is a no-op.  If the metadata key exists
-but is of the wrong type, then the filter will fail data plane RPCs with
-status `UNAVAILABLE`.  Otherwise, the audience is the value of the `url`
-field in the `Audience` proto.
+If the cluster metadata does not contain a key matching the filter's
+instance name, then the filter is a no-op.  If a cluster metadata entry
+exists for the filter's instance name, but the entry is of a type other
+than `extensions.filters.http.gcp_authn.v3.Audience`, then the filter
+will fail data plane RPCs with status `UNAVAILABLE`.  Otherwise, the
+audience is the value of the `url` field in the `Audience` proto.
 
 The filter will then check to see if it already has a cached
 GcpServiceAccountIdentityCallCredentials instance for the specified
