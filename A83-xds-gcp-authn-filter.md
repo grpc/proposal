@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-08-16
+* Last updated: 2024-08-21
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -186,11 +186,12 @@ be a simple string.
 ### xDS ConfigSelector Behavior
 
 As per [gRFC A60][A60], we currently pass the selected cluster name via
-a call attribute for access in filters.  We will now also pass the CDS
-resource for the cluster in a separate call attribute, so that the GCP
-Authentication filter can access the cluster metadata for the selected
-cluster.  Note that this will require implementing [A74], so that the
-CDS resource is available at xDS routing time.
+a call attribute for access in filters.  However, the filters will now
+also need access to the CDS resource for the selected cluster, so that
+the GCP Authentication filter can access the cluster metadata for the
+selected cluster.  This data is available via the `XdsConfig` attribute
+introduced in [A74].  If the xDS ConfigSelector is not already passing
+that attribute to the filters, it will need to be changed to do so.
 
 ### Filter Behavior
 
