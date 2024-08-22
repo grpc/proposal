@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-08-21
+* Last updated: 2024-08-22
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -161,8 +161,11 @@ The value for a given metadata key will come from only one of the
 two maps; the value from `filter_metadata` will be used only if the
 key is not present or is of an unknown protobuf message type in
 `typed_filter_metadata`.  In the resulting map in the parsed cluster
-resource, the map value will be either JSON or the appropriate internal
-form, depending on which of the two maps the entry came from.
+resource, the map value will contain the type of the original message
+(`google.protobuf.Struct` if it came from the `filter_metadata` map) and
+a parsed representation of the content.  The parsed representation may
+be either JSON or the appropriate internal form, depending on which of
+the two maps the entry came from.
 
 The logic to validate cluster metadata will look something like this
 (pseudo-code):
