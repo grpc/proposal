@@ -49,8 +49,9 @@ structured such that it is not possible to indicate both a certificate
 provider instance and using system root certs, since those options are
 mutually exclusive.
 
-Note that LDS validation will be unchanged.  The new `system_root_certs`
-field will be ignored on the gRPC server side.
+The new `system_root_certs` field will not be supported on the gRPC
+server side.  If `ca_certificate_provider_instance` is unset and
+`system_root_certs` is set, the LDS resource will be NACKed.
 
 ### xds_cluster_impl LB Policy Changes
 
@@ -66,9 +67,9 @@ to use system root certs, it will configure the TlsCreds code to do that.
 
 ### Temporary environment variable protection
 
-Use of the `system_root_certs` field in CDS and LDS will be guarded
-by the `GRPC_EXPERIMENTAL_XDS_SYSTEM_ROOT_CERTS` env var.  The env var
-guard will be removed once the feature passes interop tests.
+Use of the `system_root_certs` field in CDS will be guarded by the
+`GRPC_EXPERIMENTAL_XDS_SYSTEM_ROOT_CERTS` env var.  The env var guard
+will be removed once the feature passes interop tests.
 
 ## Rationale
 
