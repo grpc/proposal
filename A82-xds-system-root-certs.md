@@ -66,7 +66,7 @@ to use system root certs, it will configure the TlsCreds code to do that.
 
 ### Temporary environment variable protection
 
-Use of the `use_system_root_certs` field in CDS and LDS will be guarded
+Use of the `system_root_certs` field in CDS and LDS will be guarded
 by the `GRPC_EXPERIMENTAL_XDS_SYSTEM_ROOT_CERTS` env var.  The env var
 guard will be removed once the feature passes interop tests.
 
