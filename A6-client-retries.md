@@ -108,6 +108,8 @@ gRPC's call deadline applies across all attempts for a given RPC. For example, i
 
 The `initialBackoff`, `maxBackoff`, and `backoffMultiplier` parameters tune the exponential delay before retry attempts.
 
+Jitter of plus or minus 0.2 is applied to the backoff delay to avoid hammering servers at the same time from a large number of clients.  Note that this means that the backoff delay may actually be slightly lower than `initialBackoff` or slightly higher than `maxBackoff`.
+
 The initial retry attempt will occur after `initialBackoff * random(0.8, 1.2)`.  After that, the `n`-th attempt will occur after `min(initialBackoff*backoffMultiplier**(n-1), maxBackoff) * random(0.8, 1.2))`.
 
 ##### Retryable Status Codes
