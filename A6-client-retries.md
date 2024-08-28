@@ -108,7 +108,7 @@ gRPC's call deadline applies across all attempts for a given RPC. For example, i
 
 The `initialBackoff`, `maxBackoff`, and `backoffMultiplier` parameters tune the exponential delay before retry attempts.
 
-The initial retry attempt will occur after `initialBackoff`.  After that, the `n`-th attempt will occur after `min(initialBackoff*backoffMultiplier**(n-1), maxBackoff) * random(0.8, 1.2))`.
+The initial retry attempt will occur after `initialBackoff * random(0.8, 1.2)`.  After that, the `n`-th attempt will occur after `min(initialBackoff*backoffMultiplier**(n-1), maxBackoff) * random(0.8, 1.2))`.
 
 ##### Retryable Status Codes
 
@@ -431,8 +431,8 @@ The retry policy is transmitted to the client through the service config mechani
         "maxAttempts": number,
 
         // Exponential backoff parameters. The initial retry attempt will occur
-        // after initialBackoff. After that, the nth attempt since the last
-        // server pushback response (if any), will occur at
+        // after initialBackoff * random(0.8, 1.2). After that, the nth attempt
+        // since the last server pushback response (if any), will occur at
         // min(initialBackoff*backoffMultiplier**(n-1), maxBackoff) *
         // random(0.8, 1.2).
         // The following two fields take their form from:
