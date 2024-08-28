@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-08-22
+* Last updated: 2024-08-28
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -213,10 +213,27 @@ number of entries in the cache is bounded by the config field
 entry with the oldest last-used timestamp will be removed.
 
 When the filter processes the RPC's initial metadata, it will first
-attempt to determine the audience for the request by looking at the
-cluster metadata key corresponding to the filter's instance name.
-Note that in Envoy, the cluster metadata keys must exactly match
-the legacy filter name (e.g., "envoy.filters.http.gcp_authn").
+check to see what cluster the RPC is being sent to.  If the RPC is being
+sent to a route that uses a cluster specifier plugin instead of a fixed
+cluster, then the filter is a no-op.  Otherwise, the filter will attempt
+to determine the audience by looking at the CDS resource for the cluster
+that the RPC is being sent to.
+
+If the CDS resource is not available (e.g., because the client received an
+error without having previously received a valid resource, or because the
+server indicated that the resource has been deleted), then the filter will
+fail the RPC with status `UNAVAILABLE`.  Note that this does yield
+sub-optimal behavior for wait_for_ready RPCs, since we will fail them
+instead of queuing them, but we don't currently have a good alternative:
+the filter cannot queue the call until the client gets a valid CDS
+resource, because once that happens, a new instance of the filter will be
+swapped in for subsequent calls, but the queued call would already be tied
+to the original filter instance, which will never see the update.
+
+Otherwise, the filter will look in the CDS resource's metadata for
+a key corresponding to the filter's instance name.  Note that
+in Envoy, the cluster metadata keys must exactly match the
+legacy filter name (e.g., "envoy.filters.http.gcp_authn").
 However, as per envoyproxy/envoy#34251, it is desirable
 to instead use the HTTP filter instance name from the [`HttpFilter.name`
 field](https://github.com/envoyproxy/envoy/blob/7436690884f70b5550b6953988d05818bae3d087/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L1149).
