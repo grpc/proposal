@@ -80,6 +80,31 @@ void SomeInitFunctionCalledByGrpcInit() {
 }
 ```
 
+### Temporary Experimental Functions
+
+* The following functions will be added. These are very simple wrappers around absl logging.
+  * These are needed because PHP and RUBY cannot use absl directly. Absl logging cannot be used from `C` code. These simple wrapper functions will be exported so that they can be used from `C` code.
+  * We want to avoid usage of format specifiers that RUBY and PHP are currently using.
+  * As soon as we are able to use C++ APIs from Ruby and PHP, these experimental API wrappers will be deleted.
+
+```
+// Equivalent to ABSL_LOG(severity) << message_str;
+GPRAPI void grpc_absl_log(const char* file, int line,
+                          gpr_log_severity severity,
+                          const char* message_str);
+
+// Equivalent to ABSL_LOG(severity) << message_str << num;
+GPRAPI void grpc_absl_log_int(const char* file, int line,
+                              gpr_log_severity severity,
+                              const char* message_str, intptr_t num);
+
+// Equivalent to ABSL_LOG(severity) << message_str1 << message_str2;
+GPRAPI void grpc_absl_log_str(const char* file, int line,
+                              gpr_log_severity severity,
+                              const char* message_str1,
+                              const char* message_str2);
+```
+
 ## Rationale
 
 ### Advantages 
