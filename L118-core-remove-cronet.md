@@ -14,7 +14,7 @@ Remove the Cronet transport from gRPC core (and consequently the Objective-C bin
 ## Background
 
 gRPC C++, Objective-C can use Cronet on iOS as an alternative HTTP/2 stack.
-The Cronet library itself has been deprecated since September 2023, and so instead of maintaining this code we're opting to remove it.
+The Cronet library itself has been deprecated on iOS since September 2023, and so instead of maintaining this code we're opting to remove it.
 
 ## Proposal
 
