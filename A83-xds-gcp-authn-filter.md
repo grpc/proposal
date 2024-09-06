@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-08-28
+* Last updated: 2024-09-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -203,14 +203,34 @@ selected cluster.  This data is available via the `XdsConfig` attribute
 introduced in [A74].  If the xDS ConfigSelector is not already passing
 that attribute to the filters, it will need to be changed to do so.
 
-### Filter Behavior
+### Filter Call Credentials Cache
 
 The filter will maintain a cache of
-GcpServiceAccountIdentityCallCredentials instances, one for each
-audience, along with a last-used timestamp for each one.  The maximum
-number of entries in the cache is bounded by the config field
-`cache_config.cache_size`; if the cache exceeds that size, then the
-entry with the oldest last-used timestamp will be removed.
+GcpServiceAccountIdentityCallCredentials instances, one for each audience,
+along with a last-used list that tracks how recently the entries
+have been used.  As an entry is used, it is moved to the front of the
+last-used list.  The maximum number of entries in the cache is bounded
+by the config field `cache_config.cache_size`; if the cache exceeds that
+size, then entries will be removed starting from the end of the
+last-used list.
+
+Note that the `cache_config.cache_size` parameter in the filter config
+is a truly global parameters, not settable per-route, and we want the
+cache itself to be shared across all routes.  Implementations that create
+separate filter/interceptor instances for each route should share the
+cache between those instances.
+
+It is desirable to avoid losing this cache when we get an xDS Listener or
+RouteConfiguration update, so that we don't wind up needlessly refetching
+tokens after the update.  Implementations should provide a mechanism for
+new instances of the filter to retain the cache from previous instances.
+
+If an LDS update changes the cache size, the filter must apply that
+change to the cache.  If the cache currently has more entries in it than
+the new cache size, then the least recently used entries will be removed
+to make the cache adhere to the new size limit.
+
+### Filter Behavior
 
 When the filter processes the RPC's initial metadata, it will first
 check to see what cluster the RPC is being sent to.  If the RPC is being
@@ -298,4 +318,13 @@ credentials implementations in some languages.
 
 ## Implementation
 
-Will be implemented in all languages, timelines TBD.
+C-core implementation:
+- generalize CDS metadata handling (https://github.com/grpc/grpc/pull/37468)
+- implement GcpServiceAccountIdentityCredentials
+  (https://github.com/grpc/grpc/pull/37544)
+- validate Audience cluster metadata (https://github.com/grpc/grpc/pull/37566)
+- implement GCP auth filter (https://github.com/grpc/grpc/pull/37550)
+- mechanism for retaining cache across xDS updates
+  (https://github.com/grpc/grpc/pull/37646)
+
+Will be implemented in all other languages, timelines TBD.
