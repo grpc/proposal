@@ -21,7 +21,7 @@ ORCA `named_metrics` map to LRS.  That approach has been found to be
 insufficiently flexible, so we are introducing configuration to explicitly
 control which fields are propagated.
 
-### Related Proposals: 
+### Related Proposals:
 * [gRFC A51: Custom Backend Metrics Support][A51]
 * [gRFC A64: xDS LRS Custom Metrics Support][A64]
 
