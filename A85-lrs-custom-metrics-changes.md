@@ -5,7 +5,7 @@ A85: Changes to xDS LRS Custom Metrics Support
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2024-09-19
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/xawJAoE-pQE
 
 ## Abstract
 
