@@ -4,7 +4,7 @@ A85: Changes to xDS LRS Custom Metrics Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-07-19
+* Last updated: 2024-09-19
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -48,6 +48,15 @@ Note that this will change the gRPC client default behavior in two ways:
    ORCA `named_metrics` map called `foo`, then it will appear in LRS as
    `named_metrics.foo`).
 
+The new behavior will be integrated into the LRS APIs in XdsClient (or
+LrsClient, if the implementation has split the LRS APIs into their own
+interface).  When the xds_cluster_impl LB policy requests a locality stats
+handle for a given LRS server, cluster, EDS resource, and locality, it
+will now also specify the ORCA propagation info from the CDS resource.
+Then, when the xds_cluster_impl policy reports the ORCA stats for
+each call, the locality stats handle will use that propagation info to
+determine which ORCA fields to copy.
+
 ### Temporary environment variable protection
 
 This option will be guarded by the
@@ -62,8 +71,14 @@ to explicitly set it to false to get the old behavior.
 
 ## Rationale
 
-N/A
+Storing the propagation info inside the locality stats handle from the
+XdsClient or LrsClient is more efficient than the slightly more obvious
+solution of handling this in the xds_cluster_impl policy itself, since
+that would require storing the propagation information both
+per-subchannel and per-call, which would increase memory usage.
 
 ## Implementation
 
-Will be implemented in C-core, Java, and Go.
+C-core implementation in https://github.com/grpc/grpc/pull/37467.
+
+Will also be implemented in Java and Go.
