@@ -4,7 +4,7 @@ A85: Changes to xDS LRS Custom Metrics Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-09-19
+* Last updated: 2024-09-24
 * Discussion at: https://groups.google.com/g/grpc-io/c/xawJAoE-pQE
 
 ## Abstract
@@ -59,7 +59,8 @@ determine which ORCA fields to copy.
 
 ### Temporary environment variable protection
 
-This option will be guarded by the
+This option (both reading the new field in the CDS resource
+and the new propagation behavior) will be guarded by the
 `GRPC_EXPERIMENTAL_XDS_ORCA_LRS_PROPAGATION` env var until it passes
 interop tests.
 
