@@ -81,6 +81,12 @@ GrpcOpenTelemetry otModule = GrpcOpenTelemetry.newBuilder().sdk(openTelemetry).b
 otModule.registerGlobal();
 ```
 
+#### Temporary environment variable protection
+The OpenTelemetry tracing functionality in Java will be initially guarded by an environmental 
+variable called `GRPC_EXPERIMENTAL_ENABLE_OTEL_TRACING`. To try it out, set the 
+`GRPC_EXPERIMENTAL_ENABLE_OTEL_TRACING` environment variable to `true`. 
+This environment variable guard will be removed once this feature has proven stable.
+
 ### C++
 The following new methods will be added in `OpenTelemetryPluginBuilder`.
 
