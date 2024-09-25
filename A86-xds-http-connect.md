@@ -4,7 +4,7 @@ A86: xDS-Based HTTP CONNECT
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-09-19
+* Last updated: 2024-09-25
 * Discussion at: https://groups.google.com/g/grpc-io/c/WiqQ7h003fE
 
 ## Abstract
@@ -70,7 +70,7 @@ as a registered metadata type.  When validating this type, the
 field must be set to an IPv4 or IPv6 address, and the `port_value` field
 must be set.
 
-The `Http11ProxyUpstreamTransport` transport socket will look for a
+The proxy address for a given endpoint will be set by looking for a
 metadata entry of type `envoy.config.core.v3.Address` under the key
 `envoy.http11_proxy_transport_socket.proxy_address`.  If that key is not
 present, or if the key is present but the value has a different type,
@@ -80,8 +80,12 @@ in the locality-level metadata.  If not found in either place, then HTTP
 CONNECT is not used (i.e., the behavior will be exactly the same as if the
 `Http11ProxyUpstreamTransport` transport socket wrapper was not present).
 
-The argument to the HTTP CONNECT request sent on the wire will be the
-endpoint's IP address that we are trying to connect to.
+If the `Http11ProxyUpstreamTransport` transport socket is used in CDS and
+an endpoint has a proxy address, then the CDS LB policy must set some
+appropriate resolver attributes on the endpoint to cause the specified
+proxy to be used.  Note that this behavior may be triggered by a custom
+proxy mapper (see [gRFC A1]).  The argument to the HTTP CONNECT request
+sent on the wire will be IP address and port of the endpoint.
 
 ### Temporary environment variable protection
 
@@ -91,8 +95,13 @@ will be removed when the feature passes interop tests.
 
 ## Rationale
 
-N/A
+Note that prior to this feature being enabled by default, gRPC will NACK a
+CDS resource that specifies the `Http11ProxyUpstreamTransport` transport
+socket.  Users will need to upgrade their clients before their control
+plane starts sending CDS resources containing this transport socket.
 
 ## Implementation
 
-Will be implemented in C-core, Java, and Go.
+C-core implementation: grpc/grpc#37800
+
+Will also be implemented in Java and Go.
