@@ -57,11 +57,11 @@ field](https://github.com/envoyproxy/envoy/blob/d6120f3c769e70c988ddcc5c7e9cbc27
 and at the locality level (in the [`LocalityLbEndpoints.metadata`
 field](https://github.com/envoyproxy/envoy/blob/d6120f3c769e70c988ddcc5c7e9cbc2737b5f63c/api/envoy/config/endpoint/v3/endpoint_components.proto#L165)).
 
-To support this, we will use the metadata mechanism described for CDS in
-[gRFC A83] for the EDS metadata fields.  The parsed form of the EDS
-resource will include a parsed metadata map at both the individual
-endpoint and locality levels, using the same data type previously
-introduced for CDS metadata.
+To support this, we will reuse the metadata registry mechanism described
+for CDS in [gRFC A83] for the EDS metadata fields.  The parsed form
+of the EDS resource will include a parsed metadata map at both the
+individual endpoint and locality levels, using the same data type
+previously introduced for CDS metadata.
 
 We will support the [`envoy.config.core.v3.Address`
 type](https://github.com/envoyproxy/envoy/blob/d6120f3c769e70c988ddcc5c7e9cbc2737b5f63c/api/envoy/config/core/v3/address.proto#L175)
