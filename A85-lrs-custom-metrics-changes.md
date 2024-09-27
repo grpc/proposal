@@ -123,6 +123,14 @@ RefCountedPtr<ClusterLocalityStats> AddClusterLocalityStats(
     RefCountedPtr<const BackendMetricPropagation> backend_metric_propagation);
 ```
 
+### Populating LRS Protos
+
+When populating the LRS protos, if the propagation configuration says to
+include any of the top-level fields (`cpu_utilization`,
+`mem_utilization`, or `application_utilization`), then those will be
+propagated to the new LRS fields of the same names in the
+`UpstreamLocalityStats` message.
+
 ### Temporary environment variable protection
 
 This option (both reading the new field in the CDS resource
