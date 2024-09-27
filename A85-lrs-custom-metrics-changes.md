@@ -4,7 +4,7 @@ A85: Changes to xDS LRS Custom Metrics Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-09-24
+* Last updated: 2024-09-27
 * Discussion at: https://groups.google.com/g/grpc-io/c/xawJAoE-pQE
 
 ## Abstract
@@ -48,14 +48,80 @@ Note that this will change the gRPC client default behavior in two ways:
    ORCA `named_metrics` map called `foo`, then it will appear in LRS as
    `named_metrics.foo`).
 
-The new behavior will be integrated into the LRS APIs in XdsClient (or
-LrsClient, if the implementation has split the LRS APIs into their own
-interface).  When the xds_cluster_impl LB policy requests a locality stats
-handle for a given LRS server, cluster, EDS resource, and locality, it
-will now also specify the ORCA propagation info from the CDS resource.
-Then, when the xds_cluster_impl policy reports the ORCA stats for
-each call, the locality stats handle will use that propagation info to
-determine which ORCA fields to copy.
+The specific changes needed in gRPC implementations are described in
+the following subsections.
+
+### CDS Resource Validation
+
+The new `lrs_report_endpoint_metrics` field will be validated when
+receiving a CDS resource, and the parsed form of this field will be
+stored in the parsed form of the CDS resource that is provided to
+XdsClient watchers.
+
+To reduce memory usage, implementations may choose a more compact form
+than the original set of strings.  For example, C-core will use the
+following representation:
+
+```c++
+struct BackendMetricPropagation {
+  static constexpr uint8_t kCpuUtilization = 1;
+  static constexpr uint8_t kMemUtilization = 2;
+  static constexpr uint8_t kApplicationUtilization = 4;
+  static constexpr uint8_t kNamedMetricsAll = 8;
+
+  // Bit mask of top-level fields to propagate.
+  uint8_t propagation_bits = 0;
+
+  // Keys from named_metrics map to propagate.
+  // Used only if kNamedMetricsAll is not set in propagation_bits.
+  absl::flat_hash_set<std::string> named_metric_keys;
+};
+```
+
+For forward-compatibility, implementations should ignore any strings
+that do not match a currently supported ORCA field.  Implementations
+must support the following minimum set of fields:
+
+- cpu_utilization
+- mem_utilization
+- application_utilization
+- named_metrics map
+
+### LRS APIs in XdsClient or LrsClient
+
+The LRS API in XdsClient (or LrsClient, if the implementation has split
+the LRS APIs into their own interface) currently provide a way to obtain
+a locality stats handle that is keyed by LRS server, CDS and EDS
+resource names, and locality.  We will add the propagation bits as
+another dimension of this key.
+
+When the xds_cluster_impl LB policy reports LRS metrics to the locality
+stats handle at the end of an RPC, it will pass the ORCA data (if any).
+Because the locality stats handle already has the propagation
+configuration, it will know which ORCA fields to copy.
+
+As an example, in C-core, we have the following APIs in LrsClient:
+
+```c++
+class ClusterLocalityStats {
+ public:
+  // ...
+
+  // Reports metrics for a finished RPC.
+  // backend_metrics points to the reported ORCA metrics, or null if none
+  // were reported.
+  void AddCallFinished(const BackendMetricData* backend_metrics,
+                       bool fail = false);
+};
+
+// Adds locality stats for cluster_name and eds_service_name for the
+// specified locality with the specified backend metric propagation.
+RefCountedPtr<ClusterLocalityStats> AddClusterLocalityStats(
+    std::shared_ptr<const XdsBootstrap::XdsServer> lrs_server,
+    absl::string_view cluster_name, absl::string_view eds_service_name,
+    RefCountedPtr<XdsLocalityName> locality,
+    RefCountedPtr<const BackendMetricPropagation> backend_metric_propagation);
+```
 
 ### Temporary environment variable protection
 
@@ -72,14 +138,14 @@ to explicitly set it to false to get the old behavior.
 
 ## Rationale
 
-Storing the propagation info inside the locality stats handle from the
-XdsClient or LrsClient is more efficient than the slightly more obvious
-solution of handling this in the xds_cluster_impl policy itself, since
-that would require storing the propagation information both
-per-subchannel and per-call, which would increase memory usage.
+Storing the propagation info inside the locality stats handle from
+the XdsClient or LrsClient is more efficient than the perhaps slightly
+more obvious solution of handling this in the xds_cluster_impl policy
+itself, since that would require storing the propagation information
+both per-subchannel and per-call, which would increase memory usage.
 
 ## Implementation
 
-C-core implementation in https://github.com/grpc/grpc/pull/37467.
+C-core implementation in grpc/grpc#37467.
 
 Will also be implemented in Java and Go.
