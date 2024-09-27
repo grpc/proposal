@@ -42,7 +42,7 @@ primary server and the fallback server use different resource names
 for the cluster resources.  If the client is using the data from the
 fallback server and then the primary server comes back up, the client
 may see the does-not-exist notification for the cluster name from the
-fallback server before it sees the new route configuration that points
+primary server before it sees the new route configuration that points
 to the correct cluster name, thus causing us to temporarily fail RPCs
 routed to that cluster.
 
