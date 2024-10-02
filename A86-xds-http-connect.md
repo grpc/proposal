@@ -4,7 +4,7 @@ A86: xDS-Based HTTP CONNECT
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-09-25
+* Last updated: 2024-10-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/WiqQ7h003fE
 
 ## Abstract
@@ -44,11 +44,12 @@ security, as per [gRFC A29].  We honor the xDS TLS configuration only if
 the application uses `XdsCredentials` when creating the gRPC channel.
 With this design, we will now honor the `Http11ProxyUpstreamTransport`
 transport socket wrapper regardless of whether `XdsCredentials` is used.
-However, we will retain the original behavior for the underlying
-transport socket wrapped by the `Http11ProxyUpstreamTransport` wrapper:
-if the underlying transport socket is `UpstreamTlsContext`, then we will
-honor it only if `XdsCredentials` is used, and if it is any other type,
-we will not use it.
+However, we will treat the underlying transport socket wrapped by the
+`Http11ProxyUpstreamTransport` wrapper exactly the way that we would
+previously have treated the transport socket specified directly in the CDS
+resource: if the underlying transport socket is `UpstreamTlsContext`, then
+we will honor it only if `XdsCredentials` is used, and if it is any other
+type, we will NACK the CDS resource.
 
 The `Http11ProxyUpstreamTransport` transport socket
 wrapper looks for the proxy address in the EDS metadata,
