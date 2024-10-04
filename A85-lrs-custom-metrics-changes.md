@@ -90,7 +90,7 @@ must support the following minimum set of fields:
 ### LRS APIs in XdsClient or LrsClient
 
 The LRS API in XdsClient (or LrsClient, if the implementation has split
-the LRS APIs into their own interface) currently provide a way to obtain
+the LRS APIs into their own interface) currently provides a way to obtain
 a locality stats handle that is keyed by LRS server, CDS and EDS
 resource names, and locality.  We will add the propagation bits as
 another dimension of this key.
