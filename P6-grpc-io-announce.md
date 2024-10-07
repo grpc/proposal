@@ -5,7 +5,7 @@ grpc-io-announce Mailing List
 * Status: Implemented
 * Implemented in: N/A
 * Last updated: 2024-09-30
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/MJLA45hndT8
 
 ## Abstract
 
