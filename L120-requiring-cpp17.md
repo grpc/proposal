@@ -5,7 +5,7 @@ L120: Requiring C++17 in gRPC Core/C++ Library
 * Status: Draft
 * Implemented in: n/a
 * Last updated: Oct 14, 2024
-* Discussion at: TBD
+* Discussion at: https://groups.google.com/g/grpc-io/c/HXnIJJnMdgc
 
 ## Abstract
 
