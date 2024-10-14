@@ -14,7 +14,7 @@ gRPC starts requiring C++17.
 ## Background
 
 To leverage the advancements in C++ standards, gRPC has progressively updated its requirements.  
-Initially, it adopted C++11 in 2017 (as per [Allow C++ in gRPC Core Library](L6-core-allow-cpp.md)).
+Initially, it adopted C++11 in 2017 (as per [L6: Allow C++ in gRPC Core Library](L6-core-allow-cpp.md)).
 Then, in 2022, it transitioned to C++14 (as per [L98: Requiring C++14 in gRPC Core/C++ Library](L98-requiring-cpp14.md)).
 
 Now, to align with the [the OSS Foundational C++ support policy](https://opensource.google/documentation/policies/cplusplus-support)
