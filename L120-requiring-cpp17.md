@@ -27,3 +27,7 @@ gRPC 1.69 will be the final release compatible with C++14. Going forward, gRPC w
 gRPC 1.69 will continue to receive critical bug fixes (P0) and security updates for one year (until December 10, 2025).
 
 This update does not introduce API changes, so the major version of gRPC remains unchanged.
+
+After this upgrade, gRPC will automatically adopt future C++ standards according to
+[the OSS Foundational C++ support policy](https://opensource.google/documentation/policies/cplusplus-support),
+eliminating the need for a separate gRFC for each C++ update.
