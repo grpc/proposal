@@ -81,21 +81,30 @@ Overview:
 
 When composing an email to `grpc-io-announce@googlegroups.com`, you should:
 
-*   Make the email actionable. For fixes, clearly define how the user should resolve the problem
-    *   e.g., “Upgrade grpc-xds to 1.47.1 or later. If grpc-xds is a transitive dependency, adding a direct dependency on grpc-xds will upgrade the version. Maven users are strongly encouraged to use Maven Enforcer’s requireUpperBoundDeps to avoid accidental version downgrades”
-    *   e.g., “Upgrade to Node.js 18 or later, preferably Node.js 20 or later”
-*   Define a discussion forum for questions, concerns, and replies. This will generally be an existing GitHub issue or new grpc-io thread
-*   Have the email reviewed by another person
+* Make the email actionable. For fixes, clearly define how the user should
+  resolve the problem
+  * e.g., “Upgrade grpc-xds to 1.47.1 or later. If grpc-xds is a transitive
+    dependency, adding a direct dependency on grpc-xds will upgrade the version.
+    Maven users are strongly encouraged to use Maven Enforcer’s
+    requireUpperBoundDeps to avoid accidental version downgrades”
+  * e.g., “Upgrade to Node.js 18 or later, preferably Node.js 20 or later”
+* Define a discussion forum for questions, concerns, and replies. This will
+  generally be an existing GitHub issue or new grpc-io thread
+* Have the email reviewed by another person
 
-Reliability and security issues in particular benefit greatly from clear
-communication, as users need to react quickly. For reliability and security
-issues, you should:
+Reability and security issues in particular benefit greatly from clear
+counication, as users need to react quickly. For reliability and security
+ises, you should:
 
-*   Clearly define how the user should determine if their application is at risk
-    *   e.g., “grpc-java users of grpc-xds 1.43.0 and later are impacted. You can run `maven dependency:tree` or `gradle dependencies --configuration=runtimeClasspath` to find the versions used by a particular project”
-    *   e.g., “grpc-node users running on Node.js 14”
-*   Define the severity of the problem, and how to know if the issue is occurring
-    *   e.g., “This bug may cause all RPCs on a channel to fail with ‘UNAVAILABLE: Handshake failure’”
+* Clearly define how the user should determine if their application is at risk
+  * e.g., “grpc-java users of grpc-xds 1.43.0 and later are impacted. You can
+    run `maven dependency:tree` or `gradle dependencies
+    --configuration=runtimeClasspath` to find the versions used by a particular
+    project”
+  * e.g., “grpc-node users running on Node.js 14”
+* Define the severity of the problem, and how to know if the issue is occurring
+  * e.g., “This bug may cause all RPCs on a channel to fail with ‘UNAVAILABLE:
+    Handshake failure’”
 
 Emails sent to `grpc-io-announce@googlegroups.com` should be addressed as:
 
@@ -105,13 +114,19 @@ BCC: grpc-io-announce@googlegroups.com
 Subject: gRPC $LANG Lorem Ipsum
 ```
 
-Such addressing allows replies to be seen on grpc-io, prevents replies from spamming the `grpc-io-announce@` moderation queue, and allows users to quickly ignore announcements for irrelevant languages. Use a single email, independent of the number of implementations impacted.
+Such addressing allows replies to be seen on grpc-io, prevents replies from
+spamming the `grpc-io-announce@` moderation queue, and allows users to quickly
+ignore announcements for irrelevant languages. Use a single email, independent
+of the number of implementations impacted.
 
 As that is sent, for a reliability or security issue, update the Github release
 notes of impacted releases to include a warning. If too many releases are
 impacted, just update newer releases.
 
-Severe issues may require an announcement early, with only a workaround or a few releases available. Follow-up emails on `grpc-io-announce@` may occur to provide updated information, but they should be few and batched. Finer-grained notification should be on the Github issue or `grpc-io@`.
+Severe issues may require an announcement early, with only a workaround or a few
+releases available. Follow-up emails on `grpc-io-announce@` may occur to provide
+updated information, but they should be few and batched. Finer-grained
+notification should be on the Github issue or `grpc-io@`.
 
 The mailing list will prefix "[grpc-io-announce] " to email subject line, like
 is already done for `grpc-io@`. This is to replace the need for "IMPORTANT",
