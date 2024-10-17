@@ -1,6 +1,6 @@
 ## A79: Non-per-call Metrics Architecture
 
-*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya), Yijie Ma (@yijiem)
+*   Author(s): Yash Tibrewal (@yashykt), Vindhya Ningegowda (@dnvindhya), Yijie Ma (@yijiem), Zach Reyes (@zasweq)
 *   Approver: Mark Roth (@markdroth)
 *   Status: Final
 *   Implemented in: Core, C++
@@ -247,7 +247,35 @@ class DoubleHistogramDescriptor implements MetricDescriptor {
 
 ##### Go
 
-(To be filled.)
+```go
+type MetricDescriptor struct {
+	Name Metric
+	Description string
+	Unit string
+	Labels []string
+	OptionalLabels []string
+	Default bool
+	Type MetricType
+	Bounds []float64
+}
+
+type MetricType int
+
+const (
+    MetricTypeIntCount MetricType = iota
+    MetricTypeFloatCount
+    MetricTypeIntHisto
+    MetricTypeFloatHisto
+    MetricTypeIntGauge
+)
+
+
+func RegisterInt64Histo(descriptor MetricDescriptor) *Int64HistoHandle {}
+func RegisterFloat64Histo(descriptor MetricDescriptor) *Float64HistoHandle {}
+func RegisterInt64Gauge(descriptor MetricDescriptor) *Int64GaugeHandle {}
+func RegisterInt64Histo(descriptor MetricDescriptor) *Int64HistoHandle {}
+func RegisterFloat64Histo(descriptor MetricDescriptor) *Float64HistoHandle {}
+```
 
 #### Global Stats Plugin Registry
 
@@ -493,7 +521,32 @@ public interface MetricsRecorder {
 
 ##### Go
 
-(To be filled)
+```go
+// MetricsRecorderList forwards Record calls to all of its metricsRecorders.
+type MetricsRecorderList struct {
+    // metricsRecorders are the metrics recorders this list will forward to.
+    metricsRecorders []estats.MetricsRecorder
+}
+
+// MetricsRecorder records on metrics derived from metric registry.
+type MetricsRecorder interface {
+	// RecordInt64Count records the measurement alongside labels on the int
+	// count associated with the provided handle.
+	RecordInt64Count(handle *Int64CountHandle, incr int64, labels ...string)
+	// RecordFloat64Count records the measurement alongside labels on the float
+	// count associated with the provided handle.
+	RecordFloat64Count(handle *Float64CountHandle, incr float64, labels ...string)
+	// RecordInt64Histo records the measurement alongside labels on the int
+	// histo associated with the provided handle.
+	RecordInt64Histo(handle *Int64HistoHandle, incr int64, labels ...string)
+	// RecordFloat64Histo records the measurement alongside labels on the float
+	// histo associated with the provided handle.
+	RecordFloat64Histo(handle *Float64HistoHandle, incr float64, labels ...string)
+	// RecordInt64Gauge records the measurement alongside labels on the int
+	// gauge associated with the provided handle.
+	RecordInt64Gauge(handle *Int64GaugeHandle, incr int64, labels ...string)
+}
+```
 
 ### Metric Instrument Naming Conventions
 
@@ -610,7 +663,24 @@ public final class OpenTelemetryModule {
 
 #### Go
 
-(To be filled)
+```go
+// registryMetrics implements MetricsRecorder for the client and server stats
+// handlers.
+type registryMetrics struct {}
+
+func (rm *registryMetrics) RecordInt64Count(handle *estats.Int64CountHandle, incr int64, labels ...string) {}
+func (rm *registryMetrics) RecordFloat64Count(handle *estats.Float64CountHandle, incr float64, labels ...string) {}
+func (rm *registryMetrics) RecordInt64Histo(handle *estats.Int64HistoHandle, incr int64, labels ...string) {}
+func (rm *registryMetrics) RecordFloat64Histo(handle *estats.Float64HistoHandle, incr float64, labels ...string) {}
+func (rm *registryMetrics) RecordInt64Gauge(handle *estats.Int64GaugeHandle, incr int64, labels ...string) {}
+
+// DefaultMetrics returns a set of default OpenTelemetry metrics.
+//
+// This should only be invoked after init time.
+func DefaultMetrics() *estats.Metrics {
+    return defaultPerCallMetrics.Join(estats.DefaultMetrics)
+}
+```
 
 ## Rationale
 
