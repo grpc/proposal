@@ -4,8 +4,8 @@ Add Typing to gRPC Python Sync API
 * Approver: gnossen
 * Status: Draft
 * Implemented in: Python
-* Last updated: 22/08/2024
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 2024/08/23
+* Discussion at: [discussion thread](https://groups.google.com/g/grpc-io/c/_zVpELQnUQU)
 
 ## Abstract
 
@@ -85,7 +85,7 @@ We propose a phased approach to implementing this proposal:
 1. **Add typing to internal APIs:** This would involve adding type annotations to the internal functions and classes used by the gRPC Python Sync API.
     * **Implementation:** [PR1: Add typing for some internal python files.](https://github.com/grpc/grpc/pull/31514)
 2. **Add typing to public API and mark it as experimental for at least one release:** This would involve adding type annotations to the public API and marking it as experimental to allow for feedback and potential adjustments.
-    * **Implementation:**
+    * **Implementation:** [python sync api updates](https://github.com/grpc/grpc/pull/37967)
 3. **Release typed public APIs:** Once the experimental phase is complete and any necessary adjustments are made, the typed public APIs would be released as stable.
 
 
