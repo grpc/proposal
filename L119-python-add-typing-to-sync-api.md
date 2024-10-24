@@ -87,7 +87,7 @@ We propose a phased approach to implementing this proposal:
 2. **Add typing to public API and mark it as experimental for at least one release:** This would involve adding type annotations to the public API and marking it as experimental to allow for feedback and potential adjustments.
     * **Implementation:** [python sync api updates](https://github.com/grpc/grpc/pull/37967)
 3. **Release typed public APIs:** Once the experimental phase is complete and any necessary adjustments are made, the typed public APIs would be released as stable.
-
+4. **Integrate MyPy and typeguard into CI:** To ensure type consistency and catch potential errors early, we will integrate MyPy (for static type checking) and typeguard (for runtime type checking) into our continuous integration pipeline. 
 
 ## Open issues (if applicable)
 
