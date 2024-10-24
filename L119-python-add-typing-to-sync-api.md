@@ -4,7 +4,7 @@ Add Typing to gRPC Python Sync API
 * Approver: gnossen
 * Status: Draft
 * Implemented in: Python
-* Last updated: 2024/08/23
+* Last updated: 2024/08/24
 * Discussion at: [discussion thread](https://groups.google.com/g/grpc-io/c/_zVpELQnUQU)
 
 ## Abstract
