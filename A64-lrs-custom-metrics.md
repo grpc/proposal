@@ -6,6 +6,7 @@ A64: xDS LRS Custom Metrics Support
 * Implemented in: C-core, Java, Go
 * Last updated: 2023-05-10
 * Discussion at: https://groups.google.com/g/grpc-io/c/Cs7ffkO1wUA
+* Updated by: [A85: Changes to xDS LRS Custom Metrics Support](A85-lrs-custom-metrics-changes.md)
 
 ## Abstract
 
