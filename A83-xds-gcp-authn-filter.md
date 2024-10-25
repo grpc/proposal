@@ -124,8 +124,9 @@ The xDS HTTP filter will be configured via the
 message](https://github.com/envoyproxy/envoy/blob/c16faca3619fb44c24b12d15aad8a797b9e210ab/api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L27).
 The fields will be interpretted as follows:
 - `cache_config`: Optional.  Within this message:
-  - `cache_size`: Optional.  If set, must be greater than 0.  If greater
-    than `INT64_MAX`, it will be treated as `INT64_MAX`.  Defaults to 10.
+  - `cache_size`: Optional.  If set, must be greater than 0.  Defaults
+    to 10.  Implementations that cannot support caches as large as
+    `UINT64_MAX` may cap this value at their maximum supported size.
 - `http_uri`: Ignored by gRPC.
 - `token_header`: Ignored by gRPC.
 - `retry_policy`: Ignored by gRPC.
