@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-10-24
+* Last updated: 2024-10-25
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -106,10 +106,12 @@ if the HTTP request fails or if it returns an invalid JWT token),
 [backoff](https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md)
 must be applied before the next attempt may be started.  If a data
 plane RPC is started when there is no cached token available and while
-in backoff delay, it will be queued until the completion of the next
-HTTP request attempt.  Note that no attempt should be started unless a
-data plane RPC is started, since we do not want to unnecessarily retry
-if the channel is idle.
+in backoff delay, it will be failed with the status from the last HTTP
+request attempt.  When the backoff delay expires, the next data plane
+RPC will trigger a new attempt.  Note that no attempt should be started
+until and unless a data plane RPC is started, since we do not want to
+unnecessarily retry if the channel is idle.  The backoff state will be
+reset once there is a successful HTTP request.
 
 To add the token to a data plane RPC, the call credential will add a
 header named `authorization`.  The header value will be the string
