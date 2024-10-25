@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-09-05
+* Last updated: 2024-10-24
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -62,7 +62,8 @@ instead of the expiration time encoded in the token.
 When the credential is asked for a token for a data
 plane RPC, if the token is not yet cached or the cached
 token will expire within some fixed refresh interval
-(typically 1 minute), the credential will start an HTTP request to
+(typically 1 minute), the credential will start an HTTP request (if there
+is not already one pending) to
 `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]`,
 where `[AUDIENCE]` is replaced with the audience specified when the
 credential object was instantiated.  The HTTP request will include the
@@ -121,8 +122,8 @@ The xDS HTTP filter will be configured via the
 message](https://github.com/envoyproxy/envoy/blob/c16faca3619fb44c24b12d15aad8a797b9e210ab/api/envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.proto#L27).
 The fields will be interpretted as follows:
 - `cache_config`: Optional.  Within this message:
-  - `cache_size`: Optional.  If set, must be greater than 0 and less
-    than `INT64_MAX`.  Defaults to 10.
+  - `cache_size`: Optional.  If set, must be greater than 0.  If greater
+    than `INT64_MAX`, it will be treated as `INT64_MAX`.  Defaults to 10.
 - `http_uri`: Ignored by gRPC.
 - `token_header`: Ignored by gRPC.
 - `retry_policy`: Ignored by gRPC.
@@ -170,7 +171,7 @@ the two maps the entry came from.
 The logic to validate cluster metadata will look something like this
 (pseudo-code):
 
-```
+```python
 parsed_metadata = {}  # Value is either JSON or parsed object
 # First process typed_filter_metadata.
 for key, any_field in cluster_metadata.typed_filter_metadata.items():
@@ -215,7 +216,7 @@ size, then entries will be removed starting from the end of the
 last-used list.
 
 Note that the `cache_config.cache_size` parameter in the filter config
-is a truly global parameters, not settable per-route, and we want the
+is a channel-level parameter, not settable per-route, and we want the
 cache itself to be shared across all routes.  Implementations that create
 separate filter/interceptor instances for each route should share the
 cache between those instances.
