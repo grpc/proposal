@@ -4,7 +4,7 @@ A86: xDS-Based HTTP CONNECT
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-10-02
+* Last updated: 2024-10-25
 * Discussion at: https://groups.google.com/g/grpc-io/c/WiqQ7h003fE
 
 ## Abstract
@@ -44,12 +44,26 @@ security, as per [gRFC A29].  We honor the xDS TLS configuration only if
 the application uses `XdsCredentials` when creating the gRPC channel.
 With this design, we will now honor the `Http11ProxyUpstreamTransport`
 transport socket wrapper regardless of whether `XdsCredentials` is used.
-However, we will treat the underlying transport socket wrapped by the
-`Http11ProxyUpstreamTransport` wrapper exactly the way that we would
-previously have treated the transport socket specified directly in the CDS
-resource: if the underlying transport socket is `UpstreamTlsContext`, then
-we will honor it only if `XdsCredentials` is used, and if it is any other
-type, we will NACK the CDS resource.
+The parsed form of the CDS resource will include a boolean field
+indicating whether use of an HTTP proxy is enabled.
+
+When validating the `Http11ProxyUpstreamTransport`, the nested
+`transport_socket` field may be either unset or may contain an
+`UpstreamTlsContext`, which we will validate exactly as if it had been
+present in the `transport_socket` field in the CDS resource.  If there
+is any other type in this field, we will NACK the resource.
+
+We will use the nested `transport_socket` field the same way that we would
+have if it had been the `transport_socket` field in the CDS resource.
+The TLS configuration will be encoded in the parsed CDS resource in
+exactly the same way, regardless of whether the `UpstreamTlsContext`
+was present in the `Cluster.transport_socket` field or in the
+`Http11ProxyUpstreamTransport.transport_socket` field.  The transport
+security functionality will also remain unchanged: if `XdsCredentials`
+is used and the TLS configuration is present, the TLS configuration will
+be used; if `XdsCredentials` is used and the TLS configuration is absent,
+then fallback credentials will be used; if `XdsCredentials` is not used,
+then the TLS configuration will be ignored.
 
 The `Http11ProxyUpstreamTransport` transport socket
 wrapper looks for the proxy address in the EDS metadata,
@@ -86,7 +100,7 @@ an endpoint has a proxy address, then the CDS LB policy must set some
 appropriate resolver attributes on the endpoint to cause the specified
 proxy to be used.  Note that this behavior may be triggered by a custom
 proxy mapper (see [gRFC A1]).  The argument to the HTTP CONNECT request
-sent on the wire will be IP address and port of the endpoint.
+sent on the wire will be the IP address and port of the endpoint.
 
 ### Temporary environment variable protection
 
