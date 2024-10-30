@@ -68,8 +68,10 @@ regularly-scheduled events, like the regularly-scheduled dropping of a platform.
 ### Process
 
 **(If dealing with a security vulnerability you can use this process in part,
-but security vulnerability processes take priority. Make sure appropriate
-embargos are expired, before making information public.)**
+but security vulnerability processes
+[gRFC P4: gRPC CVE Process](https://github.com/grpc/proposal/blob/master/P4-grpc-cve-process.md)
+take priority. Make sure appropriate embargos are expired, before making
+information public.)**
 
 Overview:
 
@@ -92,9 +94,9 @@ When composing an email to `grpc-io-announce@googlegroups.com`, you should:
   generally be an existing GitHub issue or new grpc-io thread
 * Have the email reviewed by another person
 
-Reability and security issues in particular benefit greatly from clear
-counication, as users need to react quickly. For reliability and security
-ises, you should:
+Reliability and security issues in particular benefit greatly from clear
+communication, as users need to react quickly. For reliability and security
+issues, you should:
 
 * Clearly define how the user should determine if their application is at risk
   * e.g., “grpc-java users of grpc-xds 1.43.0 and later are impacted. You can
