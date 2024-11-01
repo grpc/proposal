@@ -99,7 +99,38 @@ an options struct for FileWatcherCertificateProvider.
 
 #### Java
 
-TODO: @erm-g to fill this in.
+In Java, we'll utilize the same [Certificate Provider Plugin Framework] as in [gRFC A29]. We will add the ability for
+the `FileWatcherCertificateProvider` to be instantiated with a SPIFFE trust bundle map file in addition to the existing files. The `XdsX509TrustManager` will gain the ability to be instantiated with a SPIFFE trust bundle map. In this case, it will use the SPIFFE trust bundle certificates as trusted roots. If the `XdsX509TrustManager` is instantiated using 
+CA certificates (existing functionality), then it'll contimue to use them exactly as it does today.
+
+In Java, we need new API to work with [SPIFFE] and [SPIFFE bundle format]. A new `SpiffeUtil` will be developed:
+```java
+class SpiffeUtil {
+   Optional<SpiffeId> extractSpiffeId(X509Certificate[] certChain);
+   SpiffeBundle loadTrustBundleFromFile(String trustBundleFile);
+}
+class SpiffeId {
+   String getTrustDomain();
+   String getPath();
+}
+class SpiffeBundle {
+   Map<String, List<X509Certificates>> getBundleMap();
+}
+```
+`XdsX509TrustManager` and `XdsTrustManagerFactory` will get new additional API to accept a SPIFFE trust bundle map:
+```java
+class XdsTrustManagerFactory {
+   XdsTrustManagerFactory(Map<String, List<X509Certificates>>);
+   XdsTrustManagerFactory(X509Certificates[]);
+}
+class XdsX509TrustManager {
+   XdsX509TrustManager(Map<String, XdsX509ExtendedTrustManager>);
+   XdsTrustManagerFactory(XdsX509ExtendedTrustManager);
+}
+```
+We'll also adjust existing hierarchies of `Watcher` and `CertificateProvider` to support the new SPIFFE trust bundle map. 
+
+[Certificate Provider Plugin Framework]: A29-xds-tls-security.md#certificate-provider-plugin-framework
 
 #### Go
 
