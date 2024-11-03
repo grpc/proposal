@@ -162,6 +162,39 @@ older versions.
 
 ## Implementation
 
-TODO: @erm-g to fill this in.
+The overall flow is nearly identical to the one described in [gRFC A29 Implementation Details].
+At a high level, the following components require modification to support SPIFFE:
+* **SpiffeUtils**: This utility needs to be enhanced with the ability to:
+    * Load a SPIFFE trust bundle from a JSON file
+    * Extract a SPIFFE ID from a certificate chain
+* **Certificate Provider Factory**: Needs to support the new xDS field `spiffe_trust_bundle_map_file`
+* **FileWatcherCertificateProvider**: Needs to support loading Trust bundle from the provided file
+* **Handshaking**: Needs to support using SPIFFE trust bundle map and extracted Spiffe ID from peer certificate chain to verify connections
 
-[A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
+The detailed description of the components and the flow is below.
+
+**Certificate Provider Factory** receives a config with the new xDS field `spiffe_trust_bundle_map_file`, and instantiates **FileWatcherCertificateProvider** using the file path to the json file containing the SPIFFE trust bundle map. Old `ca_certificate_file` (if present) is ignored.
+
+**FileWatcherCertificateProvider** starts to monitor the new file path to SPIFFE trust bundle map json file. It uses **SpiffeUtils** to load, parse the JSON file, and extract a mapping of trust domains to their corresponding CA certificates. If an error (for example, file doesn’t exist / isn’t readable / contains invalid entries) occurs during the initial load, the SPIFFE trust bundle map can't be created and, since there is no fallback mechanism), the certificate verification process will fail. For subsequent loads, errors will not affect the existing in-memory trust bundle map. Note - an empty map will be considered a valid (but empty) trust bundle map.
+
+**SpiffeUtils** provides the API for constructing SPIFFE trust bundle map from json file (used by **FileWatcherCertificateProvider**), and the API for extracting SPIFFE ID from peer certificate chain (used during **Handshaking**). Note - [SPIFFE ID] spec is fully supported, [SPIFFE bundle format] and [Publishing SPIFFE bundle format] are partially supported:
+* Only ‘keys’ and ‘spiffe_sequence’ elements of JWK set are supported
+* Only ‘kty’, ‘use’, and ‘x5c’ elements of ‘keys’ are supported
+* Instead of ignoring individual JWK entries in case of issues, we ignore the whole TrustBundle
+    
+**Handshaking**: The  handshaking logic incorporates the following SPIFFE-specific steps:
+* If the SPIFFE feature is enabled, extract (using **SpiffeUtils**) the SPIFFE ID from the peer's certificate chain.
+* Use the trust domain from the SPIFFE ID to look up the corresponding CA certificates in the SPIFFE trust bundle map.
+* Use these trusted roots for certificate verification.
+  
+Note - If the SPIFFE ID is missing or the SPIFFE trust bundle map lacks the necessary data, the verification process will fail.
+
+
+
+[gRFC A29 Implementation Details]: A29-xds-tls-security.md#implementation-details
+[SPIFFE ID]: https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE-ID.md#2-spiffe-identity
+[Publishing SPIFFE bundle format]: https://github.com/spiffe/spiffe/blob/main/standards/X509-SVID.md#61-publishing-spiffe-bundle-elements
+
+### Implementation schedule
+This will first be implemented in Java by @erm-g, with implementations in Go and C++ to follow in 2025.
+
