@@ -1,4 +1,4 @@
-L120: Adapting to Modern C++ in gRPC Core/C++ Library
+L120: Transition to Modern C++ in gRPC Core/C++ Library
 ----
 * Author(s): veblush
 * Approver: markdroth
