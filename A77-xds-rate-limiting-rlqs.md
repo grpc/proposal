@@ -73,6 +73,12 @@ The diagram below shows the conceptual components of the RLQS Filter. Note that
 the actual implementation may vary depending on the language.
 
 ```mermaid
+---
+config:
+  theme: base
+  themeVariables:
+    clusterBorder: "#777"
+---
 graph TD
 %% RLQS Components Flowchart v8
 
