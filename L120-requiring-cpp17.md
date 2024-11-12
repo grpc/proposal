@@ -1,15 +1,16 @@
-L120: Requiring C++17 in gRPC Core/C++ Library
+L120: Adapting to Modern C++ in gRPC Core/C++ Library
 ----
 * Author(s): veblush
 * Approver: markdroth
 * Status: Draft
 * Implemented in: n/a
-* Last updated: Oct 14, 2024
+* Last updated: Nov 12, 2024
 * Discussion at: https://groups.google.com/g/grpc-io/c/HXnIJJnMdgc
 
 ## Abstract
 
-gRPC starts requiring C++17.
+To align with [the OSS Foundational C++ support policy](https://opensource.google/documentation/policies/cplusplus-support), gRPC is updating its minimum required C++ standard.
+The immediate change is a transition to C++17. Future updates to the minimum version will continue to follow the policy.
 
 ## Background
 
