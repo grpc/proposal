@@ -114,6 +114,7 @@ graph TD
     rlqs_client <-. gRPC Stream .-> rlqs
     style request stroke: RoyalBlue, stroke-width: 2px;
     linkStyle 3,4 stroke: RoyalBlue, stroke-width: 2px;
+    linkStyle 11 stroke: Teal, stroke-width: 3px;
 ```
 
 ##### RLQS HTTP Filter
