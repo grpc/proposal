@@ -82,10 +82,10 @@ For forward-compatibility, implementations should ignore any strings
 that do not match a currently supported ORCA field.  Implementations
 must support the following minimum set of fields:
 
-- cpu_utilization
-- mem_utilization
-- application_utilization
-- named_metrics map
+- `cpu_utilization`
+- `mem_utilization`
+- `application_utilization`
+- `named_metrics map`
 
 ### LRS APIs in XdsClient or LrsClient
 
