@@ -148,7 +148,7 @@ to explicitly set it to false to get the old behavior.
 
 Storing the propagation info inside the locality stats handle from
 the XdsClient or LrsClient is more efficient than the perhaps slightly
-more obvious solution of handling this in the xds_cluster_impl policy
+more obvious solution of handling this in the `xds_cluster_impl` policy
 itself, since that would require storing the propagation information
 both per-subchannel and per-call, which would increase memory usage.
 
