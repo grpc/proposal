@@ -95,7 +95,7 @@ a locality stats handle that is keyed by LRS server, CDS and EDS
 resource names, and locality.  We will add the propagation bits as
 another dimension of this key.
 
-When the xds_cluster_impl LB policy reports LRS metrics to the locality
+When the `xds_cluster_impl` LB policy reports LRS metrics to the locality
 stats handle at the end of an RPC, it will pass the ORCA data (if any).
 Because the locality stats handle already has the propagation
 configuration, it will know which ORCA fields to copy.
