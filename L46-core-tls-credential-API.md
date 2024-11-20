@@ -407,6 +407,8 @@ class CertificateVerifierInterface {
   // The callback must be called when verification is complete and the
   // verification result must be populated in the output parameter of the
   // callback function.
+  // This method will only be called in the case that regular verification has succeeded.
+  // Custom verification WILL NOT be called on resumed handshakes.
   //
   // request: the verification information associated with this request
   // callback: The function that gRPC will invoke when the verifier has already
