@@ -5,7 +5,7 @@ A87: mTLS SPIFFE Support
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2024-11-20
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/55oIW6GNabs
 
 ## Abstract
 
