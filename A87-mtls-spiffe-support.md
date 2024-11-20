@@ -4,7 +4,7 @@ A87: mTLS SPIFFE Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-11-01
+* Last updated: 2024-11-20
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -25,7 +25,9 @@ https://github.com/spiffe/spiffe/pull/304.
 
 [gRFC A29]: A29-xds-tls-security.md
 [SPIFFE]: https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE.md
+[SPIFFE ID format]: https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE-ID.md#2-spiffe-identity
 [SPIFFE bundle format]: https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE_Trust_Domain_and_Bundle.md#4-spiffe-bundle-format
+[Publishing SPIFFE bundle format]: https://github.com/spiffe/spiffe/blob/main/standards/X509-SVID.md#61-publishing-spiffe-bundle-elements
 
 ## Proposal
 
@@ -47,11 +49,6 @@ standard X509 certificate verification will be used, just as it is
 today.  However, if the certificate provider returns a SPIFFE trust
 bundle map, then SPIFFE verification will be performed, and non-SPIFFE
 peer certificates will be rejected.
-
-Before performing SPIFFE verification, SPIFFE trust bundle map is extracted from provided JSON file and stored into memory. If an error (for example, file isn’t readable / contains invalid entries) occurs during the initial load, the SPIFFE trust bundle map can't be created and, since there is no fallback mechanism, the certificate verification process will fail. For subsequent loads, errors will not affect the existing in-memory trust bundle map. An empty map will be considered a valid (but empty) trust bundle map. Note - [SPIFFE bundle format] and [Publishing SPIFFE bundle format] are partially supported:
-  * Only ‘keys’ and ‘spiffe_sequence’ elements of JWK set are supported
-  * Only ‘kty’, ‘use’, and ‘x5c’ elements of ‘keys’ are supported
-  * Instead of ignoring individual JWK entries in case of issues, we ignore the whole TrustBundle
 
 When performing SPIFFE verification, the following steps will be performed:
 
@@ -87,8 +84,21 @@ setting the new field regardless of what gRPC version is in use, which
 results in older versions returning CA certificates and newer versions
 returning the SPIFFE trust bundle map.
 
-[SPIFFE ID format]: https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE-ID.md#2-spiffe-identity
-[Publishing SPIFFE bundle format]: https://github.com/spiffe/spiffe/blob/main/standards/X509-SVID.md#61-publishing-spiffe-bundle-elements
+When reading the SPIFFE trust bundle map file, the certificate provider
+will parse the JSON to ensure its validity and store the map in memory.
+If an error occurs during the initial load (e.g., a failure to read
+the file, or the file contains invalid entries), then there is no valid
+map, which means new connection attempts will fail the TLS handshake.
+For subsequent loads, errors will not affect the existing in-memory
+trust bundle map.  An empty map will be considered a valid (but empty)
+trust bundle map.
+
+Note that the [SPIFFE bundle format] and [Publishing SPIFFE bundle format]
+are partially supported:
+- Only the `keys` and `spiffe_sequence` elements of the JWK set are supported.
+- Only the `kty`, `use`, and `x5c` elements of `keys` are supported.
+- Instead of ignoring individual JWK entries in case of issues, we ignore
+  the whole trust bundle.
 
 ### SPIFFE Certificate Verification in TlsCredentials
 
