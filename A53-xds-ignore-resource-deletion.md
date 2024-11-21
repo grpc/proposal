@@ -6,6 +6,7 @@ A53: Option for Ignoring xDS Resource Deletion
 * Implemented in: C-core, Java
 * Last updated: 2022-05-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/eh7En9CY3oY
+* Updated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md)
 
 ## Abstract
 
