@@ -280,7 +280,7 @@ There will be no configuration telling gRPC to use these fields; we will
 unconditionally use them if they are present.
 
 When we receive an error for a given resource, we will cancel the resource
-timer, if any, and report the error to the watchers' `OnDataError()`
+timer, if any, and report the error to the watchers' `OnServerDataError()`
 methods.
 
 In the XdsClient cache, when we receive an error for a resource, we will
@@ -319,12 +319,12 @@ Resource timeout | false | false | `OnResourceDoesNotExist()` | Drop existing re
 Resource timeout | true  | false | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnClientDataError(Status(NOT_FOUND), true)`  | Drop existing resource and fail RPCs
 Resource timeout | false | true | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnTransientError(Status(NOT_FOUND), false)` | Ignore
 Resource timeout | true  | true | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnTransientError(Status(NOT_FOUND), true)`  | Ignore
-LDS or CDS resource deletion from server | false | | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnDataError(status, false)` | Ignore
-LDS or CDS resource deletion from server | true | | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnDataError(status, false)` | Drop existing resource and fail RPCs
-[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | false | | N/A | N/A | `OnDataError(status, false)` | Ignore
-[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | | N/A | N/A | `OnDataError(status, true)` | Drop existing resource and fail RPCs
-[xRFC TP3] error with other status | false | | N/A | N/A | `OnDataError(status, false)` | Ignore
-[xRFC TP3] error with other status | true | | N/A | N/A | `OnDataError(status, true)` | Ignore
+LDS or CDS resource deletion from server | false | | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnServerDataError(status, false)` | Ignore
+LDS or CDS resource deletion from server | true | | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnServerDataError(status, false)` | Drop existing resource and fail RPCs
+[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | false | | N/A | N/A | `OnServerDataError(status, false)` | Ignore
+[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | | N/A | N/A | `OnServerDataError(status, true)` | Drop existing resource and fail RPCs
+[xRFC TP3] error with other status | false | | N/A | N/A | `OnServerDataError(status, false)` | Ignore
+[xRFC TP3] error with other status | true | | N/A | N/A | `OnServerDataError(status, true)` | Ignore
 
 ### Temporary environment variable protection
 
