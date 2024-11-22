@@ -16,6 +16,19 @@ for handling all xDS-related data errors.
 
 ## Background
 
+### Reporting Errors from the xDS Server
+
+Currently, the xDS transport protocol does not provide a way for the
+server to report per-resource errors to the client.  The only thing that
+the server can do is react as if the resource does not exist, which
+means that the client lacks an informative error message that could be
+used for debugging purposes.
+
+[xRFC TP3] provides a mechanism for the xDS server to send per-resource
+errors to the client.  This will cover both cases like the resource not
+existing (which also allows the client to detect this case more quickly,
+as described below) and other errors, such as permission problems.
+
 ### xDS Error Handling
 
 There are two basic categories of errors that can occur in an xDS client:
@@ -87,7 +100,7 @@ this resource timer are tricky to get right, as described in [gRFC A57].[^1]
 
 [^1]: Note that gRFC A57 primarily addresses transient errors, while the
       does-not-exist timer actually reflects a data error.  However,
-      the two needed to be addressed together, since we wanted the timer
+      the two needed to be addressed together, since we want the timer
       to run only when there is no transient error condition.
 
 We have seen a number of cases where the resource timer has triggered
@@ -137,7 +150,8 @@ server feature is present, there will be two changes to the behavior of
 the resource timer:
 - The timer will be set for 30 seconds instead of 15 seconds.
 - When the timer fires, it will be treated as a transient error
-  instead of a data error.
+  instead of a data error.  (See below for how this is reflected in the
+  watcher API.)
 
 This server feature should be used only in cases where the server is known
 to support [xRFC TP3].  If the server feature is used when the server
@@ -170,9 +184,11 @@ RPCs.
 ### Changes to XdsClient Watcher APIs
 
 The current `XdsClient` API has two error-handling methods:
-- `OnError(Status status)`: Invoked for all transient errors and for some data
-  errors (NACKs).  The watcher is generally expected to ignore the error
-  if it already has a valid cached resource.
+
+- `OnError(Status status)`: Invoked for all transient errors and for some
+  data errors (NACKs).  The watcher is generally expected to ignore the
+  error if it already has a valid cached resource.
+
 - `OnResourceDoesNotExist()`: Invoked specifically for the does-not-exist
   case.  The watcher is generally expected to stop using any previously
   cached resource and put itself into a failing state.
@@ -186,46 +202,91 @@ The current `XdsClient` API has two error-handling methods:
 These methods do not map well to the two error categories defined above.
 
 This proposal replaces those two methods with the following new methods,
-which do map cleanly to the two error categories defined above:
-- `OnTransientError(Status status)`: Will be invoked for transient errors only.
-  The watcher is generally expected to ignore the error if it already has
-  a valid cached resource.
-- `OnDataError(Status status, bool fail_on_data_errors)`: Will be invoked for
-  data errors only.  The `fail_on_data_errors` parameter indicates
+which do map more cleanly to the two error categories defined above:
+
+- `OnTransientError(Status status)`: Will be invoked for transient errors
+  only.  This includes the ADS channel reporting TRANSIENT_FAILURE and
+  the ADS stream terminating without receiving a response, as described
+  in [gRFC A57].  It also includes the resource timer firing if the
+  "resource_timer_indicates_transient_failure" server feature is present.
+  The watcher is generally expected to ignore the error if it already
+  has a valid cached resource.
+
+- `OnClientDataError(Status status, bool fail_on_data_errors)`: Will be
+  invoked for client-generated data errors only.  This is used when
+  we NACK a resource.  The `fail_on_data_errors` parameter indicates
   whether the server feature of the same name was present in the
-  bootstrap configuration for the xDS server that caused the data error.
-  If the watcher already has a valid resource, it will use the two
-  parameters to determine whether it should continue using that resource
-  or whether it should stop using that resource and put itself into a
-  failing state.
+  bootstrap configuration for the xDS server that caused the data
+  error.  If the watcher already has a valid resource, it will use the
+  `fail_on_data_errors` parameter to determine whether it should continue
+  using that resource or whether it should stop using that resource and
+  put itself into a failing state.
 
-For transient errors, we will now call `OnTransientError()` instead of
-`OnError()`, but the semantics and behavior will remain the same.
+- `OnServerDataError(Status status, bool fail_on_data_errors)`: Will be
+  invoked for server-generated data errors only.  This is used for
+  [xRFC TP3] errors and when the does-not-exist timer fires when the
+  "resource_timer_indicates_transient_failure" server feature is *not*
+  present.  The `fail_on_data_errors` parameter indicates whether
+  the server feature of the same name was present in the bootstrap
+  configuration for the xDS server that caused the data error.  If the
+  watcher already has a valid resource, it will use the two parameters to
+  determine whether it should continue using that resource or whether it
+  should stop using that resource and put itself into a failing state.
+  See [xRFC TP3] for guidance on what status codes should be used to
+  decide to drop an existing resource.
 
-For data errors, we will now call `OnDataError()` instead of `OnError()`
-or `OnResourceDoesNotExist()`.  The semantics here will depend on the
-bootstrap configuration and, in the case of a status returned by the
-xDS server via the mechanism described in [xRFC TP3], the status code.
+For transient connectivity errors, including the ADS channel reporting
+TRANSIENT_FAILURE and the ADS stream terminating without receiving a
+response (as described in [gRFC A57]), we will call `OnTransientError()`
+instead of `OnError()`, but the semantics and behavior will remain
+the same.  The watcher will ignore these errors if there is a previously
+cached version of the resource.
 
+For NACKs, we will call `OnClientDataError()`.  The watcher behavior will
+depend on the presence of the "fail_on_data_errors" server feature in
+the bootstrap configuration: if the server feature is present, we will
+drop any previously cached resource and fail data plane RPCs; otherwise,
+we will continue using the previously cached resource if we have one.
 
+For the resource timer, the behavior will depend on the presence of the
+"resource_timer_indicates_transient_failure" server feature in the
+bootstrap configuration.  If that server feature is present, then when
+the timer fires, we will call `OnTransientError()` with a status code
+of UNAVAILABLE.  If the server feature is *not* present, then when
+the timer fires, we will call `OnServerDataError()` with a status code
+of NOT_FOUND.  In either case, since we use this timer only when we do
+not have a previously cached version of the resource, the result will
+be the same: we will fail data plane RPCs.
 
+For [xRFC TP3] errors, we will call `OnServerDataError()`.  The watcher
+behavior will depend on the value of the "fail_on_data_errors" parameter
+and the status code.  In gRPC, our watchers will throw away a previously
+seen resource if `fail_on_data_errors` is true and the status code is
+either NOT_FOUND or PERMISSION_DENIED; in any other case, we will retain
+the previously seen resource, if any.
 
-
-Watchers will be expected to check the
-status code to determine how to handle the error.  As per pending xRFC
-TP3, the status codes NOT_FOUND and PERMISSION_DENIED will cause the
-watcher to drop any previously cached version of the resource and put
-themselves in a failing state.  All other status codes will be ignored
-if the watcher already has a previously cached version of the resource.
-
+TODO: Do we need to batch updates to the watcher somehow for the case
+where we've got a previous version of a resource cached plus an error?
+Previously, that was okay, because we'd just deliver both updates to the
+watcher, one at a time.  But if the watcher is going to decide to throw
+away the cached resource when it sees the error, maybe we need to
+deliver both at once, in case a new watcher starts when we've already
+got both the cached resource and the error?
 
 ### Support for Errors Provided by the xDS server as per [xRFC TP3]
 
-We will unconditionally honor the new fields added in [xRFC TP3].
+We will add support for the new response fields added in [xRFC TP3].
+There will be no configuration telling gRPC to use these fields; we will
+unconditionally use them if they are present.
 
 When we receive an error for a given resource, we will cancel the resource
 timer, if any, and report the error to the watchers' `OnDataError()`
 methods.
+
+In the XdsClient cache, when we receive an error for a resource, we will
+record the error but still keep the previous version of the resource
+cached.  We will record the cache status as `RECEIVED_ERROR`, which will
+be reported in CSDS.
 
 ### Deprecating "ignore_resource_deletion" Server Feature
 
@@ -250,37 +311,46 @@ to use the new "fail_on_data_errors" server feature instead.
 
 The following table shows the old and new behavior for each case.
 
-Data Error | fail_on_data_errors Server Feature | Old Watcher Notification | Old Behavior | New Watcher Notification | New Behavior
----------- | ---------------------------------- | ------------------------ | ------------ | ------------------------ | ------------
-NACK from client | false | `OnError(status)` | Ignore | `OnDataError(status, false)` | Ignore if already have resource
-NACK from client | true  | `OnError(status)` | Ignore | `OnDataError(status, true)`  | Drop existing resource and fail RPCs
-Does-not-exist timeout | false | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnDataError(status, false)` | Ignore
-Does-not-exist timeout | true  | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnDataError(status, true)`  | Drop existing resource and fail RPCs
-LDS or CDS resource deletion from server | false | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnDataError(status, false)` | Ignore
-LDS or CDS resource deletion from server | true | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnDataError(status, false)` | Drop existing resource and fail RPCs
-[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | false | N/A | N/A | `OnDataError(status, false)` | Ignore
-[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | N/A | N/A | `OnDataError(status, true)` | Drop existing resource and fail RPCs
-[xRFC TP3] error with other status | false | N/A | N/A | `OnDataError(status, false)` | Ignore
-[xRFC TP3] error with other status | true | N/A | N/A | `OnDataError(status, true)` | Ignore
+Data Error | fail_on_data_errors Server Feature | resource_timer_indicates_transient_failure Server Feature | Old Watcher Notification | Old Behavior | New Watcher Notification | New Behavior
+---------- | ---------------------------------- | --------------------------------------------------------- | ------------------------ | ------------ | ------------------------ | ------------
+NACK from client | false | | `OnError(status)` | Ignore | `OnClientDataError(status, false)` | Ignore if already have resource
+NACK from client | true  | | `OnError(status)` | Ignore | `OnClientDataError(status, true)`  | Drop existing resource and fail RPCs
+Resource timeout | false | false | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnClientDataError(Status(NOT_FOUND), false)` | Ignore
+Resource timeout | true  | false | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnClientDataError(Status(NOT_FOUND), true)`  | Drop existing resource and fail RPCs
+Resource timeout | false | true | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnTransientError(Status(NOT_FOUND), false)` | Ignore
+Resource timeout | true  | true | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnTransientError(Status(NOT_FOUND), true)`  | Ignore
+LDS or CDS resource deletion from server | false | | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnDataError(status, false)` | Ignore
+LDS or CDS resource deletion from server | true | | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnDataError(status, false)` | Drop existing resource and fail RPCs
+[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | false | | N/A | N/A | `OnDataError(status, false)` | Ignore
+[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | | N/A | N/A | `OnDataError(status, true)` | Drop existing resource and fail RPCs
+[xRFC TP3] error with other status | false | | N/A | N/A | `OnDataError(status, false)` | Ignore
+[xRFC TP3] error with other status | true | | N/A | N/A | `OnDataError(status, true)` | Ignore
 
 ### Temporary environment variable protection
 
-[Name the environment variable(s) used to enable/disable the feature(s) this proposal introduces and their default(s).  Generally, features that are enabled by I/O should include this type of control until they have passed some testing criteria, which should also be detailed here.  This section may be omitted if there are none.]
+The new functionality will be guarded by the
+`GRPC_EXPERIMENTAL_XDS_DATA_ERROR_HANDLING` env var until it passes
+interop testing.  This env var will guard using the new response fields
+from [xRFC TP3] and the new server features "fail_on_data_errors" and
+"resource_timer_indicates_transient_failure".
+
+TODO: figure out how to handle legacy "ignore_resource_deletion" server
+feature for env var
 
 ## Rationale
+
+TODO: Anything we need to note here?
 
 [A discussion of alternate approaches and the trade offs, advantages, and disadvantages of the specified approach.]
 
 
 ## Implementation
 
-[A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
+@markdroth will implement in C-core.
 
-## Open issues (if applicable)
+Will also be implemented in Java, Go, and Node.
 
-[A discussion of issues relating to this proposal for which the author does not know the solution. This section may be omitted if there are none.]
-
-## Future Direction
+## Open issues
 
 To avoid problems where newly started clients fail when the control plane
 is down, we have designed xDS fallback functionality, as described in
