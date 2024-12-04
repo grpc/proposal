@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-11-11
+* Last updated: 2024-12-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -237,11 +237,10 @@ tokens after the update.  Implementations should provide a mechanism for
 new instances of the filter to retain the cache from previous instances.
 
 To address these requirements, we will implement a general-purpose
-mechanism for xDS HTTP filters to share state and retain that state
-across updates.  The GCP Authentication filter will be the first use of
-this mechanism, but we expect this mechanism will be used by other
-filters in the future, such as the upcoming server-side rate limiting
-filter.
+mechanism for xDS HTTP filters to retain state across updates.  The GCP
+Authentication filter will be the first use of this mechanism, but
+we expect this mechanism will be used by other filters in the future,
+such as the upcoming server-side rate limiting filter.
 
 Due to the different nature of xDS HTTP filter support in C-core vs. the
 other implementations, the details here differ by language.
@@ -250,7 +249,7 @@ other implementations, the details here differ by language.
 
 In C-core, we introduce a mechanism called a "blackboard" to allow
 filters to set arbitrary state that can be accessed by subsequent filter
-implementations.
+instances.
 
 The key for each blackboard entry is the unique type of the value and
 a string that identifies the instance of that type.  The unique type
