@@ -315,10 +315,10 @@ Data Error | fail_on_data_errors Server Feature | resource_timer_indicates_trans
 ---------- | ---------------------------------- | --------------------------------------------------------- | ------------------------ | ------------ | ------------------------ | ------------
 NACK from client | false | | `OnError(status)` | Ignore | `OnClientDataError(status, false)` | Ignore if already have resource
 NACK from client | true  | | `OnError(status)` | Ignore | `OnClientDataError(status, true)`  | Drop existing resource and fail RPCs
-Resource timeout | false | false | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnClientDataError(Status(NOT_FOUND), false)` | Ignore
-Resource timeout | true  | false | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnClientDataError(Status(NOT_FOUND), true)`  | Drop existing resource and fail RPCs
-Resource timeout | false | true | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnTransientError(Status(NOT_FOUND), false)` | Ignore
-Resource timeout | true  | true | `OnResourceDoesNotExist()` | Drop existing resource and fail RPCs | `OnTransientError(Status(NOT_FOUND), true)`  | Ignore
+Resource timeout | false | false | `OnResourceDoesNotExist()` | Fail RPCs (no existing resource) | `OnClientDataError(Status(NOT_FOUND), false)` | Fail RPCs (no existing resource)
+Resource timeout | true  | false | `OnResourceDoesNotExist()` | Fail RPCs (no existing resource) | `OnClientDataError(Status(NOT_FOUND), true)`  | Fail RPCs (no existing resource)
+Resource timeout | false | true | `OnResourceDoesNotExist()` | Fail RPCs (no existing resource) | `OnTransientError(Status(NOT_FOUND), false)` | Fail RPCs (no existing resource)
+Resource timeout | true  | true | `OnResourceDoesNotExist()` | Fail RPCs (no existing resource) | `OnTransientError(Status(NOT_FOUND), true)`  | Fail RPCs (no existing resource)
 LDS or CDS resource deletion from server | false | | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnServerDataError(status, false)` | Ignore
 LDS or CDS resource deletion from server | true | | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnServerDataError(status, false)` | Drop existing resource and fail RPCs
 [xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | false | | N/A | N/A | `OnServerDataError(status, false)` | Ignore
