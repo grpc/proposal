@@ -302,23 +302,23 @@ to use the new "fail_on_data_errors" server feature instead.
 
 The following table shows the old and new behavior for each case.
 
-Error | Resource Already Cached | fail_on_data_errors Server Feature | Old Watcher Notification | Old Behavior | New Watcher Notification | New Behavior
----------- | ---------------------------------- | --------------------------------------------------------- | ------------------------ | ------------ | ------------------------ | ------------
-xDS channel reports TRANSIENT_FAILURE | false | (any) | `OnError()` | Fail data plane RPCs | `OnResourceChanged(Status)` | Fail data plane RPCs
-xDS channel reports TRANSIENT_FAILURE | true | (any) | `OnError()` | Ignore | `OnAmbientError(Status)` | Ignore
-ADS stream failed without reading a response | false | (any) | `OnError()` | Fail data plane RPCs | `OnResourceChanged(Status)` | Fail data plane RPCs
-ADS stream failed without reading a response | true | (any) | `OnError()` | Ignore | `OnAmbientError(Status)` | Ignore
-NACK from client | false | (any) | `OnError(status)` | Fail data plane RPCs | `OnResourceChanged(Status)` | Fail data plane RPCs
-NACK from client | true | false | `OnError(status)` | Ignore | `OnAmbientError(Status)` | Ignore
-NACK from client | true | true  | `OnError(status)` | Ignore | `OnResourceChanged(Status)` | Drop existing resource and fail RPCs
-Resource timeout | false | (any) | `OnResourceDoesNotExist()` | Fail data plane RPCs | `OnResourceChanged(Status(NOT_FOUND))` | Fail data plane RPCs
-LDS or CDS resource deletion from server | true | false | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnAmbientError(Status(NOT_FOUND))` | Ignore
-LDS or CDS resource deletion from server | true | true | `OnResourceDoesNotExist()`, but skipped if "ignore_resource_deletion" server feature is present | Drop existing resource and fail RPCs | `OnResourceChanged(Status(NOT_FOUND))` | Drop existing resource and fail RPCs
-[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | false | (any) | N/A | N/A | `OnResourceChanged(status)` | Fail data plane RPCs
-[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | false | N/A | N/A | `OnAmbientError(status)` | Ignore
-[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | true | N/A | N/A | `OnResourceChanged(status)` | Drop existing resource and fail RPCs
-[xRFC TP3] error with other status | false | (any) | N/A | N/A | `OnResourceChanged(status)` | Fail data plane RPCs
-[xRFC TP3] error with other status | true | (any) | N/A | N/A | `OnAmbientError(status)` | Ignore
+Error | Resource Already Cached | fail_on_data_errors Server Feature | Old Behavior | New Behavior
+----- | ----------------------- | ---------------------------------- | ------------ | ------------
+xDS channel reports TRANSIENT_FAILURE | false | (any) | `OnError()`, Fail data plane RPCs | `OnResourceChanged(Status)`, Fail data plane RPCs
+xDS channel reports TRANSIENT_FAILURE | true | (any) | `OnError()`, Ignore | `OnAmbientError(Status)`, Ignore
+ADS stream failed without reading a response | false | (any) | `OnError()`, Fail data plane RPCs | `OnResourceChanged(Status)`, Fail data plane RPCs
+ADS stream failed without reading a response | true | (any) | `OnError()`, Ignore | `OnAmbientError(Status)`, Ignore
+NACK from client | false | (any) | `OnError(status)`, Fail data plane RPCs | `OnResourceChanged(Status)`, Fail data plane RPCs
+NACK from client | true | false | `OnError(status)`, Ignore | `OnAmbientError(Status)`, Ignore
+NACK from client | true | true  | `OnError(status)`, Ignore | `OnResourceChanged(Status)`, Drop existing resource and fail RPCs
+Resource timeout | false | (any) | `OnResourceDoesNotExist()`, Fail data plane RPCs | `OnResourceChanged(Status(NOT_FOUND))`, Fail data plane RPCs
+LDS or CDS resource deletion from server | true | false | `OnResourceDoesNotExist()`, Drop existing resource and fail RPCs (watcher notification skipped if "ignore_resource_deletion" server feature is present) | `OnAmbientError(Status(NOT_FOUND))`, Ignore
+LDS or CDS resource deletion from server | true | true | `OnResourceDoesNotExist()`, Drop existing resources and fail RPCs (watcher notification skipped if "ignore_resource_deletion" server feature is present) | `OnResourceChanged(Status(NOT_FOUND))`, Drop existing resource and fail RPCs
+[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | false | (any) | N/A | `OnResourceChanged(status)`, Fail data plane RPCs
+[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | false | N/A | `OnAmbientError(status)`, Ignore
+[xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | true | N/A | `OnResourceChanged(status)`, Drop existing resource and fail RPCs
+[xRFC TP3] error with other status | false | (any) | N/A | `OnResourceChanged(status)`, Fail data plane RPCs
+[xRFC TP3] error with other status | true | (any) | N/A | `OnAmbientError(status)`, Ignore
 
 ### Temporary environment variable protection
 
