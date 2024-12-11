@@ -1,11 +1,11 @@
-Title
+L120: Remove core function gpr_atm_no_barrier_clamped_add
 ----
 * Author(s): ctiller
-* Approver: markdorth
+* Approver: markdroth
 * Status: In Review
 * Implemented in: C++
 * Last updated: 2024/12/10
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/YnxuoZdRH-Y
 
 ## Abstract
 
