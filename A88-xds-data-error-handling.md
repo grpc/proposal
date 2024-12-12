@@ -4,7 +4,7 @@ A88: xDS Data Error Handling
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-12-09
+* Last updated: 2024-12-12
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -326,7 +326,8 @@ The new functionality will be guarded by the
 `GRPC_EXPERIMENTAL_XDS_DATA_ERROR_HANDLING` env var until it passes
 interop testing.  This env var will guard using the new response fields
 from [xRFC TP3] and the new server features "fail_on_data_errors" and
-"resource_timer_is_transient_error".
+"resource_timer_is_transient_error".  It will also guard whether we
+default to ignoring resource deletion.
 
 ## Rationale
 
