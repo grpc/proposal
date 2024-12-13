@@ -4,7 +4,7 @@ A88: xDS Data Error Handling
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-12-12
+* Last updated: 2024-12-13
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -127,12 +127,14 @@ subscribed to.
 - [gRFC A53: Option for Ignoring xDS Resource Deletion][gRFC A53]
 - [gRFC A57: XdsClient Failure Mode Behavior][gRFC A57]
 - [gRFC A40: xDS Configuration Dump via Client Status Discovery Service][gRFC A40]
+- [gRFC A78: OTel Metrics for WRR, Pick First, and XdsClient][gRFC A78]
 - [xRFC TP3: Error Propagation][xRFC TP3]
 
 [gRFC A53]: A53-xds-ignore-resource-deletion.md
 [gRFC A57]: A57-xds-client-failure-mode-behavior.md
 [gRFC A40]: A40-csds-support.md
-[xRFC TP3]: https://github.com/cncf/xds/pull/107
+[gRFC A78]: A78-grpc-metrics-wrr-pf-xds.md
+[xRFC TP3]: https://github.com/cncf/xds/blob/main/proposals/TP3-xds-error-propagation.md
 
 ## Proposal
 
@@ -319,6 +321,21 @@ LDS or CDS resource deletion from server | true | true | `OnResourceDoesNotExist
 [xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | true | true | N/A | `OnResourceChanged(status)`, Drop existing resource and fail RPCs
 [xRFC TP3] error with other status | false | (any) | N/A | `OnResourceChanged(status)`, Fail data plane RPCs
 [xRFC TP3] error with other status | true | (any) | N/A | `OnAmbientError(status)`, Ignore
+
+### XdsClient Metric Labels
+
+[gRFC A78] defines a set of XdsClient metrics to be exported via
+OpenTelemetry.  One of the metric labels defined there is the
+`grpc.xds.cache_state` label, which is used for the
+`grpc.xds_client.resources` metric.  In keeping with the new CSDS client
+state introduced in [xRFC TP3], we will add two new possible values for
+this label:
+- `received_error`: The server sent an error for this resource.
+- `received_error_but_cached`: There is a version of this resource
+  cached, but the server subsequently sent an error for this resource.
+
+By default, the second value will be seen; if the `fail_on_data_errors`
+server feature is present, then the second value will be seen.
 
 ### Temporary environment variable protection
 
