@@ -81,15 +81,17 @@ The proposals shall be numbered in increasing order.
 
 ## Updating proposals
 
-Sometimes changes are needed to approved proposals.  Rather than create new
-proposals for such changes, it is often better to revise the existing one.
+Sometimes changes are needed to already-merged proposals, such as when we
+discover problems during implementation. Rather than create new proposals for
+such changes, it is often better to revise the existing one. However, this
+approach may not be appropriate for larger changes, especially after the design
+has already been implemented in most languages.
 
-For minor changes to a proposal (what qualifies as minor is left to the
-APPROVER), a PR may be approved and merged at the OWNER's and APPROVER's
-convenience.
-
-For any other changes, the original process's 10 day comment period must be
-observed.
+To make changes to an already-merged proposal, a PR may be approved and merged
+at the OWNER's and APPROVER's convenience. Note that the APPROVER will decide
+whether this kind of post-merge change is appropriate. The APPROVER will also
+determine whether the 10-day comment period is necessary, based on how
+significant the change is.
 
 When updating a proposal, the PR description should be named as follows:
 
