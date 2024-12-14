@@ -4,7 +4,7 @@ A88: xDS Data Error Handling
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-12-13
+* Last updated: 2024-12-14
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -264,10 +264,11 @@ the timer to detect slow xDS servers.
 To that end, we will introduce a new server feature in the bootstrap
 config called "resource_timer_is_transient_error".  When this server
 feature is present, the timer will be set for 30 seconds instead of 15
-seconds.  When the timer fires, however, we will still invoke the
-watchers' `OnResourceChanged()` method with the error, because by
-definition this timer will fire only when we do not have a version of
-the resource cached.
+seconds, and when the timer fires, the resulting error will have status
+UNAVAILABLE instead of NOT_FOUND.  When the timer fires, however, we will
+still invoke the watchers' `OnResourceChanged()` method with the error,
+because by definition this timer will fire only when we do not have a
+version of the resource cached.
 
 This server feature should be used only in cases where the server is known
 to support [xRFC TP3].  If the server feature is used when the server
@@ -313,7 +314,7 @@ ADS stream failed without reading a response | true | (any) | `OnError()`, Ignor
 NACK from client | false | (any) | `OnError(status)`, Fail data plane RPCs | `OnResourceChanged(Status)`, Fail data plane RPCs
 NACK from client | true | false | `OnError(status)`, Ignore | `OnAmbientError(Status)`, Ignore
 NACK from client | true | true  | `OnError(status)`, Ignore | `OnResourceChanged(Status)`, Drop existing resource and fail RPCs
-Resource timeout | false | (any) | `OnResourceDoesNotExist()`, Fail data plane RPCs | `OnResourceChanged(Status(NOT_FOUND))`, Fail data plane RPCs
+Resource timeout | false | (any) | `OnResourceDoesNotExist()`, Fail data plane RPCs | `OnResourceChanged(Status(NOT_FOUND))` (status will be UNAVAILABLE if `resource_timer_is_transient_error` server feature is present), Fail data plane RPCs
 LDS or CDS resource deletion from server | true | false | `OnResourceDoesNotExist()`, Drop existing resource and fail RPCs (watcher notification skipped if "ignore_resource_deletion" server feature is present) | `OnAmbientError(Status(NOT_FOUND))`, Ignore
 LDS or CDS resource deletion from server | true | true | `OnResourceDoesNotExist()`, Drop existing resources and fail RPCs (watcher notification skipped if "ignore_resource_deletion" server feature is present) | `OnResourceChanged(Status(NOT_FOUND))`, Drop existing resource and fail RPCs
 [xRFC TP3] error with status NOT_FOUND or PERMISSION_DENIED | false | (any) | N/A | `OnResourceChanged(status)`, Fail data plane RPCs
