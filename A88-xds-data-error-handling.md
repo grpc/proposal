@@ -241,18 +241,15 @@ There will be no configuration telling gRPC to use these fields; we will
 unconditionally use them if they are present.
 
 When we receive an error for a given resource, we will do the following:
-- Cancel the resource timer, if any.
-- If the status code is NOT_FOUND or PERMISSION_DENIED, then the
-  watcher notification behavior is as described in the [Handling Data
-  Errors](#handling-data-errors) section.  Otherwise, the watcher
-  notification behavior is as described in the [Handling Transient
-  Errors](#handling-transient-errors) section.
-- If we have a previously cached version of the resource and we are not
-  deleting it from the cache (i.e., if either the "fail_on_data_errors"
-  server feature is not present in the bootstrap config or the status
-  code is something other than NOT_FOUND or PERMISSION_DENIED), we will
-  record the cache status as `RECEIVED_ERROR`, which will be reported in
-  CSDS.
+1. Cancel the resource timer, if any.
+2. Set the cache entry's status to `RECEIVED_ERROR` and record the error,
+   so that that information can be reported via CSDS.
+3. If the status code is NOT_FOUND or PERMISSION_DENIED and the
+   "fail_on_data_errors" server feature is present in the bootstrap
+   config, delete the existing cached resource, if any.
+4. If there is an existing cached resource, call the watchers'
+   `OnAmbientError()` method with the error.  Otherwise, call th
+   watchers' `OnResourceChanged()` method with the error.
 
 ### Changes to Resource Timer Behavior
 
