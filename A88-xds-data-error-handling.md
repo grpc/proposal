@@ -4,7 +4,7 @@ A88: xDS Data Error Handling
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-12-14
+* Last updated: 2024-12-17
 * Discussion at: https://groups.google.com/g/grpc-io/c/Gg_tItYgQoI
 
 ## Abstract
@@ -249,8 +249,9 @@ When we receive an error for a given resource, we will do the following:
 3. If the status code is NOT_FOUND or PERMISSION_DENIED and the
    "fail_on_data_errors" server feature is present in the bootstrap
    config, delete the existing cached resource, if any.
-4. If there is an existing cached resource, call the watchers'
-   `OnAmbientError()` method with the error.  Otherwise, call th
+4. If there is an existing cached resource (which there will not be if
+   it was deleted in the previous step), call the watchers'
+   `OnAmbientError()` method with the error.  Otherwise, call the
    watchers' `OnResourceChanged()` method with the error.
 
 ### Changes to Resource Timer Behavior
@@ -346,7 +347,7 @@ this label:
   cached, but the server subsequently sent an error for this resource.
 
 By default, the second value will be seen; if the `fail_on_data_errors`
-server feature is present, then the second value will be seen.
+server feature is present, then the first value will be seen.
 
 ### Temporary environment variable protection
 
