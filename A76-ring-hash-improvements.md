@@ -3,8 +3,8 @@ A76: Improvements to the Ring Hash LB Policy
 * Author(s): atollena
 * Approver: markdroth
 * Status: Draft
-* Implemented in: Go
-* Last updated: 2024-04-26
+* Implemented in: C-core
+* Last updated: 2024-12-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/ZKI1RIF0e_s/m/oBXqOFb0AQAJ
 
 ## Abstract
@@ -94,7 +94,7 @@ At pick time:
 - If `request_hash_header` is empty, then the request hash key will be based on
 the xDS hash policy in RDS, which keeps the existing LB configuration for ring
 hash working as before with xDS. If the request hash key has not been set by
-xDS, then we will generate a random hash for the request.
+xDS, then we will fail the pick.
 - If `request_hash_header` is not empty, and the header has a non-empty value,
 then the request hash key will be set to this value. If the header contains
 multiple values, then values are joined with a comma `,` character before
@@ -118,41 +118,41 @@ The following pseudo code describes the updated picker logic:
 // Determine request hash.
 using_random_hash = false;
 if (config.request_hash_header.empty()) {
-  if (call_attributes.hash.has_value()) {
-    // Set by the xDS config selector.
-    request_hash = call_attributes.hash;
-  } else {
-    using_random_hash = true;
-    request_hash = ComputeRandomHash();
+  // Set by the xDS config selector.
+  request_hash = call_attributes.hash;
+  if request_hash.empty() {
+    // Something is wrong, since the xDS config selector is responsible
+    // for generating a random hash is this case.
+    return PICK_FAILED
   }
 } else {
   header = headers.find(config.request_hash_header);
-  if (header == null) {
-    using_random_hash = true;
-    request_hash = ComputeRandomHash();
-  } else {
+  if (header != null) {
     request_hash = ComputeHash(header);
+  } else {
+    request_hash = ComputeRandomHash();
+    using_random_hash = true;
   }
 }
 
 first_index = ring.FindIndexForHash(request_hash);
 if !using_random_hash {
-    // Return based on A62 unchanged.
+    // Return based on A61 unchanged.
     // ...
-}
-
-requested_connection = picker_has_a_child_connecting;
-for (i = 0; i < ring.size(); ++i) {
-  index = (first_index + i) % ring.size();
-  if (ring[index].state == READY) {
-    return ring[index].picker->Pick(...);
+} else {
+  requested_connection = picker_has_endpoint_in_connecting_state;
+  for (i = 0; i < ring.size(); ++i) {
+    index = (first_index + i) % ring.size();
+    if (ring[index].state == READY) {
+      return ring[index].picker->Pick(...);
+    }
+    if (!requested_connection && ring[index].state == IDLE) {
+      ring[index].endpoint.TriggerConnectionAttemptInControlPlane();
+      requested_connection = true;
+    }
   }
-  if (!requested_connection && ring[index].state == IDLE) {
-    ring[index].endpoint.TriggerConnectionAttemptInControlPlane();
-    requested_connection = true;
-  }
+  if (requested_connection) return PICK_QUEUE;
 }
-if (requested_connection) return PICK_QUEUE;
 // All children are in transient failure. Return the first failure.
 return ring[first_index].picker->Pick(...);
 ```
@@ -230,7 +230,7 @@ considered the following alternative solutions:
 
 ## Implementation
 
-Will be implemented in Go first.
+Implemented in C-core in https://github.com/grpc/grpc/pull/38312.
 
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
