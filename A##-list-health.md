@@ -1,6 +1,6 @@
 # Add List endpoint to gRPC Health service
 
-* **Author(s):** Marcos Huck.
+* **Author(s):** Marcos Huck
 * **Approver:** TBD
 * **Status:** Draft  
 * **Implemented in:** TBD
@@ -14,11 +14,11 @@ This proposal introduces a new `List` RPC endpoint for the Health service, allow
 
 ## Background
 
-The existing Health service provides basic health check functionality but lacks a mechanism to retrieve a comprehensive list of all monitored servicesand their statuses. 
+The existing Health service provides basic health check functionality but lacks a mechanism to retrieve a comprehensive list of all monitored services and their statuses. 
 
 This limitation makes it challenging for clients to aggregate health information across multiple services, particularly for use cases like publishing service statuses to dashboards such as [Cachet](https://cachethq.io/) or [Statuspage](https://www.atlassian.com/software/statuspage).
 
-Kubernetes provides a similar capability with its `/readyz?verbose` endpoint, which lists the status of all components.This proposal aims to bring analogous functionality to the Health service, providing a unified view of service health.
+Kubernetes provides a similar capability with its `/readyz?verbose` endpoint, which lists the status of all components. This proposal aims to bring analogous functionality to the Health service, providing a unified view of service health.
 
 ### Related Proposals
 
