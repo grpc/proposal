@@ -4,7 +4,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-04-08
+* Last updated: 2024-09-24
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
 
 ## Abstract
@@ -24,6 +24,7 @@ metrics added using that new non-per-call metric framework.
 * [A66]: OpenTelemetry Metrics
 * [A79]: gRPC Non-Per-Call Metrics Framework (pending)
 * [A58]: Weighted Round Robin LB Policy
+* [A61]: IPv4 and IPv6 Dualstack Backend Support
 * [A62]: Pick First: Sticky TRANSIENT_FAILURE and Address Order Randomization
 * [A27]: xDS-Based Global Load Balancing
 * [A28]: xDS Traffic Splitting and Routing
@@ -33,6 +34,7 @@ metrics added using that new non-per-call metric framework.
 [A66]: A66-otel-stats.md
 [A79]: https://github.com/grpc/proposal/pull/421
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
+[A61]: A61-IPv4-IPv6-dualstack-backends.md
 [A62]: A62-pick-first.md
 [A27]: A27-xds-global-load-balancing.md
 [A28]: A28-xds-traffic-splitting-and-routing.md
@@ -119,6 +121,15 @@ The following metrics will be exported:
 | grpc.lb.pick_first.connection_attempts_succeeded | Counter | {attempt} | grpc.target | Number of successful connection attempts. |
 | grpc.lb.pick_first.connection_attempts_failed | Counter | {attempt} | grpc.target | Number of failed connection attempts. |
 
+Note that these metrics are defined from the perspective of the Pick
+First policy and not from the perspective of the subchannel, because
+we want them to reflect the behavior from the channel's perspective.
+For example, multiple subchannels may successfully establish a connection
+at basically the same moment due to Happy Eyeballs (see [A61]), but only
+one of them will actually be used by Pick First, so we want to increment
+the counter only once.  Similar cases can also occur in C-core due to
+subchannel sharing.
+
 ### XdsClient
 
 The XdsClient component was originally described in [A27].  Note that in
@@ -169,5 +180,10 @@ the number of stale weights on each scheduler update.
 
 ## Implementation
 
-Will be implemented in C-core by @markdroth, in Java by @dnvindhya, and
-in Go by @zasweq.
+C-core implementation:
+- WRR metrics: https://github.com/grpc/grpc/pull/35977
+- pick_first metrics: https://github.com/grpc/grpc/pull/35984
+- XdsClient metrics: https://github.com/grpc/grpc/pull/36020, https://github.com/grpc/grpc/pull/36291
+- locality label: https://github.com/grpc/grpc/pull/36049
+
+Will be implemented in Java by @dnvindhya and in Go by @zasweq.

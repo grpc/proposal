@@ -4,7 +4,7 @@ gRPC Retry Design
 * Approver: a11r
 * Status: Implemented
 * Implemented in: Java, .NET, Node, Go except hedging, and C-Core except hedging
-* Last updated: 2022-11-17
+* Last updated: 2024-08-23
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/zzHIICbwTZE
 
 Table of Contents
@@ -106,9 +106,11 @@ gRPC's call deadline applies across all attempts for a given RPC. For example, i
 
 ##### Exponential Backoff
 
-The `initialBackoff`, `maxBackoff`, and `backoffMultiplier` parameters determine the randomized delay before retry attempts.
+The `initialBackoff`, `maxBackoff`, and `backoffMultiplier` parameters tune the exponential delay before retry attempts.
 
-The initial retry attempt will occur at `random(0, initialBackoff)`. In general, the `n`-th attempt will occur at `random(0, min(initialBackoff*backoffMultiplier**(n-1), maxBackoff))`.
+Jitter of plus or minus 0.2 is applied to the backoff delay to avoid hammering servers at the same time from a large number of clients.  Note that this means that the backoff delay may actually be slightly lower than `initialBackoff` or slightly higher than `maxBackoff`.
+
+The initial retry attempt will occur after `initialBackoff * random(0.8, 1.2)`.  After that, the `n`-th attempt will occur after `min(initialBackoff*backoffMultiplier**(n-1), maxBackoff) * random(0.8, 1.2))`.
 
 ##### Retryable Status Codes
 
@@ -430,10 +432,11 @@ The retry policy is transmitted to the client through the service config mechani
         // This field is required and must be two or greater.
         "maxAttempts": number,
 
-        // Exponential backoff parameters. The initial retry attempt will occur at
-        // random(0, initialBackoff). In general, the nth attempt since the last
-        // server pushback response (if any), will occur at random(0,
-        //   min(initialBackoff*backoffMultiplier**(n-1), maxBackoff)).
+        // Exponential backoff parameters. The initial retry attempt will occur
+        // after initialBackoff * random(0.8, 1.2). After that, the nth attempt
+        // since the last server pushback response (if any), will occur at
+        // min(initialBackoff*backoffMultiplier**(n-1), maxBackoff) *
+        // random(0.8, 1.2).
         // The following two fields take their form from:
         // https://developers.google.com/protocol-buffers/docs/proto3#json
         // They are representations of the proto3 Duration type. Note that the
