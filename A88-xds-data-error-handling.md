@@ -4,7 +4,7 @@ A88: xDS Data Error Handling
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-12-17
+* Last updated: 2024-12-23
 * Discussion at: https://groups.google.com/g/grpc-io/c/Gg_tItYgQoI
 
 ## Abstract
@@ -192,6 +192,9 @@ This proposal replaces those methods with the following two methods:
   that are being generated for other reasons.  For example, if failing a
   data plane RPC due to all endpoints being unreachable, it may be useful
   to also report that the client has lost contact with the xDS server.
+  The error condition is considered to be cleared when either
+  `OnResourceChanged()` is invoked or `OnAmbientError()` is invoked
+  again with an OK status.
 
 ### Handling Data Errors
 
