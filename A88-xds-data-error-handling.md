@@ -381,7 +381,11 @@ behavior outside of the XdsClient.
 
 ## Implementation
 
-@markdroth will implement in C-core.
+C-core implementation:
+- XdsClient watcher API change: https://github.com/grpc/grpc/pull/38269
+- Support for "fail_on_data_errors": https://github.com/grpc/grpc/pull/38278
+- Support for "resource_timer_is_transient_failure": https://github.com/grpc/grpc/pull/38377
+- xRFC TP3 support: TBD
 
 Will also be implemented in Java, Go, and Node.
 
