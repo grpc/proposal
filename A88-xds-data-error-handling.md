@@ -4,7 +4,7 @@ A88: xDS Data Error Handling
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-12-23
+* Last updated: 2025-01-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/Gg_tItYgQoI
 
 ## Abstract
@@ -179,8 +179,9 @@ This proposal replaces those methods with the following two methods:
   be obtained.  Note that if an error is passed to this method after the
   watcher has previously seen a valid resource, the watcher is expected
   to stop using that previously delivered resource.  In this case, the
-  XdsClient will remove the resource from its cache, so that CSDS will
-  not report a resource that the client is not actually using.
+  XdsClient will remove the resource from its cache, so that CSDS (see
+  [gRFC A40]) will not report a resource that the client is not actually
+  using.
 
 - `OnAmbientError(Status status)`: Will be invoked to notify the watcher
   of an error that occurs after a resource has been received that should
@@ -268,7 +269,15 @@ To that end, we will introduce a new server feature in the bootstrap
 config called "resource_timer_is_transient_error".  When this server
 feature is present, the timer will be set for 30 seconds instead of 15
 seconds, and when the timer fires, the resulting error will have status
-UNAVAILABLE instead of NOT_FOUND.  When the timer fires, however, we will
+UNAVAILABLE instead of NOT_FOUND.  We will also record this transient
+error in the cache, so that subsequent watches started on the XdsClient
+will be notified of this error immediately.  However, note that this
+transient error in the cache will not be visible to CSDS (see [gRFC A40]),
+nor will it affect the XdsClient metrics described in [gRFC A78] -- for
+both of those purposes, the cache entry will continue to be in "requested"
+state.
+
+Note that regardless of whether this server feature is present, we will
 still invoke the watchers' `OnResourceChanged()` method with the error,
 because by definition this timer will fire only when we do not have a
 version of the resource cached.
