@@ -84,10 +84,11 @@ Unfortunately, our current behavior for data errors does not follow the
 principles outlined above.  Currently, we have special handling for
 the resource deletion case: by default, we throw away the previously
 cached resource (i.e., approach 2 above), but we provide an option
-in the bootstrap config to inhibit this behavior (see [gRFC A53]).
-However, all other data errors are actually treated as transient errors:
-we unconditionally stick with the previously cached resource (i.e.,
-approach 1 above).
+in the bootstrap config to inhibit this behavior (see [gRFC A53]),
+which confusingly makes the deletion not show up at all in CSDS (see
+[gRFC A40]) or XdsClient metrics (see [gRFC A78]).  However, all other
+data errors are actually treated as transient errors: we unconditionally
+stick with the previously cached resource (i.e., approach 1 above).
 
 This proposal changes the data error handling behavior to match the
 principles outlined above.
@@ -184,15 +185,15 @@ This proposal replaces those methods with the following two methods:
   watcher has previously seen a valid resource, the watcher is expected
   to stop using that previously delivered resource.  In this case, the
   XdsClient will remove the resource from its cache, so that CSDS (see
-  [gRFC A40]) will not report a resource that the client is not actually
-  using.
+  [gRFC A40]) and XdsClient metrics (see [gRFC A78]) will not reflect a
+  resource that the client is not actually using.
 
 - `OnAmbientError(Status status)`: Will be invoked to notify the watcher
   of an error that occurs after a resource has been received that should
   not modify the watcher's use of that resource but that may be useful
   information about the ambient state of the XdsClient.  In particular,
-  the watcher should NOT stop using the previously seen resource, and the
-  XdsClient will NOT remove the resource from its cache.  However, the
+  the watcher should *not* stop using the previously seen resource, and the
+  XdsClient will *not* remove the resource from its cache.  However, the
   error message may be useful as additional context to include in errors
   that are being generated for other reasons.  For example, if failing a
   data plane RPC due to all endpoints being unreachable, it may be useful
@@ -210,24 +211,18 @@ new server feature in the bootstrap config called "fail_on_data_errors",
 which indicates that we cannot depend on the control plane to properly
 alert human operators.
 
-This server feature affects all data errors, which are the following cases:
+This server feature affects all data errors that can occur when a
+resource is already cached, which are the following cases:
 - NACKs
 - resource deletions in LDS and CDS
 - [xRFC TP3] errors with status NOT_FOUND or PERMISSION_DENIED
 
-If one of these errors occurs and there is no previously cached version
-of the resource, then the XdsClient will call the watchers'
-`OnResourceChanged()` method with an appropriate error.
-
-If one of these errors occurs when there IS a previously cached version
-of the resource, then the behavior depends on whether the
-"fail_on_data_errors" server feature is present in the bootstrap config.
-If the server feature is present, then the XdsClient will remove the
-previous version of the resource from its cache and will call the
-watchers' `OnResourceChanged()` method with an appropriate error.  If
-the server feature is NOT present, then the XdsClient will retain the
-previous version of the resource in its cache and will call the
-watchers' `OnAmbientError()` method with an appropriate error.
+When one of these errors occurs, if the "fail_on_data_errors" server
+feature is present in the bootstrap config, we will delete the existing
+cached resource, if any.  Then, if there is an existing cached resource
+(which there will not be if we just deleted it), call the watchers'
+`OnAmbientError()` method with the error.  Otherwise, call the watchers'
+`OnResourceChanged()` method with the error.
 
 ### Handling Transient Errors
 
@@ -237,12 +232,10 @@ Transient errors include the following cases:
   [gRFC A57]
 - [xRFC TP3] errors with any status *except* NOT_FOUND or PERMISSION_DENIED
 
-When one of these errors occurs, if we do NOT have a previously cached
-version of the resource, the XdsClient will call the watchers'
-`OnResourceChanged()` method to notify them of the error.  If we DO have
-a previously cached version of the resource, the XdsClient will instead
-call the watchers' `OnAmbientError()` method to notify them of the
-error.
+When one of these errors occurs, if there is an existing cached resource,
+we will call the watchers' `OnAmbientError()` method with the error.
+Otherwise, we will call the watchers' `OnResourceChanged()` method with
+the error.
 
 ### Support for Errors Provided by the xDS server as per [xRFC TP3]
 
@@ -252,8 +245,8 @@ unconditionally use them if they are present.
 
 When we receive an error for a given resource, we will do the following:
 1. Cancel the resource timer, if any.
-2. Set the cache entry's status to `RECEIVED_ERROR` and record the error,
-   so that that information can be reported via CSDS.
+2. Set the cache entry's status to `RECEIVED_ERROR` and record the error
+   in the cache entry.
 3. If the status code is NOT_FOUND or PERMISSION_DENIED and the
    "fail_on_data_errors" server feature is present in the bootstrap
    config, delete the existing cached resource, if any.
@@ -273,13 +266,8 @@ To that end, we will introduce a new server feature in the bootstrap
 config called "resource_timer_is_transient_error".  When this server
 feature is present, the timer will be set for 30 seconds instead of 15
 seconds, and when the timer fires, the resulting error will have status
-UNAVAILABLE instead of NOT_FOUND.  We will also record this transient
-error in the cache, so that subsequent watches started on the XdsClient
-will be notified of this error immediately.  However, note that this
-transient error in the cache will not be visible to CSDS (see [gRFC A40]),
-nor will it affect the XdsClient metrics described in [gRFC A78] -- for
-both of those purposes, the cache entry will continue to be in "requested"
-state.
+UNAVAILABLE instead of NOT_FOUND, and the cache state will be set to
+`TIMEOUT` instead of `DOES_NOT_EXIST`.
 
 Note that regardless of whether this server feature is present, we will
 still invoke the watchers' `OnResourceChanged()` method with the error,
@@ -316,6 +304,68 @@ will now ignore all data errors (including resource deletions) by default.
 If the client wants to instead drop existing cached resources and start
 failing data plane RPCs on data errors, they may update their bootstrap
 to use the new "fail_on_data_errors" server feature instead.
+
+This proposal removes the requirement from [gRFC A53] to log when
+ignoring a resource deletion and then again when the resource comes back
+into existence.  Instead, we will reflect ignored resource deletion via
+both CSDS (see [gRFC A40]) and XdsClient metrics (see [gRFC A78]) by
+setting the cache entry state to `NOT_FOUND` without actually deleting
+the cached resource.
+
+### Cache Entry States, CSDS, and XdsClient Metrics
+
+The cache entry in the XdsClient is used to expose the client's state
+via both CSDS ([gRFC A40]) and XdsClient metrics ([gRFC A78]).
+Implementations must ensure that the data exposed to watchers is
+consistent with the cache, so that CSDS and our metrics accurately
+represent the resources used by the client.
+
+Cache entries will contain both the currently used resource, if any, and
+the most recent error seen, if any.  A cache entry must be in one of the
+following states, the last two of which are new:
+
+- `REQUESTED`: The client has subscribed to the resource but has not yet
+  received the resource.  In this state, neither the resource nor the
+  error will be present in the cache entry.
+- `DOES_NOT_EXIST`: The resource does not exist, either because the
+  resource timer has fired and the "resource_timer_is_transient_failure"
+  server feature is not present, or because of an LDS or CDS resource
+  deletion.  The entry will contain an error indicating how the deletion
+  occurred.  If the "fail_on_data_errors" server feature is not present,
+  the most recently seen resource may still be present in the cache entry.
+- `ACKED`: The resource exists and is valid.  In this case, the error
+  will be unset, and the resource will be present.
+- `NACKED`: The most recent version of the resource seen from the
+  control plane was invalid.  The error will indicate the validation
+  failure.  If the "fail_on_data_errors" server feature is not present,
+  the most recently seen resource may still be present in the cache entry.
+- `RECEIVED_ERROR`: The client received an [xRFC TP3] error from the
+  control plane.  The error will be the error received from the control
+  plane.  If the "fail_on_data_errors" server feature is not present, the
+  most recently seen resource may still be present in the cache entry.
+- `TIMEOUT`: The client has subscribed to the resource but did not
+  receive it before the timer fired, and the
+  "resource_timer_is_transient_failure" server feature is present.  The
+  resource will be unset and the error will indicate the timeout.
+
+Those states map directly to the states in the CSDS
+`ClientResourceStatus` enum.
+
+[gRFC A78] defines a set of XdsClient metrics to be exported via
+OpenTelemetry.  One of the metric labels defined there is the
+`grpc.xds.cache_state` label, which is used for the
+`grpc.xds_client.resources` metric.  In keeping with the new cache
+states defined here, we will add the following new possible values for
+this label:
+- `timeout`: The cache entry is in TIMEOUT state.
+- `does_not_exist_but_cached`: The cache entry is in DOES_NOT_EXIST
+  state but does contain a cached resourc (i.e., we have seen an LDS or
+  CDS resource deletion but have ignored it).
+- `received_error`: The cache entry is in RECEIVED_ERROR state, and no
+  resource is cached.
+- `received_error_but_cached`: The cache entry is in RECEIVED_ERROR
+  state, and there is a cached resource (i.e., we have ignored a data
+  error due to "fail_on_data_errors" not being present).
 
 ### Summary of Behavior Changes
 
@@ -370,21 +420,6 @@ RPCs; instead, they should be careful to set status codes carefully on
 data plane RPCs on both the client and server side.  In most cases, it
 is expected that UNAVAILABLE is an appropriate code for data plane RPCs.
 
-### XdsClient Metric Labels
-
-[gRFC A78] defines a set of XdsClient metrics to be exported via
-OpenTelemetry.  One of the metric labels defined there is the
-`grpc.xds.cache_state` label, which is used for the
-`grpc.xds_client.resources` metric.  In keeping with the new CSDS client
-state introduced in [xRFC TP3], we will add two new possible values for
-this label:
-- `received_error`: The server sent an error for this resource.
-- `received_error_but_cached`: There is a version of this resource
-  cached, but the server subsequently sent an error for this resource.
-
-By default, the second value will be seen; if the `fail_on_data_errors`
-server feature is present, then the first value will be seen.
-
 ### Temporary environment variable protection
 
 The new functionality will be guarded by the
@@ -399,9 +434,9 @@ default to ignoring resource deletion.
 We considered an approach whereby we'd notify the watchers about whether
 the error is a data error or a transient error and let the watcher make
 the decision about how to respond.  However, that would make the watcher
-API much harder to understand.  It would also break CSDS in that it
-would divorce the cache status inside the XdsClient with the watcher
-behavior outside of the XdsClient.
+API much harder to understand.  It would also break CSDS and XdsClient
+metrics in that it would divorce the cache status inside the XdsClient
+from the watcher behavior outside of the XdsClient.
 
 ## Implementation
 
