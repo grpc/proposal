@@ -5,7 +5,7 @@ L121: Deprecating and removing the `grpc++_public_hdrs` target
 * Status: Draft
 * Implemented in: C++
 * Last updated: 2025-01-07
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/YtWq0Oa_IyY
 
 ## Abstract
 
