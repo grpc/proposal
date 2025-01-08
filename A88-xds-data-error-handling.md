@@ -442,7 +442,8 @@ from the watcher behavior outside of the XdsClient.
 
 C-core implementation:
 - XdsClient watcher API change: https://github.com/grpc/grpc/pull/38269
-- resolution_note handling: https://github.com/grpc/grpc/pull/38341
+- resolution_note handling: https://github.com/grpc/grpc/pull/38341 and
+  https://github.com/grpc/grpc/pull/38411
 - Support for "fail_on_data_errors": https://github.com/grpc/grpc/pull/38278
 - Support for "resource_timer_is_transient_failure": https://github.com/grpc/grpc/pull/38377
 - xRFC TP3 support: https://github.com/grpc/grpc/pull/38381
