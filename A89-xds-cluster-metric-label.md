@@ -26,8 +26,8 @@ receiving traffic, but non-deterministic routing in xDS like weighted clusters,
 aggregate clusters, and cluster specifier plugins mean different clusters (and
 thus potentially different services or service versions) would comingle metrics
 unless the selected cluster is added as a label. It can also be helpful to know
-the selected cluster to confirm that deterministic routing like path matching is
-behaving as expected.
+the selected cluster to confirm that deterministic routing, like path matching,
+is behaving as expected.
 
 ### Related Proposals:
 * [gRFC A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient][gRFC A78]
