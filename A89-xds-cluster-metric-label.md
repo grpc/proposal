@@ -38,9 +38,9 @@ behaving as expected.
 
 ## Proposal
 
-Each pick in the `xds_clunter_impl` policy, `xds_cluster_impl` will add the
+Each pick in the `xds_cluster_impl` policy, `xds_cluster_impl` will add the
 optional label `grpc.xds.cluster` to the call attempt tracer. The value will be
-copied from `xds_clunter_impl`'s service config `cluster` key. This is done
+copied from `xds_cluster_impl`'s service config `cluster` key. This is done
 regardless of the pick's result. It is possible for later picks for the same RPC
 to have a different value. This is the case for locality as well, and the last
 pick's value should be used.
