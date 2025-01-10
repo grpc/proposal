@@ -5,7 +5,7 @@ A89: xDS Cluster Metric Label
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2025-01-10
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/s4tm26RiMyI
 
 ## Abstract
 
