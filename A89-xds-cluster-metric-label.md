@@ -14,10 +14,10 @@ used for the RPC.
 
 ## Background
 
-[gRFC A78][A78] added the `grpc.lb.locality` per-call optional label, which also
+[gRFC A78][] added the `grpc.lb.locality` per-call optional label, which also
 added the infrastructure to support LBs adding optional labels to per-call
 metrics. The optional label can be enabled in the gRPC/OpenTelemetry integration
-API added in [gRFC A79][gRFC A79].
+API added in [gRFC A79][].
 
 Similar to how locality metrics are useful for analyzing _where_ traffic is
 being routed, the xDS cluster is useful for knowing _to whom_ it is being
