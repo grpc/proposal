@@ -4,7 +4,7 @@ A88: xDS Data Error Handling
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-01-03
+* Last updated: 2025-01-16
 * Discussion at: https://groups.google.com/g/grpc-io/c/Gg_tItYgQoI
 
 ## Abstract
@@ -95,13 +95,14 @@ principles outlined above.
 
 ### The Resource Timer
 
-The xDS SotW protocol does not currently provide a way for servers to
-explicitly inform clients when a subscribed resource does not exist,
-so clients have to impose a 15-second does-not-exist timer for each
-individual resource when the client initially subscribes to it, as
-described in the [xDS protocol
-documentation](https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist).  The exact semantics of
-this resource timer are tricky to get right, as described in [gRFC A57].[^1]
+The xDS State of the World (SotW) protocol does not currently
+provide a way for servers to explicitly inform clients when a
+subscribed resource does not exist, so clients have to impose a
+15-second does-not-exist timer for each individual resource when
+the client initially subscribes to it, as described in the [xDS protocol
+documentation](https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist).
+The exact semantics of this resource timer are tricky to get right,
+as described in [gRFC A57].[^1]
 
 [^1]: Note that gRFC A57 primarily addresses transient errors, while the
       does-not-exist timer actually reflects a data error.  However,
@@ -151,6 +152,7 @@ This proposal has the following parts:
 - support for errors provided by the xDS server as per [xRFC TP3]
 - changes to the resource timer behavior
 - deprecating the "ignore_resource_deletion" server feature
+- new cache entry states, reflected in CSDS and XdsClient metrics
 
 ### Changes to XdsClient Watcher APIs
 
@@ -236,6 +238,13 @@ When one of these errors occurs, if there is an existing cached resource,
 we will call the watchers' `OnAmbientError()` method with the error.
 Otherwise, we will call the watchers' `OnResourceChanged()` method with
 the error.
+
+### New Watchers Started After Ambient Errors
+
+Note that if a new watcher is started for a resource that already has a
+watcher, and the original watcher has seen both a valid resource and an
+ambient error, then the newly started watcher should also see both the
+valid resource and the ambient error, in that order.
 
 ### Support for Errors Provided by the xDS server as per [xRFC TP3]
 
@@ -359,7 +368,7 @@ states defined here, we will add the following new possible values for
 this label:
 - `timeout`: The cache entry is in TIMEOUT state.
 - `does_not_exist_but_cached`: The cache entry is in DOES_NOT_EXIST
-  state but does contain a cached resourc (i.e., we have seen an LDS or
+  state but does contain a cached resource (i.e., we have seen an LDS or
   CDS resource deletion but have ignored it).
 - `received_error`: The cache entry is in RECEIVED_ERROR state, and no
   resource is cached.
@@ -470,10 +479,10 @@ trigger xDS fallback if the primary server is responding too slowly.
 There are a number of challenges here:
 
 - Given the number of issues we've seen where the control plane has been
-  slow to respond, it's not clear to me that we would want all of those
+  slow to respond, it's not clear to us that we would want all of those
   cases to trigger fallback, since we'd likely hit fallback way too often.
-  I suspect that we would first need the control plane to monitor and provide
-  an SLO for response time upon initial subscription to a resource.
+  We suspect that we would first need the control plane to monitor and
+  provide an SLO for response time upon initial subscription to a resource.
 
 - The current timer semantics are that we start a separate timer for each
   individual resource when it is initially subscribed to.  This ensures
@@ -524,6 +533,6 @@ There are a number of challenges here:
 It's not at all clear what the actual requirements are here, nor is it
 clear what timer-based behavior can actually be safely used to trigger
 xDS fallback, so we'll need a lot more discussion to come to consensus
-on what we need here.  As a result, I am proposing that we proceed
+on what we need here.  As a result, we are proposing that we proceed
 with only the proposal above and handle this potential improvement as
 a subsequent effort.
