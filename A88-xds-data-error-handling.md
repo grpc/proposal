@@ -226,6 +226,12 @@ cached resource, if any.  Then, if there is an existing cached resource
 `OnAmbientError()` method with the error.  Otherwise, call the watchers'
 `OnResourceChanged()` method with the error.
 
+Note that the status code passed to the watcher should not be
+directly propagated to data plane RPCs.  This is particularly true
+for NOT_FOUND, which gRPC is prohibited from generating on a data
+plane RPC.  For details, see [Propagating Status to Data Plane
+RPCs](#propagating-status-to-data-plane-rpcs) below.
+
 ### Handling Transient Errors
 
 Transient errors include the following cases:
@@ -238,6 +244,10 @@ When one of these errors occurs, if there is an existing cached resource,
 we will call the watchers' `OnAmbientError()` method with the error.
 Otherwise, we will call the watchers' `OnResourceChanged()` method with
 the error.
+
+Note that the status code passed to the watcher should not be directly
+propagated to data plane RPCs.  For details, see [Propagating Status to
+Data Plane RPCs](#propagating-status-to-data-plane-rpcs) below.
 
 ### New Watchers Started After Ambient Errors
 
