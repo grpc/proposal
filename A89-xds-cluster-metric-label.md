@@ -39,13 +39,13 @@ is behaving as expected.
 ## Proposal
 
 Each pick in the `xds_cluster_impl` policy, `xds_cluster_impl` will add the
-optional label `grpc.xds.cluster` to the call attempt tracer. The value will be
+optional label `grpc.lb.backend_service` to the call attempt tracer. The value will be
 copied from `xds_cluster_impl`'s service config `cluster` key. This is done
 regardless of the pick's result. It is possible for later picks for the same RPC
 to have a different value. This is the case for locality as well, and the last
 pick's value should be used.
 
-The `grpc.xds.cluster` label will be available on the following per-call
+The `grpc.lb.backend_service` label will be available on the following per-call
 metrics:
 - `grpc.client.attempt.duration`
 - `grpc.client.attempt.sent_total_compressed_message_size`
@@ -61,6 +61,8 @@ variable protection is unnecessary.
 gRFC A78 added `grpc.lb.locality` to per-call and WRR metrics, while this is
 only adding the new label to per-call. Cluster is an xDS-specific concept, so
 it is more awkward to add to WRR and that is left as potential future work.
+FIXME: the name was changed so is no longer an xds-specific concept and there is
+interest in expanding this to pick-first metrics as well.
 
 Which "cluster" was used for a request is ambiguous when using aggregate
 clusters as multiple clusters are involved. For placing in a label, there are
