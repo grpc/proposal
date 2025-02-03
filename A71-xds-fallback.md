@@ -226,13 +226,6 @@ Builds on top of previous option but also move resource watches from
 LB policies to XdsResolver. Redesign XdsClient watch API to express
 relationships between resource watches.
 
-## Temporary environment variable protection
-
-This option will be behind `GRPC_EXPERIMENTAL_XDS_FALLBACK`. If this variable is
-unset or is `false`, only the first server configuration from the `xds_servers`
-field in the bootstrap file will be used. This applies for the top-level
-`xds_servers` field and the per-authority `xds_servers` field.
-
 [A27]: A27-xds-global-load-balancing.md
 [A36]: A36-xds-for-servers.md
 [A40]: A40-csds-support.md
