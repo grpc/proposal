@@ -228,7 +228,8 @@ relationships between resource watches.
 
 ## Temporary environment variable protection
 
-This option will be behind `GRPC_EXPERIMENTAL_XDS_FALLBACK`. If this variable is
+xDS Fallback is behind the `GRPC_EXPERIMENTAL_XDS_FALLBACK` environment
+variable until the implementation passes the [`test suite`][test]. If this variable is
 unset or is `false`, only the first server configuration from the `xds_servers`
 field in the bootstrap file will be used. This applies for the top-level
 `xds_servers` field and the per-authority `xds_servers` field.
@@ -238,6 +239,7 @@ field in the bootstrap file will be used. This applies for the top-level
 [A40]: A40-csds-support.md
 [A47]: A47-xds-federation.md
 [A57]: A57-xds-client-failure-mode-behavior.md
+[test]: https://github.com/grpc/psm-interop/blob/3c7640f880bc410e4c3413aafc9f5ee014f6e4a1/tests/fallback_test.py
 
 [resource-does-not-exist]: https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#knowing-when-a-requested-resource-does-not-exist
 [ClientConfig]: https://github.com/envoyproxy/envoy/blob/e61e461736a28e26b6fcf0ca25d34c47ed29b0fc/api/envoy/service/status/v3/csds.proto#L130
