@@ -108,7 +108,7 @@ Because CRLs involve reading/writing from the filesystem, we will have to deal w
 
 These cases are all on a per-CRL level - a given CRL having an issue will not keep other good CRLs in an update batch to fail. The opposite behavior - failing the whole batch or dropping all the handshakes in the case of a bad CRL - might enable a DOS-type attack vector.
 
-### Example Behavior for a Directory Reloader:
+#### Example Behavior for a Directory Reloader:
 
 At startup we read 3 CRL files (A, B, C) and construct a map as described above. During the handshakes, we return the CRLs from the map.
 Then, a bad update happens and CRL C ends up corrupted, but A and B are good. When this directory is reloaded, the resulting map will have the newer A and B CRL, and will also include the original C CRL (as this will not see any update). In addition, the `CrlReadErrorCallback` would be invoked when CRL C fails to be read. There is no linkage between the map's CRL C and the fact that there was a read failure. It is the user's responsibility to act on file issues after being notified via the error callback.
@@ -198,9 +198,7 @@ We will add a `grpc::experimental::CrlProvider` that can be configured in `grpc:
 
 These will be passed down from the `TlsCreds` layer to the security connector layer, and from there to the TSI and the ssl_transport_security layer which actually constructs the handshakers and interacts with BoringSSL.
 
-The footprint of the TlsCredentialProvider is more complex than needed for the scope of our CRL work, largely because we are supporting X509 CRL files and not something that needs to make calls such as OSCP. Thus, we can look at the footprint of the custom tls CertificateVerifier to inform how these user-facing options cascade through the code - the provider will have an API that takes certificate information and returns the CRL content. There is already plumbing in these spots for the `crl_directory`, so it shouldn't be too difficult to plumb this around.
-
-Due to constraints from supporting both OpenSSL and BoringSSL, our best option for doing the revocation checks is to treat it as post-chain building validation. We will tie into BoringSSL via the `SSL_CTX_set_cert_verify_callback`. In that callback, we will iterate over the certificate chain that has been built, fetch the CRLs for those certificates from the provider, and do the associated checks per [RFC5280 6.3.3](https://datatracker.ietf.org/doc/html/rfc5280#section-6.3.3). Specifically, gRPC will do the following:
+Due to constraints from supporting both OpenSSL and BoringSSL, our best option for doing the revocation checks is to treat it as post-chain building validation. We will tie into BoringSSL via the `SSL_CTX_set_cert_verify_callback`. In that callback, we will iterate over the certificate chain that has been built, fetch the CRLs for those certificates from the provider, and do the associated checks per [RFC5280 6.3.3](https://datatracker.ietf.org/doc/html/rfc5280#section-6.3.3). Specifically, here's how gRPC will handle each of the points in that section of the RFC.
 
 * a) Not done. gRPC is not supporting distribution points. It is the responsibility of the user to implement a CrlProvider or use an existing CrlProvider
   * i) Only supporting complete direct CRLs
