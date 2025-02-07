@@ -126,7 +126,9 @@ XdsClients will need to be changed to support multiple ADS connections for each
 authority. Once the fallback process begins, an impacted XdsClient will
 establish a connection to the next xDS control plane listed in the bootstrap
 JSON. Then XdsClient will subscribe to all watched resources on that server
-and will update the cache based on the received responses.
+and will update the cache based on the received responses. Resource watchers
+will only be notified of connectivity failures after all xDS control planes
+listed in the bootstrap JSON have become unreachable.
 
 Connecting to the lower-priority servers does not close gRPC connections to the
 higher-priority servers. XdsClient will still wait for xDS resources on the ADS
