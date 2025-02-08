@@ -1,56 +1,65 @@
-Exposing the per-call authentication context data in Node
+Exposing the Peer Certificate in gRPC-JS Server Call Context
+
 ----
-* Author(s): Nicolas Noble
+* Author(s): [David Fiala](https://github.com/davidfiala), Nicolas Noble
 * Approver: murgatroid99
 * Status: Draft
-* Implemented in: Node
-* Last updated: August 21, 2018
-* Discussion at: https://groups.google.com/forum/#!topic/grpc-io/yVnvHDGxTME
+* Implemented in: Node.js
+* Last updated: May 28, 2024
+* Discussion at: https://github.com/grpc/grpc-node/issues/2730, https://groups.google.com/forum/#!topic/grpc-io/yVnvHDGxTME
 
 ## Abstract
 
-gRPC-node now exposes a `getAuthContext` method on the call objects that allows clients and servers to retreive the authentication context information. This gRFC covers how this new method should be exposed in the Node API.
+This proposal exposes the peer certificate in gRPC-JS, allowing servers to access the client's TLS certificate as part of the call context. This feature is essential for mutual authentication and secure communications involving TLS authn, key pinning, and more.
 
 ## Background
 
-The proposal is to get the new `getAuthContext` method to return a Node's idiomatic object, hiding away the iterative structure of the core's auth_context.
-
-We want to maintain feature-parity with the pure javascript implementation of gRPC. While the spirit of the core's auth_context is to be opaque and extensive, and let it up to the developers to interpret the properties, we need to be able to emulate it in the pure javascript implementation, and guarantee feature parity. This means we need to whitelist fields we are reading from the native core, and transform them in a way that we know can work similarly between the two implementations.
-
-It is worth noting that a sort of equivalent API call in the Node's runtime is [tls.TLSSocket.getPeerCertificate](https://nodejs.org/api/tls.html#tls_tlssocket_getpeercertificate_detailed), which returns an actual SSL certificate. The only common field in this object we can guarantee to be identical between the two implementations is the `raw` line, that contains a Buffer with the binary representation of the peer certificate.
-
-Therefore, this proposal offers to only cover two fields at the beginning:
- - `transport_security_type`, transformed into a singleton string `transportSecurityType`
- - `x509_pem_cert`, transformed into the object: `sslPeerCertificate: { raw: certificateBuffer }`
+The gRPC-JS library currently lacks a mechanism for servers to access the client's TLS certificate, a feature critical for mutual authentication. This proposal addresses this gap by introducing a method to expose the peer certificate in a manner consistent with modern Node.js and TypeScript practices.
 
 ### Related Proposals: 
 N/A
 
+### History
+
+In 2018, an initial proposal was made to expose the certificate's bytes in gRPC-Node and gRPC-JS. However, this was never implemented. With the deprecation of native node-grpc, we now explore options that are more aligned with Node.js and JavaScript best practices, ensuring a modern, efficient, and idiomatic solution.
+
 ## Proposal
 
-This proposal suggests that all we expose in the Node gRPC API are the raw DER bytes of the certificate for the `x509_pem_cert` field if present, and the singleton element `transport_security_type`. This would be presented in the `raw` key of an object. To illustrate, this would look like:
+Introduce a method in the gRPC-JS library to retrieve the client's peer certificate. The proposed method will return the certificate information as provided by Node.js's `tls.TLSSocket.getPeerCertificate` method. To aid present and future compatibility, for secure connections we will pass any arguments and return value to and from `tls.TLSSocket.getPeerCertificate` directly and match node's semantics. For non-secure gRPC connections, we will return an empty object.
 
-```
-const authContext = call.getAuthContext()
-/*
-authContext = {
-  transportSecurityType: 'ssl',
-  sslPeerCertificate: {
-    raw: <Buffer ... >
-  }
+### API Design
+
+The new method, `getPeerCertificate`, will be added to the gRPC server call object. This method will return the output of `tls.TLSSocket.getPeerCertificate`, either as a detailed certificate or a simplified version, based on the specified parameter. For non-secure channels, we will return an empty object keeping in line with the spirit of node's `getPeerCertificate` which states, `If the peer does not provide a certificate, an empty object will be returned`.
+
+### Example Usage
+
+```typescript
+import { Server, ServerUnaryCall, sendUnaryData } from '@grpc/grpc-js';
+
+function myServiceMethod(call: ServerUnaryCall<any, any>, callback: sendUnaryData<any>) {
+  const peerCert = call.getPeerCertificate();
+  console.log('Peer Certificate:', peerCert);
+  // Implement additional logic using the peer certificate
+  callback(null, { message: 'Success' });
 }
-*/
+
+const server = new Server();
+server.addService(myServiceDefinition, { myServiceMethod });
+server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createSsl(null, [{ private_key: privateKey, cert_chain: certChain }]), () => {
+  server.start();
+});
 ```
 
-## Rationale
-The lowest common denominator between the fully-parsed certificate made available in Node's getPeerCertificate method and the certificate stored in the auth_context by grpc-core is the raw certificate (in DER and PEM formats respectively). For this reason, we are suggesting only exposing the raw certificate and leaving it up to consumers of this callback to parse the certificate as desired.
+### Rationale
 
-The avoids needing to parse out off the fields of a certificate and trying to match the full format exposed in Node's getPeerCertificate method. However, by choosing to place the the raw DER bytes in a Buffer in the `raw` field, this matches Node's behavior with respect to this field and it thus leaves open the option of parsing additional fields to better match Node's implementation in the future.
+Exposing the peer certificate is essential for mutual TLS, where the certificate contains the peer's identity among other information. This practice is used internally by Google with LOAS and is necessary for robust security implementations. We want such practices to be possible externally and even encouraged as part of robust mutual TLS authentication.
 
-## Implementation
+### Performance Considerations
 
-[Nicolas Noble](https://github.com/nicolasnoble) will be implementing this proposal.
+By providing access to the full certificate, we ensure that developers do not have to deserialize and parse it multiple times, enhancing performance and efficiency.
 
-## Open issues (if applicable)
+### Implementation
 
-Developers utilizing this new `getAuthContext` method may expect it to behave similar to Node's `getPeerCertificate` method. I.e. they may expect to be able to apply certificate pinning by asserting `cert.fingerprint === '01:02...'`. The documentation will need to be clear that only the `raw` key is populated in the `sslPeerCertificate` property.
+[David Fiala](https://github.com/davidfiala) will provide the implementation.
+
+The implementation will involve modifying the gRPC-JS server call object to include the `getPeerCertificate` method, with parameters being inferred from grpc-js. On secure connections, it will directly call and return `tls.TLSSocket.getPeerCertificate` including any arguments passed by the user. For the return value, inferred types from node's TLS types are used to ensure that future API and/or interface changes in node are reflected transparently in grpc-js. On non-secure connections, we will short-circuit and return an empty object.
