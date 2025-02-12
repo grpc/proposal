@@ -1,4 +1,4 @@
-A89: xDS Cluster Metric Label
+A89: Backend Service Metric Label
 ----
 * Author(s): [Eric Anderson](https://github.com/ejona86)
 * Approver: @markdroth
@@ -9,8 +9,9 @@ A89: xDS Cluster Metric Label
 
 ## Abstract
 
-Add a new optional label to per-call metrics containing the xDS cluster being
-used for the RPC.
+Add a new optional label to per-call metrics containing the "backend service"
+being used for the RPC. When using xDS, the backend service would be the xDS
+cluster name.
 
 ## Background
 
@@ -38,18 +39,46 @@ is behaving as expected.
 
 ## Proposal
 
-Each pick in the `xds_cluster_impl` policy, `xds_cluster_impl` will add the
-optional label `grpc.lb.backend_service` to the call attempt tracer. The value will be
-copied from `xds_cluster_impl`'s service config `cluster` key. This is done
-regardless of the pick's result. It is possible for later picks for the same RPC
-to have a different value. This is the case for locality as well, and the last
-pick's value should be used.
+### Add grpc.lb.backend_service to per-call metrics
 
-The `grpc.lb.backend_service` label will be available on the following per-call
-metrics:
+We will add the `grpc.lb.backend_service` optional label to the following
+per-call metrics:
 - `grpc.client.attempt.duration`
 - `grpc.client.attempt.sent_total_compressed_message_size`
 - `grpc.client.attempt.rcvd_total_compressed_message_size`
+
+Label definition:
+
+| Name        | Disposition | Description |
+| ----------- | ----------- | ----------- |
+| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent. This is relevant when a single channel target can be sent to different sets of servers. When using xDS, this will be the cluster name. When not relevant, the value will be the empty string. |
+
+The value will be communicated to the gRPC OpenTelemetry module by the call
+attempt tracer. When an LB policy provides the label value to the tracer it
+will do so each pick that the information is available, regardless of the pick's
+result. This allows DEADLINE_EXCEEDED and UNAVAILABLE failures to include a
+relevant backend service. It is possible for later picks for the same RPC to
+have a different value. This is the case for locality as well, and the last
+pick's value should be used by the OpenTelemetry module.
+
+The only LB policy with a backend service concept at this time is
+`xds_cluster_impl`. It will notify the call attempt tracer of the
+`grpc.lb.backend_service` label. The value will be copied from
+`xds_cluster_impl`'s service config `cluster` key.
+
+### Add grpc.lb.backend_service to WRR metrics
+
+We will add the `grpc.lb.backend_service` optional label, with the same
+definition as for per-RPC metrics, to all existing WRR metrics:
+- `grpc.lb.wrr.rr_fallback`
+- `grpc.lb.wrr.endpoint_weight_not_yet_usable`
+- `grpc.lb.wrr.endpoint_weight_stale`
+- `grpc.lb.wrr.endpoint_weights`
+
+The `weighted_round_robin` LB policy will read a resolver attribute that
+indicates the name of the backend service. This resolver attribute should not be
+considered limited to xDS. However, only `xds_cluster_impl` will set the
+attribute at this time.
 
 ### Temporary environment variable protection
 
@@ -58,14 +87,21 @@ variable protection is unnecessary.
 
 ## Rationale
 
-gRFC A78 added `grpc.lb.locality` to per-call and WRR metrics, while this is
-only adding the new label to per-call. Cluster is an xDS-specific concept, so
-it is more awkward to add to WRR and that is left as potential future work.
-FIXME: the name was changed so is no longer an xds-specific concept and there is
-interest in expanding this to pick-first metrics as well.
+We define a new concept "backend service" so that we can add this label to
+non-xDS-specific code like the gRPC OpenTelemetry module. "Backend service"
+isn't the best of names, but all other names seemed to be obviously worse (e.g.,
+cluster) or no better. It is more important that the name not be misunderstood
+than for the name to be meaningful.
 
-Which "cluster" was used for a request is ambiguous when using aggregate
-clusters as multiple clusters are involved. For placing in a label, there are
+gRFC A78 added `grpc.lb.locality` to per-call and WRR metrics, and this is
+mirroring that approach with backend service. Adding backend service to WRR is
+less essential than per-call metrics, simply because the WRR metrics are more
+rarely used. But users of WRR would benefit from backend service. In general,
+any metrics that have a locality label should probably also have backend
+service.
+
+In xDS, which "cluster" is used for a request is ambiguous when using aggregate
+clusters, as multiple clusters are involved. For placing in a label, there are
 two potential choices: the top-level aggregate cluster and the leaf cluster.
 Using the leaf cluster seems to provide the most insight when using aggregate
 clusters as failing over to a different priority would be significant. If the
@@ -74,4 +110,4 @@ top-level cluster is needed in the future, it can be added as well.
 ## Implementation
 
 @ejona86 will immediately implement in gRPC Java. Other languages will follow as
-able. The implementation is very quick.
+able.
