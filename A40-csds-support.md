@@ -6,6 +6,8 @@ xDS Configuration Dump via Client Status Discovery Service in gRPC
 * Implemented in: TBD
 * Last updated: 2021-02-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/zL45YyxtJ08
+* Updated by: [A71: xDS Fallback](A71-xds-fallback.md)
+* Updated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md)
 
 ## Abstract
 
