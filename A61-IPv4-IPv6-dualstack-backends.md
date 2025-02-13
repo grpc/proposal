@@ -4,7 +4,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Approver: @ejona86, @dfawley
 * Status: Ready for Implementation
 * Implemented in: C-core
-* Last updated: 2023-12-15
+* Last updated: 2025-02-13
 * Discussion at: https://groups.google.com/g/grpc-io/c/VjORlKP97cE/m/ihqyN32TAQAJ
 
 ## Abstract
@@ -549,25 +549,57 @@ for (i = 0; i < ring.size(); ++i) {
 return ring[first_index].picker->Pick(...);
 ```
 
-As per [gRFC A42][A42], the ring_hash policy normally requires pick
-requests to trigger subchannel connection attempts, but if it is
-being used as a child of the priority policy, it will not be getting
-any picks once it reports TRANSIENT_FAILURE.  To work around this, it
-currently makes sure that it is attempting to connect (after applicable
-backoff period) to at least one subchannel at any given time.  After
-a given subchannel fails a connection attempt, it moves on to the
-next subchannel in the ring.  This approach allows the policy to recover
-if any one endpoint becomes reachable, while also minimizing the number
-of endpoints it is trying to connect to simultaneously, so that it does
-not wind up with a lot of unnecessary connections when connectivity is
-restored.  However, with the sticky-TF behavior, it will not be possible
-to attempt to connect to only one endpoint at a time, because when a
-given pick_first child reports TRANSIENT_FAILURE, it will automatically
-try reconnecting after the backoff period without waiting for a connection
-to be requested.  Proposed pseudo-code for this logic is:
+As per [gRFC A42][A42], the ring_hash policy normally triggers subchannel
+connection attempts from the picker.  However, if it is being used
+as a child of the priority policy, it will not be getting any picks
+once it reports TRANSIENT_FAILURE, and in some cases even when it
+reports CONNECTING, due to the failover timer in the priority policy.
+Because it reports TRANSIENT_FAILURE when only two endpoints are failing
+(see aggregation rule 2 in [gRFC A42][A42]) and CONNECTING when only
+one endpoint is reporting TRANSIENT_FAILURE (see aggregation rule 4 in
+[gRFC A42][A42]), this means that the priority policy could fail over to
+the next priority when the ring_hash policy is only attempting a small
+number of subchannels.  This would effectively cause the client to assume
+that all of the ring_hash subchannels are unreachable when in fact only
+a small number of them are, and it would never try any of the others,
+thus never recovering from that incorrect assumption.  To work around
+this, when the aggregated connectivity state is either TRANSIENT_FAILURE
+or CONNECTING, the ring_hash policy proactively triggers connection
+attempts across all of the subchannels, even without seeing any picks.
+This ensures that if any of the subchannels become reachable, ring_hash
+will eventually report READY, and the priority policy will switch back
+to using the ring_hash child.
+
+The current logic for these connection attempts tries very hard to avoid
+connecting to more than one subchannel at a time; when a connection
+attempt on one subchannel fails, it does not try that subchannel again,
+instead moving on to the next one.  This approach was an attempt
+to avoid accumulating too many possibly-unnecessary connections once
+connectivity is restored.  However, with the changes in this design, it
+will no longer be possible to attempt to connect to only one endpoint
+at a time, because of the sticky-TF behavior in pick_first ([gRFC
+A62][A62]): when a given pick_first child reports TRANSIENT_FAILURE,
+it will automatically try reconnecting after the backoff period without
+waiting for a connection to be requested.  Therefore, the ring_hash
+policy will instead simply increase the number of endpoints that are
+attempting to connect as each one fails.  Note that this means that after
+an extended connectivity outage, ring_hash will now often wind up with
+many unnecessary connections.  However, this situation is also possible
+via the picker if ring_hash is the last child under the priority policy,
+so we are willing to live with this behavior for now.  If it becomes a
+problem in the future, we can consider ways to ameliorate it at that time.
+
+The specific behavior for this will be that whenever the ring_hash
+policy gets a subchannel connectivity state update or a resolver update,
+if the aggregated connectivity state is TRANSIENT_FAILURE or CONNECTING
+and there are no endpoints in CONNECTING state, the ring_hash policy will
+choose one of the endpoints in IDLE state (if any) to trigger a connection
+attempt on.  It does not matter which IDLE endpoint is chosen; that is
+left up to the implementation to determine.  One possible implementation
+of this is shown in the following pseudo-code:
 
 ```
-if (in_transient_failure && endpoint_entered_transient_failure) {
+if (aggregated_state_is_connecting_or_transient_failure) {
   first_idle_index = -1;
   for (i = 0; i < endpoints.size(); ++i) {
     if (endpoints[i].connectivity_state() == CONNECTING) {
@@ -583,13 +615,6 @@ if (in_transient_failure && endpoint_entered_transient_failure) {
   }
 }
 ```
-
-Note that this means that after an extended connectivity outage,
-ring_hash will now often wind up with many unnecessary connections.
-However, this situation is also possible via the picker if ring_hash is
-the last child under the priority policy, so we are willing to live with
-this behavior for now.  If it becomes a problem in the future, we can
-consider ways to ameliorate it at that time.
 
 Note that in C-core, the normal approach for handling address list
 updates described [above](#address-list-updates-in-c-core) won't work,
