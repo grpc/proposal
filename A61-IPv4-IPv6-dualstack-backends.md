@@ -570,13 +570,13 @@ This ensures that if any of the subchannels become reachable, ring_hash
 will eventually report READY, and the priority policy will switch back
 to using the ring_hash child.
 
-The current logic for these connection attempts tries very hard to avoid
-connecting to more than one subchannel at a time; when a connection
-attempt on one subchannel fails, it does not try that subchannel again,
-instead moving on to the next one.  This approach was an attempt
-to avoid accumulating too many possibly-unnecessary connections once
-connectivity is restored.  However, with the changes in this design, it
-will no longer be possible to attempt to connect to only one endpoint
+The original logic for these connection attempts in [gRFC A42][A42] tries
+very hard to avoid connecting to more than one subchannel at a time;
+when a connection attempt on one subchannel fails, it does not try that
+subchannel again, instead moving on to the next one.  This approach was
+an attempt to avoid accumulating too many possibly-unnecessary connections
+once connectivity is restored.  However, with the changes in this design,
+it will no longer be possible to attempt to connect to only one endpoint
 at a time, because of the sticky-TF behavior in pick_first ([gRFC
 A62][A62]): when a given pick_first child reports TRANSIENT_FAILURE,
 it will automatically try reconnecting after the backoff period without
@@ -883,7 +883,8 @@ Reporting Mechanism](#generic-health-reporting-mechanism).
   detection to eject via health state instead of raw connectivity state
   (https://github.com/grpc/grpc/pull/34222)
 - change ring_hash to delegate to pick_first
-  (https://github.com/grpc/grpc/pull/34244)
+  (https://github.com/grpc/grpc/pull/34244 and
+  https://github.com/grpc/grpc/pull/38741)
 - add endpoint_list library for petiole policies, and use it to change
   round_robin to delegate to pick_first
   (https://github.com/grpc/grpc/pull/34337)
