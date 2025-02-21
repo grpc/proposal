@@ -159,7 +159,23 @@ We'll also adjust existing hierarchies of `Watcher` and
 
 #### Go
 
-TODO: @erm-g to fill this in.
+In Go, we can leverage [the go spiffe
+package](https://pkg.go.dev/github.com/spiffe/go-spiffe/v2) for parsing and
+object abstractions.  Currently, similarly to C++ above, Go already supports
+[file watcher credential
+providers](https://github.com/grpc/grpc-go/blob/e0d191d8adcdd73aad084154769404dd2f6b0fc6/credentials/tls/certprovider/pemfile/watcher.go#L92C4-L99)
+with xDS. We can further modify these providers, specifically the file watcher,
+to allow them to be configured with and return SPIFFE bundles instead of only
+certificates.
+Specifically, the Provider is designed to return a
+[KeyMaterial](https://github.com/grpc/grpc-go/blob/e0d191d8adcdd73aad084154769404dd2f6b0fc6/credentials/tls/certprovider/provider.go#L91-L97)
+struct where we could easily add a trust bundle.
+
+When using providers, we already [create our own custom verification
+function](https://github.com/grpc/grpc-go/blob/e0d191d8adcdd73aad084154769404dd2f6b0fc6/security/advancedtls/advancedtls.go#L513)
+for the `tls.Config`. Any specific needs for the SPIFFE bundles during
+verification can be implemented here as well.
+
 
 ### Temporary environment variable protection
 
