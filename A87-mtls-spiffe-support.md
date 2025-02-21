@@ -1,10 +1,10 @@
 A87: mTLS SPIFFE Support
 ----
-* Author(s): @erm-g, @markdroth
+* Author(s): @markdroth, @erm-g, @gtcooke94
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-11-20
+* Last updated: 2025-02-21
 * Discussion at: https://groups.google.com/g/grpc-io/c/55oIW6GNabs
 
 ## Abstract
@@ -175,7 +175,6 @@ When using providers, we already [create our own custom verification
 function](https://github.com/grpc/grpc-go/blob/e0d191d8adcdd73aad084154769404dd2f6b0fc6/security/advancedtls/advancedtls.go#L513)
 for the `tls.Config`. Any specific needs for the SPIFFE bundles during
 verification can be implemented here as well.
-
 
 ### Temporary environment variable protection
 
