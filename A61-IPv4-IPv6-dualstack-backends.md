@@ -4,7 +4,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Approver: @ejona86, @dfawley
 * Status: Ready for Implementation
 * Implemented in: C-core
-* Last updated: 2025-02-13
+* Last updated: 2025-02-28
 * Discussion at: https://groups.google.com/g/grpc-io/c/VjORlKP97cE/m/ihqyN32TAQAJ
 
 ## Abstract
@@ -53,6 +53,7 @@ for session affinity behavior in xDS.
 * [gRFC A56: Priority LB Policy][A56]
 * [gRFC A55: xDS-Based Stateful Session Affinity][A55]
 * [gRFC A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
+* [gRFC A37: xDS Aggregate and Logical DNS Clusters][A37]
 * [gRFC A62: pick_first: Sticky TRANSIENT_FAILURE and address order
   randomization][A62]
 * [gRFC A50: Outlier Detection Support][A50]
@@ -791,6 +792,19 @@ def Pick(pick_args):
   return result
 ```
 
+#### Changes to Logical DNS Clusters
+
+Currently, as per [gRFC A37][A37], we handle LOGICAL_DNS clusters by
+hard-coding the cluster's LB policy to pick_first, so that we get the
+proper semantics of connecting to only one address for the cluster at a
+time.  However, now that we have the ability to encode multiple
+addresses per endpoint, we can do away with that special case.  Instead,
+we will encode all addresses returned by the DNS resolver as a single
+endpoint.  Regardless of which LB policy is configured for the cluster,
+this will result in all addresses being passed down to the same
+pick_first child policy, thus providing the desired behavior without the
+special case.
+
 ### Temporary environment variable protection
 
 The code that reads the new EDS fields will be initially guarded by an
@@ -904,6 +918,8 @@ Reporting Mechanism](#generic-health-reporting-mechanism).
   (https://github.com/grpc/grpc/pull/34526)
 - change stateful session affinity to handle multiple addresses per endpoint
   (https://github.com/grpc/grpc/pull/34472)
+- remove special case for LOGICAL_DNS behavior
+  (https://github.com/grpc/grpc/pull/38248)
 
 ### Java
 
@@ -933,6 +949,7 @@ N/A
 [envoy-design]: https://docs.google.com/document/d/1AjmTcMWwb7nia4rAgqE-iqIbSbfiXCI4h1vk-FONFdM/edit
 [A17]: A17-client-side-health-checking.md
 [A27]: A27-xds-global-load-balancing.md
+[A37]: A37-xds-aggregate-and-logical-dns-clusters.md
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A48]: A48-xds-least-request-lb-policy.md
 [A50]: A50-xds-outlier-detection.md
