@@ -6,6 +6,7 @@ A37: xDS Aggregate and Logical DNS Clusters
 * Implemented in: C-core, Java
 * Last updated: 2021-05-06
 * Discussion at: https://groups.google.com/g/grpc-io/c/bZ7wLIdNCVY
+* Updated by: [A61: IPv4 and IPv6 Dualstack Backend Support](A61-IPv4-IPv6-dualstack-backends.md)
 
 ## Abstract
 
