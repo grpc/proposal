@@ -5,7 +5,7 @@
 * **Status:** In Review  
 * **Implemented in:** TBD
 * **Last updated:** 2025-02-22  
-* **Discussion at:** TBD
+* **Discussion at:** https://groups.google.com/g/grpc-io/c/tEI5G9sX0zc
 
 
 ## Abstract
@@ -47,13 +47,12 @@ message HealthListResponse {
 
 
 service Health {
-  // List gets the health of all the available services. A filtered list can
-  // be obtained by sending the list of the respective service names. If the
-  // list of service names is empty, all the available services must be returned.
+  // List provides a non-atomic snapshot of the health of all the available services. 
+  // A filtered list can be obtained by sending the list of the respective service names. 
+  // If the list of service names is empty, all the available services must be returned.
   //
   // Clients should set a deadline when calling List, and can declare the
   // server unhealthy if they do not receive a timely response.
-  //
   //
   // List implementations should be idempotent and side effect free.
   rpc List(HealthListRequest) returns (HealthListResponse);
@@ -74,10 +73,9 @@ Adding the List RPC method to the Health service strikes a balance between funct
 ## Implementation
 
 1. Add the `List` RPC method and the associated request/response messages in the Health service `.proto` file.
-2. Update client libraries to support the `List` method. Provide examples demonstrating how to call the method and handle its response.
-3. Implement `List` RPC method in the respective gRPC languages.
-4. Unit tests to validate the behavior of the new method.
-5. Update API documentation to describe the new method, its use cases, and sample requests/responses.
+2. Implement `List` RPC method in the respective gRPC languages.
+3. Update client libraries to support the `List` method. Provide examples demonstrating how to call the method and handle its response.
+4. Update API documentation to describe the new method, its use cases, and sample requests/responses.
 
 ## Open issues (if applicable)
 
