@@ -29,7 +29,7 @@ Outlier Detection metrics will have the following labels:
 
 | Name        | Disposition | Description |
 | ----------- | ----------- | ----------- |
-| grpc.target | required | Indicates the target we are outlier detection on. (Same as the attribute defined in A66.) |
+| grpc.target | required | Indicates the target we are running outlier detection on. (Same as the attribute defined in [A66](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md).) |
 
 The following metrics will be exported:
 
