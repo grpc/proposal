@@ -1,7 +1,7 @@
 A87: gRPC OTel Metrics for xDS Outlier Detection
 ---
 * Author(s): Pardhu Konakanchi, Sai Teja
-* Approver: a11r
+* Approver:
 * Status: Draft
 * Implemented in: Core, Go
 * Last updated: 03-04-25
