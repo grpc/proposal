@@ -12,18 +12,18 @@ This document proposes some new metrics that will be added in gRPC for xDS Clien
 
 ## Background
 
-A50: gRPC xDS Outlier Detection Support is a spec for gRPC to support xDS Outlier Detection. The current implementation only offers debug and trace logging in terms of visibility, which can be insufficient for understanding and diagnosing decision making in large-scale production systems. 
+[A50: gRPC xDS Outlier Detection Support](https://github.com/grpc/proposal/blob/master/A50-xds-outlier-detection.md) is a spec for gRPC to support xDS Outlier Detection. The current implementation only offers debug and trace logging in terms of visibility, which can be insufficient for understanding and diagnosing decision making in large-scale production systems. 
 
 Using A79: Non-per-call Metrics Architecture, it is possible to add granular metrics to make visibility into outlier detection easy for service owners utilizing gRPC.
 
 ### Related proposals: 
-* A50: gRPC xDS Outlier Detection Support
-* A66: OpenTelemetry Metrics
-* A79: Non-per-call Metrics Architecture
+* [A50: gRPC xDS Outlier Detection Support](https://github.com/grpc/proposal/blob/master/A50-xds-outlier-detection.md)
+* [A66: OpenTelemetry Metrics](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md)
+* [A79: Non-per-call Metrics Architecture](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)
 
 ## Proposal
 
-A79’s non-per-call metrics architecture fits perfectly into the metrics reporting solution. We propose to aim for parity where appropriate with Envoy’s xDS implementation for metrics to be collected in gRPC
+[A79’s](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md) non-per-call metrics architecture fits perfectly into the metrics reporting solution. We propose to aim for parity where appropriate with [Envoy’s Outlier Detection metric collection](https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cluster_stats#outlier-detection-statistics) to be collected in gRPC
 
 Outlier Detection metrics will have the following labels:
 
@@ -35,7 +35,7 @@ The following metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-|  grpc.xds_client.outlier_detection.ejections_enforced_total | Counter | {ejection} | 	grpc.target	Total enforced ejections due to any outlier type |
+|  grpc.xds_client.outlier_detection.ejections_enforced_total | Counter | {ejection} | 	grpc.target |	Total enforced ejections due to any outlier type |
 |  grpc.xds_client.outlier_detection.ejections_active | Gauge |	{ejection} |	grpc.target |	Number of currently ejected hosts |
 |  grpc.xds_client.outlier_detection.ejections_overflow |	Counter |	{ejection} |	grpc.target |	Number of ejections aborted due to max ejection percentage |
 |  grpc.xds_client.outlier_detection.ejections_enforced_success_rate |	Counter |	{ejection} |	grpc.target |	Enforced success rate outlier ejections |
