@@ -29,7 +29,7 @@ We seek to provide an alternate option for users to customize CRL handling. In a
 
 Users can also implement the interface with whatever behaviors they specifically desire.
 
-Following [RFC5280](https://datatracker.ietf.org/doc/html/rfc5280), during revocation checking one of three status should be returned - `RevocationUnrevoked`, `RevocationRevoked`, and `RevocationUndetermined` ([RFC5280 defines `Undetermined` in the CRL Processing section](https://datatracker.ietf.org/doc/html/rfc5280#section-6.3.3). There are many reasons a certificate can be revoked, but in the end gRPC cares about a certificate being revoked or not, thus we differentiate between `RevocationUnrevoked` and `RevocationRevoked`. The user must specify whether `RevocationUndetermined` should be treated as `RevocationRevoked` or `RevocationUnrevoked` (failing open vs. failing closed).
+Following [RFC5280](https://datatracker.ietf.org/doc/html/rfc5280), during revocation checking one of three status should be returned - `RevocationUnrevoked`, `RevocationRevoked`, and `RevocationUndetermined` ([RFC5280 defines `Undetermined` in the CRL Processing section](https://datatracker.ietf.org/doc/html/rfc5280#section-6.3.3)). There are many reasons a certificate can be revoked, but in the end gRPC cares about a certificate being revoked or not, thus we differentiate between `RevocationUnrevoked` and `RevocationRevoked`. The user must specify whether `RevocationUndetermined` should be treated as `RevocationRevoked` or `RevocationUnrevoked` (failing open vs. failing closed).
 
 Assumptions:
 1. There should be no direct linkage between this interface and the creation/distribution of CRLs. gRPC is a user of CRLs and credentials, not a PKI itself.
