@@ -161,18 +161,18 @@ Regarding sharing between connections - since the providers are in a high-level 
 #### Directory Reloader Specifics
 ![Directory Reloader Flow](A69_graphics/golang_reloader.png)
 ```go
-type CrlDirectoryReloadingProvider struct {
+type CRLDirectoryReloadingProvider struct {
 	ReloadInterval time.Duration
-  CrlDirectory string
-  // maps issuer hash to crl
+	CRLDirectory string
+	// maps issuer hash to crl
 	crls map[string]*CertificateListExt
 }
-func (provider *CrlDirectoryReloadingProvider) Crl(x509.Certificate) (*CertificateListExt, error) {...}
 
-func (provider *CrlDirectoryReloadingProvider) run(ctx context.Context) {
-	// golang ticker that refreshes the Crls
+func (provider *CRLDirectoryReloadingProvider) CRL(x509.Certificate) (*CertificateListExt, error) {...}
+
+func (provider *CRLDirectoryReloadingProvider) run(ctx context.Context) {
+	// golang ticker that refreshes the CRLs
 }
-```
 
 Reference Code:
 * [IdentityCertificateOptions](https://github.com/grpc/grpc-go/blob/2aa261560586eab6795301a3670d9dfdd7308625/security/advancedtls/advancedtls.go#L115)
