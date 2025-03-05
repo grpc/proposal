@@ -2,9 +2,9 @@ A69: Certificate Revocation List Enhancements
 ----
 * Author(s): Gregory Cooke (@gtcooke94)
 * Approver: ejona86
-* Status: Draft
-* Implemented in: C, Go
-* Last updated: 2023-08-03
+* Status: Approved 
+* Implemented in: C, Go, Java
+* Last updated: 2025-03-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/3o__5GhGxeg
 
 ## Abstract
