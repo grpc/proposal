@@ -5,6 +5,7 @@ A91: gRPC Metrics for Outlier Detection
 * Status: In Review
 * Implemented in: Core, Go
 * Last updated: 2025-03-05
+* Discussion at: https://groups.google.com/g/grpc-io/c/iMezDbq5U-g
 
 ## Abstract
 
