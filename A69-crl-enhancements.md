@@ -143,8 +143,8 @@ type RevocationConfig struct {
 	// Cache will store CRL files if not nil, otherwise files are reloaded for every lookup.
 	Cache Cache
 
-  // crlProvider and RootDir/Cache cannot both be set
-+ CrlProvider crlProvider
++	// crlProvider and RootDir/Cache cannot both be set
++	CRLProvider crlProvider
 }
 ```
 
