@@ -4,7 +4,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Approver: @ejona86, @dfawley
 * Status: Ready for Implementation
 * Implemented in: C-core
-* Last updated: 2025-02-28
+* Last updated: 2025-03-06
 * Discussion at: https://groups.google.com/g/grpc-io/c/VjORlKP97cE/m/ihqyN32TAQAJ
 
 ## Abstract
@@ -796,14 +796,14 @@ def Pick(pick_args):
 
 Currently, as per [gRFC A37][A37], we handle LOGICAL_DNS clusters by
 hard-coding the cluster's LB policy to pick_first, so that we get the
-proper semantics of connecting to only one address for the cluster at a
-time.  However, now that we have the ability to encode multiple
+proper semantics of connecting to only one address for the cluster
+at a time.  However, now that we have the ability to encode multiple
 addresses per endpoint, we can do away with that special case.  Instead,
-we will encode all addresses returned by the DNS resolver as a single
-endpoint.  Regardless of which LB policy is configured for the cluster,
-this will result in all addresses being passed down to the same
-pick_first child policy, thus providing the desired behavior without the
-special case.
+the xds_cluster_resolver LB policy will encode all addresses returned by
+the DNS resolver as a single endpoint.  Regardless of which LB policy
+is configured for the cluster, this will result in all addresses being
+passed down to the same pick_first child policy, thus providing the
+desired behavior without the special case.
 
 ### Temporary environment variable protection
 
