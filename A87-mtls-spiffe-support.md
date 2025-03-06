@@ -114,8 +114,37 @@ essentially the same semantics as in xDS.  We will add the ability for
 the `FileWatcherCertificateProvider` to be instantiated with a SPIFFE
 trust bundle map file instead of a CA certificate file.
 
-TODO: @erm-g to fill in API details.  We'll probably need to introduce
-an options struct for FileWatcherCertificateProvider.
+With the adding of a SPIFFE trust bundle map file, the
+`FileWatcherCertificateProvider` constructor is beginning to have a lot of
+arguments. We will introduce a `FileWatcherCertificateProviderOptions` struct
+and associated constructor similarly to `TlsCredentialOptions`.
+We will not remove the old constructors in order to not break current users.
+
+```
+class FileWatcherCertificateProviderOptions {
+   public:
+     FileWatcherCertificateProviderOptions();
+
+     FileWatcherCertificateProviderOptions& set_private_key_path(absl::string_view private_key_path);
+     FileWatcherCertificateProviderOptions& set_identity_certificate_path(absl::string_view identity_certificate_path);
+     FileWatcherCertificateProviderOptions& set_root_cert_path(absl::string_view root_cert_path);
+     FileWatcherCertificateProviderOptions& set_spiffe_bundle_map_path(absl::string_view spiffe_bundle_map_path);
+     FileWatcherCertificateProviderOptions& set_private_key_path(absl::string_view private_key_path);
+
+
+   private:
+     std::string private_key_path_;
+     std::string identity_certificate_path_;
+     std::string root_cert_path_;
+     std::string spiffe_bundle_map_path_;
+     unsigned int refresh_interval_sec_;
+}
+
+class FileWatcherCertificateProvider final .... {
+   // existing class definitions
+   FileWatcherCertificateProvider(const FileWatcherCertificateProviderOptions& options);
+}
+```
 
 #### Java
 
@@ -140,7 +169,7 @@ For the xDS functionality described above, the `XdsX509TrustManager`
 will gain the ability to be instantiated with a SPIFFE trust bundle
 map.  In this case, it will use the SPIFFE trust bundle certificates as
 trusted roots.  If the `XdsX509TrustManager` is instantiated using CA
-certificates (existing functionality), then it'll contimue to use them
+certificates (existing functionality), then it'll continue to use them
 exactly as it does today.  The new APIs will look like this:
 
 ```java
