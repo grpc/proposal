@@ -124,10 +124,6 @@ We will not remove the old constructors in order to not break current users.
 class FileWatcherCertificateProviderOptions {
    public:
      FileWatcherCertificateProviderOptions();
-     // Copy constructor does a deep copy of the underlying pointer. No assignment
-     // permitted
-     FileWatcherCertificateProviderOptions(const FileWatcherCertificateProviderOptions& other);
-     FileWatcherCertificateProviderOptions& operator=(const FileWatcherCertificateProviderOptions& other) = delete;
 
      FileWatcherCertificateProviderOptions& set_private_key_path(absl::string_view private_key_path);
      FileWatcherCertificateProviderOptions& set_identity_certificate_path(absl::string_view identity_certificate_path);
