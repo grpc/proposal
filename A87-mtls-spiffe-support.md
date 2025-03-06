@@ -126,14 +126,14 @@ class FileWatcherCertificateProviderOptions {
      FileWatcherCertificateProviderOptions();
      // Copy constructor does a deep copy of the underlying pointer. No assignment
      // permitted
-     TlsCredentialsOptions(const TlsCredentialsOptions& other);
-     TlsCredentialsOptions& operator=(const TlsCredentialsOptions& other) = delete;
+     FileWatcherCertificateProviderOptions(const FileWatcherCertificateProviderOptions& other);
+     FileWatcherCertificateProviderOptions& operator=(const FileWatcherCertificateProviderOptions& other) = delete;
 
-     void set_private_key_path(const std::string& private_key_path);
-     void set_identity_certificate_path(const std::string& identity_certificate_path);
-     void set_root_cert_path(const std::string& root_cert_path);
-     void set_spiffe_bundle_map_path(const std::string& spiffe_bundle_map_path);
-     void set_private_key_path(const std::string& private_key_path);
+     FileWatcherCertificateProviderOptions& set_private_key_path(absl::string_view private_key_path);
+     FileWatcherCertificateProviderOptions& set_identity_certificate_path(absl::string_view identity_certificate_path);
+     FileWatcherCertificateProviderOptions& set_root_cert_path(absl::string_view root_cert_path);
+     FileWatcherCertificateProviderOptions& set_spiffe_bundle_map_path(absl::string_view spiffe_bundle_map_path);
+     FileWatcherCertificateProviderOptions& set_private_key_path(absl::string_view private_key_path);
 
 
    private:
