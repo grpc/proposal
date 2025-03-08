@@ -30,7 +30,7 @@ Kubernetes provides a similar capability with its `/readyz?verbose` endpoint, wh
 
 Introduce a new `List` RPC method in the Health service with the following features:
 
-- Retrieve the health statuses of all monitored services or a filtered list of specified services.
+- Retrieve the health statuses of all monitored services.
 - Ensure the implementation is idempotent and side-effect free.
 - Provide a clear schema for the request and response to facilitate integration with external tools.
 
@@ -38,7 +38,6 @@ Introduce a new `List` RPC method in the Health service with the following featu
 
 ```protobuf
 message HealthListRequest {
-  repeated string services = 1; // Contains the name of the services that should be obtained. If empty, must return all.
 }
 
 message HealthListResponse {
