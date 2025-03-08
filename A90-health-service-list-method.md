@@ -1,4 +1,4 @@
-# A90: Add List Method to gRPC Health Service
+A90: Add List Method to gRPC Health Service
 ----
 * **Author(s):** @marcoshuck
 * **Approver:** @markdroth
