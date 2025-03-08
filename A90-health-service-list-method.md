@@ -48,8 +48,9 @@ message HealthListResponse {
 
 service Health {
   // List provides a non-atomic snapshot of the health of all the available services. 
-  // A filtered list can be obtained by sending the list of the respective service names. 
-  // If the list of service names is empty, all the available services must be returned.
+  //
+  // The maximum number of services to return is 100; responses exceeding this limit will result in a RESOURCE_EXHAUSTED 
+  // error.
   //
   // Clients should set a deadline when calling List, and can declare the
   // server unhealthy if they do not receive a timely response.
