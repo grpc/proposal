@@ -14,7 +14,7 @@ This proposal introduces a new `List` RPC method for the Health service, allowin
 
 ## Background
 
-The existing Health service provides basic health check functionality but lacks a mechanism to retrieve a comprehensive list of all monitored services and their statuses.
+The [existing Health service](https://github.com/grpc/grpc-proto/blob/cbb231341938471b78b38729c2e4a712a9e098d0/grpc/health/v1/health.proto) provides basic health check functionality but lacks a mechanism to retrieve a comprehensive list of all monitored services and their statuses.
 
 This limitation makes it challenging for clients to aggregate health information across multiple services, particularly for use cases like publishing service statuses to dashboards such as [Cachet](https://cachethq.io/) or [Statuspage](https://www.atlassian.com/software/statuspage).
 
