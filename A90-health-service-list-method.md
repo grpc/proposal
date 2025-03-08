@@ -55,6 +55,9 @@ service Health {
   // Clients should set a deadline when calling List, and can declare the
   // server unhealthy if they do not receive a timely response.
   //
+  // Clients should keep in mind that the list of health services exposed by an application 
+  // can change over the lifetime of the process.
+  //
   // List implementations should be idempotent and side effect free.
   rpc List(HealthListRequest) returns (HealthListResponse);
 }
