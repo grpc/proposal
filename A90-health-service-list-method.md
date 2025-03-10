@@ -10,7 +10,7 @@ A90: Add List Method to gRPC Health Service
 
 ## Abstract
 
-This proposal introduces a new `List` RPC method for the Health service, allowing clients to retrieve the statuses of all monitored services or a filtered list of specific services. This feature simplifies integration with status-reporting dashboards and enhances observability for microservices.
+This proposal introduces a new `List` RPC method for the Health service, allowing clients to retrieve the statuses of all monitored services. This feature simplifies integration with status-reporting dashboards and enhances observability for microservices.
 
 ## Background
 
