@@ -150,13 +150,10 @@ class Watcher {
  public:
   virtual ~Watcher() = default;
 
-  // Called when a new xDS config is available.
-  virtual void OnUpdate(XdsConfig config) = 0;
-
-  // Called when there is an error on LDS or RDS only.  The context will
-  // be a human-readable string indicating the scope in which the error
-  // occurred (e.g., the resource type and name).
-  virtual void OnError(absl::string_view context, absl::Status status) = 0;
+  // Called when a new xDS config is available or when there is an error
+  // for the LDS or RDS resource for which we want to stop using the
+  // previously seen resource, if any.
+  virtual void OnUpdate(absl::StatusOr<XdsConfig> config) = 0;
 };
 ```
 
@@ -201,10 +198,11 @@ struct XdsConfig {
 };
 ```
 
-Note that the watcher's OnError() method will be invoked only for problems
-with the listener and route configuration resources that require the
-xds resolver to stop using the previously returned resources, if any.
-Specifically, it will be invoked in the following cases:
+Note that the watcher's OnUpdate() method will be invoked with an error
+only for problems with the listener and route configuration resources
+that require the xds resolver to stop using the previously returned
+resources, if any.  Specifically, it will be invoked with an error in
+the following cases:
 - When the listener or route configuration watchers see
   OnResourceDoesNotExist().
 - When the listener or route configuration watchers see OnError(), if
