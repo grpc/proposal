@@ -24,7 +24,7 @@ Kubernetes provides a similar capability with its `/readyz?verbose` endpoint, wh
 
 ### Related Proposals
 
-- [A17 - Client-Side Health Checking](https://github.com/grpc/proposal/blob/master/A17-client-side-health-checking.md)
+- [A17 - Client-Side Health Checking](A17-client-side-health-checking.md)
 
 ## Proposal
 
