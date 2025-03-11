@@ -3,7 +3,7 @@ A90: Add List Method to gRPC Health Service
 * **Author(s):** @marcoshuck
 * **Approver:** @markdroth
 * **Status:** Final
-* **Implemented in:** C++, Go, Java and Node.
+* **Implemented in:** -
 * **Last updated:** 2025-02-22  
 * **Discussion at:** https://groups.google.com/g/grpc-io/c/tEI5G9sX0zc
 
