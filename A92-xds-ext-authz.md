@@ -43,35 +43,53 @@ the bootstrap config, described in [A77].  It will also make use of the
 
 ### Filter Configuration
 
-We will support the following fields:
-- grpc_service: This field must be present.  Inside of it:
-  - google_grpc: This field must be present.  Inside of it:
-    - target_uri: This field must be non-empty and must be a valid
-      target URI.  The value specified here must be present in the
-      `allowed_grpc_services` map in the bootstrap config, which will
-      also determine the credentials to use, as described in [A77].
+We will support the following fields in the [`ExtAuthz`
+proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L34):
+- [grpc_service](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L45):
+  This field must be present.  Inside of it:
+  - [google_grpc](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L303):
+    This field must be present.  Inside of it:
+    - [target_uri](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L254):
+      This field must be non-empty and must be a valid target URI.  The
+      value specified here must be present in the `allowed_grpc_services`
+      map in the bootstrap config, which will also determine the credentials
+      to use, as described in [A77].
     - Note: All other fields are ignored.
-  - timeout: Used to set the RPC deadline.  If unset, there is no deadline.
+  - [timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L308):
+    Specifies the deadline for the RPCs sent to the ext_authz server.
+    If unset, there is no deadline.  The value must obey the restrictions
+    specified in the [`google.protobuf.Duration`
+    documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
+    and it must have a positive value.
   - All other fields are ignored.
-- failure_mode_allow
-- failure_mode_allow_header_add
-- status_on_error: Note that this field specifies an HTTP status code,
+- [failure_mode_allow](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L68)
+- [failure_mode_allow_header_add](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L74)
+- [status_on_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L95): Note that this field specifies an HTTP status code,
   not a gRPC status code.  The gRPC status code will be determined using
   the normal [HTTP-to-gRPC status conversion
   rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-- allowed_headers: TODO: Want to not allow sending certain sensitive
-  headers unless `trusted_xds_server` is present, but hard with regex
-  matches...  Maybe just don't allow matchers to match against sensitive
-  headers?
-- disallowed_headers
-- decoder_header_mutation_rules: Optional.  Inside of it:
-  - allow_all_routing: This field will control only whether the
+- [allowed_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L229):
+  TODO: Want to not allow sending certain sensitive headers unless
+  `trusted_xds_server` is present, but hard with regex matches...
+  Maybe just don't allow matchers to match against sensitive headers?
+- [disallowed_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L233)
+- [decoder_header_mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L282):
+  Optional.  Inside of it:
+  - [allow_all_routing](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L52): This field will control only whether the
     ext_authz server can overwrite the `:authority` header.  If this
     field is set to true and the `trusted_xds_server` server feature is
     not present in the bootstrap config, we will reject the config.
-  - TODO: Figure out how to handle allow_expression w.r.t. it matching a
-    restricted header.  Maybe just don't allow it to match against those?
-- include_peer_certificate
+  - [allow_envoy](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L59C29-L59C40):
+    TODO: Do we need this?  Those headers aren't really special to gRPC.
+  - [disallow_system](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L65C29-L65C44):
+    TODO: Should we allow these headers to be modified at all?
+  - [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70C29-L70C41)
+  - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75C32-L75C48):
+    TODO: Figure out how to handle matching a restricted header.  Maybe just
+    don't allow it to match against those?
+  - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79C32-L79C51)
+  - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87C29-L87C46)
+- [include_peer_certificate](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L181)
 - TODO: CACHING!
 
 The following fields will be ignored by gRPC:
@@ -83,7 +101,8 @@ The following fields will be ignored by gRPC:
 - with_request_body: This feature is structured around an HTTP request
   and doesn't really make sense for gRPC, both because it's unclear how
   it would work for streaming RPCs and because it would include only the
-  first message on the stream, not the raw HTTP DATA frame content.
+  first message on the stream (after gRPC deframing), not the raw HTTP
+  DATA frame content.
 - validate_mutations: We will unconditionally reject invalid mutations.
 - clear_route_cache: We don't currently support recomputing the route.
   We could consider adding this in the future if we have a use-case for
@@ -111,40 +130,62 @@ used."
 
 ### Communication With the ext_authz Server
 
-The `AttributeContext` message sent to the server will be populated as
-follows:
-- source: Will always be set.  Inside it:
-  - address and service will be set.
+The [`AttributeContext`
+message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L43)
+sent to the server will be populated as follows:
+- [source](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L192): Will always be set.  Inside it:
+  - [address](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L58)
+    and [service](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L65)
+    will be set.
   - labels will not be set.
-  - principal will be set if the client provided a cert and we validates
-    it, unset otherwise.
-  - certificate: This will be populated if configured.
-- destination: This field will not be populated, because there is no
-  destination on a gRPC server.
-- request: Will always be set.  Inside it:
-  - id: TODO: how do we set this?
-  - method: Will always be "POST".
-  - header_map: Will be set based on config.
-  - path: Will always be set.
-  - scheme: TODO: set based on whether TLS is used?
-  - size: Will always be set to -1.  TODO: For unary, could maybe set it
-    to the size of the message payload.
-  - protocol: Always set to "HTTP/2".
-  - headers, query, fragment, body, raw_body: Will *not* be set.
+  - [principal](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L82)
+    will be set if the client provided a cert and we validates it, unset
+    otherwise.
+  - [certificate](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L86): This will be populated if configured.
+- [destination](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L197):
+  This field will not be populated, because there is no destination on a gRPC
+  server.
+- [request](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L200):
+  Will always be set.  Inside it:
+  - [time](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L95):
+    Will be set to the RPC's start time.
+  - [http](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L98):
+    Will always be set.  Inside of it:
+    - [id](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L112): TODO: how do we set this?
+    - [method](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L115):
+      Will always be "POST".
+    - [header_map](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L143):
+      Will be set based on config.
+    - [path](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L148):
+      Will always be set.
+    - [scheme](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L154):
+      TODO: set based on whether TLS is used?
+    - [size](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L165):
+      Will always be set to -1.
+    - [protocol](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L171):
+      Always set to "HTTP/2".
+    - headers, query, fragment, body, raw_body: Will *not* be set.
 - context_extensions, metadata_context, route_metadata_context,
   tls_session: Will *not* be set.
 
-We will handle the `CheckResponse` as follows:
-- status: Supported.
-- denied_response:
-  - status: The HTTP status to fail the RPC with.  We apply the normal
+We will handle the [`CheckResponse`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L117)
+as follows:
+- [status](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L124):
+  Supported.
+- [denied_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L131):
+  Supported.  Inside of it:
+  - [status](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L50):
+    The HTTP status to fail the RPC with.  We apply the normal
     [HTTP-to-gRPC status conversion
     rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-  - headers: TODO: Figure out what restrictions to apply here.
+  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L55):
+    TODO: Figure out what restrictions to apply here.
   - body: Ignored; does not apply to gRPC.
-- ok_response:
-  - headers, headers_to_remove, response_headers_to_add: See [header
-    rewriting](#header-rewriting) below for details.
+- [ok_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L134):
+  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L75),
+    [headers_to_remove](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L92),
+    [response_headers_to_add](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L104):
+    See [header rewriting](#header-rewriting) below for details.
   - query_parameters_to_set, query_parameters_to_remove: Ignored; these
     do not apply to gRPC.
 - dynamic_metadata: Ignored.
