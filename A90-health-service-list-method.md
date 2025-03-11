@@ -4,7 +4,7 @@ A90: Add List Method to gRPC Health Service
 * **Approver:** @markdroth
 * **Status:** Final
 * **Implemented in:** -
-* **Last updated:** 2025-02-22  
+* **Last updated:** 2025-03-10
 * **Discussion at:** https://groups.google.com/g/grpc-io/c/tEI5G9sX0zc
 
 
