@@ -210,7 +210,7 @@ the following cases:
   *did* previously see OnResourceChanged(), then the OnError() event is
   ignored by the XdsDependencyManager and not passed on to the xds
   resolver.)
-- When the received listener resource is a socket listner instead of an
+- When the received listener resource is a socket listener instead of an
   API listener.
 - When the received route configuration does not contain a virtual host
   matching the channel's default authority.
