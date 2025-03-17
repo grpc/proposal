@@ -4,7 +4,7 @@ A87: mTLS SPIFFE Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-02-21
+* Last updated: 2025-03-17
 * Discussion at: https://groups.google.com/g/grpc-io/c/55oIW6GNabs
 
 ## Abstract
@@ -122,28 +122,34 @@ We will not remove the old constructors in order to not break current users.
 
 ```
 class FileWatcherCertificateProviderOptions {
-   public:
-     FileWatcherCertificateProviderOptions();
+ public:
+  FileWatcherCertificateProviderOptions();
 
-     FileWatcherCertificateProviderOptions& set_private_key_path(absl::string_view private_key_path);
-     FileWatcherCertificateProviderOptions& set_identity_certificate_path(absl::string_view identity_certificate_path);
-     FileWatcherCertificateProviderOptions& set_root_cert_path(absl::string_view root_cert_path);
-     FileWatcherCertificateProviderOptions& set_spiffe_bundle_map_path(absl::string_view spiffe_bundle_map_path);
-     FileWatcherCertificateProviderOptions& set_private_key_path(absl::string_view private_key_path);
+  FileWatcherCertificateProviderOptions& set_private_key_path(
+      absl::string_view private_key_path);
+  FileWatcherCertificateProviderOptions& set_identity_certificate_path(
+      absl::string_view identity_certificate_path);
+  FileWatcherCertificateProviderOptions& set_root_cert_path(
+      absl::string_view root_cert_path);
+  FileWatcherCertificateProviderOptions& set_spiffe_bundle_map_path(
+      absl::string_view spiffe_bundle_map_path);
+  FileWatcherCertificateProviderOptions& set_private_key_path(
+      absl::string_view private_key_path);
 
+ private:
+  std::string private_key_path_;
+  std::string identity_certificate_path_;
+  std::string root_cert_path_;
+  std::string spiffe_bundle_map_path_;
+  unsigned int refresh_interval_sec_;
+};
 
-   private:
-     std::string private_key_path_;
-     std::string identity_certificate_path_;
-     std::string root_cert_path_;
-     std::string spiffe_bundle_map_path_;
-     unsigned int refresh_interval_sec_;
-}
-
-class FileWatcherCertificateProvider final .... {
-   // existing class definitions
-   FileWatcherCertificateProvider(const FileWatcherCertificateProviderOptions& options);
-}
+class FileWatcherCertificateProvider final ... {
+ public:
+  // ...existing class definitions...
+  FileWatcherCertificateProvider(
+      const FileWatcherCertificateProviderOptions& options);
+};
 ```
 
 #### Java
@@ -186,9 +192,11 @@ class XdsX509TrustManager {
 We'll also adjust existing hierarchies of `Watcher` and
 `CertificateProvider` to support the new SPIFFE trust bundle map.
 
-For the AdvancedTls case in Java, the API changes will look as follows:
-In AdvancedTlsX509TrustManager.java, the API must allow configuring and reloading a SPIFFE Bundle Map.
-There are currently three functions that configure the root trust certificate
+For the AdvancedTls case in Java, the API changes will look as follows.
+In AdvancedTlsX509TrustManager.java, the API must allow configuring and
+reloading a SPIFFE Bundle Map.  There are currently three functions that
+configure the root trust certificate
+
 ```
 public void updateTrustCredentials(X509Certificate[] trustCerts) throws IOException,
    GeneralSecurityException
@@ -200,11 +208,9 @@ public Closeable updateTrustCredentials(File trustCertFile, long period, TimeUni
    ScheduledExecutorService executor) throws IOException, GeneralSecurityException
 ```
 
-We will add three similar new functions for updating the SPIIFE root of trust
-```
-public void updateSpiffeTrustBundle(SpiffeBundle spiffeBundle) throws IOException,
-   GeneralSecurityException
+We will add two similar new functions for updating the SPIIFE root of trust:
 
+```
 public void updateSpiffeTrustBundle(File spiffeBundleFile) throws IOException,
    GeneralSecurityException
 
