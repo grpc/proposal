@@ -186,6 +186,34 @@ class XdsX509TrustManager {
 We'll also adjust existing hierarchies of `Watcher` and
 `CertificateProvider` to support the new SPIFFE trust bundle map.
 
+For the AdvancedTls case in Java, the API changes will look as follows:
+In AdvancedTlsX509TrustManager.java, the API must allow configuring and reloading a SPIFFE Bundle Map.
+There are currently three functions that configure the root trust certificate
+```
+public void updateTrustCredentials(X509Certificate[] trustCerts) throws IOException,
+   GeneralSecurityException
+
+public void updateTrustCredentials(File trustCertFile) throws IOException,
+   GeneralSecurityException
+
+public Closeable updateTrustCredentials(File trustCertFile, long period, TimeUnit unit,
+   ScheduledExecutorService executor) throws IOException, GeneralSecurityException
+```
+
+We will add three similar new functions for updating the SPIIFE root of trust
+```
+public void updateSpiffeTrustBundle(SpiffeBundle spiffeBundle) throws IOException,
+   GeneralSecurityException
+
+public void updateSpiffeTrustBundle(File spiffeBundleFile) throws IOException,
+   GeneralSecurityException
+
+public Closeable updateSpiffeTrustBundle(File spiffeBundleFile, long period, TimeUnit unit,
+   ScheduledExecutorService executor) throws IOException, GeneralSecurityException
+```
+
+The `checkTrusted` implementations will be updated to properly use the SPIFFE Bundles as described in this gRFC.
+
 #### Go
 
 In Go, we can leverage [the go spiffe
