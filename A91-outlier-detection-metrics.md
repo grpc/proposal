@@ -40,9 +40,9 @@ The following metrics will be exported:
 |  grpc.lb.outlier_detection.ejections_active | Gauge |	{ejection} |	grpc.target |	Number of currently ejected hosts |
 |  grpc.lb.outlier_detection.ejections_overflow |	Counter |	{ejection} |	grpc.target |	Number of ejections aborted due to max ejection percentage |
 |  grpc.lb.outlier_detection.ejections_enforced_success_rate |	Counter |	{ejection} |	grpc.target |	Enforced success rate outlier ejections |
-|  grpc.lb.outlier_detection.ejections_detected_success_rate |	Counter |	{ejection} |	grpc.target |	Detected (but unenforced) success rate outlier ejections |
+|  grpc.lb.outlier_detection.ejections_detected_success_rate |	Counter |	{ejection} |	grpc.target |	Detected (even if unenforced) success rate outlier ejections |
 |  grpc.lb.outlier_detection.ejections_enforced_failure_percentage |	Counter |	{ejection} |	grpc.target |	Enforced failure percentage outlier ejections |
-|  grpc.lb.outlier_detection.ejections_detected_failure_percentage |	Counter |	{ejection} |	grpc.target |	Detected (but unenforced) failure percentage outlier ejections |
+|  grpc.lb.outlier_detection.ejections_detected_failure_percentage |	Counter |	{ejection} |	grpc.target |	Detected (even if unenforced) failure percentage outlier ejections |
 
 On any ejection/unejection, these metrics will be accordingly updated using globally available metric recorder.
 
