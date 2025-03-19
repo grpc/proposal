@@ -31,18 +31,21 @@ Outlier Detection metrics will have the following labels:
 | Name        | Disposition | Description |
 | ----------- | ----------- | ----------- |
 | grpc.target | required | Indicates the target we are running outlier detection on. (Same as the attribute defined in [A66](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md).) |
+| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent. This is relevant when a single channel target can be sent to different sets of servers. When using xDS, this will be the cluster name. When not relevant, the value will be the empty string.
+
+Note that `grpc.lb.backend_service` will not be supported as a label until completion of [A75](https://github.com/grpc/proposal/blob/master/A75-xds-aggregate-cluster-behavior-fixes.md)
 
 The following metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-|  grpc.lb.outlier_detection.ejections_enforced_total | Counter | {ejection} | 	grpc.target |	Total enforced ejections due to any outlier type |
-|  grpc.lb.outlier_detection.ejections_active | Gauge |	{ejection} |	grpc.target |	Number of currently ejected hosts |
-|  grpc.lb.outlier_detection.ejections_overflow |	Counter |	{ejection} |	grpc.target |	Number of ejections aborted due to max ejection percentage |
-|  grpc.lb.outlier_detection.ejections_enforced_success_rate |	Counter |	{ejection} |	grpc.target |	Enforced success rate outlier ejections |
-|  grpc.lb.outlier_detection.ejections_detected_success_rate |	Counter |	{ejection} |	grpc.target |	Detected (even if unenforced) success rate outlier ejections |
-|  grpc.lb.outlier_detection.ejections_enforced_failure_percentage |	Counter |	{ejection} |	grpc.target |	Enforced failure percentage outlier ejections |
-|  grpc.lb.outlier_detection.ejections_detected_failure_percentage |	Counter |	{ejection} |	grpc.target |	Detected (even if unenforced) failure percentage outlier ejections |
+|  grpc.lb.outlier_detection.ejections_enforced_total | Counter | {ejection} | 	grpc.target, grpc.lb.backend_service |	Total enforced ejections due to any outlier type |
+|  grpc.lb.outlier_detection.ejections_active | Gauge |	{ejection} |	grpc.target, grpc.lb.backend_service |	Number of currently ejected hosts |
+|  grpc.lb.outlier_detection.ejections_overflow |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Number of ejections aborted due to max ejection percentage |
+|  grpc.lb.outlier_detection.ejections_enforced_success_rate |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Enforced success rate outlier ejections |
+|  grpc.lb.outlier_detection.ejections_detected_success_rate |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Detected (even if unenforced) success rate outlier ejections |
+|  grpc.lb.outlier_detection.ejections_enforced_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Enforced failure percentage outlier ejections |
+|  grpc.lb.outlier_detection.ejections_detected_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Detected (even if unenforced) failure percentage outlier ejections |
 
 On any ejection/unejection, these metrics will be accordingly updated using globally available metric recorder.
 
