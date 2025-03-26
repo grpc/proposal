@@ -21,10 +21,12 @@ Using [A79: Non-per-call Metrics Architecture][A79], it is possible to add granu
 * [A50: gRPC xDS Outlier Detection Support][A50]
 * [A66: OpenTelemetry Metrics][A66]
 * [A79: Non-per-call Metrics Architecture][A79]
+* [A75: xDS Aggregate Cluster Behavior Fixes][A75]
 * [A89: Backend Service Metric Label][A89] (pending)
 
 [A50]: A50-xds-outlier-detection.md
 [A66]: A66-otel-stats.md
+[A75]: A75-xds-aggregate-cluster-behavior-fixes.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A89]: https://github.com/grpc/proposal/pull/471
 
