@@ -151,7 +151,7 @@ This proposal has the following parts:
 - handling data errors and transient errors
 - support for errors provided by the xDS server as per [xRFC TP3]
 - changes to the resource timer behavior
-- deprecating the "ignore_resource_deletion" server feature
+- removing the "ignore_resource_deletion" server feature
 - new cache entry states, reflected in CSDS and XdsClient metrics
 
 ### Changes to XdsClient Watcher APIs
