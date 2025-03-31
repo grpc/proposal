@@ -4,7 +4,7 @@ A87: mTLS SPIFFE Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-03-17
+* Last updated: 2025-03-31
 * Discussion at: https://groups.google.com/g/grpc-io/c/55oIW6GNabs
 
 ## Abstract
@@ -17,8 +17,7 @@ will be supported both with TlsCredentials and via xDS.
 [SPIFFE] is a standardized way of encoding workload identity in mTLS
 certificates.  Specifically, we want to support using the [SPIFFE bundle
 format] in place of a single CA certificate for peer certificate
-verification.  The bundle map format is defined in
-https://github.com/spiffe/spiffe/pull/304.
+verification.
 
 ### Related Proposals: 
 * [gRFC A29: xDS-Based mTLS Security for gRPC Clients and Servers][gRFC A29]
@@ -31,7 +30,7 @@ https://github.com/spiffe/spiffe/pull/304.
 
 ## Proposal
 
-There are two main parts to this proposal, support for SPIFFE
+There are two main parts to this proposal: support for SPIFFE
 certificate verification in TlsCredentials, and configuring that
 functionality via xDS.  We will cover the xDS case first.
 
