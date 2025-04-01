@@ -56,10 +56,10 @@ Label definition:
 The value will be communicated to the gRPC OpenTelemetry module by the call
 attempt tracer. When an LB policy provides the label value to the tracer it
 will do so each pick that the information is available, regardless of the pick's
-result. This allows DEADLINE_EXCEEDED and UNAVAILABLE failures to include a
-relevant backend service. It is possible for later picks for the same RPC to
-have a different value. This is the case for locality as well, and the last
-pick's value should be used by the OpenTelemetry module.
+result. This allows metrics for DEADLINE_EXCEEDED and UNAVAILABLE failures to
+include a relevant backend service. It is possible for later picks for the same
+RPC to have a different value. This is the case for locality as well, and the
+last pick's value should be used by the OpenTelemetry module.
 
 The only LB policy with a backend service concept at this time is
 `xds_cluster_impl`. It will notify the call attempt tracer of the
