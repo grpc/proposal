@@ -229,9 +229,24 @@ providers](https://github.com/grpc/grpc-go/blob/e0d191d8adcdd73aad084154769404dd
 with xDS. We can further modify these providers, specifically the file watcher,
 to allow them to be configured with and return SPIFFE bundles instead of only
 certificates.
-Specifically, the Provider is designed to return a
+The Provider is designed to return a
 [KeyMaterial](https://github.com/grpc/grpc-go/blob/e0d191d8adcdd73aad084154769404dd2f6b0fc6/credentials/tls/certprovider/provider.go#L91-L97)
-struct where we could easily add a trust bundle.
+struct to which we will add the field SPIFFEBundleMap.
+
+```
+// KeyMaterial wraps the certificates and keys returned by a Provider instance.
+type KeyMaterial struct {
+	// Certs contains a slice of cert/key pairs used to prove local identity.
+	Certs []tls.Certificate
+	// Roots contains the set of trusted roots to validate the peer's identity.
+	// This field will only be used if the `SPIFFEBundleMap` field is unset.
+	Roots *x509.CertPool
+	// SPIFFEBundleMap is an in-memory representation of a spiffe trust bundle
+	// map. If this value exists, it will be used to find the roots for a given
+	// trust domain rather than the Roots in this struct.
+	SPIFFEBundleMap map[string]*spiffebundle.Bundle
+}
+```
 
 When using providers, we already [create our own custom verification
 function](https://github.com/grpc/grpc-go/blob/e0d191d8adcdd73aad084154769404dd2f6b0fc6/security/advancedtls/advancedtls.go#L513)
