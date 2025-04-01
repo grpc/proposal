@@ -4,7 +4,7 @@ A89: Backend Service Metric Label
 * Approver: @markdroth
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-01-10
+* Last updated: 2025-04-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/s4tm26RiMyI
 
 ## Abstract
