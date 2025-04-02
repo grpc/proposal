@@ -62,7 +62,8 @@ priorities.
 * [A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
 * [A56: Priority LB policy][A56]
 * [A61: IPv4 and IPv6 Dualstack Backend Support][A61]
-* [A74: xDS Config Tears (pending)][A74]
+* [A74: xDS Config Tears][A74]
+* [A89: Backend Service Metric Label][A89]
 
 [A37]: A37-xds-aggregate-and-logical-dns-clusters.md
 [A50]: A50-xds-outlier-detection.md
@@ -70,7 +71,8 @@ priorities.
 [A56]: A56-priority-lb-policy.md
 [A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
-[A74]: https://github.com/grpc/proposal/pull/404
+[A74]: A74-xds-config-tears.md
+[A89]: A89-backend-service-metric-label.md
 
 ## Proposal
 
@@ -277,6 +279,14 @@ def Pick(pick_args):
       override_host_attribute.set_actual_address_list(entry.address_list)
   return result
 ```
+
+#### Changes to Backend Service metric label plumbing
+
+[gRFC A89 Backend Service Metric Label][A89] has a different implementation
+approach dependent on whether this gRFC has been implemented. If A89 was
+implemented before this gRFC, then backend service plumbing needs to change to
+go through the `cds` policy instead of the `xds_cluster_impl` policy, as
+documented in A89.
 
 ### Temporary environment variable protection
 
