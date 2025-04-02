@@ -63,9 +63,13 @@ include a relevant backend service. It is possible for later picks for the same
 RPC to have a different value. This is the case for locality as well, and the
 last pick's value should be used by the OpenTelemetry module.
 
-The LB policy `xds_cluster_impl` will notify the call attempt tracer of the
-`grpc.lb.backend_service` label. The value will be copied from
-`xds_cluster_impl`'s service config `cluster` key.
+If A75 has not been implemented, the LB policy `xds_cluster_impl` will notify
+the call attempt tracer of the `grpc.lb.backend_service` label. The value will
+be copied from `xds_cluster_impl`'s service config `cluster` key.
+
+If A75 has been implemented, the LB policy `cds` for non-aggregate clusters will
+notify the call attempt tracer of the `grpc.lb.backend_service` label. The value
+will be copied from `cds`'s service config `cluster` key.
 
 ### Add grpc.lb.backend_service to WRR metrics
 
@@ -78,8 +82,16 @@ definition as for per-RPC metrics, to all existing WRR metrics:
 
 The `weighted_round_robin` LB policy will read a resolver attribute that
 indicates the name of the backend service. This resolver attribute should not be
-considered limited to xDS. However, only `xds_cluster_impl` will set the
-attribute at this time.
+considered limited to xDS. However, only xds will set the attribute at this
+time.
+
+If A75 has not been implemented, the LB policy `xds_cluster_impl` will set the
+backend service resolver attribute to the same value as used for the per-call
+metrics.
+
+If A75 has been implemented, the LB policy `cds` for non-aggregate clusters will
+set the backend service resolver attribute to the same value as used for the
+per-call metrics.
 
 ### Temporary environment variable protection
 
@@ -96,11 +108,8 @@ than for the name to be meaningful.
 
 Prior to A75 the only LB policy with a backend service concept is
 `xds_cluster_impl`, as it needs to be below the `priority` policy. After A75
-`cds` could have the code to provide the label instead, but it has no advantage
-over `xds_cluster_impl` as there are no policies that would fail RPCs between
-`cds` and `xds_cluster_impl`. Since A75 is not yet implemented everywhere, we'll
-use `xds_cluster_impl` and can always change the policy adding the label in the
-future if there becomes a reason.
+`cds` also have the code to provide the label instead. This has the advantage of
+allowing outlier detection to use the backend service in its own metrics.
 
 gRFC A78 added `grpc.lb.locality` to per-call and WRR metrics, and this is
 mirroring that approach with backend service. Adding backend service to WRR is
