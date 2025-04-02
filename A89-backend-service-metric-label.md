@@ -31,10 +31,12 @@ the selected cluster to confirm that deterministic routing, like path matching,
 is behaving as expected.
 
 ### Related Proposals:
+* [gRFC A66: OpenTelemetry Metrics][gRFC A66]
 * [gRFC A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient][gRFC A78]
 * [gRFC A79: Non-per-call Metrics Architecture][gRFC A79]
 * [gRFC A75: xDS Aggregate Cluster Behavior Fixes][gRFC A75]
 
+[gRFC A66]: A66-otel-stats.md
 [gRFC A78]: A78-grpc-metrics-wrr-pf-xds.md#per-call-metrics
 [gRFC A79]: A79-non-per-call-metrics-architecture.md
 [gRFC A75]: A75-xds-aggregate-cluster-behavior-fixes.md
@@ -44,7 +46,7 @@ is behaving as expected.
 ### Add grpc.lb.backend_service to per-call metrics
 
 We will add the `grpc.lb.backend_service` optional label to the following
-per-call metrics:
+per-call metrics defined in [gRFC A66]:
 - `grpc.client.attempt.duration`
 - `grpc.client.attempt.sent_total_compressed_message_size`
 - `grpc.client.attempt.rcvd_total_compressed_message_size`
@@ -74,7 +76,8 @@ will be copied from `cds`'s service config `cluster` key.
 ### Add grpc.lb.backend_service to WRR metrics
 
 We will add the `grpc.lb.backend_service` optional label, with the same
-definition as for per-RPC metrics, to all existing WRR metrics:
+definition as for per-RPC metrics, to all existing WRR metrics defined in [gRFC
+A78]:
 - `grpc.lb.wrr.rr_fallback`
 - `grpc.lb.wrr.endpoint_weight_not_yet_usable`
 - `grpc.lb.wrr.endpoint_weight_stale`
