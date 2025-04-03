@@ -84,9 +84,9 @@ Error string         | Description
 -------------------- | -----------
 GOAWAY <ERROR_CODE>  | HTTP2 GOAWAY frame with error code for example (“GOAWAY NO_ERROR”, “GOAWAY PROTOCOL_ERROR”, “GOAWAY ENHANCE_YOUR_CALM”). The list of error codes is available in [RFC 9113](https://www.rfc-editor.org/rfc/rfc9113.html#name-error-codes).
 subchannel shutdown  | The subchannel was shutdown. This can happen due to reasons such as the parent channel shutting down, channel becoming idle, the load balancing policy changing due to a resolver update, or a change in list of endpoint addresses.
-connection reset     | Connection was reset (eg. ECONNRESET, WSAECONNERESET)
+connection reset     | Connection was reset (eg. ECONNRESET, WSAECONNERESET.)
 connection timed out | Connection timed out (eg. ETIMEDOUT, WSAETIMEDOUT), also includes connections closed due to [A8]: gRPC keepalives.
-connection aborted   | Connection was aborted (eg. ECONNABORTED)
+connection aborted   | Connection was aborted (eg. ECONNABORTED, WSAECONNABORTED.)
 socket error         | Any socket error not covered by “connection reset”, “connection timed out” and “connection aborted”. Implementations that are not able to differentiate between the different socket error codes should also use this.
 unknown              | Catch-all for all other reasons.
 
