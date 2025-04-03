@@ -9,8 +9,8 @@
 
 ## Abstract
 
-Introduce metrics for subchannels. These metrics will replace the existing
-pick-first metrics.
+Introduce OpenTelemetry metrics for subchannels. These metrics will replace the
+existing pick-first metrics.
 
 ## Background
 
@@ -63,25 +63,20 @@ enough time for users to transition to the new metrics. For example,
 implementations should report both the old pick-first metrics and the new
 subchannel metrics for 2 releases, and then remove the old pick-first metrics.
 
-| Label Name              | Disposition | Description                |
-| ----------------------- | ----------- | -------------------------- |
-| grpc.target             | Required    | Indicates the target of    |
-:                         :             : the gRPC channel (defined  :
-:                         :             : in                         :
-:                         :             : [A66](A66-otel-stats.md).) :
-| grpc.lb.backend_service | Optional    | The backend service to     |
-:                         :             : which the RPC was routed   :
-:                         :             : (defined in [A89])         :
-| grpc.lb.locality        | Optional    | The locality to which the  |
-:                         :             : traffic is being sent.     :
-:                         :             : This will be set to the    :
-:                         :             : resolver attribute passed  :
-:                         :             : down from the              :
-:                         :             : weighted_target policy, or :
-:                         :             : the empty string if the    :
-:                         :             : resolver attribute is      :
-:                         :             : unset. (defined in [A78])  :
-| grpc.disconnect_error   | Optional    | Reason for disconnection   |
+| Label Name              | Disposition | Description                          |
+| ----------------------- | ----------- | ------------------------------------ |
+| grpc.target             | Required    | Indicates the target of the gRPC     |
+:                         :             : channel (defined in [A66].)          :
+| grpc.lb.backend_service | Optional    | The backend service to which the RPC |
+:                         :             : was routed (defined in [A89].)       :
+| grpc.lb.locality        | Optional    | The locality to which the traffic is |
+:                         :             : being sent. This will be set to the  :
+:                         :             : resolver attribute passed down from  :
+:                         :             : the weighted_target policy, or the   :
+:                         :             : empty string if the resolver         :
+:                         :             : attribute is unset (defined in       :
+:                         :             : [A78].)                              :
+| grpc.disconnect_error   | Optional    | Reason for disconnection.            |
 
 List of allowed values for `grpc.disconnect_error` -
 
