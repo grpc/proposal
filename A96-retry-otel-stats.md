@@ -1,11 +1,11 @@
-## A96: gRPC OTel Metrics for Retries
+## A96: OTel Metrics for Retries
 
 *   Author: Yash Tibrewal (@yashykt)
 *   Approver: Mark Roth (@markdroth)
-*   Status: Draft
+*   Status: In Review
 *   Implemented in:
 *   Last updated: 2025-04-02
-*   Discussion at: <google group thread> (filled after thread exists)
+*   Discussion at: https://groups.google.com/g/grpc-io/c/bFUHkcBA9cw
 
 ## Abstract
 
