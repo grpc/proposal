@@ -157,11 +157,19 @@ if !using_random_hash {
 return ring[first_index].picker->Pick(...);
 ```
 
-This behavior ensures that a single RPC does not cause more than one endpoint to
+This behavior ensures that a single RPC does not cause more than two endpoint to
 exit `IDLE` state at a time, and that a request missing the header does not
 incur extra latency in the common case where there is already at least one
 endpoint in `READY` state. It converges to picking a random endpoint, since each
-request may eventually cause a random endpoint to go from `IDLE` to `READY`.
+request may cause one or two random endpoints to go from `IDLE` to `READY`: one
+if it randomly picks an `IDLE` endpoint, and one if the pick was queued and an
+endpoint transitioned from `CONNECTING` to `READY`, but no other endpoint is
+currently `CONNECTING`.
+
+Note that because triggering a connection attempt and transitioning to
+`CONNECTING` is not synchronous, it is possible for multiple endpoints to exit
+`IDLE` state if no endpoint is `CONNECTING` and multiple RPCs that use a random
+hash are made concurrently on the same picker.
 
 ### Explicitly setting the endpoint hash key
 
@@ -177,6 +185,10 @@ The xDS resolver, described in [A74][A74], will be changed to set the `hash_key`
 endpoint attribute to the value of [LbEndpoint.Metadata][LbEndpoint.Metadata]
 `envoy.lb` `hash_key` field, as described in [Envoy's documentation for the ring
 hash load balancer][envoy-ringhash].
+
+If multiple endpoints have the same `hash_key`, then which endpoint is chosen is
+unspecified, and the implementation is free to choose any of the endpoint with a
+matching `hash_key`.
 
 ### Temporary environment variable protection
 
@@ -230,7 +242,9 @@ considered the following alternative solutions:
 
 ## Implementation
 
-Implemented in C-core in https://github.com/grpc/grpc/pull/38312.
+Implemented in:
+- C-core in https://github.com/grpc/grpc/pull/38312.
+- Go: https://github.com/grpc/grpc-go/pull/8159
 
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
