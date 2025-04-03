@@ -102,6 +102,13 @@ first seen reason should be chosen, `GOAWAY ENHANCE_YOUR_CALM` in this case.
 
 We might add more error cases to this in the future.
 
+### Stability
+
+As recommended by [A79], these metrics will start off as experimental, and hence
+off-by-default. The decision on whether these metrics will be on-by-default or
+off-by-default on de-experimentalization will be made at the same time as the
+de-experimentalization.
+
 ## Rationale
 
 ### Renaming pick-first metrics
