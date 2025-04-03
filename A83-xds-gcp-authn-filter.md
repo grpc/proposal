@@ -375,7 +375,7 @@ credentials implementations in some languages.
 
 ## Implementation
 
-#### C-core implementation:
+C-core implementation:
 - generalize CDS metadata handling (https://github.com/grpc/grpc/pull/37468)
 - implement GcpServiceAccountIdentityCredentials
   (https://github.com/grpc/grpc/pull/37544)
@@ -384,7 +384,7 @@ credentials implementations in some languages.
 - mechanism for retaining cache across xDS updates
   (https://github.com/grpc/grpc/pull/37646)
   
-#### Java implementation:
+Java implementation:
 - implement GCP auth filter (https://github.com/grpc/grpc-java/pull/11638)
 - xDS cluster metadata parsing (https://github.com/grpc/grpc-java/pull/11741)
 - propagate audience from cluster resource in gcp auth filter (https://github.com/grpc/grpc-java/pull/11972)
