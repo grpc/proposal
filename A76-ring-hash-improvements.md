@@ -158,18 +158,21 @@ return ring[first_index].picker->Pick(...);
 ```
 
 This behavior ensures that a single RPC does not cause more than two endpoint to
-exit `IDLE` state at a time, and that a request missing the header does not
-incur extra latency in the common case where there is already at least one
-endpoint in `READY` state. It converges to picking a random endpoint, since each
-request may cause one or two random endpoints to go from `IDLE` to `READY`: one
-if it randomly picks an `IDLE` endpoint, and one if the pick was queued and an
-endpoint transitioned from `CONNECTING` to `READY`, but no other endpoint is
-currently `CONNECTING`.
+exit `IDLE` state, and that a request missing the header does not incur extra
+latency in the common case where there is already at least one endpoint in
+`READY` state. It converges to picking a random endpoint if the header is not
+set, since each request may cause one or two random endpoints to go from `IDLE`
+to `READY`:
+- a first connection attempt if it randomly picks an `IDLE` endpoint and no
+  endpoint is currently `CONNECTING`
+- a second connection attempt if the pick was queued and an endpoint
+  transitioned from `CONNECTING` to `READY`, but no other endpoint is currently
+  `CONNECTING`.
 
-Note that because triggering a connection attempt and transitioning to
-`CONNECTING` is not synchronous, it is possible for multiple endpoints to exit
-`IDLE` state if no endpoint is `CONNECTING` and multiple RPCs that use a random
-hash are made concurrently on the same picker.
+Because pickers generated with `picker_has_endpoint_in_connecting_state` set to
+false may be used by multiple requests until an endpoint transitions to
+`CONNECTING` and a the picker is updated, we can still start multiple
+simultaneous connection attempts for different RPCs.
 
 ### Explicitly setting the endpoint hash key
 
