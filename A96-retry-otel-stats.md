@@ -30,13 +30,14 @@ metrics originally proposed in [A45].
 
 ## Proposal
 
-Metric Name                          | Type      | Unit                | Labels                                         | Description
------------------------------------- | --------- | ------------------- | ---------------------------------------------- | -----------
-grpc.client.call.retries             | Histogram | {retry}             | grpc.method (required), grpc.target (required) | Number of retry or hedging attempts excluding transparent retries made during the client call. The original attempt is not counted as a retry/hedging attempt.
-grpc.client.call.transparent_retries | Histogram | {transparent_retry} | grpc.method (required), grpc.target (required) | Number of transparent retries made during the client call.
-grpc.client.call.retry_delay         | Histogram | s                   | grpc.method (required), grpc.target (required) | Total time of delay while there is no active attempt during the client call.
+Metric Name                  | Type      | Unit    | Labels                                                                     | Description
+---------------------------- | --------- | ------- | -------------------------------------------------------------------------- | -----------
+grpc.client.call.retries     | Histogram | {retry} | grpc.method (required), grpc.target (required), grpc.retry_type (required) | Number of retry attempts made during the client call. The original attempt is not counted as a retry attempt.
+grpc.client.call.retry_delay | Histogram | s       | grpc.method (required), grpc.target (required)                             | Total time of delay while there is no active attempt during the client call.
 
-The labels, `grpc.method` and `grpc.target` have been defined in [A66].
+The labels, `grpc.method` and `grpc.target` have been defined in [A66]. The
+label, `grpc.retry_type` can take one of three values - "retry", "hedge", or
+"transparent".
 
 These metrics are recorded per call utilizing the `CallTracer` approach (also
 defined in [A66]).
@@ -50,13 +51,24 @@ de-experimentalization.
 
 ## Rationale
 
-OpenCensus Metric                           | Equivalent OpenTelemetry Metric
-------------------------------------------- | -------------------------------
-grpc.io/client/retries_per_call             | grpc.client.call.retries
-grpc.io/client/retries                      | Derivable from grpc.client.call.retries
-grpc.io/client/transparent_retries_per_call | grpc.client.call.transparent_retries
-grpc.io/client/transparent_retries          | Derivable from grpc.client.call.transparent_retries
-grpc.io/client/retry_delay_per_call         | grpc.client.call.retry_delay
+| OpenCensus Metric                           | Equivalent OpenTelemetry       |
+:                                             : Metric                         :
+| ------------------------------------------- | ------------------------------ |
+| grpc.io/client/retries_per_call             | grpc.client.call.retries where |
+:                                             : grpc.retry_type !=             :
+:                                             : "transparent"                  :
+| grpc.io/client/retries                      | Sum of                         |
+:                                             : grpc.client.call.retries where :
+:                                             : grpc.retry_type !=             :
+:                                             : "transparent"                  :
+| grpc.io/client/transparent_retries_per_call | grpc.client.call.retries where |
+:                                             : grpc.retry_type =              :
+:                                             : "transparent"                  :
+| grpc.io/client/transparent_retries          | Sum of                         |
+:                                             : grpc.client.call.retries where :
+:                                             : grpc.retry_type =              :
+:                                             : "transparent"                  :
+| grpc.io/client/retry_delay_per_call         | grpc.client.call.retry_delay   |
 
 The names of the metrics proposed for the OpenTelemetry version follows the
 general OpenTelemetry
@@ -64,6 +76,18 @@ general OpenTelemetry
 [naming guidelines](https://opentelemetry.io/docs/specs/semconv/general/naming/),
 the existing per-call gRPC OpenTelemetry metrics (proposed in [A66]) and the
 gRPC OpenTelemetry metric instrument naming conventions (proposed in [A79]).
+
+### New label - grpc.retry_type
+
+The OpenCensus version of the retry metrics combined the number of retry and
+hedging attempts under a single OpenCensus measure
+`grpc.io/client/retries_per_call` and had a separate measure for transparent
+retries `grpc.io/client/transparent_retries_per_call`. Since different
+channels/clients can be configured differently, for example, some with a retry
+policy while others with a hedging policy, it is useful to differentiate between
+retry attempts and hedging attempts as well. This would also help in the future
+if we allow both retry and hedging policies to be configured on a client at the
+same time.
 
 ### Label addition - grpc.target
 
