@@ -39,6 +39,9 @@ The labels, `grpc.method` and `grpc.target` have been defined in [A66]. The
 label, `grpc.retry_type` can take one of three values - "retry", "hedge", or
 "transparent".
 
+The recommended histogram bucket boundary values for `grpc.client.call.retries`
+are [0,1,2,3,4].
+
 These metrics are recorded per call utilizing the `CallTracer` approach (also
 defined in [A66]).
 
@@ -51,24 +54,13 @@ de-experimentalization.
 
 ## Rationale
 
-| OpenCensus Metric                           | Equivalent OpenTelemetry       |
-:                                             : Metric                         :
-| ------------------------------------------- | ------------------------------ |
-| grpc.io/client/retries_per_call             | grpc.client.call.retries where |
-:                                             : grpc.retry_type !=             :
-:                                             : "transparent"                  :
-| grpc.io/client/retries                      | Sum of                         |
-:                                             : grpc.client.call.retries where :
-:                                             : grpc.retry_type !=             :
-:                                             : "transparent"                  :
-| grpc.io/client/transparent_retries_per_call | grpc.client.call.retries where |
-:                                             : grpc.retry_type =              :
-:                                             : "transparent"                  :
-| grpc.io/client/transparent_retries          | Sum of                         |
-:                                             : grpc.client.call.retries where :
-:                                             : grpc.retry_type =              :
-:                                             : "transparent"                  :
-| grpc.io/client/retry_delay_per_call         | grpc.client.call.retry_delay   |
+OpenCensus Metric                           | Equivalent OpenTelemetry Metric
+------------------------------------------- | -------------------------------
+grpc.io/client/retries_per_call             | grpc.client.call.retries where grpc.retry_type != "transparent"
+grpc.io/client/retries                      | Sum of grpc.client.call.retries where grpc.retry_type != "transparent"
+grpc.io/client/transparent_retries_per_call | grpc.client.call.retries where grpc.retry_type = "transparent"
+grpc.io/client/transparent_retries          | Sum of grpc.client.call.retries where grpc.retry_type = "transparent"
+grpc.io/client/retry_delay_per_call         | grpc.client.call.retry_delay
 
 The names of the metrics proposed for the OpenTelemetry version follows the
 general OpenTelemetry
