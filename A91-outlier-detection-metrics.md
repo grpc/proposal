@@ -54,8 +54,7 @@ The following metrics will be exported:
 |  grpc.lb.outlier_detection.ejections_enforced_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Enforced failure percentage outlier ejections |
 |  grpc.lb.outlier_detection.ejections_detected_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Detected (even if unenforced) failure percentage outlier ejections |
 
-On any ejection/unejection, these metrics will be accordingly updated using globally available metric recorder.
-
+On any ejection/unejection, these metrics will be accordingly updated.
 ### Metric Stability
 
 All metrics added in this proposal will start as experimental and therefore off by default. The long term goal will be to de-experimentalize them and have them be on by default, but the exact criteria for that change are TBD.
