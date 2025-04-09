@@ -41,7 +41,7 @@ Outlier Detection metrics will have the following labels:
 | grpc.target | required | Indicates the target we are running outlier detection on, as described in [A66]. |
 | grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as described in [A89]. Note that this label will be supported only if [A75] has already been implemented. |
 
-the `grpc.lb.backend_service` label will be populated based on the resolver attribute passed down from the cds policy, as described in A89.
+The `grpc.lb.backend_service` label will be populated based on the resolver attribute passed down from the cds policy, as described in A89.
 
 The following metrics will be exported:
 
