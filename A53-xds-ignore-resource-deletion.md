@@ -27,7 +27,7 @@ server to stop accepting incoming connections, effectively stopping
 the server.
 
 This behavior means that gRPC will not behave in a fault-tolerant manner
-in the face a control plane bug or misconfiguration that deletes a
+in the face of a control plane bug or misconfiguration that deletes a
 resource that it was actually using, which can lead to an outage.  To avoid
 this, we would like gRPC to ignore the deletion of any required resource.
 
