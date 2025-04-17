@@ -3,7 +3,7 @@ A91: gRPC Metrics for Outlier Detection
 * Author(s): @pardhukonakanchi, @huntsman90
 * Approver: @markdroth
 * Status: In Review
-* Implemented in: Core, Go
+* Implemented in:
 * Last updated: 2025-03-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/iMezDbq5U-g
 
@@ -22,13 +22,13 @@ Using [A79: Non-per-call Metrics Architecture][A79], it is possible to add granu
 * [A66: OpenTelemetry Metrics][A66]
 * [A79: Non-per-call Metrics Architecture][A79]
 * [A75: xDS Aggregate Cluster Behavior Fixes][A75]
-* [A89: Backend Service Metric Label][A89] (pending)
+* [A89: Backend Service Metric Label][A89]
 
 [A50]: A50-xds-outlier-detection.md
 [A66]: A66-otel-stats.md
 [A75]: A75-xds-aggregate-cluster-behavior-fixes.md
 [A79]: A79-non-per-call-metrics-architecture.md
-[A89]: https://github.com/grpc/proposal/pull/471
+[A89]: A89-backend-service-metric-label.md
 
 ## Proposal
 
