@@ -14,11 +14,10 @@ existing pick-first metrics.
 
 ## Background
 
-In [A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient], metrics for
-PickFirst load-balancing policy were proposed that provide observability on
-disconnections for subchannels and connection attempts made for those
-subchannels. These metrics do not currently contain information on the reason
-for disconnection, the xds locality or the cluster information.
+In [A78], metrics for PickFirst load-balancing policy were proposed that provide
+observability on disconnections for subchannels and connection attempts made for
+those subchannels. These metrics do not currently contain information on the
+reason for disconnection, the xds locality or the cluster information.
 
 [A89] is a proposal to introduce a new optional label `grpc.lb.backend_service`
 to client-side per-attempt metrics. This label has xds cluster information.
@@ -63,20 +62,12 @@ enough time for users to transition to the new metrics. For example,
 implementations should report both the old pick-first metrics and the new
 subchannel metrics for 2 releases, and then remove the old pick-first metrics.
 
-| Label Name              | Disposition | Description                          |
-| ----------------------- | ----------- | ------------------------------------ |
-| grpc.target             | Required    | Indicates the target of the gRPC     |
-:                         :             : channel (defined in [A66].)          :
-| grpc.lb.backend_service | Optional    | The backend service to which the RPC |
-:                         :             : was routed (defined in [A89].)       :
-| grpc.lb.locality        | Optional    | The locality to which the traffic is |
-:                         :             : being sent. This will be set to the  :
-:                         :             : resolver attribute passed down from  :
-:                         :             : the weighted_target policy, or the   :
-:                         :             : empty string if the resolver         :
-:                         :             : attribute is unset (defined in       :
-:                         :             : [A78].)                              :
-| grpc.disconnect_error   | Optional    | Reason for disconnection.            |
+Label Name              | Disposition | Description
+----------------------- | ----------- | -----------
+grpc.target             | Required    | Indicates the target of the gRPC channel (defined in [A66].)
+grpc.lb.backend_service | Optional    | The backend service to which the RPC was routed (defined in [A89].)
+grpc.lb.locality        | Optional    | The locality to which the traffic is being sent. This will be set to the resolver attribute passed down from the weighted_target policy, or the empty string if the resolver attribute is unset (defined in [A78].)
+grpc.disconnect_error   | Optional    | Reason for disconnection.
 
 List of allowed values for `grpc.disconnect_error` -
 

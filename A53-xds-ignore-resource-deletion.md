@@ -6,6 +6,7 @@ A53: Option for Ignoring xDS Resource Deletion
 * Implemented in: C-core, Java
 * Last updated: 2022-05-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/eh7En9CY3oY
+* Deprecated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md)
 
 ## Abstract
 
@@ -26,7 +27,7 @@ server to stop accepting incoming connections, effectively stopping
 the server.
 
 This behavior means that gRPC will not behave in a fault-tolerant manner
-in the face a control plane bug or misconfiguration that deletes a
+in the face of a control plane bug or misconfiguration that deletes a
 resource that it was actually using, which can lead to an outage.  To avoid
 this, we would like gRPC to ignore the deletion of any required resource.
 
