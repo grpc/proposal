@@ -32,7 +32,7 @@ metrics originally proposed in [A45].
 
 Metric Name                  | Type      | Unit    | Labels                                                                     | Description
 ---------------------------- | --------- | ------- | -------------------------------------------------------------------------- | -----------
-grpc.client.call.retries     | Histogram | {retry} | grpc.method (required), grpc.target (required), grpc.retry_type (required) | Number of retry attempts made during the client call. The original attempt is not counted as a retry attempt.
+grpc.client.call.retries     | Histogram | {retry} | grpc.method (required), grpc.target (required), grpc.retry_type (required) | Number of retry attempts made during the client call. The original attempt is not counted as a retry attempt. Recommended histogram bucket boundaries are [0,1,2,3,4,5,10,100,1000].
 grpc.client.call.retry_delay | Histogram | s       | grpc.method (required), grpc.target (required)                             | Total time of delay while there is no active attempt during the client call.
 
 The labels, `grpc.method` and `grpc.target` have been defined in [A66]. The
