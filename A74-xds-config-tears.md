@@ -4,7 +4,7 @@ A74: xDS Config Tears
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-07-12
+* Last updated: 2025-03-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/ifcC3DbopWM
 
 ## Abstract
@@ -150,15 +150,10 @@ class Watcher {
  public:
   virtual ~Watcher() = default;
 
-  // Called when a new xDS config is available.
-  virtual void OnUpdate(XdsConfig config) = 0;
-
-  // These methods are invoked when there is an error or
-  // does-not-exist on LDS or RDS only.  The context will be a
-  // human-readable string indicating the scope in which the error
-  // occurred (e.g., the resource type and name).
-  virtual void OnError(absl::string_view context, absl::Status status) = 0;
-  virtual void OnResourceDoesNotExist(std::string context) = 0;
+  // Called when a new xDS config is available or when there is an error
+  // for the LDS or RDS resource for which we want to stop using the
+  // previously seen resource, if any.
+  virtual void OnUpdate(absl::StatusOr<XdsConfig> config) = 0;
 };
 ```
 
@@ -203,17 +198,32 @@ struct XdsConfig {
 };
 ```
 
-Note that the watcher's OnError() and OnResourceDoesNotExist()
-methods will be invoked only for problems with the listener and route
-configuration resources.  For cluster-specific errors, we need to
-retain the existing behavior, which is that it causes a problem for the
-individual cluster but does not affect traffic sent to any other cluster.
-Therefore, when the XdsDependencyManager sees an error on a cluster for
-which it did not previously have data, or if it sees a does-not-exist
-notification on a cluster, it will report that by returning a non-OK
-status for the cluster in the XdsConfig.  Similarly, if there is a problem
-obtaining endpoint data from EDS or DNS, the XdsDependencyManager will
-report that problem via the cluster's resolution_note field.
+Note that the watcher's OnUpdate() method will be invoked with an error
+only for problems with the listener and route configuration resources
+that require the xds resolver to stop using the previously returned
+resources, if any.  Specifically, it will be invoked with an error in
+the following cases:
+- When the listener or route configuration watchers see
+  OnResourceDoesNotExist().
+- When the listener or route configuration watchers see OnError(), if
+  they did not previously see OnResourceChanged().  (If the watchers
+  *did* previously see OnResourceChanged(), then the OnError() event is
+  ignored by the XdsDependencyManager and not passed on to the xds
+  resolver.)
+- When the received listener resource is a socket listener instead of an
+  API listener.
+- When the received route configuration does not contain a virtual host
+  matching the channel's default authority.
+
+For cluster-specific errors, we need to retain the existing behavior,
+which is that it causes a problem for the individual cluster but does
+not affect traffic sent to any other cluster.  Therefore, when the
+XdsDependencyManager sees an error on a cluster for which it did not
+previously have data, or if it sees a does-not-exist notification on a
+cluster, it will report that by returning a non-OK status for the cluster
+in the XdsConfig.  Similarly, if there is a problem obtaining endpoint
+data from EDS or DNS, the XdsDependencyManager will report that problem
+via the cluster's resolution_note field.
 
 The xds resolver will pass the returned XdsConfig to the LB policies via
 an attribute, so that the LB policies can use the cluster data.  Note that

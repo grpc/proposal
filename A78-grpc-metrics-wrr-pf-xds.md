@@ -6,6 +6,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Implemented in: <language, ...>
 * Last updated: 2024-09-24
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
+* Updated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md)
 
 ## Abstract
 
@@ -180,5 +181,10 @@ the number of stale weights on each scheduler update.
 
 ## Implementation
 
-Will be implemented in C-core by @markdroth, in Java by @dnvindhya, and
-in Go by @zasweq.
+C-core implementation:
+- WRR metrics: https://github.com/grpc/grpc/pull/35977
+- pick_first metrics: https://github.com/grpc/grpc/pull/35984
+- XdsClient metrics: https://github.com/grpc/grpc/pull/36020, https://github.com/grpc/grpc/pull/36291
+- locality label: https://github.com/grpc/grpc/pull/36049
+
+Will be implemented in Java by @dnvindhya and in Go by @zasweq.

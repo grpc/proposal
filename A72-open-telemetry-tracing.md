@@ -34,9 +34,9 @@ design considerations about creating a child span for each individual call attem
 A gRPC server uses span ID from the incoming request header as a parent span to 
 maintain the parent child span relationship with the gRPC client. To propagate 
 span context over the wire, gRPC uses metadata (header name: `grpc-trace-bin`) 
-and OpenCensus's binary format for (de)serialization. The header name is unique 
-from other census library propagators to differentiate with the application’s 
-tracing instrumentation.
+and OpenCensus's [binary format](https://github.com/census-instrumentation/opencensus-specs/blob/master/encodings/BinaryEncoding.md)
+for (de)serialization. The header name is unique from other census library
+propagators to differentiate with the application’s tracing instrumentation.
 
 ### Related Proposals and Documents:
 * [gRFC L29: C++ API Changes for OpenCensus Integration][L29]
@@ -152,6 +152,7 @@ On the server side, there is only per-call traces.  With the new OpenTelemetry
 plugin we will produce the following tracing information during an RPC lifecycle:
 
 At the client, on parent span:
+* Span should be named `Sent.<service_name>.<method_name>`.
 * If the RPC experienced name resolution delay, add an Event at the start of the
   call with the name "Delayed name resolution complete" upon completion of the
   name resolution process.
@@ -161,8 +162,10 @@ At the client, on parent span:
   For example, a span status description might be "UNAVAILABLE, unable to resolve host".
 
 On attempt span:
+* Span should be named `Attempt.<service_name>.<method_name>`.
 * When span is created, set the attribute with key `previous-rpc-attempts` and an 
-  integer value representing the count of previous attempts made for the RPC.
+  integer value representing the count of previous attempts made for the RPC,
+  transparent retry not included.
 * When span is created, set the attribute with key `transparent-retry` and a 
   boolean value indicating whether the stream is undergoing a transparent retry.
 * If the RPC experienced load balancer pick delay, add an Event with the name 
@@ -170,7 +173,7 @@ On attempt span:
 * When the application sends an outbound message, add Event(s)
   (it depends on implementation whether there is a single event or an additional 
   separate event with name "Outbound message compressed" for compressed message size) 
-  with name "Outbound message sent" and the following attributes:
+  with name "Outbound message" and the following attributes:
   * key `sequence-number` with integer value of the seq no. The seq no. indicates
     the order of the sent messages on the attempt (i.e., it starts at 0 and is 
     incremented by 1 for each message sent), the same below.
@@ -181,11 +184,11 @@ On attempt span:
   * If compression needed, add key `message-size-compressed` with integer 
     value of compressed message size. If this is reported as a separate event in 
     an implementation, the event name is "Outbound message compressed" and the 
-    order of the event must be after the "Outbound message sent" event.
+    order of the event must be after the "Outbound message" event.
 * When an inbound message has been received, add Event(s) (it depends on 
   implementation whether there is a single event or an additional separate event
   with name "Inbound compressed message" for compressed message size) with name 
-  "Inbound message received" and the following attributes:
+  "Inbound message" and the following attributes:
   * key `sequence-number` with integer value of the seq no. The seq no. indicates
     the order of the received messages on the attempt (i.e., it starts at 0 and is
     incremented by 1 for each message received), the same below.
@@ -194,32 +197,33 @@ On attempt span:
   * If the message needs decompression, add key `message-size-compressed`
     with integer value of compressed message size. If this is reported as a 
     separate event in an implementation, the event name is "Inbound compressed message"
-    and the order of the event must be before the "Inbound message received" event.
+    and the order of the event must be before the "Inbound message" event.
 * When the stream is closed, set RPC status and end the attempt span.
 
 At the server:
+* Span should be named `Recv.<service_name>.<method_name>`.
 * When the application sends an outbound message, add Event(s) 
   (it depends on implementation whether there is a single event or an additional
   separate event with name "Outbound message compressed" for compressed message size)
-  with name "Outbound message sent" and the following attributes:
+  with name "Outbound message" and the following attributes:
   * key `sequence-number` with integer value of the seq no.
   * key named `message-size`, with integer value of message size,
     or uncompressed message size if message needs compression.
   * If compression needed, add key `message-size-compressed` with integer
     value of compressed message size. If this is reported as a separate event in
     an implementation, the event name is "Outbound message compressed" and the
-    order of the event must be after the "Outbound message sent" event.
+    order of the event must be after the "Outbound message" event.
 * When an inbound message has been received, add Event(s) (it depends on
   implementation whether there is a single event or an additional separate event
   with name "Inbound compressed message" for compressed message size) with name
-  "Inbound message received" and the following attributes:
+  "Inbound message" and the following attributes:
   * key `sequence-number` with integer value of the seq no.
   * key named `message-size` with integer value of wire message size, or decompressed
     message size if the message needs decompression.
   * If the message needs decompression, add key `message-size-compressed`
     with integer value of compressed message size. If this is reported as a
     separate event in an implementation, the event name is "Inbound compressed message"
-    and the order of the event must be before the "Inbound message received" event.
+    and the order of the event must be before the "Inbound message" event.
 * When the stream is closed, set the RPC status and end the span.
 
 A few examples of what message events (w/ and w/o message compression) look like in different implementations:
@@ -227,33 +231,33 @@ A few examples of what message events (w/ and w/o message compression) look like
 An example trace with message compression (Java): 
 
 Sending:
-|-- Event 'Outbound message sent', attributes('sequence-numer' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
+|-- Event 'Outbound message', attributes('sequence-number' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
 
 Receiving:
-|-- Event 'Inbound compressed message', attributes('sequence-numer' = 0, 'message-size-compressed' = 5493 ) ----|
-|-- Event 'Inbound message received', attributes('message-size' = 7854) ----|
+|-- Event 'Inbound compressed message', attributes('sequence-number' = 0, 'message-size-compressed' = 5493 ) ----|
+|-- Event 'Inbound message', attributes('sequence-number' = 0, 'message-size' = 7854) ----|
 ```
 
 ```agsl
 An example trace with message compression (Go): 
 
 Sending:
-|-- Event 'Outbound message sent', attributes('sequence-numer' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
+|-- Event 'Outbound message', attributes('sequence-number' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
 
 Receiving:
-|-- Event 'Inbound message received', attributes('sequence-numer' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
+|-- Event 'Inbound message', attributes('sequence-number' = 0, 'message-size' = 7854, 'message-size-compressed' = 5493) ----|
 ```
 
 ```agsl
 An example trace with message compression (C++): 
 
 Sending:
-|-- Event 'Outbound message sent', attributes('sequence-numer' = 0, 'message-size' = 7854) ----|
-|-- Event 'Outbound message compressed', attributes('message-size-compressed' = 5493) ----|
+|-- Event 'Outbound message', attributes('sequence-number' = 0, 'message-size' = 7854) ----|
+|-- Event 'Outbound message compressed', attributes('sequence-number' = 0, 'message-size-compressed' = 5493) ----|
 
 Receiving:
-|-- Event 'Inbound compressed message', attributes('sequence-numer' = 0, 'message-size-compressed' = 5493 ) ----|
-|-- Event 'Inbound message received', attributes('message-size' = 7854) ----|
+|-- Event 'Inbound compressed message', attributes('sequence-number' = 0, 'message-size-compressed' = 5493 ) ----|
+|-- Event 'Inbound message', attributes('sequence-number' = 0, 'message-size' = 7854) ----|
 
 ```
 
@@ -261,10 +265,10 @@ Receiving:
 An example trace with no message compression (Java/Go/C++): 
 
 Sending:
-|-- Event 'Outbound message sent', attributes('sequence-numer' = 0, 'message-size' = 7854) ----|
+|-- Event 'Outbound message', attributes('sequence-number' = 0, 'message-size' = 7854) ----|
 
 Receiving:
-|-- Event 'Inbound message received', attributes('sequence-numer' = 0, 'message-size' = 7854) ----|
+|-- Event 'Inbound message', attributes('sequence-number' = 0, 'message-size' = 7854) ----|
 ```
 
 ### Limitations
@@ -638,7 +642,7 @@ gRPC is generating similar tracing information for OpenTelemetry compared with O
 but due to API differences between those two libraries, the
 trace information is represented slightly differently.
 In the new OpenTelemetry plugin, the client will add `Event`s (name:
-`Outbound message sent` and `Inbound message received`) with corresponding attributes,
+`Outbound message` and `Inbound message`) with corresponding attributes,
 mapped from OpenCensus `MessageEvent` fields:
 
 | OpenCensus Trace Message Event Fields | OpenTelemetry Trace Event Attribute Key |

@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-10-25
+* Last updated: 2024-12-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -218,6 +218,13 @@ by the config field `cache_config.cache_size`; if the cache exceeds that
 size, then entries will be removed starting from the end of the
 last-used list.
 
+If an LDS update changes the cache size, the filter must apply that
+change to the cache.  If the cache currently has more entries in it than
+the new cache size, then the least recently used entries will be removed
+to make the cache adhere to the new size limit.
+
+#### Cache Sharing and Lifetime
+
 Note that the `cache_config.cache_size` parameter in the filter config
 is a channel-level parameter, not settable per-route, and we want the
 cache itself to be shared across all routes.  Implementations that create
@@ -229,10 +236,56 @@ RouteConfiguration update, so that we don't wind up needlessly refetching
 tokens after the update.  Implementations should provide a mechanism for
 new instances of the filter to retain the cache from previous instances.
 
-If an LDS update changes the cache size, the filter must apply that
-change to the cache.  If the cache currently has more entries in it than
-the new cache size, then the least recently used entries will be removed
-to make the cache adhere to the new size limit.
+To address these requirements, we will implement a general-purpose
+mechanism for xDS HTTP filters to retain state across updates.  The GCP
+Authentication filter will be the first use of this mechanism, but
+we expect this mechanism will be used by other filters in the future,
+such as the upcoming server-side rate limiting filter.
+
+Due to the different nature of xDS HTTP filter support in C-core vs. the
+other implementations, the details here differ by language.
+
+##### C-core
+
+In C-core, we introduce a mechanism called a "blackboard" to allow
+filters to set arbitrary state that can be accessed by subsequent filter
+instances.
+
+The key for each blackboard entry is the unique type of the value and
+a string that identifies the instance of that type.  The unique type
+will be different for each type of data stored, which avoids conflicts
+between different xDS HTTP filter implementations.  The string
+differentiates between different instances of the same type, which can
+be used to share data between filter instances -- e.g., if a filter uses
+its configuration as the key string, then two instances of that filter
+that share the same config will use the same instance.
+
+Entries in a blackboard are ref-counted.  Whenever we create a new
+filter stack (i.e., upon receiving an LDS or RDS update), each filter
+has access to both the previous blackboard (if any) and to a new
+blackboard, which starts empty.  As each filter is initialized, it can
+look for entries in the old blackboard to reuse, and any such entry is
+added to the new blackboard.  The channel then destroys the old
+blackboard and replaces it with the new one, which it will retain until
+the next time it creates a new filter stack.
+
+The GCP Authentication filter will use this mechanism for the call
+credentials cache.  The blackboard key string will be the filter's
+instance name, so that two instances of this filter will not share
+their cache, but the same instance will retain its cache instance
+across updates.
+
+The cache will provide a `SetMaxSize()` method, so that if a config
+update changes the cache size, we can apply that change to the existing
+cache without having to lose the cache contents.  Because this cache
+object is shared between the old and new filter stacks during an update,
+a cache size change will wind up affecting the old filter instance,
+which in principle it shouldn't, but that is considered acceptable for
+this type of change.
+
+##### Java and Go
+
+TODO(sergiitk, ejona86, dfawley): Fill this in.
 
 ### Filter Behavior
 
@@ -330,5 +383,10 @@ C-core implementation:
 - implement GCP auth filter (https://github.com/grpc/grpc/pull/37550)
 - mechanism for retaining cache across xDS updates
   (https://github.com/grpc/grpc/pull/37646)
+  
+Java implementation:
+- implement GCP auth filter (https://github.com/grpc/grpc-java/pull/11638)
+- xDS cluster metadata parsing (https://github.com/grpc/grpc-java/pull/11741)
+- propagate audience from cluster resource in gcp auth filter (https://github.com/grpc/grpc-java/pull/11972)
 
 Will be implemented in all other languages, timelines TBD.
