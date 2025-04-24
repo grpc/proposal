@@ -295,10 +295,6 @@ different caches.
 
 To achieve this, we need to make several key changes to the class design.
 
-**Phase 1. Introduce Filter.Provider**
-
-Implemented in: https://github.com/grpc/grpc-java/pull/11883.
-
 In Java, each xDS HTTP Filter has a corresponding concrete implementation of the
 `io.grpc.xds.Filter` interface. We will refer these classes as "Filters" from here.
 
@@ -317,51 +313,23 @@ may implement `newInstance` to keep returning a singleton instance of self.
 We will update `FilterRegistry` to register `Filter.Provider` instances instead
 of `Filter` instances.
 
-**Phase 2. Implement the lifecycle of Filter objects**
+Next, we will implement the lifecycle of Filter objects, which differs between
+client-side and server-side Filters. This will be implemented separately in
+`XdsNameResolver` and `XdsServerWrapper` respectively, due to the structural
+differences in configuration: client-side has a single `HttpConnectionManager`
+directly containing filters, while server-side can have multiple `FilterChain`
+and an optional `default_filter_chain`, each containing an
+`HttpConnectionManager` and its filters.
 
-Implemented in: https://github.com/grpc/grpc-java/pull/11936.
+To keep track of track of individual filter chains across LDS updates, we'll be
+using their unique names. Since filter chain names are optional but must be
+unique if provided, the implementation will generates names based on the list
+order (e.g., `chain_0`, `chain_1`). If present, `default_filter_chain` is
+tracked independently.
 
-The lifecycle differs between client-side and server-side Filters.
-
-**xDS gRPC clients**
-
-New filter instances are created per combination of:
-
-1.  `XdsNameResolver` instance,
-2.  Filter name+typeUrl as configured in `HttpConnectionManager` (HCM)
-    http_filters.
-
-Existing client-side filter instances are shutdown:
-
--   A single filter instance -- when an LDS update contains HCM that is missing
-    filter configuration for name+typeUrl combination of this instance.
--   All filter instances -- when watched LDS resource is missing from an LDS
-    update.
--   All filter instances -- on name resolver shutdown.
-
-**xDS-enabled gRPC servers**
-
-New filter instances are created per combination of:
-
-1. Server instance,
-2. `FilterChain` name,
-3. Filter name+typeUrl as configured in `FilterChain`'s HCM.http_filters.
-
-Filter instances of Default Filter Chain is tracked separately per:
-
-1. Server instance,
-2. Filter name+typeUrl in default_filter_chain's HCM.http_filters.
-
-Existing server-side filter instances are shutdown:
-
--   A single filter instance -- when an LDS update contains `FilterChain` with
-    HCM.http_filters that is missing configuration for filter name+typeUrl.
--   All filter instances associated with the `FilterChain` -- when an LDS update 
-    no longer contains `FilterChain`'s name.
--   All filter instances -- when watched LDS resource is missing from an LDS
-    update.
--   All filter instances -- on server shutdown.
-
+Filter instances are shut down when either they are removed from their
+`HttpConnectionManager` or when their `HttpConnectionManager` is removed (which
+may happen at client or server shutdown).
 ##### Go
 
 TODO(dfawley): Fill this in.
@@ -467,5 +435,8 @@ Java implementation:
 - implement GCP auth filter (https://github.com/grpc/grpc-java/pull/11638)
 - xDS cluster metadata parsing (https://github.com/grpc/grpc-java/pull/11741)
 - propagate audience from cluster resource in gcp auth filter (https://github.com/grpc/grpc-java/pull/11972)
+- filter state retention:
+  - make Filter objects stateful (https://github.com/grpc/grpc-java/pull/11883)
+  - implement the lifecycle of Filter objects (https://github.com/grpc/grpc-java/pull/11936)
 
 Will be implemented in all other languages, timelines TBD.
