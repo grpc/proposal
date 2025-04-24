@@ -333,12 +333,11 @@ New filter instances are created per combination of:
 
 Existing client-side filter instances are shutdown:
 
--   A single filter instance is shut down when an LDS update contains HCM that
-    is missing filter configuration for name+typeUrl combination of this
-    instance.
--   All filter instances when watched LDS resource is missing from an LDS
+-   A single filter instance -- when an LDS update contains HCM that is missing
+    filter configuration for name+typeUrl combination of this instance.
+-   All filter instances -- when watched LDS resource is missing from an LDS
     update.
--   All filter instances on name resolver shutdown.
+-   All filter instances -- on name resolver shutdown.
 
 **xDS-enabled gRPC servers**
 
@@ -355,14 +354,13 @@ Filter instances of Default Filter Chain is tracked separately per:
 
 Existing server-side filter instances are shutdown:
 
--   A single filter instance is shut down when an LDS update contains
-    `FilterChain` with HCM.http_filters that is missing configuration for filter
-    name+typeUrl.
--   All filter instances associated with the `FilterChain` when an LDS update no
-    longer contains `FilterChain`'s name.
--   All filter instances when watched LDS resource is missing from an LDS
+-   A single filter instance -- when an LDS update contains `FilterChain` with
+    HCM.http_filters that is missing configuration for filter name+typeUrl.
+-   All filter instances associated with the `FilterChain` -- when an LDS update 
+    no longer contains `FilterChain`'s name.
+-   All filter instances -- when watched LDS resource is missing from an LDS
     update.
--   All filter instances on server shutdown.
+-   All filter instances -- on server shutdown.
 
 ##### Go
 
