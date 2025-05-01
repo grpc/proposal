@@ -27,6 +27,7 @@ to client-side per-attempt metrics. This label has xds cluster information.
 *   [A8]: Client-side Keepalive
 *   [A18]: TCP User Timeout
 *   [A61]: IPv4 and IPv6 Dualstack Backend Support
+*   [A62]: gRPC security level negotiation between call credentials and channels
 *   [A66]: OpenTelemetry Metrics
 *   [A78]: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 *   [A79]: Non-per-call Metrics Architecture
@@ -51,7 +52,7 @@ Metric Name                                                                     
 grpc.subchannel.disconnections (Old - grpc.lb.pick_first.disconnections)                               | Counter        | {disconnection} | grpc.target, grpc.lb.backend_service (optional), grpc.lb.locality (optional), grpc.disconnect_error (optional) | Number of times the selected subchannel becomes disconnected.
 grpc.subchannel.connection_attempts_succeeded (Old - grpc.lb.pick_first.connection_attempts_succeeded) | Counter        | {attempt}       | grpc.target, grpc.lb.backend_service (optional), grpc.lb.locality (optional)                                   | Number of successful connection attempts.
 grpc.subchannel.connection_attempts_failed (Old - grpc.lb.pick_first.connection_attempts_failed)       | Counter        | {attempt}       | grpc.target, grpc.lb.backend_service (optional), grpc.lb.locality (optional)                                   | Number of failed connection attempts.
-grpc.subchannel.open_connections                                                                       | UpDown Counter | {connection}    | grpc.target, grpc.lb.backend_service (optional), grpc.lb.locality (optional)                                   | Number of open connections.
+grpc.subchannel.open_connections                                                                       | UpDown Counter | {connection}    | grpc.target, grpc.security_level (optional), grpc.lb.backend_service (optional), grpc.lb.locality (optional)   | Number of open connections.
 
 If we end up discarding connection attempts as we do with the “happy eyeballs”
 algorithm (as per [A61]), we should not record the connection attempt or the
@@ -68,6 +69,7 @@ grpc.target             | Required    | Indicates the target of the gRPC channel
 grpc.lb.backend_service | Optional    | The backend service to which the RPC was routed (defined in [A89].)
 grpc.lb.locality        | Optional    | The locality to which the traffic is being sent. This will be set to the resolver attribute passed down from the weighted_target policy, or the empty string if the resolver attribute is unset (defined in [A78].)
 grpc.disconnect_error   | Optional    | Reason for disconnection.
+grpc.security_level     | Optional    | Denotes the security level of the connection. Allowed values - "none", "integrity only" and "privacy and integrity".
 
 List of allowed values for `grpc.disconnect_error` -
 
