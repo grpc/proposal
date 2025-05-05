@@ -5,7 +5,7 @@ A95: xDS Endpoint Fallback
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2025-04-18
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/yrGarS78ZgY
 
 ## Abstract
 
