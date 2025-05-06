@@ -5,7 +5,7 @@ A98: Debug protocol
 * Status: Draft
 * Implemented in: <language, ...>
 * Last updated: 2025/05/06
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/XrOzA4akIHo
 
 ## Abstract
 
