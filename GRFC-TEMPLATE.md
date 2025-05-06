@@ -1,9 +1,9 @@
 Title
 ----
 * Author(s): [Author Name, Co-Author Name ...]
-* Approver: a11r
+* Approver: markdroth
 * Implemented in: <language, ...>
-* Last updated: [Date]
+* Last updated: [YYYY-MM-DD]
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
