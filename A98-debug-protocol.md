@@ -170,6 +170,35 @@ message QueryTraceResponse {
 The idea here is that these traces will be very detailed - beyond what can feasibly be stored in the historical traces.
 So instead of needing to store this data in historical traces *in case* it is needed, we query and collect this data on demand for small windows of time.
 
+### Well Known Data
+
+A separate `well_known_data.proto` file will be maintained, with debug state that's common across implementations described within it.
+
+The initial state will be:
+
+```
+// Channel connectivity state - attached to kind "channel" and "subchannel".
+// These come from the specified states in this document:
+// https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
+message ChannelConnectivityState {
+    enum State {
+        UNKNOWN = 0;
+        IDLE = 1;
+        CONNECTING = 2;
+        READY = 3;
+        TRANSIENT_FAILURE = 4;
+        SHUTDOWN = 5;
+    }
+    State state = 1;
+}
+
+// Channel target information. Attached to kind "channel" and "subchannel".
+message ChannelTarget {
+    // The target this channel originally tried to connect to.  May be absent
+    string target = 1;
+}
+```
+
 ## Rationale
 
 The new interface is heavily inspired by channelz, but removes rigid node associations and predefined data sets.
@@ -185,6 +214,10 @@ There are some fundamental data model issues in that protocol that I'd like to a
 
 * chaotic-good (a transport currently implemented and in production in C++) has multiple TCP sockets per transport. This might be representable as a subchannel with multiple sockets on the client side (though we've already represented the HTTP2 transport as a socket there), but server side makes no allowance for properly describing the object hierarchy.
 * Further, the set of node types ("kinds" here-in) and their relationships are pre-baked into the protocol, and as we evolve and improve gRPC new node types are needed and new relationships will be added or removed. We should not need to update channelz each time this happens.
+
+Specific metrics have been not been carried forward from channelz as required parts of the protocol.
+Users that need call or message counts from the system are encouraged to use the telemetry features of gRPC.
+Implementations however are encouraged to publish whatever metrics they have available at query time to some `data` protobuf.
 
 ## Implementation
 
