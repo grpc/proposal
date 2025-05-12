@@ -247,8 +247,8 @@ RLQS Filter State object will include the following data members:
     reporting intervals and their execution handlers.
     -   Entries inserted we get the first data plane RPC for a given bucket and
         there's no key for bucket reporting interval.
-    -   Entries deleted when there's more buckets with given reporting interval
-        in RLQS Bucket Map.
+    -   Entries deleted when there's no more buckets with given reporting
+        interval in RLQS Bucket Map.
 
 Pseudo-code for RLQS Filter State RPC rate limiting:
 
@@ -375,7 +375,7 @@ RLQS Client object will include the following data members:
 
 #### On LDS/RDS Updates
 
-When receiving an LDS/RDS update, the RLQS filter will perform the following 
+When receiving an LDS/RDS update, the RLQS filter will perform the following
 steps for each route:
 
 1.  Parse the new filter config and per-route overrides into an internal RLQS
@@ -476,7 +476,7 @@ matching target URI.
    Control Plane, and NACK the xDS resource.
 2. If target URI is present, we create the connection to the requested Control
    Plane using the channel credentials provided in the bootstrap file. Transport
-   security configuration provided by the TD is ignored.
+   security configuration provided by the control plane is ignored.
 
 > [!IMPORTANT]
 > This solution is not specific to RLQS, and should be used with any
@@ -544,12 +544,12 @@ for gRPC.
 
 | Attribute           | Type                  | gRPC source                  | Envoy Description                                           |
 |---------------------|-----------------------|------------------------------|-------------------------------------------------------------|
-| `request.path`      | `string`              | Full method name<sup>1</sup> | The path portion of the URL.                                |
+| `request.path`      | `string`              | Full method name             | The path portion of the URL.                                |
 | `request.url_path`  | `string`              | Same as `request.path`       | The path portion of the URL without the query string.       |
-| `request.host`      | `string`              | Authority<sup>2</sup>        | The host portion of the URL.                                |
+| `request.host`      | `string`              | Authority                    | The host portion of the URL.                                |
 | `request.scheme`    | `string`              | Not set                      | The scheme portion of the URL.                              |
-| `request.method`    | `string`              | `POST`<sup>3</sup>           | Request method.                                             |
-| `request.headers`   | `map<string, string>` | `metadata`<sup>4</sup>       | All request headers indexed by the lower-cased header name. |
+| `request.method`    | `string`              | `POST`<sup>1</sup>           | Request method.                                             |
+| `request.headers`   | `map<string, string>` | `metadata`<sup>2</sup>       | All request headers indexed by the lower-cased header name. |
 | `request.referer`   | `string`              | `metadata["referer"]`        | Referer request header.                                     |
 | `request.useragent` | `string`              | `metadata["user-agent"]`     | User agent request header.                                  |
 | `request.time`      | `timestamp`           | Not set                      | Time of the first byte received.                            |
@@ -559,22 +559,11 @@ for gRPC.
 
 ###### Footnotes
 
-**<sup>1</sup> `request.path`**
-
-* CPP: `metadata[":path"]`
-* Go: `grpc.Method(ctx)`
-* Java: `"/" + serverCall.getMethodDescriptor().getFullMethodName()`
-
-**<sup>2</sup> `request.host`**
-
-* CPP, Go: `metadata[":authority"]`
-* Java: `serverCall.getAuthority()`
-
-**<sup>3</sup> `request.method`**\
+**<sup>1</sup> `request.method`**\
 Hard-coded to `"POST"` if unavailable and a code audit confirms the server
 denies requests for all other method types.
 
-**<sup>4</sup> `request.headers`**\
+**<sup>2</sup> `request.headers`**\
 As defined in [gRFC A41], "header" field.
 
 ##### Implementation
