@@ -22,5 +22,3 @@ Remove gpr_atm_no_barrier_clamped_add.
 ## Implementation
 
 https://github.com/grpc/grpc/pull/38263
-
-## Open issues (if applicable)
