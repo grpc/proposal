@@ -2,10 +2,10 @@
 
 *   Author(s): Yash Tibrewal (@yashykt)
 *   Approver: Mark Roth (@markdroth) , Esun Kim (@veblush)
-*   Status: Draft
+*   Status: In Review
 *   Implemented in: C++
-*   Last updated: May 12, 2025
-*   Discussion at: <google group thread> (filled after thread exists)
+*   Last updated: May 13, 2025
+*   Discussion at: https://groups.google.com/g/grpc-io/c/ASVIZhcZgl0
 
 ## Abstract
 
