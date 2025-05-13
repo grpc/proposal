@@ -50,9 +50,9 @@ The following metrics will be exported:
 |  grpc.lb.outlier_detection.ejections_enforced | Counter | {ejection} | 	grpc.target, grpc.lb.backend_service |	Total enforced ejections due to any outlier type |
 |  grpc.lb.outlier_detection.ejections_overflow |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Number of ejections aborted due to max ejection percentage |
 |  grpc.lb.outlier_detection.ejections_enforced_success_rate |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Enforced success rate outlier ejections |
-|  grpc.lb.outlier_detection.ejections_detected_success_rate |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Detected (even if unenforced) success rate outlier ejections |
+|  grpc.lb.outlier_detection.ejections_unenforced_success_rate |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Unenforced success rate outlier ejections due to either max ejection percentage or enforcement_percentage |
 |  grpc.lb.outlier_detection.ejections_enforced_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Enforced failure percentage outlier ejections |
-|  grpc.lb.outlier_detection.ejections_detected_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Detected (even if unenforced) failure percentage outlier ejections |
+|  grpc.lb.outlier_detection.ejections_unenforced_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Unenforced failure percentage outlier ejections due to either max ejection percentage or enforcement_percentage |
 
 On any detection and ejection/unejection, these metrics will be accordingly updated.
 
@@ -69,6 +69,8 @@ This proposal does not include any features enabled via external I/O, so it does
 The metrics defined here are generally a trade-off between the usefulness
 of the metric and the cost of reporting it. As the design goal is offering parity to envoy metrics,
 we decided to include any metric that was appropriate to gRPC outlier detection.
+
+One change from envoy metrics was instead of reporting all detected ejections (enforced or unenforced) for each algorithm type as its own metric, we opted to simply report enforced and unenforced ejections separately. This reduces cost of any detected outlier by 1 metric in the enforced case, and the unenforced count is more likely the direct information a user of the "detected" metric in Envoy is seeking.
 
 ## Implementation
 
