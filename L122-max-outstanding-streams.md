@@ -40,4 +40,4 @@ upper bound.
 
 ## Implementation
 
-Implemented in grpc/grpc#39125.
+Implemented in https://github.com/grpc/grpc/pull/39125.
