@@ -30,17 +30,17 @@ metrics originally proposed in [A45].
 
 ## Proposal
 
-Metric Name                  | Type      | Unit    | Labels                                                                     | Description
----------------------------- | --------- | ------- | -------------------------------------------------------------------------- | -----------
-grpc.client.call.retries     | Histogram | {retry} | grpc.method (required), grpc.target (required), grpc.retry_type (required) | Number of retry attempts made during the client call. The original attempt is not counted as a retry attempt. Recommended histogram bucket boundaries are [0,1,2,3,4,5,10,100,1000].
-grpc.client.call.retry_delay | Histogram | s       | grpc.method (required), grpc.target (required)                             | Total time of delay while there is no active attempt during the client call.
+Metric Name                  | Type      | Unit    | Labels                                                                       | Description
+---------------------------- | --------- | ------- | ---------------------------------------------------------------------------- | -----------
+grpc.client.attempt.started  | Histogram | {retry} | grpc.method (required), grpc.target (required), grpc.attempt_type (optional) | The total number of RPC attempts started, including those that have not completed.
+grpc.client.call.retry_delay | Histogram | s       | grpc.method (required), grpc.target (required)                               | Total time of delay while there is no active attempt during the client call.
 
 The labels, `grpc.method` and `grpc.target` have been defined in [A66]. The
-label, `grpc.retry_type` can take one of three values - "retry", "hedge", or
-"transparent".
+label, `grpc.attempt_type` can take one of four values - "original", "retry",
+"hedge", or "transparent_retry".
 
-The recommended histogram bucket boundary values for `grpc.client.call.retries`
-are [0,1,2,3,4].
+`grpc.client.attempt.started` is an existing metric (defined in [A66]) to which
+we are adding the optional label `grpc.attempt_type`.
 
 These metrics are recorded per call utilizing the `CallTracer` approach (also
 defined in [A66]).
@@ -56,10 +56,10 @@ de-experimentalization.
 
 OpenCensus Metric                           | Equivalent OpenTelemetry Metric
 ------------------------------------------- | -------------------------------
-grpc.io/client/retries_per_call             | grpc.client.call.retries where grpc.retry_type != "transparent"
-grpc.io/client/retries                      | Sum of grpc.client.call.retries where grpc.retry_type != "transparent"
-grpc.io/client/transparent_retries_per_call | grpc.client.call.retries where grpc.retry_type = "transparent"
-grpc.io/client/transparent_retries          | Sum of grpc.client.call.retries where grpc.retry_type = "transparent"
+grpc.io/client/retries_per_call             | grpc.client.attempt.started where grpc.attempt_type != "original" and grpc.attempt_type != "transparent_retry"
+grpc.io/client/retries                      | Sum of grpc.client.call.retries where grpc.attempt_type != "original" and grpc.attempt_type != "transparent_retry"
+grpc.io/client/transparent_retries_per_call | grpc.client.call.retries where grpc.attempt_type = "transparent_retry"
+grpc.io/client/transparent_retries          | Sum of grpc.client.call.retries where grpc.attempt_type = "transparent_retry"
 grpc.io/client/retry_delay_per_call         | grpc.client.call.retry_delay
 
 The names of the metrics proposed for the OpenTelemetry version follows the
@@ -69,7 +69,7 @@ general OpenTelemetry
 the existing per-call gRPC OpenTelemetry metrics (proposed in [A66]) and the
 gRPC OpenTelemetry metric instrument naming conventions (proposed in [A79]).
 
-### New label - grpc.retry_type
+### New label - grpc.attempt_type
 
 The OpenCensus version of the retry metrics combined the number of retry and
 hedging attempts under a single OpenCensus measure
