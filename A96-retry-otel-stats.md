@@ -30,10 +30,10 @@ metrics originally proposed in [A45].
 
 ## Proposal
 
-Metric Name                  | Type      | Unit    | Labels                                                                       | Description
----------------------------- | --------- | ------- | ---------------------------------------------------------------------------- | -----------
-grpc.client.attempt.started  | Histogram | {retry} | grpc.method (required), grpc.target (required), grpc.attempt_type (optional) | The total number of RPC attempts started, including those that have not completed.
-grpc.client.call.retry_delay | Histogram | s       | grpc.method (required), grpc.target (required)                               | Total time of delay while there is no active attempt during the client call.
+Metric Name                  | Type      | Unit      | Labels                                                                       | Description
+---------------------------- | --------- | --------- | ---------------------------------------------------------------------------- | -----------
+grpc.client.attempt.started  | Histogram | {attempt} | grpc.method (required), grpc.target (required), grpc.attempt_type (optional) | The total number of RPC attempts started, including those that have not completed.
+grpc.client.call.retry_delay | Histogram | s         | grpc.method (required), grpc.target (required)                               | Total time of delay while there is no active attempt during the client call.
 
 The labels, `grpc.method` and `grpc.target` have been defined in [A66]. The
 label, `grpc.attempt_type` can take one of four values - "original", "retry",
