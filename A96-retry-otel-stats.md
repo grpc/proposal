@@ -35,7 +35,7 @@ Metric Name                          | Type      | Unit                | Labels 
 grpc.client.call.retries             | Histogram | {retry}             | grpc.method (required), grpc.target (required) | Number of retries during the client call. If there were no retries, 0 is not reported. Recommended histogram bucket boundaries are [1,2,3,4,5].
 grpc.client.call.transparent_retries | Histogram | {transparent_retry} | grpc.method (required), grpc.target (required) | Number of transparent retries during the client call. If there were no transparent retries, 0 is not reported. Recommended histogram bucket boundaries are [1,2,3,4,5,10].
 grpc.client.call.hedges              | Histogram | {hedge}             | grpc.method (required), grpc.target (required) | Number of hedges during the client call. If there were no hedges, 0 is not reported. Recommended histogram bucket boundaries are [1,2,3,4,5].
-grpc.client.call.retry_delay         | Histogram | s                   | grpc.method (required), grpc.target (required) | Total time of delay while there is no active attempt during the client call.
+grpc.client.call.retry_delay         | Histogram | s                   | grpc.method (required), grpc.target (required) | Total time of delay while there is no active attempt during the client call. Recommended to use exponential histograms if available, otherwise, use latency buckets defined in [A66].
 
 The labels, `grpc.method` and `grpc.target` have been defined in [A66].
 
