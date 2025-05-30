@@ -6,6 +6,7 @@ A42: xDS Ring Hash LB Policy
 * Implemented in: Java (C-core and Go in progress)
 * Last updated: 2021-06-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/_Z_oiWVXf6k
+* Updated by: [A61: IPv4 and IPv6 Dualstack Backend Support](A61-IPv4-IPv6-dualstack-backends.md)
 
 ## Abstract
 

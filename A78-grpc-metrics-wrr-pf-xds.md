@@ -6,6 +6,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Implemented in: <language, ...>
 * Last updated: 2024-09-24
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
+* Updated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md)
 
 ## Abstract
 

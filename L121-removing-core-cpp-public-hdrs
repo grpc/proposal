@@ -1,0 +1,26 @@
+L121: Deprecating and removing the `grpc++_public_hdrs` target
+----
+* Author(s): Adam Heller <drfloob>
+* Approver: Craig Tiller <ctiller>
+* Status: Draft
+* Implemented in: C++
+* Last updated: 2025-01-07
+* Discussion at: https://groups.google.com/g/grpc-io/c/YtWq0Oa_IyY
+
+## Abstract
+
+The `grpc++_public_hdrs` target is not indended for public use, and it is being made private. It is redundant to the `grpc++` target, and all users should depend on `grpc++` instead.
+
+## Background
+
+The gRPC Core/C++ public API headers are exposed from multiple bazel targets, and users should only need to depend on the complete grpc and grpc++ targets.
+The `*_public_hdrs` targets are sometimes useful for internal gRPC build configurations, and are still used to break up large monolithic targets and avoid circular dependencies.
+Nobody knows whether these redundant header-only targets were ever meant to be public when they were introduced many years ago, but it's generally thought to be a bad idea.
+Today, there is no good reason to continue to expose redundant header-only gRPC public API targets, and their existence is a liability and a nuisance.
+
+In the past few years, the gRPC maintainers have put effort into reclaiming ownership of internal code, which has improved our ability to make changes that should not affect our users.
+The long-term plan is to refactor the build configuration and ideally delete the public header targets entirely.
+
+## Proposal
+
+The `grpc++_public_hdrs` target will be given private visibility.
