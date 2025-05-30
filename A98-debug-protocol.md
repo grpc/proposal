@@ -41,14 +41,17 @@ message Entity {
     string kind = 2;
     // Parents for this entity.
     repeated int64 parents = 3;
+    // Has this entity been orphaned?
+    bool orphaned = 4;
     // Instantaneous data for this entity.
-    repeated google.protobuf.Any data = 4;
+    repeated google.protobuf.Any data = 5;
     // Historical trace information for the entity.
-    repeated TraceEvent trace = 5;
+    repeated TraceEvent trace = 6;
 }
 ```
 
 Entities have state and configuration, and tend be be relatively long lived - such that querying them makes sense.
+It's allowed for this protocol to return entities who's active object has already been deleted.
 
 **id**: An entity is identified by an id.
 These ids are allocated sequentially per the rationale in A14, and implementations should use the same id space for debug entities and channelz objects.
@@ -66,6 +69,8 @@ Channelz listed specific kinds of children in its various node types - this trac
 Should the list of children (optionally of a particular kind) for an entity be desired - and that's common - a separate paginated service call can be made.
 Instead, this protocol lists only parents (as that set is far more stable).
 Multiple parents are allowed - to handle at least the case of C++ subchannels being owned by multiple channels.
+
+**orphaned**: If the gRPC object that this entity represents has been deleted, then this field MUST be set to true to represent that this is potentially stale data.
 
 **data**: This is a list of protobuf Any objects describing the current state of this entity.
 Implementations may define their own protobufs to be exposed here, and common sets will be standardized separately.
