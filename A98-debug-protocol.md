@@ -1,4 +1,4 @@
-A98: Debug protocol
+A98: Channelz v2
 ----
 * Author(s): ctiller
 * Approver: markdroth
@@ -16,6 +16,7 @@ Add a generalized debug interface for gRPC services.
 In A14 we added channelz.
 This protocol mixes some lightweight monitoring with some tracing and debuggability features.
 It suffers from being relatively rigid in the topology it presents, and the set of node types available.
+This update improves the protocols flexibility.
 
 
 ### Related Proposals: 
@@ -23,7 +24,7 @@ It suffers from being relatively rigid in the topology it presents, and the set 
 
 ## Proposal
 
-A new debug service proto will be added, `debug/debug.proto` in the `grpc.debug.v1` namespace.
+A new debug service proto will be added, `channelz/v2/channelz.proto` in the `grpc.channelz.v2` namespace.
 
 ### Entities
 
@@ -106,10 +107,10 @@ Again, there is a facility for implementations to provide their own additional i
 
 ### Queries
 
-Queries are made available via the `Debug` service:
+Queries are made available via the `Channelz` service:
 
 ```
-service Debug {
+service Channelz {
     // Gets all entities of a given kind, optionally with a given parent.
     rpc QueryEntities(QueryEntitiesRequest) returns (QueryEntitiesResponse);
     // Gets information for a specific entity.
