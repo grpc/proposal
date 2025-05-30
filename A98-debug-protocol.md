@@ -92,6 +92,12 @@ message TraceEvent {
 ```
 
 These are made available to all entities (in contrast to channelz that selected which nodes had traces, and which did not) - though an implementation need not make that facility available in its implementation of entities.
+Implementations may limit memory per entity, or impose an overall system limit to the amount of traces collected.
+
+The entity trace is a historical snapshot of important events in the entities history.
+Which is to say it's not intended to be a high fidelity log of every event that occurred.
+It's recommended that implementations limit this trace to high value historical data (a channel disconnected for this reason), and additionally provide some higher fidelity on currently ongoing operations.
+For in-depth examination of all events on an entity the QueryTrace API provides live tracing of entities.
 
 Also note that any notion of severity has been removed from the protocol (in contrast to channelz) - in practice this has not been a useful field.
 When converting this protocol to channelz all trace events should be taken as CT_INFO.
@@ -111,7 +117,7 @@ service Debug {
     // Query a named trace from an entity.
     // These query live information from the system, and run for as long
     // as the query time is made for.
-    rpc QueryTrace(QueryTraceRequest) returns (QueryTraceResponse);
+    rpc QueryTrace(QueryTraceRequest) returns (stream QueryTraceResponse);
 }
 ```
 
@@ -157,14 +163,14 @@ message QueryTraceRequest {
     int64 id = 1;
     // The name of the trace to query.
     string name = 2;
-    // The amount of time to query. Implementations may arbitrarily cap this.
-    google.protobuf.Duration duration = 3;
     // Implementation defined query arguments.
     repeated google.protobuf.Any args = 4;
 }
 
 message QueryTraceResponse {
     // The events in the trace.
+    // If multiple events occurred between the last message in the stream being
+    // sent and this one being sent, this can contain more than one event.
     repeated TraceEvent events = 1;
     // Number of events matched by the trace.
     // This may be higher than the number returned if memory limits were exceeded.
