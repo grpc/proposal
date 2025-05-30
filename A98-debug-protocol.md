@@ -220,7 +220,7 @@ There are some fundamental data model issues in that protocol that I'd like to a
 * chaotic-good (a transport currently implemented and in production in C++) has multiple TCP sockets per transport. This might be representable as a subchannel with multiple sockets on the client side (though we've already represented the HTTP2 transport as a socket there), but server side makes no allowance for properly describing the object hierarchy.
 * Further, the set of node types ("kinds" here-in) and their relationships are pre-baked into the protocol, and as we evolve and improve gRPC new node types are needed and new relationships will be added or removed. We should not need to update channelz each time this happens.
 
-Specific metrics have been not been carried forward from channelz as required parts of the protocol.
+Specific metrics have not been carried forward from channelz as required parts of the protocol.
 Users that need call or message counts from the system are encouraged to use the telemetry features of gRPC.
 Implementations however are encouraged to publish whatever metrics they have available at query time to some `data` protobuf.
 
