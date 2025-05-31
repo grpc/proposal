@@ -25,6 +25,8 @@ Introducing a `slow_start_config` configuration in gRPC WRR will offer these ben
 ### Related Proposals:
 * [gRFC A58][A58] - Client-side weighted round robin LB policy
 
+[A58]: A58-client-side-weighted-round-robin-lb-policy.md
+
 ## Proposal
 
 Add slow start configuration to the `weighted_round_robin` load balancing policy. The slow start feature will scale the computed weights for endpoints during their warmup period, gradually increasing the traffic they receive.
