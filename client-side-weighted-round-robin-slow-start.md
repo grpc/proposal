@@ -20,7 +20,7 @@ However, the current WRR implementation lacks support for any ramp-up or warm-up
 
 In contrast, many modern systems adopt slow start strategies in load balancing to address these issues. These strategies allow endpoints to ramp up traffic gradually over a defined window, smoothing transitions and mitigating the risks of traffic spikes. Similar functionality exists in Envoy's load balancing policies, where slow start is implemented for round robin and least request policies.
 
-Introducing a slow_start_config configuration in gRPC WRR will offer these benefits within the native client policy, reducing reliance on external traffic-shaping mechanisms or manual intervention.
+Introducing a `slow_start_config` configuration in gRPC WRR will offer these benefits within the native client policy, reducing reliance on external traffic-shaping mechanisms or manual intervention.
 
 ### Related Proposals:
 * [gRFC A58][A58] - Client-side weighted round robin LB policy
@@ -84,11 +84,6 @@ The scale factor is calculated as follows:
 time_factor = max(time_since_start_in_seconds, 1) / slow_start_window_seconds
 scale = max(min_weight_percent, time_factor ^ (1/aggression))
 ```
-
-For example, with default values (min_weight_percent = 10%, aggression = 1.0):
-- At t=0s: scale = 0.1
-- At t=15s: scale = 0.55
-- At t=30s: scale = 1.0
 
 The following image shows how different aggression values affect the scaling factor over time during the slow start window (in milliseconds):
 
