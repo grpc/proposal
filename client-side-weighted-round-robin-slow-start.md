@@ -1,6 +1,6 @@
 Client-side weighted round robin slow start configuration
 ----
-* Author(s): Anurag Agarwal (@anuragagarwal561994)
+* Author(s): [Anurag Agarwal](https://github.com/anuragagarwal561994)
 * Approver: a11r
 * Status: Draft
 * Last updated: 2025-05-31
