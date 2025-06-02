@@ -57,7 +57,7 @@ This proposal has the following parts:
 - xDS ConfigSelector: We will propagate the `host_rewrite_literal` configuration to the
   configSeletor where it would be stored in the rpc context. 
 
-- During the stream creation, and the RPC call attributes are being set, if there is a non-empty
+- During the stream creation, when the RPC call attributes are being set, if there is a non-empty
   value for the `host_rewrite_literal`, it will take precedence over other options for the RPC
   Call Host attribute. An exception would if a host override is specified either per-client or
   per-RPC. In either case the per-client or per-RPC configuration would take precedence.
