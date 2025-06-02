@@ -10,7 +10,7 @@ Title
 ## Abstract
 
 Implement the 
-[`host_rewrite_literal`](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-literal) 
+[`host_rewrite_literal`][envoy-host_rewrite_literal]
 route_action feature in gRPC xDS client, enabling explicit authority header rewrites. This will
 be conditioned on `trusted_xds_server` as described in [gRFC A81][A81].
 
@@ -54,8 +54,8 @@ This proposal has the following parts:
   If the `xds_trusted_server` attribute is set to false, the `host_rewrite_literal` field will
   be ignored.
 
-- xDS ConfigSelector: We will propagate the `host_rewrite_literal` configuration to the
-  configSeletor where it would be stored in the rpc context. 
+- xDS ConfigSelector: gRPC will pass down the `host_rewrite_literal`literal to use to the child
+  policies via channel arguments, or a similar mechanism depending on the language.
 
 - During the stream creation, when the RPC call attributes are being set, if there is a non-empty
   value for the `host_rewrite_literal`, it will take precedence over other options for the RPC
@@ -86,9 +86,10 @@ migrating to or using both systems concurrently.
 
 ## Implementation
 
-[Go implementation](https://github.com/zhiyanfoo/grpc-go/pull/2/files).
+[Go implementation](https://github.com/zhiyanfoo/grpc-go/pull/2).
 
 [A29]: A29-xds-tls-security.md
 [A81]: A81-xds-authority-rewriting.md
 [A86]: https://github.com/grpc/proposal/pull/455
+[envoy-host_rewrite_literal]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-field-config-route-v3-routeaction-host-rewrite-literal
 [route_action]: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto
