@@ -1,7 +1,7 @@
 Title
 ----
 * Author(s): Zhiyan Foo
-* Approver: a11r
+* Approver: TBD
 * Status: Draft
 * Implemented in: TBD
 * Last updated: 2025-04-23
