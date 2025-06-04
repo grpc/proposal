@@ -4,7 +4,7 @@ A97: xDS JWT Call Credentials
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-04-28
+* Last updated: 2025-06-04
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -74,7 +74,7 @@ expiration time.
 
 To handle potential clock skew issues and to account for processing time
 on the server, the credential will set the cache expiration time to be
-30 seconds before the expiration time encoded in the token. All logic in
+30 seconds before the expiration time encoded in the token.  All logic in
 the call credential code will use this modified expiration time instead
 of the expiration time encoded in the token.
 
@@ -85,26 +85,23 @@ re-reading it from the file.
 
 When a data plane RPC starts, if the token is cached and is not expired,
 the token will immediately be added to the RPC, and the RPC will
-continue. Otherwise (i.e., before the token is initially obtained or
+continue.  Otherwise (i.e., before the token is initially obtained or
 after the cached token has expired), the data plane RPC will be queued
-until the file read completes. When the file read completes, the
+until the file read completes.  When the file read completes, the
 result (either success or failure, as described below) will be applied
 to all queued data plane RPCs.
 
 Note that when the token's expiration time is less than the refresh
 interval in the future, a new data plane RPC being started will trigger
 a new file read, but the cached token value will still be used for
-that data plane RPC. This pre-emptive re-fetching is intended to avoid
+that data plane RPC.  This pre-emptive re-fetching is intended to avoid
 periodic latency spikes when refreshing the token.
 
 If reading the file fails, all queued data plane RPCs will be failed
 with UNAVAILABLE status.
 
-TODO: Use UNAUTHENTICATED instead of UNAVAILABLE if we know there was a
-permission problem with the file?
-
 If reading the file succeeds, the content of the file will contain the JWT
-token. which the client will cache. The client does not need to do full
+token, which the client will cache.  The client does not need to do full
 [RFC-7519](https://datatracker.ietf.org/doc/html/rfc7519) validation
 of the token (that is the responsibility of the server side), but it
 does need to extract the `exp` field for caching purposes. If the `exp`
@@ -116,17 +113,17 @@ plane RPCs, which may then continue.
 If reading the file does not result in the cache being updated (i.e.,
 if reading the file fails or if it returns an invalid JWT token),
 [backoff](https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md)
-must be applied before the next attempt may be started. If a data plane
+must be applied before the next attempt may be started.  If a data plane
 RPC is started when there is no cached token available and while in
 backoff delay, it will be failed with the status from the last attempt
 to read the file.  When the backoff delay expires, the next data plane
-RPC will trigger a new attempt. Note that no attempt should be started
+RPC will trigger a new attempt.  Note that no attempt should be started
 until and unless a data plane RPC is started, since we do not want to
-unnecessarily retry if the channel is idle. The backoff state will be
+unnecessarily retry if the channel is idle.  The backoff state will be
 reset once the file has been read successfully.
 
 To add the token to a data plane RPC, the call credential will add
-a header named `authorization`. The header value will be the string
+a header named `authorization`.  The header value will be the string
 `Bearer ` (note trailing space) followed by the token value.
 
 ### Configuring Call Credentials in xDS Bootstrap File
@@ -134,7 +131,7 @@ a header named `authorization`. The header value will be the string
 We will add a new field to the xDS bootstrap representation of an xDS
 server:
 
-```json
+```json5
 {
   "server_uri": <string containing URI of xds server>,
 
@@ -182,7 +179,7 @@ existing "channel_creds" field, but with the following key differences:
 For now, we will support only one type of call credentials,
 "jwt_token", whose configuration will look like this:
 
-```json
+```json5
 {
   // Path to JWT token file.  Required.
   "jwt_token_file": <string>,
