@@ -5,7 +5,7 @@ A97: xDS JWT Call Credentials
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2025-06-04
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/D2S6cQvD6Tg
 
 ## Abstract
 
