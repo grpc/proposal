@@ -39,7 +39,9 @@ Outlier Detection metrics will have the following labels:
 | Name        | Disposition | Description |
 | ----------- | ----------- | ----------- |
 | grpc.target | required | Indicates the target we are running outlier detection on, as described in [A66]. |
-| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as described in [A89]. Note that this label will be supported only if [A75] has already been implemented. |
+| grpc.lb.outlier_detection.detection_method | required | Indicates the method with which we detected outlier. Currently one of {"success_rate", "failure_percentage"}
+| grpc.lb.outlier_detection.unejection_reason | required | Indicates the reason we did not eject a detected outlier. Currently one of {"enforcement_percentage", "max_ejection_overflow"}
+| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as described in [A89]. Note that this label will be supported only if [A75] has already been implemented |
 
 The `grpc.lb.backend_service` label will be populated based on the resolver attribute passed down from the cds policy, as described in A89.
 
@@ -49,10 +51,8 @@ The following metrics will be exported:
 | ------------- | ----- | ----- | ------- | ----------- |
 |  grpc.lb.outlier_detection.ejections_enforced | Counter | {ejection} | 	grpc.target, grpc.lb.backend_service |	Total enforced ejections due to any outlier type |
 |  grpc.lb.outlier_detection.ejections_overflow |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Number of ejections aborted due to max ejection percentage |
-|  grpc.lb.outlier_detection.ejections_enforced_success_rate |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Enforced success rate outlier ejections |
-|  grpc.lb.outlier_detection.ejections_unenforced_success_rate |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Unenforced success rate outlier ejections due to either max ejection percentage or enforcement_percentage |
-|  grpc.lb.outlier_detection.ejections_enforced_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Enforced failure percentage outlier ejections |
-|  grpc.lb.outlier_detection.ejections_unenforced_failure_percentage |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Unenforced failure percentage outlier ejections due to either max ejection percentage or enforcement_percentage |
+|  grpc.lb.outlier_detection.ejections_enforced |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service, grpc.lb.outlier_detection.detection_method  |	Enforced outlier ejections by ejection reason |
+|  grpc.lb.outlier_detection.ejections_unenforced |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service, grpc.lb.outlier_detection.detection_method, grpc.lb.outlier_detection.unejection_reason |	Unenforced outlier ejections due to either max ejection percentage or enforcement_percentage |
 
 On any detection and ejection/unejection, these metrics will be accordingly updated.
 
@@ -71,6 +71,8 @@ of the metric and the cost of reporting it. As the design goal is offering parit
 we decided to include any metric that was appropriate to gRPC outlier detection.
 
 One change from envoy metrics was instead of reporting all detected ejections (enforced or unenforced) for each algorithm type as its own metric, we opted to simply report enforced and unenforced ejections separately. This reduces cost of any detected outlier by 1 metric in the enforced case, and the unenforced count is more likely the direct information a user of the "detected" metric in Envoy is seeking.
+
+Additionally, we combined the ejections_enforced and ejections_unenforced into one metric with a label to provide the ejection/unejection reason.
 
 ## Implementation
 
