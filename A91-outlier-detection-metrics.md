@@ -49,8 +49,6 @@ The following metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-|  grpc.lb.outlier_detection.ejections_enforced | Counter | {ejection} | 	grpc.target, grpc.lb.backend_service |	Total enforced ejections due to any outlier type |
-|  grpc.lb.outlier_detection.ejections_overflow |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service |	Number of ejections aborted due to max ejection percentage |
 |  grpc.lb.outlier_detection.ejections_enforced |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service, grpc.lb.outlier_detection.detection_method  |	Enforced outlier ejections by ejection reason |
 |  grpc.lb.outlier_detection.ejections_unenforced |	Counter |	{ejection} |	grpc.target, grpc.lb.backend_service, grpc.lb.outlier_detection.detection_method, grpc.lb.outlier_detection.unejection_reason |	Unenforced outlier ejections due to either max ejection percentage or enforcement_percentage |
 
