@@ -184,7 +184,7 @@ validation is appropriate for the call creds type; if it does not, the
 bootstrap config will be considered invalid.
 
 For now, we will support only one type of call credentials,
-"jwt_token", whose configuration will look like this:
+"jwt_token_file", whose configuration will look like this:
 
 ```json5
 {
