@@ -49,13 +49,13 @@ this document.
 
 ## Proposal
 
-We will add a new type of call credentials called JwtTokenCallCredentials
-that loads a JWT token from a local file, with the ability to
-periodically reload the token.  We will also provide hooks to configure
-the use of this new call credentials type in the xDS bootstrap file,
-which was originally described in [A27].
+We will add a new type of call credentials called
+JwtTokenFileCallCredentials that loads a JWT token from a local file,
+with the ability to periodically reload the token.  We will also provide
+hooks to configure the use of this new call credentials type in the xDS
+bootstrap file, which was originally described in [A27].
 
-### JwtTokenCallCredentials
+### JwtTokenFileCallCredentials
 
 Note: This section is intended for gRPC implementations that need to
 implement a new call credential type for loading JWT tokens from a file.
@@ -63,14 +63,15 @@ Implementations that already support this functionality may continue to
 use their existing functionality, even if the behavior differs in small
 ways from what is described in this section.
 
-gRPC will support a JwtTokenCallCredentials call credentials type, which
-is not xDS-specific.  The design for this call credential type is modeled
-after GcpServiceAccountIdentityCallCredentials, described in [A83].
+gRPC will support a JwtTokenFileCallCredentials call credentials type,
+which is not xDS-specific.  The design for this call credential type
+is modeled after GcpServiceAccountIdentityCallCredentials, described in
+[A83].
 
-JwtTokenCallCredentials will be instantiated with one parameter, the
-path to the file containing the JWT token.  The credential object will
-handle loading the token on-demand and caching it based on the token's
-expiration time.
+JwtTokenFileCallCredentials will be instantiated with one parameter,
+the path to the file containing the JWT token.  The credential object
+will handle loading the token on-demand and caching it based on the
+token's expiration time.
 
 To handle potential clock skew issues and to account for processing time
 on the server, the credential will set the cache expiration time to be
