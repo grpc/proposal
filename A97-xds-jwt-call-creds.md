@@ -4,7 +4,7 @@ A97: xDS JWT Call Credentials
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-06-04
+* Last updated: 2025-06-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/D2S6cQvD6Tg
 
 ## Abstract
@@ -176,6 +176,12 @@ existing "channel_creds" field, but with the following key differences:
 - Unlike channel creds, call creds are optional, so if the call_creds
   field is not specified or does not contain any supported call creds
   type, the client will proceed without configuring any call creds.
+
+Just like in the "channel_creds" field, the "config" field is optional
+and can be omitted for a channel creds type that does not require any
+configuration.  However, if present, the config must pass whatever
+validation is appropriate for the call creds type; if it does not, the
+bootstrap config will be considered invalid.
 
 For now, we will support only one type of call credentials,
 "jwt_token", whose configuration will look like this:
