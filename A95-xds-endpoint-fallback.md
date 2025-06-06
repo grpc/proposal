@@ -79,7 +79,7 @@ The [LEDS] design was originally designed to address scalability
 concerns for large proxies.  The idea is to have the EDS resource
 contain only the locality assignments, but then have it refer to other
 resources for the endpoint assignments, where each endpoint is
-represented as a separate resoure of type
+represented as a separate resource of type
 [`LbEndpoint`](https://github.com/envoyproxy/envoy/blob/c5182bcc7a5e6138c36e6c894d19af152b82d48e/api/envoy/config/endpoint/v3/endpoint_components.proto#L101).
 LEDS was initially designed to use glob collections (see [xRFC TP1]) to get
 each individual endpoint in its own resource, which requires the use of
