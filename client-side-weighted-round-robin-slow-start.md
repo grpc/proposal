@@ -215,6 +215,16 @@ In these cases, the slow start feature may lead to:
 - Non-gradual traffic increases when requests do arrive
 - Reduced effectiveness of the load balancing algorithm
 
+## Scope and Limitations
+
+This proposal specifically focuses on implementing slow start for the weighted round robin load balancing policy. While similar slow start functionality could potentially be implemented for other load balancing algorithms like Round Robin and Least Request, these are not included in this proposal for the following reasons:
+
+1. These algorithms don't use weights to determine endpoint selection, making the implementation of slow start more complex
+2. Additional considerations would be needed for how to gradually increase traffic to new endpoints in these algorithms
+3. The implementation details would likely differ significantly from the weighted round robin approach
+
+These other load balancing algorithms can be considered for slow start implementation in future proposals, with their own specific design considerations and requirements.
+
 ## Metrics
 
 The following metric will be exposed to help monitor the slow start behavior:
