@@ -204,7 +204,9 @@ headers, regardless of the value of this field.
 
 ### Temporary environment variable protection
 
-[Name the environment variable(s) used to enable/disable the feature(s) this proposal introduces and their default(s).  Generally, features that are enabled by I/O should include this type of control until they have passed some testing criteria, which should also be detailed here.  This section may be omitted if there are none.]
+Support for the `ext_authz` filter will be guarded by the
+`GRPC_EXPERIMENTAL_XDS_EXT_AUTHZ` environment variable.  This guard will
+be removed once the feature passes interop tests.
 
 ## Rationale
 
