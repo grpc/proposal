@@ -225,6 +225,24 @@ in the XdsConfig.  Similarly, if there is a problem obtaining endpoint
 data from EDS or DNS, the XdsDependencyManager will report that problem
 via the cluster's resolution_note field.
 
+For aggregate clusters, [A37] states that if any of the clusters in
+the dependency tree do not exist, then the aggregate cluster as a
+whole should be considered to be in state TRANSIENT_FAILURE.  However,
+from a reliability perspective, it seems sub-optimal to fail the entire
+aggregate cluster if only one of its underlying clusters has a problem.
+So instead, we will now simply skip any underlying cluster that does
+not exist.  There are two ways to implement this.  One is to have the
+XdsDependencyManager add the non-existing cluster to the aggregate
+cluster's list of leaf clusters in the XdsConfig (even though we don't
+actually know whether the cluster is a leaf cluster or another aggregate
+cluster), which will result in a child of the priority policy that will
+always report state TRANSIENT_FAILURE.  The other option is to have the
+XdsDependencyManager omit the entry for the non-existing cluster from the
+aggregate cluster's leaf cluster list in the XdsConfig, although in that
+case care should be taken to ensure that the aggregate cluster properly
+fails picks when the leaf cluster list is empty due to all underlying
+cluster resources not existing.
+
 The xds resolver will pass the returned XdsConfig to the LB policies via
 an attribute, so that the LB policies can use the cluster data.  Note that
 we cannot simply pass the data via the cds LB policy's JSON config,
