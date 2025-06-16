@@ -67,12 +67,12 @@ message SlowStartConfig {
   //
   // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
   // Once host exits slow start, time_factor and aggression no longer affect its weight.
-  core.v3.RuntimeDouble aggression = 2;
+  google.protobuf.FloatValue aggression = 2;
 
   // Configures the minimum percentage of origin weight that avoids too small new weight,
   // which may cause endpoints in slow start mode receive no traffic in slow start window.
   // If not specified, the default is 10%.
-  type.v3.Percent min_weight_percent = 3;
+  google.protobuf.UInt32Value min_weight_percent = 3;
 }
 ```
 
