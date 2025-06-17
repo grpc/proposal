@@ -38,6 +38,23 @@ distributed among all open connections to the server. If the user also specifies
 a per-connection `MAX_CONCURRENT_STREAMS`, that will also be respected as an
 upper bound.
 
+### C++ API
+
+```
+// Sets the maximum number of streams corresponding to the ResourceQuota object.
+ResourceQuota::SetMaxOutstandingStreams(int max_outstanding_streams)
+```
+
+### Core APIs
+
+```
+// Sets the maximum number of streams corresponding on the StreamQuota object.
+StreamQuota::SetMaxOutstandingStreams(int max_outstanding_streams)
+
+// Returns the number of allowed concurrent streams on a given connection.
+StreamQuota::GetPerConnectionMaxConcurrentRequests(int current_open_requests)
+```
+
 ## Implementation
 
 Implemented in https://github.com/grpc/grpc/pull/39125.
