@@ -161,7 +161,6 @@ sent to the server will be populated as follows:
     Will be set to the RPC's start time.
   - [http](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L98):
     Will always be set.  Inside of it:
-    - [id](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L112): TODO: how do we set this?
     - [method](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L115):
       Will always be "POST".
     - [header_map](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L143):
@@ -172,7 +171,7 @@ sent to the server will be populated as follows:
       Will always be set to -1.
     - [protocol](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L171):
       Always set to "HTTP/2".
-    - scheme, headers, query, fragment, body, raw_body: Will *not* be set.
+    - id, scheme, headers, query, fragment, body, raw_body: Will *not* be set.
 - context_extensions, metadata_context, route_metadata_context,
   tls_session: Will *not* be set.
 
