@@ -134,16 +134,27 @@ message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba
 sent to the server will be populated as follows:
 - [source](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L192): Will always be set.  Inside it:
   - [address](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L58)
-    and [service](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L65)
-    will be set.
-  - labels will not be set.
-  - [principal](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L82)
-    will be set if the client provided a cert and we validates it, unset
-    otherwise.
+    will be set to the peer address of the connection that the request
+    came in on.
+  - [principal](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L82):
+    If TLS is used and the client provided a valid certificate, this will be
+    set to the cert's first URI SAN if set, otherwise the cert's first DNS
+    SAN if set, otherwise the subject field of the certificate in RFC
+    2253 format.  If TLS is not used or the client did not provide a
+    cert, this field will be unset.
   - [certificate](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L86): This will be populated if configured.
+  - service, labels: Will *not* be set.
 - [destination](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L197):
-  This field will not be populated, because there is no destination on a gRPC
-  server.
+  Will always be set.  Inside it:
+  - [address](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L58)
+    will be set to the local address of the connection that the request
+    came in on.
+  - [principal](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L82):
+    If TLS is used, this will be set to the server's cert's first URI SAN
+    if set, otherwise the cert's first DNS SAN if set, otherwise the
+    subject field of the certificate in RFC 2253 format.  If TLS is not
+    used, this field will be unset.
+  - certificate, service, labels: Will *not* be set.
 - [request](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L200):
   Will always be set.  Inside it:
   - [time](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L95):
