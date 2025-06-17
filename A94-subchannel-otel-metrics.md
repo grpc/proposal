@@ -69,7 +69,7 @@ grpc.target             | Required    | Indicates the target of the gRPC channel
 grpc.lb.backend_service | Optional    | The backend service to which the RPC was routed (defined in [A89].)
 grpc.lb.locality        | Optional    | The locality to which the traffic is being sent. This will be set to the resolver attribute passed down from the weighted_target policy, or the empty string if the resolver attribute is unset (defined in [A78].)
 grpc.disconnect_error   | Optional    | Reason for disconnection.
-grpc.security_level     | Optional    | Denotes the security level of the connection. Allowed values - "none", "integrity only" and "privacy and integrity".
+grpc.security_level     | Optional    | Denotes the security level of the connection. Allowed values - "none", "integrity_only" and "privacy_and_integrity".
 
 List of allowed values for `grpc.disconnect_error` -
 
