@@ -27,11 +27,11 @@ to client-side per-attempt metrics. This label has xds cluster information.
 *   [A8]: Client-side Keepalive
 *   [A18]: TCP User Timeout
 *   [A61]: IPv4 and IPv6 Dualstack Backend Support
-*   [A62]: gRPC security level negotiation between call credentials and channels
 *   [A66]: OpenTelemetry Metrics
 *   [A78]: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 *   [A79]: Non-per-call Metrics Architecture
 *   [A89]: Backend Service Metric Label
+*   [L62]: gRPC security level negotiation between call credentials and channels
 
 [A8]: A8-client-side-keepalive.md
 [A18]: A18-tcp-user-timeout.md
@@ -40,6 +40,7 @@ to client-side per-attempt metrics. This label has xds cluster information.
 [A78]: A78-grpc-metrics-wrr-pf-xds.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A89]: A89-backend-service-metric-label.md
+[L62]: L62-grpc-security-level-negotiation.md
 
 ## Proposal
 
