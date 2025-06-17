@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-03-10
+* Last updated: 2025-06-17
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -90,7 +90,6 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79)
   - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87)
 - [include_peer_certificate](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L181)
-- TODO: CACHING!
 
 The following fields will be ignored by gRPC:
 - http_service: It doesn't make sense for gRPC to support non-gRPC
@@ -210,8 +209,12 @@ be removed once the feature passes interop tests.
 
 ## Rationale
 
-[A discussion of alternate approaches and the trade offs, advantages, and disadvantages of the specified approach.]
-
+We will ultimately need caching support for performance reasons, since
+it will not scale to make an ext_authz RPC for every data plane RPC.
+However, the design discussions around caching are still ongoing, and
+we have use-cases that require use of ext_authz today.  Therefore, we
+are decoupling the caching discussion to a separate gRFC to be published
+later.
 
 ## Implementation
 
