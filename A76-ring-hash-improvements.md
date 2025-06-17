@@ -157,11 +157,20 @@ if !using_random_hash {
 return ring[first_index].picker->Pick(...);
 ```
 
-This behavior ensures that a single RPC does not cause more than one endpoint to
-exit `IDLE` state at a time, and that a request missing the header does not
-incur extra latency in the common case where there is already at least one
-endpoint in `READY` state. It converges to picking a random endpoint, since each
-request may eventually cause a random endpoint to go from `IDLE` to `READY`.
+This behavior ensures that a single RPC does not cause more than two endpoints
+to exit `IDLE` state, and that a request missing the header does not incur extra
+latency in the common case where there is already at least one endpoint in
+`READY` state. It converges to picking a random endpoint if the header is not
+set, since each request may cause one or two random endpoints to go from `IDLE`
+to `READY`: - a first connection attempt if it randomly picks an `IDLE` endpoint
+and no endpoint is currently `CONNECTING` - a second connection attempt if the
+pick was queued and an endpoint transitioned from `CONNECTING` to `READY`, but
+no other endpoint is currently `CONNECTING`.
+
+Because pickers generated with `picker_has_endpoint_in_connecting_state` set to
+false may be used by multiple requests until an endpoint transitions to
+`CONNECTING` and a the picker is updated, we can still start multiple
+simultaneous connection attempts for different RPCs.
 
 ### Explicitly setting the endpoint hash key
 
@@ -177,6 +186,10 @@ The xDS resolver, described in [A74][A74], will be changed to set the `hash_key`
 endpoint attribute to the value of [LbEndpoint.Metadata][LbEndpoint.Metadata]
 `envoy.lb` `hash_key` field, as described in [Envoy's documentation for the ring
 hash load balancer][envoy-ringhash].
+
+If multiple endpoints have the same `hash_key`, then which endpoint is chosen is
+unspecified, and the implementation is free to choose any of the endpoints with
+a matching `hash_key`.
 
 ### Temporary environment variable protection
 
@@ -230,7 +243,9 @@ considered the following alternative solutions:
 
 ## Implementation
 
-Implemented in C-core in https://github.com/grpc/grpc/pull/38312.
+Implemented in:
+- C-core in https://github.com/grpc/grpc/pull/38312.
+- Go: https://github.com/grpc/grpc-go/pull/8159
 
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
