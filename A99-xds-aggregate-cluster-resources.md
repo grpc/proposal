@@ -5,7 +5,7 @@ A99: xDS Aggregate Cluster Resources
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2025-06-18
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/NkAv5WGdxnk
 
 ## Abstract
 
