@@ -72,6 +72,11 @@ grpc.lb.locality        | Optional    | The locality to which the traffic is bei
 grpc.disconnect_error   | Optional    | Reason for disconnection.
 grpc.security_level     | Optional    | Denotes the security level of the connection. Allowed values - "none", "integrity_only" and "privacy_and_integrity".
 
+The resolver attributes for the `grpc.lb.backend_service` and `grpc.lb.locality`
+labels (defined in [A89] and [A78] respectively) will be passed into the
+subchannel. This implies that the subchannel will be recreated when these
+attributes change.
+
 List of allowed values for `grpc.disconnect_error` -
 
 Error string         | Description
