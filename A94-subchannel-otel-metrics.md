@@ -1,6 +1,6 @@
 ## A94: OTel metrics for Subchannels
 
-*   Author(s): Yash Tibrewal (yashykt@)
+*   Author(s): Yash Tibrewal (@yashykt)
 *   Approver: Mark Roth (@markdroth)
 *   Status: In Review
 *   Implemented in:
