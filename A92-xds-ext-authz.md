@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-06-17
+* Last updated: 2025-06-27
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -68,27 +68,26 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   not a gRPC status code.  The gRPC status code will be determined using
   the normal [HTTP-to-gRPC status conversion
   rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-- [allowed_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L229):
-  TODO: Want to not allow sending certain sensitive headers unless
-  `trusted_xds_server` is present, but hard with regex matches...
-  Maybe just don't allow matchers to match against sensitive headers?
+- [allowed_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L229)
 - [disallowed_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L233)
 - [decoder_header_mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L282):
   Optional.  Inside of it:
-  - [allow_all_routing](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L52): This field will control only whether the
-    ext_authz server can overwrite the `:authority` header.  If this
-    field is set to true and the `trusted_xds_server` server feature is
-    not present in the bootstrap config, we will reject the config.
-  - [allow_envoy](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L59):
-    TODO: Do we need this?  Those headers aren't really special to gRPC.
+  - [allow_all_routing](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L52):
+    This field will control only whether the ext_authz server can overwrite
+    the `:authority` header.  If this field is set to true and the
+    `trusted_xds_server` server feature is not present in the bootstrap
+    config, we will reject the config.
   - [disallow_system](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L65):
-    TODO: Should we allow these headers to be modified at all?
+    This field will control only whether the ext_authz server can overwrite
+    the `:authority` header.  If this field is set to true and the
+    `trusted_xds_server` server feature is not present in the bootstrap
+    config, we will reject the config.
   - [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70)
-  - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75):
-    TODO: Figure out how to handle matching a restricted header.  Maybe just
-    don't allow it to match against those?
+  - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75)
   - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79)
   - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87)
+  - The [allow_envoy](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L59)
+    field will be ignored, since those headers aren't really special to gRPC.
 - [include_peer_certificate](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L181)
 
 The following fields will be ignored by gRPC:
@@ -185,8 +184,7 @@ as follows:
     The HTTP status to fail the RPC with.  We apply the normal
     [HTTP-to-gRPC status conversion
     rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L55):
-    TODO: Figure out what restrictions to apply here.
+  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L55)
   - body: Ignored; does not apply to gRPC.
 - [ok_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L134):
   - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L75),
@@ -199,15 +197,16 @@ as follows:
 
 ### Header Rewriting
 
+gRPC will not support rewriting the `:scheme`, `:method`, or `:path`
+headers, regardless of what settings are present in the ext_authz
+filter config.
+
 gRPC will support rewriting the `:authority` field only if the
 `trusted_xds_server` server feature is present in the bootstrap config,
 regardless of what settings are present in the ext_authz filter config.
 
 If the ext_authz server attempts to overwrite the `host` header, that
 change will actually apply to the `:authority` header instead.
-
-Note that gRPC will not support rewriting the `:scheme` or `:method`
-headers, regardless of the value of this field.
 
 ### Temporary environment variable protection
 
