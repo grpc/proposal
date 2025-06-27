@@ -32,12 +32,14 @@ the bootstrap config, described in [A77].  It will also make use of the
 * [A41: xDS RBAC Support][A41]
 * [A77: xDS Server-Side Rate Limiting][A77] (pending)
 * [A81: xDS Authority Rewriting][A81]
+* [A33: xDS Fault Injection][A33]
 
 [A36]: A36-xds-for-servers.md
 [A39]: A39-xds-http-filters.md 
 [A41]: A41-xds-rbac.md
 [A77]: https://github.com/grpc/proposal/pull/414
 [A81]: A81-xds-authority-rewriting.md
+[A33]: A33-Fault-Injection.md
 
 ## Proposal
 
@@ -62,6 +64,22 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
     documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
     and it must have a positive value.
   - All other fields are ignored.
+- [filter_enabled](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L158):
+  Optional; if unset, the filter is enabled.  This field will be validated
+  the same way as in the fault injection filter (see [A33]).  Within it:
+  - [default_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L648):
+    This field must be present.  The configured value will be capped at 100%.
+  - The `runtime_key` field will be ignored, since gRPC does not have a
+    runtime system.
+- [deny_at_disable](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L175C18-L175C36):
+  Optional; if unset, requests are allowed when the filter is disabled.
+  If set, then within this field:
+  - [default_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L298):
+    Must be present.  If true, then when the filter is disabled, the
+    request will be failed with a status based on the `status_on_error`
+    field (see below).
+  - The `runtime_key` field will be ignored, since gRPC does not have a
+    runtime system.
 - [failure_mode_allow](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L68)
 - [failure_mode_allow_header_add](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L74)
 - [status_on_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L95): Note that this field specifies an HTTP status code,
@@ -108,12 +126,10 @@ The following fields will be ignored by gRPC:
 - encode_raw_headers: We will unconditionally encode headers in raw form.
 - metadata_context_namespaces, typed_metadata_context_namespaces,
   route_metadata_context_namespaces, route_typed_metadata_context_namespaces,
-  enable_dynamic_metadata_ingestion, filter_metadata: gRPC does not currently
-  support dynamic metadata.
+  enable_dynamic_metadata_ingestion, filter_metadata, filter_enabled_metadata:
+  gRPC does not currently support dynamic metadata.
 - bootstrap_metadata_labels_key: We have no current use-case for this.  We
   could consider adding it in the future if there is a need.
-- filter_enabled, filter_enabled_metadata, deny_at_disable: We don't currently
-  support the runtime system.
 - include_tls_session: We do not currently have a use-case for this, but
   we could consider adding it in the future if we do encounter such a
   use-case.
