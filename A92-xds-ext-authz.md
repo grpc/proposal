@@ -52,10 +52,19 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   - [google_grpc](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L303):
     This field must be present.  Inside of it:
     - [target_uri](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L254):
-      This field must be non-empty and must be a valid target URI.  The
-      value specified here must be present in the `allowed_grpc_services`
-      map in the bootstrap config, which will also determine the credentials
-      to use, as described in [A77].
+      This field must be non-empty and must be a valid target URI.  If
+      the `trusted_xds_server` server feature (see [A81]) is *not* set in
+      the bootstrap config, then the value specified here must be present
+      in the `allowed_grpc_services` map in the bootstrap config, which
+      will also determine the credentials to use, as described in [A77].
+    - [channel_credentials](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L256):
+      Used only if `trusted_xds_server` server feature is present in the
+      bootstrap config.
+      TODO: flesh this out
+    - [call_credentials](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L260):
+      Used only if `trusted_xds_server` server feature is present in the
+      bootstrap config.
+      TODO: flesh this out
     - Note: All other fields are ignored.
   - [timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L308):
     Specifies the deadline for the RPCs sent to the ext_authz server.
@@ -259,8 +268,4 @@ later.
 
 ## Implementation
 
-[A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
-
-## Open issues (if applicable)
-
-[A discussion of issues relating to this proposal for which the author does not know the solution. This section may be omitted if there are none.]
+Will be implemented in C-core, Java, Go, and Node.
