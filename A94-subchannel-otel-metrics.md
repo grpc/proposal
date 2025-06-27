@@ -40,7 +40,7 @@ to client-side per-attempt metrics. This label has xds cluster information.
 [A78]: A78-grpc-metrics-wrr-pf-xds.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A89]: A89-backend-service-metric-label.md
-[L62]: L62-grpc-security-level-negotiation.md
+[L62]: L62-core-call-credential-security-level.md
 
 ## Proposal
 
