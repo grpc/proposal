@@ -118,13 +118,31 @@ The following fields will be ignored by gRPC:
   we could consider adding it in the future if we do encounter such a
   use-case.
 
-We will not support per-route config overrides for this filter.  TODO:
-If we need the `disabled` flag, maybe just support that via the
-`FilterConfig.disabled` field in `typed_per_filter_config` instead of
-doing it in an ext_authz-specific way?  Just make sure that the
-semantics are the same -- ext_authz config says "If disabled is
-specified in multiple per-filter-configs, the most specific one will be
-used."
+### Filter Configuration Overrides
+
+We will support `typed_per_filter_config` config overrides for this
+filter, as described in [A39].
+
+The override config for this filter is encoded as an [`ExtAuthzPerRoute`
+proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L460).
+However, we will ignore all of the fields in the proto; the only reason
+for supporting it is so that we can disable the filter for individual
+virtual hosts, routes, or cluster weights.
+
+Note that we will not use the [`disabled`
+field](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L469)
+in the `ExtAuthzPerRoute` proto itself; instead, we will support disabling
+via a more generic mechanism that can apply to any filter.  Specifically,
+we will honor both the `disabled` field in both the [`HttpFilter`
+message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L1229)
+in the HCM config and in the [`FilterConfig` wrapper
+message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/route/v3/route_components.proto#L2562)
+that can be used in `typed_per_filter_config` fields.
+
+Note that the most specific `typed_per_filter_config` will be used.  For
+example, if there is an override config at the virtual host level that
+disables the filter but then another config at the route level that does
+not disable the filter, the filter will be enabled.
 
 ### Communication With the ext_authz Server
 

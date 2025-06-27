@@ -6,6 +6,7 @@ A39: xDS HTTP Filter Support
 * Implemented in: C-core
 * Last updated: 2021-07-20
 * Discussion at: https://groups.google.com/g/grpc-io/c/M-l8k2v5snY
+* Updated by: [gRFC A92: xDS ExtAuthz](A92-xds-ext-authz.md)
 
 ## Abstract
 
