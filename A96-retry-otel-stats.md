@@ -1,8 +1,9 @@
 ## A96: OTel Metrics for Retries
 
 *   Author: Yash Tibrewal (@yashykt)
-*   Approver: Mark Roth (@markdroth)
-*   Status: In Review
+*   Approver(s): Mark Roth (@markdroth), Eric Anderson (@ejona86), Doug Fawley
+    (@dfawley)
+*   Status: Ready for Implementation
 *   Implemented in:
 *   Last updated: 2025-07-01
 *   Discussion at: https://groups.google.com/g/grpc-io/c/bFUHkcBA9cw
