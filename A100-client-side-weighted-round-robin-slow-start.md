@@ -10,7 +10,7 @@ A100: Client-side weighted round robin slow start configuration
 
 This proposal introduces an enhancement to the existing client-side weighted_round_robin (WRR) load balancing policy in gRPC by incorporating a configurable `slow_start_config` mechanism. The intent of this feature is to gradually increase traffic to backend endpoints that are newly introduced or have recently rejoined the cluster, allowing them time to warm up and reach their optimal performance level before handling their full share of traffic. This change increases system stability and resilience in environments with dynamic scaling and volatile workloads.
 
-The design borrows from production-ready practices in other load balancers such as Envoy, where gradual traffic ramp-up (slow start) is a well-established technique for avoiding performance degradation and request failures during backend startup or recovery. The slow start feature gradually increases the traffic sent to newly added endpoints during a warmup period, allowing them to warm up their caches and establish connections before receiving full traffic load.
+The design borrows from production-ready practices in other load balancers such as Envoy, where gradual traffic ramp-up (slow start) is a [well-established technique][Envoy Slow Start Documentation] for avoiding performance degradation and request failures during backend startup or recovery. The slow start feature gradually increases the traffic sent to newly added endpoints during a warmup period, allowing them to warm up their caches and establish connections before receiving full traffic load.
 
 ## Background
 
@@ -23,9 +23,7 @@ In contrast, many modern systems adopt slow start strategies in load balancing t
 Introducing a `slow_start_config` configuration in gRPC WRR will offer these benefits within the native client policy, reducing reliance on external traffic-shaping mechanisms or manual intervention.
 
 ### Related Proposals:
-* [gRFC A58][A58] - Client-side weighted round robin LB policy
-
-[A58]: A58-client-side-weighted-round-robin-lb-policy.md
+* [gRFC A58: weighted_round_robin LB policy][A58]
 
 ## Proposal
 
@@ -59,7 +57,7 @@ message SlowStartConfig {
   // so that endpoint would get linearly increasing amount of traffic.
   // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
   // The value of aggression parameter should be greater than 0.0.
-  // By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
+  // By tuning the parameter, it is possible to achieve polynomial or exponential shape of ramp-up curve.
   //
   // During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
   // ``new_weight = weight * max(min_weight_percent, time_factor ^ (1 / aggression))``,
@@ -78,7 +76,7 @@ message SlowStartConfig {
 
 ### Weight Scaling During Warmup
 
-When an endpoint is first added or becomes ready after being in a non-ready state, it enters the warmup period. During this period, its weight will be scaled by a factor that increases non-linearly from `min_weight_percent` to 100% over the duration of `slow_start_window`.
+When an endpoint is ready after being in a non-ready state, it enters the warmup period. During this period, its weight will be scaled by a factor that increases non-linearly from `min_weight_percent` to 100% over the duration of `slow_start_window`.
 
 The scale factor is calculated as follows:
 
@@ -242,7 +240,5 @@ This metric will help operators monitor the number of endpoints currently in slo
 
 This will be implemented in all languages C++, Java, and Go.
 
-## References
-
-1. [Envoy Slow Start Documentation](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/slow_start)
-2. [gRFC A58][A58] - Client-side weighted round robin LB policy 
+[Envoy Slow Start Documentation]: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/slow_start
+[A58]: A58-client-side-weighted-round-robin-lb-policy.md
