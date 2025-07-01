@@ -4,7 +4,7 @@
 *   Approver: Mark Roth (@markdroth)
 *   Status: In Review
 *   Implemented in:
-*   Last updated: 2025-05-16
+*   Last updated: 2025-07-01
 *   Discussion at: https://groups.google.com/g/grpc-io/c/bFUHkcBA9cw
 
 ## Abstract
@@ -41,6 +41,11 @@ The labels `grpc.method` and `grpc.target` have been defined in [A66].
 
 These metrics are recorded at the end of the call utilizing the `CallTracer`
 approach (also defined in [A66]).
+
+Note that even if a client's configured policy doesn't specify a delay between
+call attempts (eg. a non-fatal status code on a hedged request), it is possible
+that the CallTracer notices a non-zero delay due to the internal overhead of the
+retry mechanism.
 
 ### Stability
 
