@@ -44,8 +44,8 @@ approach (also defined in [A66]).
 
 Note that even if a client's configured policy doesn't specify a delay between
 call attempts (eg. a non-fatal status code on a hedged request), it is possible
-that the CallTracer notices a non-zero delay due to the internal overhead of the
-retry mechanism.
+that the CallTracer records a non-zero `grpc.client.call.retry_delay` due to the
+internal overhead of the retry mechanism.
 
 ### Stability
 
