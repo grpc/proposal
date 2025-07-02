@@ -81,7 +81,7 @@ When an endpoint is ready after being in a non-ready state, it enters the warmup
 The scale factor is calculated as follows:
 
 ```
-time_factor = max(time_since_start_in_seconds, 1) / slow_start_window_seconds
+time_factor = max(time_since_ready_in_seconds, 1) / slow_start_window_seconds
 scale = max(min_weight_percent, time_factor ^ (1/aggression))
 ```
 
@@ -98,7 +98,9 @@ final_weight = computed_weight * scale
 
 ### Subchannel Weights
 
-The existing `non_empty_since` timestamp, which is already used to check for `blackout_period`, can be repurposed to track the start of the warmup period for each endpoint. This timestamp tracks when the first non-zero load report was received, marking the beginning of its warmup period. This approach eliminates the need for additional timestamp tracking while maintaining the existing functionality.
+To maintain independence between the blackout period and slow start period, a new timestamp `ready_since` will be introduced to track when an endpoint transitioned to ready state. This timestamp is separate from the existing `non_empty_since` timestamp used for the blackout period.
+
+The `ready_since` timestamp is set when an endpoint transitions from a non-ready state (e.g., CONNECTING, TRANSIENT_FAILURE) to a ready state (READY). This marks the beginning of the slow start period for that endpoint. The existing `non_empty_since` timestamp continues to be used exclusively for tracking the blackout period, which begins when the first non-zero load report is received.
 
 Weight calculation in the WRR policy follows a two-step process. First, the base weight for each endpoint is computed using the formula from [gRFC A58][A58]:
 
@@ -110,7 +112,7 @@ $$scaled\\_weight = weight * max(min\\_weight\\_percent, time\\_factor ^ {1/aggr
 
 where,
 
-$$time\\_factor = \dfrac{max(time\\_since\\_non\\_empty\\_seconds, 1)}{slow\\_start\\_window\\_seconds}$$
+$$time\\_factor = \dfrac{max(time\\_since\\_ready\\_seconds, 1)}{slow\\_start\\_window\\_seconds}$$
 
 The scaling formula ensures that new endpoints receive a gradually increasing share of traffic while maintaining a minimum threshold to prevent starvation. The `aggression` parameter allows fine-tuning of the ramp-up curve, enabling either more aggressive initial scaling (values > 1.0) or more conservative approaches (values < 1.0).
 
@@ -118,15 +120,20 @@ When an endpoint is not in the warmup period, the scale factor is set to 1.0, me
 
 ### Blackout Period vs Slow Start
 
-The WRR load balancing policy offers two independent mechanisms for handling new endpoints: the blackout period and slow start. These mechanisms can be used independently or in combination, allowing operators to choose the approach that best fits their needs.
+The WRR load balancing policy will offers two independent mechanisms for handling new endpoints: the blackout period and slow start. These mechanisms can be used independently or in combination, allowing operators to choose the approach that best fits their needs.
 
-The blackout period, which defaults to 10 seconds, begins when an endpoint receives its first non-zero load report. During this period, the endpoint continues to receive traffic, but instead of using the weights reported by the backend servers, the load balancer uses the mean of all backend-reported weights. This period helps prevent churn in the load balancing decisions when the set of endpoint addresses changes, ensuring that the weights used are based on stable, continuous load reporting.
+The blackout period, which defaults to 10 seconds, begins when an endpoint receives its first non-zero load report (tracked by `non_empty_since` timestamp). During this period, the endpoint continues to receive traffic, but instead of using the weights reported by the backend servers, the load balancer uses the mean of all backend-reported weights. This period helps prevent churn in the load balancing decisions when the set of endpoint addresses changes, ensuring that the weights used are based on stable, continuous load reporting.
 
-The slow start period also begins when the endpoint receives its first non-zero load report and applies a gradual scaling factor to the weights over a configurable duration (default 30 seconds). This scaling is applied to whatever weight is being used (either the mean weight during blackout period or the actual backend-reported weight after blackout period). The slow start period operates independently of the blackout period, meaning it will continue to scale the weights regardless of whether the blackout period is still active or has ended.
+The slow start period begins when an endpoint transitions to ready state (tracked by `ready_since` timestamp) and applies a gradual scaling factor to the weights over a configurable duration. This scaling is applied to whatever weight is being used (either the mean weight during blackout period or the actual backend-reported weight after blackout period). The slow start period operates independently of the blackout period, meaning it will continue to scale the weights regardless of whether the blackout period is still active or has ended.
+
+The independence of these mechanisms allows for more flexible configurations:
+- Slow start can begin immediately when an endpoint becomes ready, even before any load reports are received
+- The blackout period can continue to function as designed for weight stability, regardless of the slow start configuration
+- Both mechanisms can be tuned independently based on specific operational requirements
 
 It is recommended to keep the blackout period shorter than the slow start period. This is because when the blackout period ends, the endpoint's weight will suddenly change from the mean weight to its actual backend-reported weight. If this weight is significantly higher than the mean (e.g., 2x the mean weight), it could cause a sudden traffic spike that defeats the purpose of gradual traffic increase. By having a longer slow start period, the scaling factor will continue to gradually increase the weight even after the blackout period ends, ensuring a smooth transition to the full backend-reported weight.
 
-When endpoint weights become stale after the `weight_expiration_period`, the load balancer will continue to use the mean weight for load balancing. This is different from the blackout period as it's a response to weight staleness rather than initial endpoint setup. In these cases, since the endpoint weights were previously active, the slow start period is typically not triggered. However, when new weights arrive after expiration, the endpoint will enter the blackout period again, and if slow start is configured, the weights will be scaled up gradually during this period.
+When endpoint weights become stale after the `weight_expiration_period`, the load balancer will continue to use the mean weight for load balancing. This is different from the blackout period as it's a response to weight staleness rather than initial endpoint setup. In these cases, since the endpoint weights were previously active, the slow start period is typically not triggered. When new weights arrive after expiration, the endpoint will enter the blackout period again but not the slow start since there was no transition of sub-channel state and no gradullay traffic increase should ideally be expected here.
 
 These mechanisms can be configured in different ways:
 - Using only blackout period: Ensures stable weight reporting by using mean weights before switching to backend weights
@@ -146,14 +153,15 @@ min_weight_percent: float
 aggression: float
 
 // State
-non_empty_since: Time  // Time when first non-zero load report was received
+non_empty_since: Time  // Time when first non-zero load report was received (for blackout period)
+ready_since: Time      // Time when endpoint transitioned to ready state (for slow start period)
 
 function get_scale() -> float:
-    time_elapsed_since_start = current_time - non_empty_since
-    if time_elapsed_since_start >= slow_start_window:
+    time_elapsed_since_ready = current_time - ready_since
+    if time_elapsed_since_ready >= slow_start_window:
         return 1.0
         
-    time_factor = max(time_elapsed_since_start, 1.0) / slow_start_window
+    time_factor = max(time_elapsed_since_ready, 1.0) / slow_start_window
     min_scale = min_weight_percent / 100.0
     
     // Apply non-linear scaling based on aggression factor
