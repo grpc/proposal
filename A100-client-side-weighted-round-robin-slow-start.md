@@ -246,7 +246,9 @@ This metric will help operators monitor the number of endpoints currently in slo
 
 ## Implementation
 
-This will be implemented in all languages C++, Java, and Go.
+The functionality is being implemented in Java. It will be implemented in Go, C++ in the near future.
+
+Java Implementation: https://github.com/grpc/grpc-java/pull/12200
 
 [Envoy Slow Start Documentation]: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/slow_start
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
