@@ -63,11 +63,6 @@ However, we considered that this might cause too much overhead to users to add a
 Hence, the current approach to allow users to disable using an enironment variable was chosen.
 
 
-Secondly, we also tried adding `absl/log/initialize.cc` directly as a Core dependency instead of a specific Cython level dependency. But as we have multiple languages wrapped on the core layer, this implied that every wrapped language got an additional dependency on `absl/log/initialize.cc`. This is not too much of an overhead given that this is a single additional file and Core already depends on the abseil package. 
-
-However this file is only needed for Python, and hence it seemed to be a better option to use this file as Python specific dependency without affecting Core and other wrapped languages.
-
-
 ## Implementation
 
 The automatic call to `absl::InitializeLog()` will be included in the `_initialize()` Cython function of `src/python/grpcio/grpc/_cython/cygrpc.pyx` file as follows:
