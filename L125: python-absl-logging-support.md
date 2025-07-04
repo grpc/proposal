@@ -9,7 +9,7 @@ Title
 xxxxxxx
 ## Abstract
 
-This proposal describes the cahnges necessary to add absl logging support in gRPC Python hence solving the user warning:
+This proposal describes the changes necessary to add absl logging support in gRPC Python hence solving the user warning:
 
 ```sh
 WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
