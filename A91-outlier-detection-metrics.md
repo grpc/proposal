@@ -40,7 +40,7 @@ Outlier Detection metrics will have the following labels:
 | ----------- | ----------- | ----------- |
 | grpc.target | required | Indicates the target we are running outlier detection on, as described in [A66]. |
 | grpc.lb.outlier_detection.detection_method | required | Indicates the method with which we detected outlier. Currently one of {"success_rate", "failure_percentage"}
-| grpc.lb.outlier_detection.unejection_reason | required | Indicates the reason we did not eject a detected outlier. Currently one of {"enforcement_percentage", "max_ejection_overflow"}
+| grpc.lb.outlier_detection.unenforced_reason | required | Indicates the reason we did not eject a detected outlier. Currently one of {"enforcement_percentage", "max_ejection_overflow"}
 | grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as described in [A89]. Note that this label will be supported only if [A75] has already been implemented |
 
 The `grpc.lb.backend_service` label will be populated based on the resolver attribute passed down from the cds policy, as described in A89.
