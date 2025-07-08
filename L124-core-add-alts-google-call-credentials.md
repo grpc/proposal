@@ -1,12 +1,10 @@
-# Support ALTS Hard Bound Call Credentials in Google Default Credentials
-
+# L124: C-core: Support ALTS Hard Bound Call Credentials in Google Default Credentials
 --------------------------------------------------------------------------------
-
 *   Author(s): anniefrchz
-*   Approver: a11r
-*   Status: Draft
+*   Approver: markdroth
+*   Status: In Review
 *   Implemented in: C++
-*   Last updated: 2025/06/30
+*   Last updated: 2025-07-08
 *   Discussion at: https://groups.google.com/g/grpc-io/c/7rRWghiS95E/m/nENwU3BtCgAJ
 
 ## Abstract
@@ -16,7 +14,7 @@ alts-credentials configurations within `grpc_google_default_credentials`. This
 enhancement specifically allows a secondary set of call credentials for ALTS to
 be provided alongside the default credentials.
 
-### Background
+## Background
 
 The existing `grpc_google_default_credentials_create` function allows the
 configuration of a single set of call credentials. In some scenarios, a client
@@ -24,11 +22,10 @@ would want to communicate with services that support hard bound credentials over
 ALTS. This proposal addresses the possibility to support this use case on a
 channel initialized with Google's default credentials.
 
-### Proposal
+## Proposal
 
-To maintain backward compatibility with the existing C-API, this proposal
-modifies the function `grpc_google_default_credentials_create` to add a second
-set of call credentials.
+This proposal modifies the function `grpc_google_default_credentials_create` to
+add a second set of call credentials.
 
 ```c
 GRPCAPI grpc_channel_credentials* grpc_google_default_credentials_create(
@@ -39,20 +36,17 @@ GRPCAPI grpc_channel_credentials* grpc_google_default_credentials_create(
 This new function accepts two arguments:
 
 1.  `tls_credentials`: The primary call credentials, consistent with the
-    existing API. Usually. default back to the TLS connection.
+    existing API. Usually, for TLS connections.
 2.  `alts_credentials`: A secondary set of call credentials to be used
     specifically for ALTS connections.
 
 After a secure connection is established, the gRPC runtime identifies the
-channel's transport security type, which indicates whether the underlying
-channel is using a protocol like ALTS or TLS. The runtime then selects the
+connection's transport security type, which indicates whether the underlying
+connection is using a protocol like ALTS or TLS. The runtime then selects the
 appropriate call credentials for that connection. If the determined transport
 security type is ALTS, the provided alts_credentials will be used. For all other
 transport types, the primary call_credentials are used, maintaining the default
 behavior.
-
-This approach was decided upon after initial feedback suggested modifying the
-existing API.
 
 ## Rationale
 
@@ -82,4 +76,3 @@ The implementation for this proposal has been completed and merged into the main
 gRPC repository.
 
 *   Pull Request: grpc/grpc#39770
-*   Key Commit: The changes were integrated via commit ca2e8c9.
