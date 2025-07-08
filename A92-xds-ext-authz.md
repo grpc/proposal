@@ -65,6 +65,13 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
       Used only if `trusted_xds_server` server feature is present in the
       bootstrap config.
       TODO: flesh this out
+    - [credentials_factory_name](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L276)
+      and
+      [config](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L280):
+      These fields are used to configure channel credentials using the
+      same channel credentials registry that we use in the xDS bootstrap
+      file.  If `credentials_factory_name` is set, it takes precedence
+      over `channel_credentials`.
     - Note: All other fields are ignored.
   - [timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L308):
     Specifies the deadline for the RPCs sent to the ext_authz server.
