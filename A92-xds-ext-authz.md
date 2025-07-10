@@ -155,7 +155,7 @@ Note that we will not use the [`disabled`
 field](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L469)
 in the `ExtAuthzPerRoute` proto itself; instead, we will support disabling
 via a more generic mechanism that can apply to any filter.  Specifically,
-we will honor both the `disabled` field in both the [`HttpFilter`
+we will honor the `disabled` field in both the [`HttpFilter`
 message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L1229)
 in the HCM config and in the [`FilterConfig` wrapper
 message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/route/v3/route_components.proto#L2562)
