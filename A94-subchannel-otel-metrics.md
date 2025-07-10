@@ -28,6 +28,7 @@ to client-side per-attempt metrics. This label has xds cluster information.
 *   [A18]: TCP User Timeout
 *   [A61]: IPv4 and IPv6 Dualstack Backend Support
 *   [A66]: OpenTelemetry Metrics
+*   [A74]: xDS Config Tears
 *   [A78]: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 *   [A79]: Non-per-call Metrics Architecture
 *   [A89]: Backend Service Metric Label
@@ -37,6 +38,7 @@ to client-side per-attempt metrics. This label has xds cluster information.
 [A18]: A18-tcp-user-timeout.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
 [A66]: A66-otel-stats.md
+[A74]: A74-xds-config-tears.md
 [A78]: A78-grpc-metrics-wrr-pf-xds.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A89]: A89-backend-service-metric-label.md
@@ -72,10 +74,12 @@ grpc.lb.locality        | Optional    | The locality to which the traffic is bei
 grpc.disconnect_error   | Optional    | Reason for disconnection.
 grpc.security_level     | Optional    | Denotes the security level of the connection. Allowed values - "none", "integrity_only" and "privacy_and_integrity".
 
-The resolver attributes for the `grpc.lb.backend_service` and `grpc.lb.locality`
-labels (defined in [A89] and [A78] respectively) will be passed into the
-subchannel. This implies that the subchannel will be recreated when these
-attributes change.
+The subchannel needs to be passed attributes with the values for the
+`grpc.lb.backend_service` and `grpc.lb.locality` labels (defined in [A89] and
+[A78] respectively). This implies that the subchannel will be recreated when
+these attributes change. Since currently, only xDS is using these labels, the
+attributes will be set for each endpoint by cds (post-[A74]) or
+xds_cluster_resolver (pre-[A74]) LB policies.
 
 List of allowed values for `grpc.disconnect_error` -
 
