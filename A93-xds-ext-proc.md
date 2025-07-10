@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-03-13
+* Last updated: 2025-07-10
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -117,15 +117,18 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
   and it must have a positive value.
 - [mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L225):
-  TODO: Figure out how these rules apply to gRPC.
+  Optional.  Inside of it:
+  - [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70)
+  - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75)
+  - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79)
+  - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87)
+  - allow_all_routing, disallow_system, allow_envoy: These fields will be ignored.
 - [max_message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L230):
   If present, the value must obey the restrictions specified in the
   [`google.protobuf.Duration`
   documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
   and it must have a positive value.
-- [forward_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L237):
-  TODO: Which headers do we allow forwarding with or without
-  `trusted_xds_server`?
+- [forward_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L237)
 - [allow_mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L249)
 - [disable_immediate_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L256)
 - [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283):
@@ -149,23 +152,41 @@ The following fields will be ignored by gRPC:
   recomputing the route.  We could consider adding this in the future if we
   have a use-case for it.
 
-We will support the following fields in the per-route config:
+### Filter Configuration Overrides
+
+We will support `typed_per_filter_config` config overrides for this
+filter, as described in [A39].
+
+We will support the following fields in the
+[`ExtProcPerRoute`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L395)
+proto:
 - [overrides](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L406):
   Optional.  Inside of it:
   - [processing_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L414):
     Same as in top-level filter config.
   - [grpc_service](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L431):
     Same as in top-level filter config.
-  - [grpc_initial_metadata](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L444):
-    TODO: Why is this only in the per-route override config?
+  - [grpc_initial_metadata](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L444)
+  - [request_attributes](https://github.com/envoyproxy/envoy/blob/72833beab4fdc87f7fc53ec31ab70fd734581720/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L442)
+    and
+    [response_attributes](https://github.com/envoyproxy/envoy/blob/72833beab4fdc87f7fc53ec31ab70fd734581720/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L447)
+  - [failure_mode_allow](https://github.com/envoyproxy/envoy/blob/72833beab4fdc87f7fc53ec31ab70fd734581720/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L468C29-L468C47)
   - We will ignore the metadata_options field.
 
-TODO: If we need the `disabled` flag, maybe just support that via the
-`FilterConfig.disabled` field in `typed_per_filter_config` instead of
-doing it in an ext_proc-specific way?  Just make sure that the semantics
-are the same -- ext_proc config says "A set of overrides in a more
-specific configuration will override a "disabled" flag set in a
-less-specific one."
+Note that we will not use the [`disabled`
+field](https://github.com/envoyproxy/envoy/blob/72833beab4fdc87f7fc53ec31ab70fd734581720/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L420)
+in the `ExtProcPerRoute` proto itself; instead, we will support disabling
+via a more generic mechanism that can apply to any filter.  Specifically,
+we will honor the `disabled` field in both the [`HttpFilter`
+message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L1229)
+in the HCM config and in the [`FilterConfig` wrapper
+message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/route/v3/route_components.proto#L2562)
+that can be used in `typed_per_filter_config` fields.
+
+Note that the most specific `typed_per_filter_config` will be used.  For
+example, if there is an override config at the virtual host level that
+disables the filter but then another config at the route level that does
+not disable the filter, the filter will be enabled.
 
 ### Communication With the ext_proc Server
 
@@ -235,22 +256,16 @@ as follows:
 
 ### Header Rewriting
 
-TODO: What other restrictions are needed here?
-
-gRPC will support rewriting the `:authority` field only if the
-`trusted_xds_server` server feature is present in the bootstrap config,
-regardless of what the ext_proc server specifies.  TODO: Ignore or fail
-if the server says to rewrite but the server feature is not present?
-
-If the ext_authz server attempts to overwrite the `host` header, that
-change will actually apply to the `:authority` header instead.
-
-Note that gRPC will not support rewriting the `:scheme` or `:method`
-headers, regardless of the value of this field.
+gRPC will not support rewriting the `:scheme`, `:method`, `:path`,
+`:authority`, or `host` headers, regardless of what settings are present
+in the ext_proc filter config. If the server specifies a rewrite for
+one of these headers, that rewrite will be ignored.
 
 ### Temporary environment variable protection
 
-[Name the environment variable(s) used to enable/disable the feature(s) this proposal introduces and their default(s).  Generally, features that are enabled by I/O should include this type of control until they have passed some testing criteria, which should also be detailed here.  This section may be omitted if there are none.]
+Support for the ext_authz filter will be guarded by the
+`GRPC_EXPERIMENTAL_XDS_EXT_PROC` environment variable. This guard will
+be removed once the feature passes interop tests.
 
 ## Rationale
 
@@ -266,8 +281,4 @@ the future.
 
 ## Implementation
 
-[A description of the steps in the implementation, who will do them, and when.  If a particular language is going to get the implementation first, this section should list the proposed order.]
-
-## Open issues (if applicable)
-
-[A discussion of issues relating to this proposal for which the author does not know the solution. This section may be omitted if there are none.]
+Will be implemented in C-core, Java, Go, and Node.
