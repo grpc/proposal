@@ -4,7 +4,7 @@
 *   Approver: Mark Roth (@markdroth)
 *   Status: In Review
 *   Implemented in:
-*   Last updated: 2025-04-02
+*   Last updated: 2025-07-11
 *   Discussion at: https://groups.google.com/g/grpc-io/c/iMdK7r4E5tU
 
 ## Abstract
@@ -78,7 +78,7 @@ The subchannel needs to be passed attributes with the values for the
 `grpc.lb.backend_service` and `grpc.lb.locality` labels (defined in [A89] and
 [A78] respectively). This implies that the subchannel will be recreated when
 these attributes change. Since currently, only xDS is using these labels, the
-attributes will be set for each endpoint by cds (post-[A74]) or
+attributes will be set for each endpoint or address by cds (post-[A74]) or
 xds_cluster_resolver (pre-[A74]) LB policies.
 
 List of allowed values for `grpc.disconnect_error` -
