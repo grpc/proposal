@@ -33,7 +33,7 @@ grpc_tls_certificate_provider_file_watcher_create(
 ```
 
 ### C++
-While the existing C++ API is marked experimental, we don't _want_ to break existing users. Thus, in https://github.com/grpc/grpc/blob/79769b35d04535259592ac1b0a98d65f63203f06/include/grpcpp/security/tls_certificate_provider.h#L109-L112, add a constructor with the `spiffe_bundle_map_path` argument.
+While the existing C++ API is marked experimental, we don't _want_ to break existing users. Thus, in https://github.com/grpc/grpc/blob/79769b35d04535259592ac1b0a98d65f63203f06/include/grpcpp/security/tls_certificate_provider.h#L109-L112, we will add a constructor with the `spiffe_bundle_map_path` argument.
 In order to not break current users, we will make the existing constructors support this by supplying an empty SPIFFE bundle map path.
 ```
 
