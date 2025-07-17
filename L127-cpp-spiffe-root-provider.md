@@ -2,10 +2,10 @@ L127: C++: SPIFFE Bundle Map support in Root Providers
 ----
 * Author(s): gtcooke94
 * Approver: markdroth
-* Status: Draft
+* Status: In Review
 * Implemented in: core, cpp
-* Last updated: 2025-07-15
-* Discussion at: TODO
+* Last updated: 2025-07-17
+* Discussion at: https://groups.google.com/g/grpc-io/c/G47BjLsF4JQ
 
 ## Abstract
 
@@ -51,3 +51,6 @@ FileWatcherCertificateProvider(const std::string& private_key_path,
 
 ### Other Providers
 This proposal _only_ aims to support file-based SPIFFE Bundle Maps via the file watcher providers. The `StaticDataCertificateProvider` structure is left as future work. This will involve broadening the API surface to expose a type for the SPIFFE bundle map.
+
+## Implementation
+PR will be linked when created.
