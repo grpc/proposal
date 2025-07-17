@@ -1,4 +1,4 @@
-L127: Spiffe Bundle Map support in Root Providers
+L127: C++: SPIFFE Bundle Map support in Root Providers
 ----
 * Author(s): gtcooke94
 * Approver: markdroth
@@ -9,14 +9,16 @@ L127: Spiffe Bundle Map support in Root Providers
 
 ## Abstract
 
-The purpose of this proposal is to add public API support for SPIFFE bundle maps in root certificate file watcher providers. [gRFC A87](https://github.com/grpc/proposal/blob/master/A87-mtls-spiffe-support.md) details the broader internals for this support.
+The purpose of this proposal is to add public API support for SPIFFE bundle maps in root certificate file watcher providers. [A87] details the broader internals for this support.
 
 ## Background
 
-gRPC supports SPIFFE bundle maps as root certificate material per [gRFC A87](https://github.com/grpc/proposal/blob/master/A87-mtls-spiffe-support.md). Public APIs to configure these roots is needed.
+gRPC supports SPIFFE bundle maps as root certificate material per [A87]. Public APIs to configure these roots are needed.
 
 ### Related Proposals:
-* [gRFC A87](https://github.com/grpc/proposal/blob/master/A87-mtls-spiffe-support.md)
+* [A87]
+
+[A87]: A87-mtls-spiffe-support.md
 
 ## Proposal
 
@@ -24,7 +26,8 @@ This document proposes to extend the C-Core and C++ APIs as follows:
 
 
 ### C-Core
-C-Core APIs are always subject to change - we will simply add an argument to the existing constructor in https://github.com/grpc/grpc/blob/79769b35d04535259592ac1b0a98d65f63203f06/include/grpc/credentials.h#L663-L666.
+In the C-core API, we will add a new `spiffe_bundle_map_path` parameter to the `grpc_tls_certificate_provider_file_watcher_create()` function, which will now look like this:
+
 ```
 GRPCAPI grpc_tls_certificate_provider*
 grpc_tls_certificate_provider_file_watcher_create(
@@ -32,8 +35,10 @@ grpc_tls_certificate_provider_file_watcher_create(
     const char* root_cert_path, const char* spiffe_bundle_map_path, unsigned int refresh_interval_sec);
 ```
 
+If the `spiffe_bundle_map_path` is set, the `root_cert_path` will be ignored. This holds even in the case where the `spiffe_bundle_map_path` ends up being invalid.
+
 ### C++
-While the existing C++ API is marked experimental, we don't _want_ to break existing users. Thus, in https://github.com/grpc/grpc/blob/79769b35d04535259592ac1b0a98d65f63203f06/include/grpcpp/security/tls_certificate_provider.h#L109-L112, we will add a constructor with the `spiffe_bundle_map_path` argument.
+While the existing C++ API is marked experimental, we don't _want_ to break existing users. Thus, we will add a constructor with the `spiffe_bundle_map_path` argument to the `FileWatcherCertificateProvider`.
 In order to not break current users, we will make the existing constructors support this by supplying an empty SPIFFE bundle map path.
 ```
 
@@ -45,4 +50,4 @@ FileWatcherCertificateProvider(const std::string& private_key_path,
 ```
 
 ### Other Providers
-This proposal _only_ aims to support file-based SPIFFE Bundle Maps via the file watcher providers. The `StaticDataCertificateProvider` structure is left as future work - we do not want to expose our internal SPIFFE utilities.
+This proposal _only_ aims to support file-based SPIFFE Bundle Maps via the file watcher providers. The `StaticDataCertificateProvider` structure is left as future work. This will involve broadening the API surface to expose a type for the SPIFFE bundle map.
