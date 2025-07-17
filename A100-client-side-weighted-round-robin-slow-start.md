@@ -120,7 +120,7 @@ When an endpoint is not in the warmup period, the scale factor is set to 1.0, me
 
 ### Blackout Period vs Slow Start
 
-The WRR load balancing policy will offers two independent mechanisms for handling new endpoints: the blackout period and slow start. These mechanisms can be used independently or in combination, allowing operators to choose the approach that best fits their needs.
+The WRR load balancing policy will offer two independent mechanisms for handling new endpoints: the blackout period and slow start. These mechanisms can be used independently or in combination, allowing operators to choose the approach that best fits their needs.
 
 The blackout period, which defaults to 10 seconds, begins when an endpoint receives its first non-zero load report (tracked by `non_empty_since` timestamp). During this period, the endpoint continues to receive traffic, but instead of using the weights reported by the backend servers, the load balancer uses the mean of all backend-reported weights. This period helps prevent churn in the load balancing decisions when the set of endpoint addresses changes, ensuring that the weights used are based on stable, continuous load reporting.
 
