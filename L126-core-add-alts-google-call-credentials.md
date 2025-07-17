@@ -1,5 +1,5 @@
-# L124: C-core: Support ALTS Hard Bound Call Credentials in Google Default Credentials
---------------------------------------------------------------------------------
+# L126: C-core: Support ALTS Hard Bound Call Credentials in Google Default Credentials
+
 *   Author(s): anniefrchz
 *   Approver: markdroth
 *   Status: In Review
@@ -36,7 +36,7 @@ GRPCAPI grpc_channel_credentials* grpc_google_default_credentials_create(
 This new function accepts two arguments:
 
 1.  `tls_credentials`: The primary call credentials, consistent with the
-    existing API. Usually, for TLS connections.
+    existing API. This is usually used for TLS connections.
 2.  `alts_credentials`: A secondary set of call credentials to be used
     specifically for ALTS connections.
 
