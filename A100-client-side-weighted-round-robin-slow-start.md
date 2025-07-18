@@ -67,9 +67,9 @@ message SlowStartConfig {
   // Once host exits slow start, time_factor and aggression no longer affect its weight.
   google.protobuf.FloatValue aggression = 2;
 
-  // Configures the minimum percentage of origin weight that avoids too small new weight,
-  // which may cause endpoints in slow start mode receive no traffic in slow start window.
-  // If not specified, the default is 10%.
+  // Configures the minimum percentage of the original weight that will be used for an endpoint
+  // in slow start. This helps to avoid a scenario in which endpoints receive no traffic during the
+  // slow start window. Must be between 0 and 100. If not specified, the default is 10%.
   google.protobuf.UInt32Value min_weight_percent = 3;
 }
 ```
@@ -82,7 +82,7 @@ The scale factor is calculated as follows:
 
 ```
 time_factor = max(time_since_ready_in_seconds, 1) / slow_start_window_seconds
-scale = max(min_weight_percent, time_factor ^ (1/aggression))
+scale = max(min_weight_percent/100, time_factor ^ (1/aggression))
 ```
 
 The following image shows how different aggression values affect the scaling factor over time during the slow start window (in milliseconds):
@@ -133,7 +133,7 @@ The independence of these mechanisms allows for more flexible configurations:
 
 It is recommended to keep the blackout period shorter than the slow start period. This is because when the blackout period ends, the endpoint's weight will suddenly change from the mean weight to its actual backend-reported weight. If this weight is significantly higher than the mean (e.g., 2x the mean weight), it could cause a sudden traffic spike that defeats the purpose of gradual traffic increase. By having a longer slow start period, the scaling factor will continue to gradually increase the weight even after the blackout period ends, ensuring a smooth transition to the full backend-reported weight.
 
-When endpoint weights become stale after the `weight_expiration_period`, the load balancer will continue to use the mean weight for load balancing. This is different from the blackout period as it's a response to weight staleness rather than initial endpoint setup. In these cases, since the endpoint weights were previously active, the slow start period is typically not triggered. When new weights arrive after expiration, the endpoint will enter the blackout period again but not the slow start since there was no transition of sub-channel state and no gradullay traffic increase should ideally be expected here.
+When endpoint weights become stale after the `weight_expiration_period`, the load balancer will continue to use the mean weight for load balancing. This is different from the blackout period as it's a response to weight staleness rather than initial endpoint setup. In these cases, since the endpoint weights were previously active, the slow start period is typically not triggered. When new weights arrive after expiration, the endpoint will enter the blackout period again but not the slow start since there was no transition of sub-channel state and no gradual traffic increase should be expected.
 
 These mechanisms can be configured in different ways:
 - Using only blackout period: Ensures stable weight reporting by using mean weights before switching to backend weights
