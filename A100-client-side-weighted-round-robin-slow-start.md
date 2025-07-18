@@ -60,7 +60,7 @@ message SlowStartConfig {
   // By tuning the parameter, it is possible to achieve polynomial or exponential shape of ramp-up curve.
   //
   // During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
-  // ``new_weight = weight * max(min_weight_percent, time_factor ^ (1 / aggression))``,
+  // ``new_weight = weight * max(min_weight_percent / 100, time_factor ^ (1 / aggression))``,
   // where ``time_factor=(time_since_start_seconds / slow_start_time_seconds)``.
   //
   // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
