@@ -116,7 +116,8 @@ using the formula from [gRFC A58][A58]:
 
 $$weight = \dfrac{qps}{utilization + \dfrac{eps}{qps} * error\\_utilization\\_penalty}$$
 
-This base weight represents the endpoint's capacity based on its current performance metrics. When an endpoint enters the
+This base weight represents the endpoint's capacity based on its current performance metrics. When an endpoint enters
+the
 warmup period after being in a non-ready state, its weight will be scaled by a factor that increases non-linearly from
 `min_weight_percent` to 100% over the duration of `slow_start_window`.
 
@@ -250,12 +251,15 @@ The following metric will be exposed to help monitor the slow start behavior:
 - Type: Counter
 - Description: Number of endpoints currently in slow start period
 - Labels:
-  - `grpc.lb.locality`: The locality of the endpoints [gRFC A78][A78]
-  - `grpc.lb.backend_service`: The backend service name [gRFC A89][A89]
-  - `grpc.target`: gRPC channel target [gRFC A66][A66]
+    - `grpc.lb.locality`: The locality of the endpoints [gRFC A78][A78]
+    - `grpc.lb.backend_service`: The backend service name [gRFC A89][A89]
+    - `grpc.target`: gRPC channel target [gRFC A66][A66]
 
 This metric will help operators monitor the number of endpoints currently in slow start mode across different localities
 and backend services.
+
+Please note that this metric will start as experimental and off by default, and we will consider stabilizing it in the
+future.
 
 ## Rationale
 
@@ -311,8 +315,13 @@ The functionality is being implemented in Java. It will be implemented in Go, C+
 Java Implementation: https://github.com/grpc/grpc-java/pull/12200
 
 [Envoy Slow Start Documentation]: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/slow_start
+
 [A58]: A58-client-side-weighted-round-robin-lb-policy.md
+
 [A66]: A66-otel-stats.md
+
 [A78]: A78-grpc-metrics-wrr-pf-xds.md
+
 [A79]: A79-non-per-call-metrics-architecture.md
+
 [A89]: A89-backend-service-metric-label.md
