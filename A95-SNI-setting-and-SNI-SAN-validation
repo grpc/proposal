@@ -12,13 +12,19 @@ This proposal describes setting S
 
 ### Background
 
-During Tls handshake, the server presents its certificate to the client for authentication. 
+During Tls handshake, the server presents its certificate to the client for authentication. For servers
+serving multiple domains, the client needs to indicate which domain it is requesting, so that the server
+can present the certificate is has for that domain. The client does this at the time of Tls handshaking
+via Server Name Indication (SNI). When using `XdsChannelCredentials` for a channel, the gRPC client needs
+to be configured by the xDS server with what value to send for SNI and the gRPC client should use it for
+the Tls handshake.
+
 In [A29][A29] for TLS security in xDS-managed connections, it
 proposed that the `SNI` field from [UpstreamTlsContext.SNI][UTC_SNI]
 would be ignored. In proposal seeks to start using this and other fields
 for setting the SNI by the gRPC client.
 
-When using `XdsCredentials` for the transport, hostname validation
+When using `XdsChannelCredentials` for the transport, hostname validation
 is turned off and instead SAN matching is performed against [UpstreamTlsContext.match_subject_alt_names][match_subject_alt_names].
 This proposal adds checking of SAN against the SNI provided by the client as well.
 
