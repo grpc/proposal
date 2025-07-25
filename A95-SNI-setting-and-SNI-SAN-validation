@@ -1,15 +1,26 @@
 ### Background
-For an overview of securing connections in the envoy proxy using SNI 
-and SAN validation, read [envoy-SNI]. gRPC will implement the same
-behavior.
 
+In [A29][A29] for TLS security in xDS-managed connections, it
+proposed that the `SNI` field from [UpstreamTlsContext.SNI][UTC_SNI]
+would be ignored and [DownstreamTlsContext.require_sni][DTC_require-SNI] would 
+cause the LDS update to fail. In proposal changes these, and also starts
+using certain other related fields for securing TLS
+connections via xDS.
+
+For an overview of securing connections in the envoy proxy using SNI 
+and SAN validation, read [envoy-SNI].
+
+[UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
+[DTC_require-SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L115
+[A29]: A29-xds-tls-security.md
 [envoy-SNI]: https://www.envoyproxy.io/docs/envoy/latest/_sources/start/quick-start/securing.rst.txt
 
-### Summary of changes
+## Proposal
+This proposal has two parts:
 * Setting SNI
 xDS-managed gRPC clients will set SNI for the Tls handshake for 
 Tls connections using the fields from [UpstreamTlsContext][UTC]
-set in the CDS resource.
+in a CDS update.
 
 1. If [UpstreamTlsContext][UTC] specifies the SNI to use, then
 it will be used.
@@ -30,4 +41,11 @@ gRPC client will replace any Subject Alternative Name (SAN)
 validations with a validation for a DNS SAN matching the SNI value 
 sent.
 
+### Related Proposals:
+* [gRFC A29: xDS-Based Security for gRPC Clients and Servers][A29]
+* [gRFC A81: xDS Authority Rewriting][A81]
 
+[A29]: A29-xds-tls-security.md
+[A81]: A81-xds-authority-rewriting.md
+
+### xds_cluster_impl LB Policy Changes
