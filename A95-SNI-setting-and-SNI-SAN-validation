@@ -1,0 +1,33 @@
+### Background
+For an overview of securing connections in the envoy proxy using SNI 
+and SAN validation, read [envoy-SNI]. gRPC will implement the same
+behavior.
+
+[envoy-SNI]: https://www.envoyproxy.io/docs/envoy/latest/_sources/start/quick-start/securing.rst.txt
+
+### Summary of changes
+* Setting SNI
+xDS-managed gRPC clients will set SNI for the Tls handshake for 
+Tls connections using the fields from [UpstreamTlsContext][UTC]
+set in the CDS resource.
+
+1. If [UpstreamTlsContext][UTC] specifies the SNI to use, then
+it will be used.
+
+2. If [UpstreamTlsContext][UTC] specifies `auto_host_sni`, then
+SNI will be set to the hostname, which is either the logical
+DNS name for DNS clusters or the endponit hostname for EDS
+clusters, as in the case of the hostname useed for authority
+rewriting [Ar 81-hostname][A81-hostname].
+
+[UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
+[A81-hostname]: https://github.com/grpc/proposal/blob/4f833c5774e71e94534f72b94ee1b9763ec58516/A81-xds-authority-rewriting.md?plain=1#L85
+
+* Server SAN validation against SNI used
+
+If `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC] 
+gRPC client will replace any Subject Alternative Name (SAN) 
+validations with a validation for a DNS SAN matching the SNI value 
+sent.
+
+
