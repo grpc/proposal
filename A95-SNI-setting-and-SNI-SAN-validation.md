@@ -8,7 +8,8 @@ A95: xDS-Based setting SNI and server certificate SAN validation
 
 ## Abstract
 
-This proposal describes setting S
+gRPC will add support for setting Server Name Indication (SNI) and validation of server certificate's
+Subject Alternative Names (SANs) aginst the SNI that was used.
 
 ### Background
 
