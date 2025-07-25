@@ -97,12 +97,12 @@ creating the `SslEngine` for the transport.
 The server certificate validation described in [A29 SAN matching][A29_SAN-matching]
 matches the Subject Alternative Names specified in the server certificate against 
 [`match_subject_alt_names`][match_subject_alt_names] in `CertificateValidationContext`.
-When `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC], it will
-take precedence, and matching will be performed against the SNI that was used by the
+When `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC], independent of
+the above validation,  matching will be performed against the SNI that was used by the
 client, and will be made available to the code performing SAN validation in a
-language dependent way, for example in Java, it is the `X509TrustManager` that 
-performs the SAN validation and is created by the protocol negotiating code, that
-will be made available the SNI value to check against, by the `SslContextProvider`.
+language dependent way, for example in Java, the SNI used will be set in the 
+`XdsX509TrustManager` that performs the SAN validation and is set in the `SslContext` 
+used for the handshake.
 
 [A29_SAN-matching]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#server-authorization-aka-subject-alt-name-checks
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
