@@ -42,7 +42,7 @@ This proposal has two parts:
 * Setting SNI
 xDS-managed gRPC clients will set SNI for the Tls handshake for 
 Tls connections using the fields from [UpstreamTlsContext][UTC]
-in a CDS update.
+in the CDS update.
 
 1. If [UpstreamTlsContext][UTC] specifies the SNI to use, then
 it will be used.
@@ -59,8 +59,7 @@ rewriting [Ar 81-hostname][A81-hostname].
 * Server SAN validation against SNI used
 
 If `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC] 
-gRPC client will replace any Subject Alternative Name (SAN) 
-validations with a validation for a DNS SAN matching the SNI value 
+gRPC client will perform validation for a DNS SAN matching the SNI value 
 sent.
 
 ### Related Proposals:
@@ -97,9 +96,10 @@ creating the `SslEngine` for the transport.
 The server certificate validation described in [A29 SAN matching][A29_SAN-matching]
 matches the Subject Alternative Names specified in the server certificate against 
 [`match_subject_alt_names`][match_subject_alt_names] in `CertificateValidationContext`.
-When `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC], independent of
-the above validation,  matching will be performed against the SNI that was used by the
-client, and will be made available to the code performing SAN validation in a
+If `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC], matching will be 
+performed against the SNI that was used by the client, and this validation will replace
+the [`match_subject_alt_names`][match_subject_alt_names] if set. The SNI to check 
+aggainst will be made available to the code performing SAN validation in a
 language dependent way, for example in Java, the SNI used will be set in the 
 `XdsX509TrustManager` that performs the SAN validation and is set in the `SslContext` 
 used for the handshake.
@@ -108,6 +108,6 @@ used for the handshake.
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 
-### Temporary environment variable protection
+#### Temporary environment variable protection
 Setting SNI and performing the SAN validation against SNI will be guarded by the `GRPC_EXPERIMENTAL_XDS_SNI`
 env var. The env var guard will be removed once the feature passes interop tests.
