@@ -102,7 +102,8 @@ the [`match_subject_alt_names`][match_subject_alt_names] if set. The SNI to chec
 aggainst will be made available to the code performing SAN validation in a
 language dependent way, for example in Java, the SNI used will be set in the 
 `XdsX509TrustManager` that performs the SAN validation and is set in the `SslContext` 
-used for the handshake.
+used for the handshake, and this SNI will be passed on from the `SslContextProvider`
+to the `XdsX509TrustManager` constructor.
 
 [A29_SAN-matching]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#server-authorization-aka-subject-alt-name-checks
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
