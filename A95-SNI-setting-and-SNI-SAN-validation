@@ -2,13 +2,13 @@
 
 In [A29][A29] for TLS security in xDS-managed connections, it
 proposed that the `SNI` field from [UpstreamTlsContext.SNI][UTC_SNI]
-would be ignored and [DownstreamTlsContext.require_sni][DTC_require-SNI] would 
-cause the LDS update to fail. In proposal changes these, and also starts
-using certain other related fields for securing TLS
-connections via xDS.
+would be ignored and [DownstreamTlsContext.require_sni][DTC_require-SNI] 
+would cause the LDS update to fail. In proposal changes these, 
+and also starts using certain other related fields for securing 
+TLS connections via xDS.
 
 For an overview of securing connections in the envoy proxy using SNI 
-and SAN validation, read [envoy-SNI].
+and SAN validation, see [envoy-SNI].
 
 [UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
 [DTC_require-SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L115
@@ -49,3 +49,24 @@ sent.
 [A81]: A81-xds-authority-rewriting.md
 
 ### xds_cluster_impl LB Policy Changes
+#### Setting SNI
+As mentioned in [A29 implementation details][A29_impl-details] the
+`UpstreamTlsContext` is either passed down to child policies via
+channel arguments or is put in sub-channel attribute wrapped in a
+`SslContextProvider`, depending on the language. This mechanism
+will be augmented in the ClusterImpl LB policy to also add the
+information about SNI if any that needs to be used during the 
+Tls handshake. To make this decision, the the LB policy will
+make use of [UpstreamTlsContext.SNI][UTC_SNI] and the hostname
+from `CdsUpdate` that is passed down by the Cds LB policy to the
+ClusterImpl LB policy. In a language implementation dependent
+way, this SNI value to set will be passed on to the Tls handling
+code. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` 
+that is made available the `SslContext` dynamically constructed 
+based on the cert store to use as indicated by `UpstreamTlsContext`. 
+This `ProtocolNegotiators.ClientTlsHandler` will also be handed
+over the SNI value by the `SslContextProvider` to use when 
+creating the `SslEngine` for the transport.
+
+[A29_impl-details]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#implementation-details
+[UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
