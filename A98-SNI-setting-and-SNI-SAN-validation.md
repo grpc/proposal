@@ -87,13 +87,18 @@ will have to move from the LB policy's accepting addresses to the LB policy
 helper creating subchannel when invoed by the child LB policy. The `UpstreamTlsContext.SNI`
 would already be available to this provider from the parsed Cluster resource. 
 
+##### Performance optimization
+If several or all of the endpoints in a cluster have the same hostname, then 
+the corresponding Ssl provider instances all hold the same information, and this
+can lead to too many unnecessary objects created when not really necessary. To
+avoid this, the LB helper will maintain a map of hostname to Ssl provider instances
+and reuse the same instance if the hostname to use is the same.
+
 #### Tls handshake time changes
 In a language implementation dependent way, this SNI value to set will be passed on to the Tls handling
-code from the Tls context provider set as a subchannel attribute. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` 
-that is made available the `SslContext` dynamically constructed 
-based on the cert store to use as indicated by `UpstreamTlsContext`. 
-The SNI value to use in the `SslContextProvider` will be made
-available to the `ProtocolNegotiators.ClientTlsHandler` to use when 
+code from the Tls context provider set as a subchannel attribute. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` that is made available the `SslContext` dynamically constructed 
+based on the cert store to use as indicated by `UpstreamTlsContext`. The SNI value to use from the 
+`SslContextProvider` will be made available to the `ProtocolNegotiators.ClientTlsHandler` to use when 
 creating the `SslEngine` for the transport.
 
 [A29_impl-details]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#implementation-details
