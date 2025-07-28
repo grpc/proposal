@@ -76,7 +76,7 @@ As mentioned in [A29 implementation details][A29_impl-details] the
 channel arguments or is put in sub-channel attribute wrapped in a
 `SslContextProvider`, depending on the language. So far the same
 information has been used for creating the Ssl connection for all
-the subchannels in the channel so it sufficed to have a single instance of
+the subchannels in the cluster so it sufficed to have a single instance of
 the provider of this Tls/Ssl context, instantiated by the LB policy
 and set in the ClusterImpl LB policy helper, which then set this
 provider object as an address attribute of all the subchannels created
@@ -85,21 +85,9 @@ of the provider needs to be created for each subchannel, augmented with
 the hostname to use for the subchannel. So the creation of this provider
 will have to move from the LB policy's accepting addresses to the LB policy
 helper creating subchannel when invoed by the child LB policy. The `UpstreamTlsContext.SNI`
-if any, is either already avaiiable to the provider via the TlsContext, or if 
-it doesn't hold the whole object in a langguage implementation, it will need to 
-have an additional field to hold the SNI to use for all the endpoints in the cluster.
-
-1. 
-
-This mechanism
-will be augmented in the ClusterImpl LB policy to also add the
-information about SNI if any that needs to be used during the 
-Tls handshake. To make this decision, the the LB policy will
-make use of [UpstreamTlsContext.SNI][UTC_SNI] and the hostname
-from `CdsUpdate` that is passed down by the Cds LB policy to the
-ClusterImpl LB policy. In a language implementation dependent
-way, this SNI value to set will be passed on to the Tls handling
-code. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` 
+would already be available to this provider from the parsed Cluster resource. 
+In a language implementation dependent way, this SNI value to set will be passed on to the Tls handling
+code from this Tls context provider. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` 
 that is made available the `SslContext` dynamically constructed 
 based on the cert store to use as indicated by `UpstreamTlsContext`. 
 The SNI value to use in the `SslContextProvider` will be made
