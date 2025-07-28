@@ -48,6 +48,20 @@ security type is ALTS, the provided alts_credentials will be used. For all other
 transport types, the primary call_credentials are used, maintaining the default
 behavior.
 
+Additionally, external customers will de able to create GoogleDefaultCredentials
+by setting a GoogleDefaultCredentialsOptions value into their standard call.
+For this addition, the proposed struct `GoogleDefaultCredentialsOptions` will hold
+a boolean that will be default to false. Callers of the GoogleDefaultCredentials()
+API will be able to set use_alts to false value, if required to indicate the
+request for the underlying bound token call credentials.
+
+```c
+struct GoogleDefaultCredentialsOptions {
+  bool use_alts = false;
+};
+```
+
+
 ## Rationale
 
 The primary motivation for this change is to enable seamless support for hybrid
