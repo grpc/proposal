@@ -79,8 +79,15 @@ information has been used for creating the Ssl connection for all
 the subchannels in the channel so it sufficed to have a single instance of
 the provider of this Tls/Ssl context, instantiated by the LB policy
 and set in the ClusterImpl LB policy helper, which then set this
-provider object as an address attribute of the subchannels created
-by this helper. 
+provider object as an address attribute of all the subchannels created
+by this helper. For setting the SNI to the hostname, a separate instance
+of the provider needs to be created for each subchannel, augmented with
+the hostname to use for the subchannel. So the creation of this provider
+will have to move from the LB policy's accepting addresses to the LB policy
+helper creating subchannel when invoed by the child LB policy. The `UpstreamTlsContext.SNI`
+if any, is either already avaiiable to the provider via the TlsContext, or if 
+it doesn't hold the whole object in a langguage implementation, it will need to 
+have an additional field to hold the SNI to use for all the endpoints in the cluster.
 
 1. 
 
