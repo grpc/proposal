@@ -74,7 +74,15 @@ sent.
 As mentioned in [A29 implementation details][A29_impl-details] the
 `UpstreamTlsContext` is either passed down to child policies via
 channel arguments or is put in sub-channel attribute wrapped in a
-`SslContextProvider`, depending on the language. This mechanism
+`SslContextProvider`, depending on the language. So far the same
+information has been used for creating the Ssl connection for all
+the subchannels in the channel so there was a single instance of
+the provider of this Tls/Ssl context, instantiated by the LB policy
+and made available as a subchannel attribute to b
+
+1. 
+
+This mechanism
 will be augmented in the ClusterImpl LB policy to also add the
 information about SNI if any that needs to be used during the 
 Tls handshake. To make this decision, the the LB policy will
