@@ -69,8 +69,8 @@ sent.
 [A29]: A29-xds-tls-security.md
 [A81]: A81-xds-authority-rewriting.md
 
-### xds_cluster_impl LB Policy Changes
-#### Setting SNI
+### Setting SNI
+#### xds_cluster_impl LB Policy Changes
 As mentioned in [A29 implementation details][A29_impl-details] the
 `UpstreamTlsContext` is either passed down to child policies via
 channel arguments or is put in sub-channel attribute wrapped in a
@@ -86,8 +86,10 @@ the hostname to use for the subchannel. So the creation of this provider
 will have to move from the LB policy's accepting addresses to the LB policy
 helper creating subchannel when invoed by the child LB policy. The `UpstreamTlsContext.SNI`
 would already be available to this provider from the parsed Cluster resource. 
+
+#### Tls handshake time changes
 In a language implementation dependent way, this SNI value to set will be passed on to the Tls handling
-code from this Tls context provider. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` 
+code from the Tls context provider set as a subchannel attribute. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` 
 that is made available the `SslContext` dynamically constructed 
 based on the cert store to use as indicated by `UpstreamTlsContext`. 
 The SNI value to use in the `SslContextProvider` will be made
@@ -97,7 +99,7 @@ creating the `SslEngine` for the transport.
 [A29_impl-details]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#implementation-details
 [UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
 
-#### SAN SNI validation
+### SAN SNI validation
 The server certificate validation described in [A29 SAN matching][A29_SAN-matching]
 matches the Subject Alternative Names specified in the server certificate against 
 [`match_subject_alt_names`][match_subject_alt_names] in `CertificateValidationContext`.
@@ -114,6 +116,9 @@ to the `XdsX509TrustManager` constructor.
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 
-#### Temporary environment variable protection
+#### Behavior when SNI is not indicated in UpstreamTlsContext
+When `UpstreamTlsContext` has neither of `SNI` and `auto_host_sni` values set, the current behavior will continue, i.e. SNI will be set to the xds hostname from `GrpcRoute`.
+
+### Temporary environment variable protection
 Setting SNI and performing the SAN validation against SNI will be guarded by the `GRPC_EXPERIMENTAL_XDS_SNI`
 env var. The env var guard will be removed once the feature passes interop tests.
