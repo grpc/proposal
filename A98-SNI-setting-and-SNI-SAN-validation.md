@@ -76,9 +76,11 @@ As mentioned in [A29 implementation details][A29_impl-details] the
 channel arguments or is put in sub-channel attribute wrapped in a
 `SslContextProvider`, depending on the language. So far the same
 information has been used for creating the Ssl connection for all
-the subchannels in the channel so there was a single instance of
+the subchannels in the channel so it sufficed to have a single instance of
 the provider of this Tls/Ssl context, instantiated by the LB policy
-and made available as a subchannel attribute to b
+and set in the ClusterImpl LB policy helper, which then set this
+provider object as an address attribute of the subchannels created
+by this helper. 
 
 1. 
 
