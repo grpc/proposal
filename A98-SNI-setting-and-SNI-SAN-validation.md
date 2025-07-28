@@ -4,7 +4,7 @@ A98: xDS-Based setting SNI and server certificate SAN validation
 * Approver: [Eric Anderson](https://github.com/ejona86)
 * Status: Draft
 * Implemented in:
-* Last updated: 2025-07-25
+* Last updated: 2025-07-28
 
 ## Abstract
 
