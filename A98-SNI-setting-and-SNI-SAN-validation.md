@@ -87,12 +87,12 @@ will have to move from the LB policy's accepting addresses to the LB policy
 helper creating subchannel when invoed by the child LB policy. The `UpstreamTlsContext.SNI`
 would already be available to this provider from the parsed Cluster resource. 
 
-##### Performance optimization
+##### Caching
 If several or all of the endpoints in a cluster have the same hostname, then 
 the corresponding Ssl provider instances all hold the same information, and this
 can lead to too many unnecessary objects created when not really necessary. To
-avoid this, the LB helper will maintain a map of hostname to Ssl provider instances
-and reuse the same instance if the hostname to use is the same.
+avoid this, the LB helper will maintain a map of hostname to `SslContextProviderSupplier`
+instancesand reuse the same instance if the hostname to use is the same.
 
 #### Tls handshake time changes
 In a language implementation dependent way, this SNI value to set will be passed on to the Tls handling
