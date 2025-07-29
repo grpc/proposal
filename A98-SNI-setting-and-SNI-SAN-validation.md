@@ -74,7 +74,7 @@ sent.
 As mentioned in [A29 implementation details][A29_impl-details] the
 `UpstreamTlsContext` is either passed down to child policies via
 channel arguments or is put in sub-channel attribute wrapped in a
-`SslContextProvider`, depending on the language. So far the same
+`SslContextProviderSupplier`, depending on the language. So far the same
 information has been used for creating the Ssl connection for all
 the subchannels in the cluster so it sufficed to have a single instance of
 the provider of this Tls/Ssl context, instantiated by the LB policy
@@ -98,7 +98,7 @@ and reuse the same instance if the hostname to use is the same.
 In a language implementation dependent way, this SNI value to set will be passed on to the Tls handling
 code from the Tls context provider set as a subchannel attribute. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` that is made available the `SslContext` dynamically constructed 
 based on the cert store to use as indicated by `UpstreamTlsContext`. The SNI value to use from the 
-`SslContextProvider` will be made available to the `ProtocolNegotiators.ClientTlsHandler` to use when 
+`SslContextProviderSupplier` will be made available to the `ProtocolNegotiators.ClientTlsHandler` to use when 
 creating the `SslEngine` for the transport.
 
 [A29_impl-details]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#implementation-details
@@ -110,12 +110,18 @@ matches the Subject Alternative Names specified in the server certificate agains
 [`match_subject_alt_names`][match_subject_alt_names] in `CertificateValidationContext`.
 If `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC], matching will be 
 performed against the SNI that was used by the client, and this validation will replace
-the [`match_subject_alt_names`][match_subject_alt_names] if set. The SNI to check 
-aggainst will be made available to the code performing SAN validation in a
-language dependent way, for example in Java, the SNI used will be set in the 
-`XdsX509TrustManager` that performs the SAN validation and is set in the `SslContext` 
-used for the handshake, and this SNI will be passed on from the `SslContextProvider`
-to the `XdsX509TrustManager` constructor.
+the [`match_subject_alt_names`][match_subject_alt_names] if set. This verification occurs
+in the TrustManager of the SslContext which is created using the cert store indicated by 
+`CertificateValidationContext` in `UpstreamTlsContext` which is either a managed cert store
+or the system root cert store. 
+
+#### Caching for the SslContext 
+The `SslContextProviderSupplier` creates a provider for the 
+client `SslContext` and today maintains a cache of `UpstreamTlsContext` to the client `SslContext`
+provider instances. For the SNI requirement, the `TrustManager` in the `SslContext` needs to 
+be aware of the SNI to validate the SAN against, so a different `TrustManager` instance needs 
+to be created for each SNI to use for the same `UpstreamTlsContext`, so this cache's key will 
+need to be enhanced to be <UpstreamTlsContext, String> to hold the SNI as well.
 
 [A29_SAN-matching]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#server-authorization-aka-subject-alt-name-checks
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
