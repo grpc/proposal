@@ -116,12 +116,15 @@ in the TrustManager of the SslContext which is created using the cert store indi
 or the system root cert store. 
 
 #### Caching for the SslContext 
-The `SslContextProviderSupplier` creates a provider for the 
-client `SslContext` and today maintains a cache of `UpstreamTlsContext` to the client `SslContext`
-provider instances. For the SNI requirement, the `TrustManager` in the `SslContext` needs to 
+The `SslContextProviderSupplier` (named so because it supplies both client and server
+SslContext providers) creates a provider for the client `SslContext` and today 
+maintains a cache of `UpstreamTlsContext` to the client `SslContext` provider instances. 
+For the SNI requirement, the `TrustManager` in the `SslContext` needs to 
 be aware of the SNI to validate the SAN against, so a different `TrustManager` instance needs 
 to be created for each SNI to use for the same `UpstreamTlsContext`, so this cache's key will 
-need to be enhanced to be <UpstreamTlsContext, String> to hold the SNI as well.
+need to be enhanced to be <UpstreamTlsContext, String> to hold the SNI as well, and the client
+`SslContext` provider for a particular key will create a `TrustManager` instance that takes the 
+SNI to validate the SANs against and set it in the `SslContext` it provides.
 
 [A29_SAN-matching]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#server-authorization-aka-subject-alt-name-checks
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
