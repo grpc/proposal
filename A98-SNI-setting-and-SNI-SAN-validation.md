@@ -70,35 +70,19 @@ sent.
 [A81]: A81-xds-authority-rewriting.md
 
 ### Setting SNI
-#### xds_cluster_impl LB Policy Changes
+#### Tls handshake time changes
 As mentioned in [A29 implementation details][A29_impl-details] the
 `UpstreamTlsContext` is either passed down to child policies via
 channel arguments or is put in sub-channel attribute wrapped in a
-`SslContextProviderSupplier`, depending on the language. So far the same
-information has been used for creating the Ssl connection for all
-the subchannels in the cluster so it sufficed to have a single instance of
-the provider of this Tls/Ssl context, instantiated by the LB policy
-and set in the ClusterImpl LB policy helper, which then set this
-provider object as an address attribute of all the subchannels created
-by this helper. For setting the SNI to the hostname, a separate instance
-of the provider needs to be created for each subchannel, augmented with
-the hostname to use for the subchannel. So the creation of this provider
-will have to move from the LB policy's accepting addresses to the LB policy
-helper creating subchannel when invoed by the child LB policy. The `UpstreamTlsContext.SNI`
-would already be available to this provider from the parsed Cluster resource. 
-
-##### Caching
-If several or all of the endpoints in a cluster have the same hostname, then 
-the corresponding Ssl provider instances all hold the same information, and this
-can lead to too many unnecessary objects created when not really necessary. To
-avoid this, the LB helper will maintain a map of hostname to `SslContextProviderSupplier`
-instancesand reuse the same instance if the hostname to use is the same.
-
-#### Tls handshake time changes
-In a language implementation dependent way, this SNI value to set will be passed on to the Tls handling
-code from the Tls context provider set as a subchannel attribute. For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` that is made available the `SslContext` dynamically constructed 
-based on the cert store to use as indicated by `UpstreamTlsContext`. The SNI value to use from the 
-`SslContextProviderSupplier` will be made available to the `ProtocolNegotiators.ClientTlsHandler` to use when 
+`SslContextProviderSupplier`, depending on the language. The `UpstreamTlsContext.SNI`
+would already be available to this provider supplier  from the parsed Cluster resource.
+At the time of Tls protocol negotiation, when this provider supplier is 
+invoked to set the SslContext, the hostname from the channel attributes
+also will be passed, to determine the SNI to be set for the Tls handshake.
+For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` that is 
+made available the `SslContext` dynamically constructed  based on the cert store to use 
+as indicated by `UpstreamTlsContext`. The SNI value to use from the `SslContextProviderSupplier` 
+will be made available to the `ProtocolNegotiators.ClientTlsHandler` to use when 
 creating the `SslEngine` for the transport.
 
 [A29_impl-details]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#implementation-details
