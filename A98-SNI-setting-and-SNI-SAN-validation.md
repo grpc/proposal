@@ -20,47 +20,45 @@ via Server Name Indication (SNI). When using `XdsChannelCredentials` for a chann
 to be configured by the xDS server with what value to send for SNI and the gRPC client should use it for
 the Tls handshake.
 
-In [A29][A29] for TLS security in xDS-managed connections, it
-proposed that the `SNI` field from [UpstreamTlsContext.SNI][UTC_SNI]
-would be ignored. In proposal seeks to start using this and other fields
-for setting the SNI by the gRPC client.
+In [A29][A29] for TLS security in xDS-managed connections, the `sni` field from [UpstreamTlsContext.sni][UTC_SNI]
+was ignored. 
 
-When using `XdsChannelCredentials` for the transport, hostname validation
-is turned off and instead SAN matching is performed against [UpstreamTlsContext.match_subject_alt_names][match_subject_alt_names].
-This proposal adds checking of SAN against the SNI provided by the client as well.
+When using `XdsChannelCredentials` for the channel, hostname validation
+is turned off and instead SAN matching is performed against [UpstreamTlsContext.match_subject_alt_names][match_subject_alt_names]
+instead of a typical hostname. This proposal adds SAN matching for the same name as the client used for SNI.
 
 For an overview of securing connections in the envoy proxy using SNI 
 and SAN validation, see [envoy-SNI].
 
 [UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
 [A29]: A29-xds-tls-security.md
-[envoy-SNI]: https://www.envoyproxy.io/docs/envoy/latest/_sources/start/quick-start/securing.rst.txt
+[envoy-SNI]: https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/securing
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
 
 ## Proposal
 This proposal has two parts:
 * Setting SNI
-xDS-managed gRPC clients will set SNI for the Tls handshake for 
-Tls connections using the fields from [UpstreamTlsContext][UTC]
-in the CDS update.
+When using `XdsChannelCredentials` for the channel, gRPC clients will set SNI for the Tls handshake for 
+Tls connections using the fields from [UpstreamTlsContext][UTC] in the CDS update.
 
-1. If [UpstreamTlsContext][UTC] specifies the SNI to use, then
+1. If `UpstreamTlsContext.sni` specifies the SNI to use, then
 it will be used.
 
 2. If [UpstreamTlsContext][UTC] specifies `auto_sni_host`, then
 SNI will be set to the hostname, which is either the logical
-DNS name for DNS clusters or the endponit hostname for EDS
-clusters, as in the case of the hostname useed for authority
-rewriting [Ar 81-hostname][A81-hostname].
+DNS name for DNS clusters or the endpoint hostname for EDS
+clusters, as in the case of the hostname used for [authority
+rewriting][A81-hostname].
 
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 [A81-hostname]: https://github.com/grpc/proposal/blob/4f833c5774e71e94534f72b94ee1b9763ec58516/A81-xds-authority-rewriting.md?plain=1#L85
 
 * Server SAN validation against SNI used
 
-If `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC] 
+If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
 gRPC client will perform validation for a DNS SAN matching the SNI value 
-sent.
+sent. The normal matching when using `TlsCredentials' for the channel 
+allows other SAN types, but only the DNS type will be checked here.
 
 ### Related Proposals:
 * [gRFC A29: xDS-Based Security for gRPC Clients and Servers][A29]
