@@ -38,6 +38,7 @@ and SAN validation, see [envoy-SNI].
 ## Proposal
 This proposal has two parts:
 * Setting SNI
+
 When using `XdsChannelCredentials` for the channel, gRPC clients will set SNI for the Tls handshake for 
 Tls connections using the fields from [UpstreamTlsContext][UTC] in the CDS update.
 
