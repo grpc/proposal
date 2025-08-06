@@ -37,15 +37,13 @@ and SAN validation, see [envoy-SNI].
 
 ## Proposal
 This proposal has two parts:
-* Setting SNI
-
-When using `XdsChannelCredentials` for the channel, gRPC clients will set SNI for the Tls handshake for 
+1. Setting SNI: When using `XdsChannelCredentials` for the channel, gRPC clients will set SNI for the Tls handshake for 
 Tls connections using the fields from [UpstreamTlsContext][UTC] in the CDS update.
 
-1. If `UpstreamTlsContext.sni` specifies the SNI to use, then
+    i. If `UpstreamTlsContext.sni` specifies the SNI to use, then
 it will be used.
 
-2. If [UpstreamTlsContext][UTC] specifies `auto_sni_host`, then
+    ii. If [UpstreamTlsContext][UTC] specifies `auto_sni_host`, then
 SNI will be set to the hostname, which is either the logical
 DNS name for DNS clusters or the endpoint hostname for EDS
 clusters, as in the case of the hostname used for [authority
@@ -54,9 +52,7 @@ rewriting][A81-hostname].
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 [A81-hostname]: https://github.com/grpc/proposal/blob/4f833c5774e71e94534f72b94ee1b9763ec58516/A81-xds-authority-rewriting.md?plain=1#L85
 
-* Server SAN validation against SNI used
-
-If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
+2. Server SAN validation against SNI used: If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
 gRPC client will perform validation for a DNS SAN matching the SNI value 
 sent. The normal matching when using `TlsCredentials' for the channel 
 allows other SAN types, but only the DNS type will be checked here.
@@ -76,13 +72,13 @@ channel arguments or is put in sub-channel attribute wrapped in a
 `SslContextProviderSupplier`, depending on the language. The `UpstreamTlsContext.SNI`
 would already be available to this provider supplier  from the parsed Cluster resource.
 At the time of Tls protocol negotiation, when this provider supplier is 
-invoked to set the SslContext, the hostname from the channel attributes
-also will be passed, to determine the SNI to be set for the Tls handshake.
-For example, in Java, there is a `ProtocolNegotiators.ClientTlsHandler` that is 
-made available the `SslContext` dynamically constructed  based on the cert store to use 
-as indicated by `UpstreamTlsContext`. The SNI value to use from the `SslContextProviderSupplier` 
-will be made available to the `ProtocolNegotiators.ClientTlsHandler` to use when 
-creating the `SslEngine` for the transport.
+used to invoked to set the SslContext, the hostname from the channel attributes
+also will be passed now, to determine the SNI to be set for the Tls handshake.
+For example, in Java, at protocol negotiation time the `SslContextProviderSupplier` is given 
+a callback to be invoked with the `SslContext` when the client Ssl Provider instantiated by 
+this supplier has the `SslContext` ready. This callback will now also be passed the SNI
+taken from the subchannel attributes. This value along with the `UpstreamTlsContext` available
+in the `SslContextProviderSupplier` will be used to decide the SNI to be used for the handshake.
 
 [A29_impl-details]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#implementation-details
 [UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
