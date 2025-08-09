@@ -93,7 +93,7 @@ the service is set with an invalid config.
 Examples of invalid service configs:
 
 * Badly Formatted service config
-```
+```js
 "serviceConfig" : {
   "MethodConfig" : {
     "Service // bad format
@@ -101,7 +101,7 @@ Examples of invalid service configs:
 ```
 
 * Fields with invalid values are not allowed
-```
+```js
 "serviceConfig" : {
   "loadBalancingPolicy" : "UnknownPolicy"
 }
@@ -109,10 +109,11 @@ Examples of invalid service configs:
 
 Note that loadBalancingPolicy is deprecated in favor of loadBalancingConfig,
 which provides a list of LB policies with the client selecting the first policy
-it supports. If it doesn’t understand any of the policies, it is treated as
-invalid, and the entire service config is rejected.
+it supports. Any subsequent policies won't affect the validity as long as 
+supported policy is already selected. If it doesn’t understand any of the policies, 
+it is treated as invalid, and the entire service config is rejected. 
 
-```
+```js
 "serviceConfig" : {
   "loadBalancingConfig" : [
     "UnknownPolicy1" : {},
@@ -121,9 +122,21 @@ invalid, and the entire service config is rejected.
 }
 ```
 
+* A Supported but invalid policy (`InvalidPolicy`) is okay if after selected policy (`KnownPolicy`)
+```js
+"serviceConfig" : { 
+  "loadBalancingConfig" : [
+    "UnknownPolicy" : {}, // Unsupported policy will be ignored
+    "KnownPolicy" : {}, // Supported policy will be used
+    // it won't affect, because KnownPolicy is already selected
+    "InvalidPolicy" : {"KnownNumberField": "not a number"} 
+  ]
+}
+```
+
 Examples of valid service configs :
 * Unknown fields are allowed
-```
+```js
 "serviceConfig" : {
   "UnknownField" : "value", // Field is unknown and hence ignored
   "methodConfig" : {}
