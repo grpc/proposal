@@ -53,4 +53,7 @@ FileWatcherCertificateProvider(const std::string& private_key_path,
 This proposal _only_ aims to support file-based SPIFFE Bundle Maps via the file watcher providers. The `StaticDataCertificateProvider` structure is left as future work. This will involve broadening the API surface to expose a type for the SPIFFE bundle map.
 
 ## Implementation
-PR will be linked when created.
+- https://github.com/grpc/grpc/pull/39148
+- https://github.com/grpc/grpc/pull/39445
+- https://github.com/grpc/grpc/pull/39708
+- https://github.com/grpc/grpc/pull/40321
