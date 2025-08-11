@@ -2,9 +2,9 @@ L127: C++: SPIFFE Bundle Map support in Root Providers
 ----
 * Author(s): gtcooke94
 * Approver: markdroth
-* Status: In Review
+* Status: Implemented
 * Implemented in: core, cpp
-* Last updated: 2025-07-17
+* Last updated: 2025-08-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/G47BjLsF4JQ
 
 ## Abstract
