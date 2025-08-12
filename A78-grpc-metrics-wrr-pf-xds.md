@@ -4,9 +4,9 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-09-24
+* Last updated: 2025-07-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
-* Updated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md)
+* Updated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md), [A94: OTel metrics for Subchannels](A94-subchannel-otel-metrics.md)
 
 ## Abstract
 
@@ -103,7 +103,7 @@ The following metrics will be exported:
 | grpc.lb.wrr.endpoint_weight_stale | Counter | {endpoint} | grpc.target, grpc.lb.locality | Number of endpoints from each scheduler update whose latest weight is older than the expiration period. |
 | grpc.lb.wrr.endpoint_weights | Histogram | {weight} | grpc.target, grpc.lb.locality | Weight of each endpoint, recorded on every scheduler update. Endpoints without usable weights will be recorded as weight 0. |
 
-### Pick First LB Policy
+### [Outdated] Pick First LB Policy (Updated by [A94](A94-subchannel-otel-metrics.md))
 
 The Pick First LB policy predates the gRFC process but was updated in
 [A62].  We propose to add the following metrics to it.
