@@ -1,10 +1,11 @@
 ## A94: OTel metrics for Subchannels
 
 *   Author(s): Yash Tibrewal (@yashykt)
-*   Approver: Mark Roth (@markdroth)
-*   Status: In Review
+*   Approver: Mark Roth (@markdroth), Eric Anderson (@ejona86), Doug Fawley
+    (@dfawley)
+*   Status: Ready for Implementation
 *   Implemented in:
-*   Last updated: 2025-07-11
+*   Last updated: 2025-08-12
 *   Discussion at: https://groups.google.com/g/grpc-io/c/iMdK7r4E5tU
 
 ## Abstract
