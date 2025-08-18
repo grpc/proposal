@@ -4,7 +4,7 @@ A56: `priority_experimental` LB policy
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: C-core, Java, Go, Node
-* Last updated: 2025-08-15
+* Last updated: 2025-08-18
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -220,14 +220,15 @@ reuse that data at any time.
 
 Each child will also have a 10-second failover timer that indicates
 that it is currently trying to connect.  While this timer is running,
-the algorithm used to choose a priority (see below) will wait for
-this child to finish attempting to connect before it moves on to the
-next priority.  The timer will be cancelled when the child reports its
-state as `READY`, `IDLE`, or `TRANSIENT_FAILURE`.  If the timer fires
-without being cancelled, it will call the algorithm used to choose a
-priority (see below).  The timer will be started when the child is first
-created.  It will also be started if the child reports `CONNECTING`
-and it has previously reported `READY` or `IDLE` more recently than
+the algorithm used to choose a priority (see below) will wait for this
+child to finish attempting to connect before it moves on to the next
+priority.  The timer will be cancelled when the child reports its state
+as `READY`, `IDLE`, or `TRANSIENT_FAILURE`.  If the timer fires without
+being cancelled, it will call the algorithm used to choose a priority
+(see below).  The timer will be started when the child is first created.
+It will also be started when the child transitions to `CONNECTING` from
+some other state (i.e., ignoring duplicate `CONNECTING` notifications)
+if it has previously reported `READY` or `IDLE` more recently than
 `TRANSIENT_FAILURE`.
 
 ### Configuration Updates
