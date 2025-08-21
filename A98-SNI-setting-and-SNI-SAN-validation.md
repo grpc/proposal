@@ -64,8 +64,7 @@ allows other SAN types, but only the DNS type will be checked here.
 [A29]: A29-xds-tls-security.md
 [A81]: A81-xds-authority-rewriting.md
 
-### Setting SNI
-#### Tls handshake time changes
+### Setting SNI during Tls handshake
 As mentioned in [A29 implementation details][A29_impl-details] the `UpstreamTlsContext` is either 
 passed down to child policies via channel arguments or a similar mechanism, depending on the language, 
 and the SslContext is instantiated using the truststore location indicated by the `UpstreamTlsContext`. 
