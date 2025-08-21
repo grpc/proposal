@@ -54,7 +54,7 @@ it will be used.
 
 2. Server SAN validation against SNI used: If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
 gRPC client will perform validation for a DNS SAN matching the SNI value 
-sent. The normal matching when using `TlsCredentials' for the channel 
+sent. The normal matching when using `TlsCredentials` for the channel 
 allows other SAN types, but only the DNS type will be checked here.
 
 ### Related Proposals:
