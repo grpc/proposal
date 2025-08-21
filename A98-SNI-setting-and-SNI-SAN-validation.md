@@ -110,7 +110,7 @@ SNI to validate the SANs against and set it in the `SslContext` it provides.
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 
 #### Behavior when SNI is not indicated in UpstreamTlsContext
-When `UpstreamTlsContext` has neither of `SNI` and `auto_sni_host` values set, the current behavior will continue, i.e. SNI will be set to the xds hostname from `GrpcRoute`.
+When `UpstreamTlsContext` has neither of `SNI` nor `auto_sni_host` values set, the current behavior will continue, i.e. SNI will be set to the xds hostname from `GrpcRoute`.
 
 ### Temporary environment variable protection
 Setting SNI and performing the SAN validation against SNI will be guarded by the `GRPC_EXPERIMENTAL_XDS_SNI`
