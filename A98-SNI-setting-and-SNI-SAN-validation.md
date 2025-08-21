@@ -110,7 +110,7 @@ need to be enhanced to be <UpstreamTlsContext, String> to hold the SNI as well, 
 `SslContext` provider for a particular key will create a `TrustManager` instance that takes the 
 SNI to validate the SANs against and set it in the `SslContext` it provides.
 
-[A29_SAN-matching]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#server-authorization-aka-subject-alt-name-checks
+[A29_SAN-matching]: A29-xds-tls-security.md#server-authorization-aka-subject-alt-name-checks
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 
