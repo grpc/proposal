@@ -113,6 +113,9 @@ SNI to validate the SANs against and set it in the `SslContext` it provides.
 #### Behavior when SNI is not indicated in UpstreamTlsContext
 When `UpstreamTlsContext` has neither of `SNI` nor `auto_sni_host` values set, the current behavior will continue, i.e. SNI will be set to the xds hostname from `GrpcRoute`.
 
+#### Validation
+The Cds update will be NACKed if `UpstreamTlsContext.sni` exceeds 255 characters, similar to Envoy.
+
 ### Temporary environment variable protection
 Setting SNI and performing the SAN validation against SNI will be guarded by the `GRPC_EXPERIMENTAL_XDS_SNI`
 env var. The env var guard will be removed once the feature passes interop tests.
