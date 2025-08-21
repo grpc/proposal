@@ -144,7 +144,7 @@ and call credentials specified in the map.
 ### Credential Configuration in `GrpcService` Proto
 
 In order to make channel and call credentials more pluggable, we are
-introducing new extension points in `GrpcService`, as show in
+introducing new extension points in `GrpcService`, as shown in
 https://github.com/envoyproxy/envoy/pull/40823.  Specifically, this
 introduces the following new fields:
 
