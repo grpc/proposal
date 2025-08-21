@@ -50,7 +50,7 @@ rewriting][A81-hostname].
 it will be used.
 
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
-[A81-hostname]: https://github.com/grpc/proposal/blob/4f833c5774e71e94534f72b94ee1b9763ec58516/A81-xds-authority-rewriting.md?plain=1#L85
+[A81-hostname]: https://github.com/grpc/proposal/blob/4f833c5774e71e94534f72b94ee1b9763ec58516/A81-xds-authority-rewriting.md#xds-resource-validation
 
 2. Server SAN validation against SNI used: If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
 gRPC client will perform validation for a DNS SAN matching the SNI value 
@@ -66,19 +66,24 @@ allows other SAN types, but only the DNS type will be checked here.
 
 ### Setting SNI
 #### Tls handshake time changes
-As mentioned in [A29 implementation details][A29_impl-details] the
-`UpstreamTlsContext` is either passed down to child policies via
-channel arguments or is put in sub-channel attribute wrapped in a
-`SslContextProviderSupplier`, depending on the language. The `UpstreamTlsContext.SNI`
-would already be available to this provider supplier  from the parsed Cluster resource.
-At the time of Tls protocol negotiation, when this provider supplier is 
-used to invoked to set the SslContext, the hostname from the channel attributes
-also will be passed now, to determine the SNI to be set for the Tls handshake.
-For example, in Java, at protocol negotiation time the `SslContextProviderSupplier` is given 
-a callback to be invoked with the `SslContext` when the client Ssl Provider instantiated by 
-this supplier has the `SslContext` ready. This callback will now also be passed the SNI
-taken from the subchannel attributes. This value along with the `UpstreamTlsContext` available
-in the `SslContextProviderSupplier` will be used to decide the SNI to be used for the handshake.
+As mentioned in [A29 implementation details][A29_impl-details] the `UpstreamTlsContext` is either 
+passed down to child policies via channel arguments or a similar mechanism, depending on the language, 
+and the SslContext is instantiated using the truststore location indicated by the `UpstreamTlsContext`. 
+This SslContext is then used to initiate the Tls handshake for the transport and this is when the SNI is sent
+for the `ClientHello` frame of the handshake. To determine the SNI, we need both the `UpstreamTlsContext` and 
+the hostname for the endpoint. The hostname attribute is already stored in the subchannel wrapper by the 
+xds_cluster_impl policy when its child policy creates a subchannel. Once the `SslContext` is available during the 
+Tls handshake phase of the transport creation (the creation of which depends on the choice of the certificate provider 
+infra to use as indicated by the `UpstreamTlsContext`), the fields from `UpstreamTlsContext` and the hostname 
+from the channel attributes will be used to determine the SNI to set for the handshake.
+
+##### Language specific example
+As an example, in Java, the ClusterImpl LB policy creates the `SslContextProviderSuppler` wrapping the
+`UpstreamTlsContext` and puts it in the subchannel wrapper when its child policy creates a subchannel. At the time of Tls protocol negotiation
+for the subchannel, the hostname from the channel attributes also should be passed to this provider supplier to determine the SNI to be set for 
+the Tls handshake. The hostname will be set in the callback object that is given to the `SslContextProviderSupplier`, to be invoked with the 
+`SslContext` when the client Ssl Provider instantiated by this supplier has the `SslContext` available. This value along with the 
+`UpstreamTlsContext` available in the `SslContextProviderSupplier` will be used to decide the SNI to be used for the handshake.
 
 [A29_impl-details]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#implementation-details
 [UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
