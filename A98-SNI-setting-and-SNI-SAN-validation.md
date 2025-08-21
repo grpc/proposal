@@ -38,16 +38,16 @@ and SAN validation, see [envoy-SNI].
 ## Proposal
 This proposal has two parts:
 1. Setting SNI: When using `XdsChannelCredentials` for the channel, gRPC clients will set SNI for the Tls handshake for 
-Tls connections using the fields from [UpstreamTlsContext][UTC] in the CDS update.
+Tls connections using the fields from [UpstreamTlsContext][UTC] in the CDS update.    
 
-    i. If `UpstreamTlsContext.sni` specifies the SNI to use, then
-it will be used.
-
-    ii. If [UpstreamTlsContext][UTC] specifies `auto_sni_host`, then
+    i. If [UpstreamTlsContext][UTC] specifies `auto_sni_host`, then
 SNI will be set to the hostname, which is either the logical
 DNS name for DNS clusters or the endpoint hostname for EDS
 clusters, as in the case of the hostname used for [authority
 rewriting][A81-hostname].
+
+    ii. If `UpstreamTlsContext.sni` specifies the SNI to use, then
+it will be used.
 
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 [A81-hostname]: https://github.com/grpc/proposal/blob/4f833c5774e71e94534f72b94ee1b9763ec58516/A81-xds-authority-rewriting.md?plain=1#L85
