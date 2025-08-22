@@ -53,20 +53,14 @@ behavior.
 
 The hard-bound call credentials will be created through
 `grpc_google_compute_engine_credentials_create`. This function will have a
-`grpc_google_compute_engine_credentials_options` parameter. By setting the
-appropiate transport protocol in the form of query parameters pairs, the caller
-will be able to obtain ALTS hard-bound credentials instead of the standard
-default call credentials.
+`grpc_google_compute_engine_credentials_options` parameter. The caller will be
+able to obtain ALTS hard-bound credentials instead of the standard default call
+credentials by toggling the corresponding flag use_alts_call_credentials in the
+structure.
 
 ```c
 typedef struct {
-  struct {
-    const char* param;
-    const char* value;
-  } QueryParam;
-
-  const QueryParam* query_params;
-  size_t query_params_count;
+  bool use_alts_call_credentials = false;
 } grpc_google_compute_engine_credentials_options;
 
 GRPCAPI grpc_call_credentials* grpc_google_compute_engine_credentials_create(
