@@ -4,7 +4,7 @@
 *   Approver: markdroth
 *   Status: In Review
 *   Implemented in: C++
-*   Last updated: 2025-07-08
+*   Last updated: 2025-08-22
 *   Discussion at:
     https://groups.google.com/g/grpc-io/c/7rRWghiS95E/m/nENwU3BtCgAJ
 
