@@ -66,7 +66,7 @@ typedef struct {
   } QueryParam;
 
   const QueryParam* query_params;
-  int query_params_count;
+  size_t query_params_count;
 } grpc_google_compute_engine_credentials_options;
 
 GRPCAPI grpc_call_credentials* grpc_google_compute_engine_credentials_create(
