@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-07-10
+* Last updated: 2025-08-21
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -18,21 +18,21 @@ The ext_proc filter provides support for making side-channel call-outs
 to perform filtering/interception.
 
 The ext_proc filter will use the existing infrastructure for xDS HTTP
-filters, described in gRFCs [A39].  We will support this filter on both
+filters, described in gRFC [A39].  We will support this filter on both
 the gRPC client and server side.
 
 Note that this filter will make use of the `allowed_grpc_services` map in
-the bootstrap config, described in [A77].  It will also make use of the
+the bootstrap config, described in [A102].  It will also make use of the
 `trusted_xds_server` server feature introduced in [A81].
 
 ### Related Proposals: 
 * [A39: xDS HTTP Filter Support][A39]
-* [A77: xDS Server-Side Rate Limiting][A77] (pending)
 * [A81: xDS Authority Rewriting][A81]
+* [A102: xDS GrpcService Support][A102] (pending)
 
 [A39]: A39-xds-http-filters.md 
-[A77]: https://github.com/grpc/proposal/pull/414
 [A81]: A81-xds-authority-rewriting.md
+[A102]: https://github.com/grpc/proposal/pull/510
 
 ## Proposal
 
@@ -82,16 +82,7 @@ planes without breaking their ext_proc servers.
 We will support the following fields in the [`ExternalProcessor`
 proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L101):
 - [grpc_service](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L129):
-  This field must be present.  Inside of it:
-  - [google_grpc](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L303):
-    This field must be present.  Inside of it:
-    - [target_uri](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L254):
-      This field must be non-empty and must be a valid target URI.  The
-      value specified here must be present in the `allowed_grpc_services`
-      map in the bootstrap config, which will also determine the credentials
-      to use, as described in [A77].
-    - All other fields are ignored.
-  - All other fields are ignored.
+  This field must be present.  It will be validated as described in [A102].
 - [failure_mode_allow](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L177)
 - [processing_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L181):
   Required.  Inside of it:
