@@ -25,6 +25,8 @@ channel initialized with Google's default credentials.
 
 ## Proposal
 
+### C-Core changes
+
 This proposal modifies the function `grpc_google_default_credentials_create` to
 add a second set of call credentials.
 
@@ -50,12 +52,11 @@ transport types, the primary call_credentials are used, maintaining the default
 behavior.
 
 The hard-bound call credentials will be created through
-`grpc_google_compute_engine_credentials_create`. This function has a reserved
-argument that will allow us to inject a new structure,
-`grpc_google_compute_engine_credentials_options`. By setting the appropiate
-transport protocol in the form of query parameters pairs, the caller will be
-able to obtain ALTS hard-bound credentials instead of the standard default call
-credentials.
+`grpc_google_compute_engine_credentials_create`. This function will have a
+`grpc_google_compute_engine_credentials_options` parameter. By setting the
+appropiate transport protocol in the form of query parameters pairs, the caller
+will be able to obtain ALTS hard-bound credentials instead of the standard
+default call credentials.
 
 ```c
 typedef struct {
@@ -65,6 +66,7 @@ typedef struct {
   } QueryParam;
 
   const QueryParam* query_params;
+  int query_params_count;
 } grpc_google_compute_engine_credentials_options;
 
 GRPCAPI grpc_call_credentials* grpc_google_compute_engine_credentials_create(
@@ -76,8 +78,10 @@ create GoogleDefaultCredentials by setting a GoogleDefaultCredentialsOptions
 value into their standard call. For this addition, the proposed struct
 `GoogleDefaultCredentialsOptions` will hold a boolean that will be default to
 false. Callers of the GoogleDefaultCredentials() API will be able to set
-use_alts to false value, if required to indicate the request for the underlying
-bound token call credentials.
+use_alts_call_credentials to false value, if required to indicate the request
+for the underlying bound token call credentials.
+
+### C++ Changes
 
 ```c++
 struct GoogleDefaultCredentialsOptions {
@@ -88,6 +92,8 @@ std::shared_ptr<ChannelCredentials> GoogleDefaultCredentials(
     const GoogleDefaultCredentialsOptions& options =
         GoogleDefaultCredentialsOptions());
 ```
+
+### Other C-Core languages
 
 Other wrapped languages are not in scope for changes to their public API, and
 further discussion is needed if an implementation is scoped.
