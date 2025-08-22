@@ -214,7 +214,10 @@ When validating a `GrpcService` proto, the following fields will be used:
   - `channel_args`: Ignored.  Not supportable across languages in gRPC.
 - [`timeout`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L308):
   If set, this will be used to set the deadline on RPCs sent to the
-  side-channel service.
+  side-channel service.  The value must obey the restrictions specified in
+  the [`google.protobuf.Duration`
+  documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
+  and it must have a positive value.
 - [`initial_metadata`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L315):
   If present, specifies headers to be added to RPCs sent to the side-channel
   service.  Inside of each entry:
