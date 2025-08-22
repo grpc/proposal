@@ -104,7 +104,6 @@ bootstrap config:
     // supports.  This field is required and must contain at least one
     // channel creds type that the client supports.
     "channel_creds": [
-      // The format is identical to xds_servers.channel_creds.
       {
         "type": <string containing channel cred type>,
         // The "config" field is optional; it may be missing if the
