@@ -73,6 +73,8 @@ GRPCAPI grpc_call_credentials* grpc_google_compute_engine_credentials_create(
     grpc_google_compute_engine_credentials_options* options);
 ```
 
+### C++ Changes
+
 Additionally, external customers for the public C++ library will de able to
 create GoogleDefaultCredentials by setting a GoogleDefaultCredentialsOptions
 value into their standard call. For this addition, the proposed struct
@@ -80,8 +82,6 @@ value into their standard call. For this addition, the proposed struct
 false. Callers of the GoogleDefaultCredentials() API will be able to set
 use_alts_call_credentials to false value, if required to indicate the request
 for the underlying bound token call credentials.
-
-### C++ Changes
 
 ```c++
 struct GoogleDefaultCredentialsOptions {
