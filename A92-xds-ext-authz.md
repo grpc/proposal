@@ -4,42 +4,39 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-07-07
+* Last updated: 2025-08-21
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
 
-We will add support for the xDS ext_authz filter in the gRPC server.
+We will add support for the xDS ext_authz filter in both the gRPC client
+and server.
 
 ## Background
 
-The ext_authz filter provides support for servers making side-channel
-call-outs to perform authorization decisions.
+The ext_authz filter provides support for making side-channel call-outs
+to perform authorization decisions.
 
 The ext_authz filter will use the existing infrastructure for xDS HTTP
-servers in the gRPC server, which was originally introduced in gRFCs [A39]
-and [A36].  This infrastructure has previously been used for the RBAC
-filter, described in [A41], and the rate-limiting filter, described in
-[A77].
+filters, described in [A39]. We will support this filter on both
+the gRPC client and server side.
 
 Note that this filter will make use of the `allowed_grpc_services` map in
-the bootstrap config, described in [A77].  It will also make use of the
+the bootstrap config, described in [A102].  It will also make use of the
 `trusted_xds_server` server feature introduced in [A81].
 
 ### Related Proposals: 
 * [A39: xDS HTTP Filter Support][A39]
 * [A36: xDS-Enabled Servers][A36]
-* [A41: xDS RBAC Support][A41]
-* [A77: xDS Server-Side Rate Limiting][A77] (pending)
 * [A81: xDS Authority Rewriting][A81]
 * [A33: xDS Fault Injection][A33]
+* [A102: xDS GrpcService Support][A102] (pending)
 
 [A36]: A36-xds-for-servers.md
 [A39]: A39-xds-http-filters.md 
-[A41]: A41-xds-rbac.md
-[A77]: https://github.com/grpc/proposal/pull/414
 [A81]: A81-xds-authority-rewriting.md
 [A33]: A33-Fault-Injection.md
+[A102]: https://github.com/grpc/proposal/pull/510
 
 ## Proposal
 
@@ -48,38 +45,7 @@ the bootstrap config, described in [A77].  It will also make use of the
 We will support the following fields in the [`ExtAuthz`
 proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L34):
 - [grpc_service](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L45):
-  This field must be present.  Inside of it:
-  - [google_grpc](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L303):
-    This field must be present.  Inside of it:
-    - [target_uri](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L254):
-      This field must be non-empty and must be a valid target URI.  If
-      the `trusted_xds_server` server feature (see [A81]) is *not* set in
-      the bootstrap config, then the value specified here must be present
-      in the `allowed_grpc_services` map in the bootstrap config, which
-      will also determine the credentials to use, as described in [A77].
-    - [channel_credentials](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L256):
-      Used only if `trusted_xds_server` server feature is present in the
-      bootstrap config.
-      TODO: flesh this out
-    - [call_credentials](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L260):
-      Used only if `trusted_xds_server` server feature is present in the
-      bootstrap config.
-      TODO: flesh this out
-    - [credentials_factory_name](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L276)
-      and
-      [config](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L280):
-      These fields are used to configure channel credentials using the
-      same channel credentials registry that we use in the xDS bootstrap
-      file.  If `credentials_factory_name` is set, it takes precedence
-      over `channel_credentials`.
-    - Note: All other fields are ignored.
-  - [timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/grpc_service.proto#L308):
-    Specifies the deadline for the RPCs sent to the ext_authz server.
-    If unset, there is no deadline.  The value must obey the restrictions
-    specified in the [`google.protobuf.Duration`
-    documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
-    and it must have a positive value.
-  - All other fields are ignored.
+  This field must be present.  It will be handled as described in [A102].
 - [filter_enabled](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L158):
   Optional; if unset, the filter is enabled.  This field will be validated
   the same way as in the fault injection filter (see [A33]).  Within it:
