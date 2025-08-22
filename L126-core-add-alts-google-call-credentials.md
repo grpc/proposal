@@ -5,7 +5,8 @@
 *   Status: In Review
 *   Implemented in: C++
 *   Last updated: 2025-07-08
-*   Discussion at: https://groups.google.com/g/grpc-io/c/7rRWghiS95E/m/nENwU3BtCgAJ
+*   Discussion at:
+    https://groups.google.com/g/grpc-io/c/7rRWghiS95E/m/nENwU3BtCgAJ
 
 ## Abstract
 
@@ -48,19 +49,48 @@ security type is ALTS, the provided alts_credentials will be used. For all other
 transport types, the primary call_credentials are used, maintaining the default
 behavior.
 
-Additionally, external customers will de able to create GoogleDefaultCredentials
-by setting a GoogleDefaultCredentialsOptions value into their standard call.
-For this addition, the proposed struct `GoogleDefaultCredentialsOptions` will hold
-a boolean that will be default to false. Callers of the GoogleDefaultCredentials()
-API will be able to set use_alts to false value, if required to indicate the
-request for the underlying bound token call credentials.
+The hard-bound call credentials will be created through
+`grpc_google_compute_engine_credentials_create`. This function has a reserved
+argument that will allow us to inject a new structure,
+`grpc_google_compute_engine_credentials_options`. By setting the appropiate
+transport protocol in the form of query parameters pairs, the caller will be
+able to obtain ALTS hard-bound credentials instead of the standard default call
+credentials.
 
 ```c
-struct GoogleDefaultCredentialsOptions {
-  bool use_alts = false;
-};
+typedef struct {
+  struct {
+    const char* param;
+    const char* value;
+  } QueryParam;
+
+  const QueryParam* query_params;
+} grpc_google_compute_engine_credentials_options;
+
+GRPCAPI grpc_call_credentials* grpc_google_compute_engine_credentials_create(
+    grpc_google_compute_engine_credentials_options* options);
 ```
 
+Additionally, external customers for the public C++ library will de able to
+create GoogleDefaultCredentials by setting a GoogleDefaultCredentialsOptions
+value into their standard call. For this addition, the proposed struct
+`GoogleDefaultCredentialsOptions` will hold a boolean that will be default to
+false. Callers of the GoogleDefaultCredentials() API will be able to set
+use_alts to false value, if required to indicate the request for the underlying
+bound token call credentials.
+
+```c++
+struct GoogleDefaultCredentialsOptions {
+  bool use_alts_call_credentials = false;
+};
+
+std::shared_ptr<ChannelCredentials> GoogleDefaultCredentials(
+    const GoogleDefaultCredentialsOptions& options =
+        GoogleDefaultCredentialsOptions());
+```
+
+Other wrapped languages are not in scope for changes to their public API, and
+further discussion is needed if an implementation is scoped.
 
 ## Rationale
 
