@@ -82,7 +82,7 @@ the Tls handshake. The hostname will be set in the callback object that is given
 `SslContext` when the client Ssl Provider instantiated by this supplier has the `SslContext` available. This value along with the 
 `UpstreamTlsContext` available in the `SslContextProviderSupplier` will be used to decide the SNI to be used for the handshake.
 
-[A29_impl-details]: https://github.com/grpc/proposal/blob/master/A29-xds-tls-security.md#implementation-details
+[A29_impl-details]: A29-xds-tls-security.md#implementation-details
 [UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
 
 ### SAN SNI validation
