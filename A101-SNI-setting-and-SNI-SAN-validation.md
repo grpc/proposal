@@ -64,15 +64,20 @@ allows other SAN types, but only the DNS type will be checked here.
 
 ### Setting SNI during Tls handshake
 As mentioned in [A29 implementation details][A29_impl-details] the `UpstreamTlsContext` is either 
-passed down to child policies via channel arguments or a similar mechanism, depending on the language, 
-and the SslContext is instantiated using the truststore location indicated by the `UpstreamTlsContext`. 
-This SslContext is then used to initiate the Tls handshake for the transport and this is when the SNI is sent
-for the `ClientHello` frame of the handshake. To determine the SNI, we need both the `UpstreamTlsContext` and 
-the hostname for the endpoint. The hostname attribute is already stored in the subchannel wrapper by the 
-xds_cluster_impl policy when its child policy creates a subchannel. Once the `SslContext` is available during the 
-Tls handshake phase of the transport creation (the creation of which depends on the choice of the certificate provider 
-infra to use as indicated by the `UpstreamTlsContext`), the fields from `UpstreamTlsContext` and the hostname 
-from the channel attributes will be used to determine the SNI to set for the handshake.
+passed down to child policies via channel arguments or a similar mechanism, depending on the language.
+[A29 implementation details][A29_impl-details] also talks about a `CertificateProvider` object that represents 
+a plugin that provides the required certificates and keys to the gRPC application. When Tls handshake is
+initiated for a channel that is using `XdsCredentials`, this `CertificateProvider` object is used to
+provide the certs and trust roots for establishing the secure connection. During this handshake we need 
+to set the SNI to use for the `ClientHello` frame of the handshake. To determine the SNI, we need both the 
+`UpstreamTlsContext` and the hostname for the endpoint. 
+The `UpstreamTlsContext` comes via the xds cluster configuration, and the xds_cluster_impl policy sets this
+`CertificateProvider` into the subchannel wrapper when its child LB policy creates the subchannel. It also 
+stores the hostname attribute of the endpoint in the subchannel wrapper. To determine the SNI the parsed
+information from `UpstreamTlsContext.sni` and `UpstreamTlsContext.auto_host_sni` will also be set into the
+`CertificateProvider`. When the Tls handling code uses the certs and trust roots from the `CertificateProvider`
+to establish the connection, it will also now determine the SNI to set based on the parsed sni related fields
+available in the `CertificateProvider` and also the hostname available in the subchannel attributes.
 
 ##### Language specific example
 As an example, in Java, the ClusterImpl LB policy creates the `SslContextProviderSuppler` wrapping the
