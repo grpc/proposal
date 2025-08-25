@@ -48,7 +48,7 @@ logical DNS clusters or the endpoint hostname for EDS clusters, as in the case o
    iii. Otherwise no SNI will be set for the Tls handshake.
 
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
-[A81-hostname]: https://github.com/grpc/proposal/blob/4f833c5774e71e94534f72b94ee1b9763ec58516/A81-xds-authority-rewriting.md#xds-resource-validation
+[A81-hostname]: A81-xds-authority-rewriting.md#xds-resource-validation
 
 2. Server SAN validation against SNI used: If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
 gRPC client will perform validation for a DNS SAN matching the SNI value 
