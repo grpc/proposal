@@ -101,7 +101,7 @@ in the TrustManager created by the `CertificateProvider` using the cert store in
 `CertificateValidationContext` in `UpstreamTlsContext` which is either a managed cert store
 or the system root cert store. 
 
-#### Caching for the SslContext 
+#### (Java language specific) Caching for the SslContext 
 The `SslContextProviderSupplier` (named so because it supplies both client and server
 SslContext providers) creates a provider for the client `SslContext` and today 
 maintains a cache of `UpstreamTlsContext` to the client `SslContext` provider instances. 
