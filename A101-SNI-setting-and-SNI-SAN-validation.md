@@ -97,7 +97,7 @@ matches the Subject Alternative Names specified in the server certificate agains
 If `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC], matching will be 
 performed against the SNI that was used by the client, and this validation will replace
 the [`match_subject_alt_names`][match_subject_alt_names] if set. This verification occurs
-in the TrustManager of the SslContext which is created using the cert store indicated by 
+in the TrustManager created by the `CertificateProvider` using the cert store indicated by 
 `CertificateValidationContext` in `UpstreamTlsContext` which is either a managed cert store
 or the system root cert store. 
 
