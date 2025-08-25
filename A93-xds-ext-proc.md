@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-08-21
+* Last updated: 2025-08-25
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -123,7 +123,8 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
 - [allow_mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L249)
 - [disable_immediate_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L256)
 - [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283):
-  TODO: Figure out flow control story!
+  See [Observability Mode and Flow
+  Control](#observability-mode-and-flow-control) below.
 - [deferred_close_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L305):
   If present, the value must obey the restrictions specified in the
   [`google.protobuf.Duration`
@@ -252,9 +253,39 @@ gRPC will not support rewriting the `:scheme`, `:method`, `:path`,
 in the ext_proc filter config. If the server specifies a rewrite for
 one of these headers, that rewrite will be ignored.
 
+### Observability Mode and Flow Control
+
+In observability mode, the contents of the data plane RPC are sent to
+the ext_proc server, but the ext_proc server is not expected to make any
+modifications to the data plane RPC, so the data plane RPC proceeds
+without waiting for a response from the ext_proc server.  One challenge
+in this mode is flow control: if we are blocked sending a message to the
+ext_proc server by flow control, then we need some push-back on the data
+plane RPC, or else we would have to buffer messages to be sent to the
+ext_proc server, which can cause OOMs.  (Envoy has noted this problem in
+https://github.com/envoyproxy/envoy/issues/33319 but has not proposed a
+solution yet.)
+
+For gRPC, we will address this problem by requiring the message to the
+ext_proc server to pass flow control before we allow the message to
+proceed on the data plane RPC.  Due to differences in flow control
+semantics across languages, this will look a little different in each
+one:
+
+- In C-core, we will wait for the write to complete on the ext_proc
+  stream before we allow the message to continue on the data plane RPC.
+- In Java, the application has to explicitly check whether there is flow
+  control push-back before doing a write.  For the purposes of that API,
+  Java will not consider the flow control available until it passes flow
+  control on both the ext_proc stream and on the data plane stream.
+- In Go, a write is blocking and doesn't return until the write passed
+  flow control.  So observability mode doesn't need to do anything
+  special to handle flow control; it will simply not wait for the
+  ext_proc response before sending the message on the data plane stream.
+
 ### Temporary environment variable protection
 
-Support for the ext_authz filter will be guarded by the
+Support for the ext_proc filter will be guarded by the
 `GRPC_EXPERIMENTAL_XDS_EXT_PROC` environment variable. This guard will
 be removed once the feature passes interop tests.
 
