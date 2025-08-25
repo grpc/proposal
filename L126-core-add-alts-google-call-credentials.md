@@ -55,12 +55,11 @@ The hard-bound call credentials will be created through
 `grpc_google_compute_engine_credentials_create`. This function will have a
 `grpc_google_compute_engine_credentials_options` parameter. The caller will be
 able to obtain ALTS hard-bound credentials instead of the standard default call
-credentials by toggling the corresponding flag use_alts_call_credentials in the
-structure.
+credentials by toggling the corresponding flag alts_hard_bound in the structure.
 
 ```c
 typedef struct {
-  bool use_alts_call_credentials = false;
+  bool alts_hard_bound = false;
 } grpc_google_compute_engine_credentials_options;
 
 GRPCAPI grpc_call_credentials* grpc_google_compute_engine_credentials_create(
