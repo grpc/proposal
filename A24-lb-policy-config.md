@@ -6,6 +6,7 @@ Load Balancing Policy Configuration
 * Implemented in: C-core
 * Last updated: 2018-12-05
 * Discussion at: https://groups.google.com/d/topic/grpc-io/K03NV5H8HoE/discussion
+* Updated By: [A100-client-side-weighted-round-robin-slow-start.md](A100-client-side-weighted-round-robin-slow-start.md)
 
 ## Abstract
 
