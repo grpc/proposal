@@ -70,7 +70,7 @@ a plugin that provides the required certificates and keys to the gRPC applicatio
 initiated for a channel that is using `XdsCredentials`, this `CertificateProvider` object is used to
 provide the certs and trust roots for establishing the secure connection. During this handshake we need 
 to set the SNI to use for the `ClientHello` frame of the handshake. To determine the SNI, we need both the 
-`UpstreamTlsContext` and the hostname for the endpoint. 
+SNI related fields from the parsed `UpstreamTlsContext` and the hostname for the endpoint. 
 The `UpstreamTlsContext` comes via the xds cluster configuration, and the xds_cluster_impl policy sets this
 `CertificateProvider` into the subchannel wrapper when its child LB policy creates the subchannel. It also 
 stores the hostname attribute of the endpoint in the subchannel wrapper. To determine the SNI the parsed
