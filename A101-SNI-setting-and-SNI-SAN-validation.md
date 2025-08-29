@@ -51,9 +51,9 @@ Tls connections using the fields from [UpstreamTlsContext][UTC] in the CDS updat
 [A81-hostname]: A81-xds-authority-rewriting.md#xds-resource-validation
 
 2. Server SAN validation against SNI used: If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
-gRPC client will perform validation for a DNS SAN matching the SNI value 
-sent. The normal matching when using `TlsCredentials` for the channel 
-allows other SAN types, but only the DNS type will be checked here.
+gRPC client will perform matching for a SAN against the SNI used for the handshake. The normal matching when using
+`TlsCredentials` for the channel only checks against DNS SANs in the certificate, but with `XdsChannelCredentials`
+matching will be done using any of DNS / URI / IPA SAN types in the server certificate.
 
 ### Related Proposals:
 * [gRFC A29: xDS-Based Security for gRPC Clients and Servers][A29]
@@ -76,6 +76,10 @@ cluster resource will also be set into the `CertificateProvider` by the xds_clus
 When the Tls handling code uses the certs and trust roots from the `CertificateProvider`
 to establish the connection, it will also now determine the SNI to set based on the parsed sni related fields
 available in the `CertificateProvider` and the hostname in the endpoint attributes.
+The precedence order mentioned in the `Proposal1` section will be used to determine the SNI to use. For example,
+if `UpstreamTlsContext.auto_host_sni` was set but there is no EDS hostname for the endpoint, but 
+`UpstreamTlsContext.sni` is set, then it would use the value of the `UpstreamTlsContext.sni` if set. 
+If no SNI value is determined, then it will no set SNI for the Tls handshake.
 
 [A81_xds_resource_validation]: A81-xds-authority-rewriting.md#xds-resource-validation
 
@@ -100,6 +104,7 @@ the [`match_subject_alt_names`][match_subject_alt_names] if set. The value of th
 `auto_sni_san_validation` field and the SNI used by the client will need to be propagated
 to the certificate verifying mechanism that is used based on the settings in the 
 `CertificateProvider` when using `XdsChannelCredentials` for the transport.
+The SNI used by the client will be used for matching, regardless of how that SNI was determined.
 
 #### Language specific example
 For example in Java the SAN SNI validation verification occurs in the TrustManager created by the `CertProviderClientSslContextProvider` using 
