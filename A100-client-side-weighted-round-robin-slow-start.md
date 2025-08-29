@@ -97,7 +97,7 @@ message SlowStartConfig {
   // Configures the minimum percentage of the original weight that will be used for an endpoint
   // in slow start. This helps to avoid a scenario in which endpoints receive no traffic during the
   // slow start window. Valid range is [0.0, 100.0]. If the value is not specified, the default is 10%.
-  float min_weight_percent = 3;
+  google.protobuf.FloatValue min_weight_percent = 3;
 }
 ```
 
@@ -118,9 +118,8 @@ using the formula from [gRFC A58][A58]:
 $$weight = \dfrac{qps}{utilization + \dfrac{eps}{qps} * error\\_utilization\\_penalty}$$
 
 This base weight represents the endpoint's capacity based on its current performance metrics. When an endpoint enters
-the
-warmup period after being in a non-ready state, its weight will be scaled by a factor that increases non-linearly from
-`min_weight_percent` to 100% over the duration of `slow_start_window`.
+the warmup period after being in a non-ready state, its weight will be scaled by a factor that increases non-linearly
+from `min_weight_percent` to 100% over the duration of `slow_start_window`.
 
 The scale factor is calculated as follows:
 
