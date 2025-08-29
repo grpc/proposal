@@ -71,18 +71,18 @@ initiated for a channel that is using `XdsCredentials`, this `CertificateProvide
 provide the certs and trust roots for establishing the secure connection. During this handshake we need 
 to set the SNI to use for the `ClientHello` frame of the handshake. To determine the SNI, we need both the 
 SNI related fields from the parsed `UpstreamTlsContext` and the hostname for the endpoint. 
-The `UpstreamTlsContext` comes via the xds cluster configuration, and the xds_cluster_impl policy sets this
-`CertificateProvider` into the subchannel wrapper when its child LB policy creates the subchannel. It also 
-stores the hostname attribute of the endpoint in the subchannel wrapper. To determine the SNI the parsed
-information from `UpstreamTlsContext.sni` and `UpstreamTlsContext.auto_host_sni` will also be set into the
-`CertificateProvider`. When the Tls handling code uses the certs and trust roots from the `CertificateProvider`
+To determine the SNI `UpstreamTlsContext.sni` and `UpstreamTlsContext.auto_host_sni` from the parsed
+cluster resource will also be set into the `CertificateProvider` by the xds_cluster_impl policy. 
+When the Tls handling code uses the certs and trust roots from the `CertificateProvider`
 to establish the connection, it will also now determine the SNI to set based on the parsed sni related fields
-available in the `CertificateProvider` and also the hostname available in the subchannel attributes.
+available in the `CertificateProvider` and the hostname in the endpoint attributes.
+
+[A81_xds_resource_validation]: A81-xds-authority-rewriting.md#xds-resource-validation
 
 ##### Language specific example
 As an example, in Java, the ClusterImpl LB policy creates the `SslContextProviderSuppler` wrapping the
 `UpstreamTlsContext` and puts it in the subchannel wrapper when its child policy creates a subchannel. At the time of Tls protocol negotiation
-for the subchannel, the hostname from the channel attributes also should be passed to this provider supplier to determine the SNI to be set for 
+for the subchannel, the hostname from the endpoint address attributes also should be passed to this provider supplier to determine the SNI to be set for 
 the Tls handshake. The hostname will be set in the callback object that is given to the `SslContextProviderSupplier`, to be invoked with the 
 `SslContext` when the client Ssl Provider instantiated by this supplier has the `SslContext` available. This value along with the 
 `UpstreamTlsContext` available in the `SslContextProviderSupplier` will be used to decide the SNI to be used for the handshake.
