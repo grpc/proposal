@@ -104,8 +104,16 @@ field in the top-level config.
 In addition to the CEL request attributes described in [A77], we will
 also add support for the following [configuration
 attributes](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.html#configuration-attributes):
-- `xds.route_metadata`
-- TODO: others?
+(TODO: document these fields!)
+- `xds.route_metadata`: TODO: tie to metadata registry from A83
+- `source.ip`: TODO: behavior on client side?
+- `source.port`: TODO: behavior on client side?
+- `connection.requested_server_name`: TODO: behavior on client side?  Do
+  we have access to this data on server side?
+- `connection.tls_version`: TODO: behavior on client side?  Do we have
+  access to this data on server side?
+- `connection.sha256_peer_certificate_digest`: TODO: behavior on client
+  side?  Do we have access to this data on server side?
 
 ### Temporary environment variable protection
 
