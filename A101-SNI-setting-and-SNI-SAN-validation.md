@@ -96,14 +96,17 @@ matches the Subject Alternative Names specified in the server certificate agains
 [`match_subject_alt_names`][match_subject_alt_names] in `CertificateValidationContext`.
 If `auto_sni_san_validation` is set in the [UpstreamTlsContext][UTC], matching will be 
 performed against the SNI that was used by the client, and this validation will replace
-the [`match_subject_alt_names`][match_subject_alt_names] if set. This verification occurs
-in the TrustManager created by the `CertificateProvider` using the cert store indicated by 
-`CertificateValidationContext` in `UpstreamTlsContext` which is either a managed cert store
-or the system root cert store. 
+the [`match_subject_alt_names`][match_subject_alt_names] if set. The value of the 
+`auto_sni_san_validation` field and the SNI used by the client will need to be propagated
+to the certificate verifying mechanism that is used based on the settings in the 
+`CertificateProvider` when using `XdsChannelCredentials` for the transport.
 
-#### (Java language specific) Caching for the SslContext 
-The `SslContextProviderSupplier` (named so because it supplies both client and server
-SslContext providers) creates a provider for the client `SslContext` and today 
+#### Language specific example
+For example in Java the SAN SNI validation verification occurs in the TrustManager created by the `CertProviderClientSslContextProvider` using 
+the cert store indicated by `CertificateValidationContext` in `UpstreamTlsContext` which is either a managed cert store or the system root cert store. 
+
+gRPC Java also has a Caching for the SslContext. The `SslContextProviderSupplier` (named so because it 
+supplies both client and server SslContext providers) creates a provider for the client `SslContext` and today 
 maintains a cache of `UpstreamTlsContext` to the client `SslContext` provider instances. 
 For the SNI requirement, the `TrustManager` in the `SslContext` needs to 
 be aware of the SNI to validate the SAN against, so a different `TrustManager` instance needs 
