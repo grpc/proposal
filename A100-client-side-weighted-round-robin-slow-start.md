@@ -43,12 +43,12 @@ reducing reliance on external traffic-shaping mechanisms or manual intervention.
 
 ### Related Proposals:
 
-* [gRFC A24][A24]
-* [gRFC A58][A58]
-* [gRFC A66][A66]
-* [gRFC A78][A78]
-* [gRFC A79][A79]
-* [gRFC A89][A89]
+* [A24: Load Balancing Policy Configuration][A24]
+* [A58: `weighted_round_robin` LB policy][A58]
+* [A66: OpenTelemetry Metrics][A66]
+* [A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient][A78]
+* [A79: Non-per-call Metrics Architecture][A79]
+* [A89: Backend Service Metric Label][A89]
 
 ## Proposal
 
@@ -92,7 +92,7 @@ message SlowStartConfig {
   //
   // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
   // Once endpoint exits slow start, time_factor and aggression no longer affect its weight.
-  float aggression = 2;
+  double aggression = 2;
 
   // Configures the minimum percentage of the original weight that will be used for an endpoint
   // in slow start. This helps to avoid a scenario in which endpoints receive no traffic during the
@@ -199,7 +199,7 @@ prioritize stable weight reporting, faster weight adoption, or gradual traffic r
 // Configuration parameters
 slow_start_window: Duration
 min_weight_percent: float
-aggression: float
+aggression: double
 
 // State
 non_empty_since: Time  // Time when first non-zero load report was received (for blackout period)
@@ -209,10 +209,10 @@ function get_scale() -> float:
     time_elapsed_since_ready = current_time - ready_since
     if time_elapsed_since_ready >= slow_start_window:
         return 1.0
-        
+
     time_factor = max(time_elapsed_since_ready, 1.0) / slow_start_window
     min_scale = min_weight_percent / 100.0
-    
+
     // Apply non-linear scaling based on aggression factor
     scale = max(min_scale, time_factor ^ (1.0 / aggression))
     return scale
