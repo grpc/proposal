@@ -119,9 +119,6 @@ SNI to validate the SANs against and set it in the `SslContext` it provides.
 [match_subject_alt_names]: https://github.com/envoyproxy/envoy/blob/b29d6543e7568a8a3e772c7909a1daa182acc670/api/envoy/extensions/transport_sockets/tls/v3/common.proto#L407
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 
-#### Behavior when SNI is not indicated in UpstreamTlsContext
-When `UpstreamTlsContext` has neither of `SNI` nor `auto_sni_host` values set, the current behavior will continue, i.e. SNI will be set to the xds hostname from `GrpcRoute`.
-
 #### Validation
 The Cds update will be NACKed if `UpstreamTlsContext.sni` exceeds 255 characters, similar to Envoy.
 
