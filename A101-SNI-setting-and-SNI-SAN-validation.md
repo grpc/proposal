@@ -66,7 +66,7 @@ matching will be done using any of DNS / URI / IPA SAN types in the server certi
 As mentioned in [A29 implementation details][A29_impl-details] the `UpstreamTlsContext` is either 
 passed down to child policies via channel arguments or a similar mechanism, depending on the language.
 [A29 implementation details][A29_impl-details] also talks about a `CertificateProvider` object that represents 
-a plugin that provides the required certificates and keys to the gRPC application. When Tls handshake is
+a plugin that provides the required certificates and keys to the gRPC implementation. When Tls handshake is
 initiated for a channel that is using `XdsCredentials`, this `CertificateProvider` object is used to
 provide the certs and trust roots for establishing the secure connection. During this handshake we need 
 to set the SNI to use for the `ClientHello` frame of the handshake. To determine the SNI, we need both the 
