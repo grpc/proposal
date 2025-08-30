@@ -105,7 +105,9 @@ field in the top-level config.
 
 The parsed representation of the composite filter's config will be a
 matcher tree, using the same unified matcher API implemented for [A77].
-The actions in the matcher tree will be parsed filter configs.
+The actions in the matcher tree will be one of two possible values: a
+parsed filter config, or an indication that the filter should be skipped
+(in the case of a `SkipFilter` proto).
 
 ### CEL Attributes
 
