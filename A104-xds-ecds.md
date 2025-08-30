@@ -122,7 +122,27 @@ that indicates that the filter config should be fetched via ECDS.
 In this case, the ECDS resource name comes from the [`DynamicConfig.name`
 field](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/http/composite/v3/composite.proto#L39).
 
-TODO: document parsed representation changes
+The validation rules for the fields in the `ExecuteFilterAction` proto
+will now be (first match wins):
+- If `dynamic_config` is set, that gets used.
+- If `filter_chain` is set, that gets used.
+- If `typed_config` is set, that gets used.
+- Otherwise, the config is considered invalid.
+
+Note that `dynamic_config` is being set as higher precedence to the other
+fields, because gRPC will already support the other two fields, so this
+provides a path for control planes to migrate to the new field without
+breaking existing gRPC clients.  However, control plane operators should
+be aware that Envoy currently requires that exactly one of `typed_config`
+or `dynamic_config` are present, so a config setting both of those is
+likely to be rejected by Envoy.
+
+The parsed representation of the composite filter will change in a similar
+way to the parsed LDS representation.  As per [A103], the actions in the
+matcher tree can have two possible values, a parsed filter config or an
+indication to skip the filter.  With the addition of ECDS support, a
+third possible value will be added, which is the ECDS resource name to
+fetch.
 
 ### ECDS Resource Validation
 
