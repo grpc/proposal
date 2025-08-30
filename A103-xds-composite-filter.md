@@ -4,7 +4,7 @@ A103: xDS Composite Filter
 * Approver: ejona86, dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-08-28
+* Last updated: 2025-08-29
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -28,11 +28,13 @@ support described in [A77].
 * [A39: xDS HTTP Filter Support][A39]
 * [A36: xDS-Enabled Servers][A36]
 * [A77: xDS Server-Side Rate Limiting][A77] (pending)
+* [A83: xDS GCP Authentication Filter][A83]
 
 [A27]: A27-xds-global-load-balancing.md
 [A36]: A36-xds-for-servers.md
 [A39]: A39-xds-http-filters.md
 [A77]: https://github.com/grpc/proposal/pull/414
+[A83]: A83-xds-gcp-authn-filter.md
 
 ## Proposal
 
@@ -67,16 +69,18 @@ Within it, gRPC will look at the following fields:
     - [typed_config](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/http/composite/v3/composite.proto#L54C39-L54C51):
       The filter to configure.  It will be validated using the xDS HTTP filter
       registry, just as the top-level filters in the HTTP connection manager
-      config are.  This field is ignored if `filter_chain` is set.
+      config are.  This field is ignored if `filter_chain` is set.  It
+      is an error if neither `typed_config` nor `filter_chain` are set.
     - [dynamic_config](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/http/composite/v3/composite.proto#L59):
-      TODO: Do we need to support ECDS here?  Also need to define
-      precedence rules.
+      This field will be ignored for now, since gRPC does not currently
+      support ECDS.  Support for ECDS will be added in a subsequent gRFC.
     - filter_chain (new field added in
-      https://github.com/envoyproxy/envoy/pull/40885): If set, the
-      `typed_config` field is ignored.  This specifies a chain of
-      filters to call, in order.  Each filter in the chain will be
-      validated using the xDS HTTP filterregistry, just as the top-level
-      filters in the HTTP connection manager config are.
+      https://github.com/envoyproxy/envoy/pull/40885): This specifies a
+      chain of filters to call, in order.  Each filter in the chain will
+      be validated using the xDS HTTP filter registry, just as the
+      top-level filters in the HTTP connection manager config are.
+      If set, the `typed_config` field is ignored.  It is an error if
+      neither `typed_config` nor `filter_chain` are set.
     - [sample_percent](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/http/composite/v3/composite.proto#L69C43-L69C57):
       - Optional; if unset, the specified filter(s) are always executed.
         If set, for each RPC, a random number will be generated between
@@ -99,21 +103,37 @@ must be validated the same way as the corresponding field in the
 top-level config.  The value of this field will replace the value of the
 field in the top-level config.
 
+The parsed representation of the composite filter's config will be a
+matcher tree, using the same unified matcher API implemented for [A77].
+The actions in the matcher tree will be parsed filter configs.
+
 ### CEL Attributes
 
 In addition to the CEL request attributes described in [A77], we will
-also add support for the following [configuration
-attributes](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.html#configuration-attributes):
-(TODO: document these fields!)
-- `xds.route_metadata`: TODO: tie to metadata registry from A83
-- `source.ip`: TODO: behavior on client side?
-- `source.port`: TODO: behavior on client side?
-- `connection.requested_server_name`: TODO: behavior on client side?  Do
-  we have access to this data on server side?
-- `connection.tls_version`: TODO: behavior on client side?  Do we have
-  access to this data on server side?
-- `connection.sha256_peer_certificate_digest`: TODO: behavior on client
-  side?  Do we have access to this data on server side?
+also add support for some additional [CEL
+attributes](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.html#configuration-attributes)
+that we expect to be useful for the composite filter.
+
+On both the gRPC client and server sides, we will add support for the
+`xds.route_metadata` attribute.  To support this, we will add support
+for parsing the [`Route.metadata`
+field](https://github.com/envoyproxy/envoy/blob/f384ab2b3e3aa0564ef25f57dc2ed8ad61eaf0cb/api/envoy/config/route/v3/route_components.proto#L319)
+in the xDS RouteConfiguration.  This field will be validated the same
+way as cluster metadata, as described in [A83].  The parsed metadata map
+will be added to the route in the parsed RouteConfiguration resource,
+and that map will be accessed by this CEL attribute.
+
+TODO: from CEL's perspective, the `xds.route_metadata` attribute is
+supposed to be an xDS metadata proto.  how do we make that work without
+depending on protobuf?
+
+We will also add support for the following attributes on the gRPC server
+side only (these attributes are not relevant on the client side):
+- `source.ip`
+- `source.port`
+- `connection.requested_server_name`
+- `connection.tls_version`
+- `connection.sha256_peer_certificate_digest`
 
 ### Temporary environment variable protection
 
