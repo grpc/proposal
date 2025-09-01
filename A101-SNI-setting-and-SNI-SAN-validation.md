@@ -76,20 +76,19 @@ cluster resource will also be set into the `CertificateProvider` by the xds_clus
 When the Tls handling code uses the certs and trust roots from the `CertificateProvider`
 to establish the connection, it will also now determine the SNI to set based on the parsed sni related fields
 available in the `CertificateProvider` and the hostname in the endpoint attributes.
-The precedence order mentioned in the `Proposal1` section will be used to determine the SNI to use. For example,
+The precedence order mentioned at the top of the [Proposal](#proposal) section will be used to determine the SNI to use. For example,
 if `UpstreamTlsContext.auto_host_sni` was set but there is no EDS hostname for the endpoint, but 
 `UpstreamTlsContext.sni` is set, then it would use the value of the `UpstreamTlsContext.sni` if set. 
-If no SNI value is determined, then it will no set SNI for the Tls handshake.
-
-[A81_xds_resource_validation]: A81-xds-authority-rewriting.md#xds-resource-validation
+If no SNI value is determined, then it will not set SNI for the Tls handshake.
 
 ##### Language specific example
 As an example, in Java, the ClusterImpl LB policy creates the `SslContextProviderSuppler` wrapping the
 `UpstreamTlsContext` and puts it in the subchannel wrapper when its child policy creates a subchannel. At the time of Tls protocol negotiation
-for the subchannel, the hostname from the endpoint address attributes also should be passed to this provider supplier to determine the SNI to be set for 
-the Tls handshake. The hostname will be set in the callback object that is given to the `SslContextProviderSupplier`, to be invoked with the 
-`SslContext` when the client Ssl Provider instantiated by this supplier has the `SslContext` available. This value along with the 
-`UpstreamTlsContext` available in the `SslContextProviderSupplier` will be used to decide the SNI to be used for the handshake.
+for the subchannel, the Tls handling code should use the hostname from the endpoint address attributes and the SNI related fields in `UpstreamTlsContext`
+to determine the SNI to be used for the Tls handshake. This SNI will also be passed to the the `SslContextProviderSupplier`, in addition to the 
+callback to be invoked to provide the `SslContext` when it is available. The `ClientCertificateSslContextProvider` instantiated by the `SslContextProviderSupplier`
+will be passed both the callback argument and the SNI value to use, that will be used in the `XdsX509TrustManager` it creates to perform the SAN - SNI
+matching. The Tls protocol negotiating code will use the SNI value determined to use when creating the the SSL engine from the `SslContext` received via the callback.
 
 [A29_impl-details]: A29-xds-tls-security.md#implementation-details
 [UTC_SNI]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L42
