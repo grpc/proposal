@@ -4,7 +4,7 @@ A104: xDS Extension Config Discovery Service (ECDS)
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-08-29
+* Last updated: 2025-09-04
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -49,13 +49,19 @@ We will support configuring ECDS in two places:
 - In the xDS composite filter (see [A103]), as part of the configuration
   of the filter to choose based on the match criteria.
 
+In order to support that second case in a general-purpose way, we will
+change the interface for defining xDS HTTP filters such that when a
+filter parses its config, it may return an indication of any ECDS
+resources that it may require, even transitively.
+
 ### Validation of `ExtensionConfigSource` Proto
 
-ECDS is configured via an [`ExtensionConfigSource`
+In both LDS and in the composite filter, ECDS is configured via an
+[`ExtensionConfigSource`
 proto](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/config/core/v3/config_source.proto#L266).
-The presence of this message will indicate that ECDS should be used, but
-gRPC will not actually use any of the fields inside of this proto, each
-for different reasons:
+The presence of this message will indicate that ECDS should be used,
+but gRPC will not actually use any of the fields inside of this proto,
+each for different reasons:
 - [config_source](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/config/core/v3/config_source.proto#L267):
   We will use xDS federation (see [A47]) to determine what server to
   fetch the resource from based on the resource name, so there is no
@@ -75,7 +81,35 @@ for different reasons:
   of a failure mode that cannot be reflected in a NACK, which could
   compromise reliability (see [Rationale](#rationale) below for details).
 
+### xDS HTTP Filter API Changes
+
+As per [A39], when gRPC sees an HTTP filter config in either LDS or RDS,
+it will look up the filter implementation in the xDS HTTP filter
+registry by the protobuf type of the filter config.  It will then ask that
+filter implementation to parse the filter config.
+
+We will change the xDS HTTP filter implementation API such that when it
+parses the config, it has the ability to return a set of ECDS resource
+names that it depends on.  Note that this will work transitively for
+cases like the composite filter: if the composite filter uses the xDS
+HTTP filter registry to parse a nested filter config, then any ECDS
+resource needed anywhere in that tree will be returned from the
+composite filter's parsing function.
+
+Note that in order to avoid potential circular dependencies or stack
+overflows, we will impose a maximum recursion depth of 8 when parsing
+HTTP filter configs.
+
 ### LDS Resource Validation Changes
+
+We will add a new field to the parsed representation of the
+`HttpConnectionManager` config that will indicate the set of ECDS resource
+names that are needed as dependencies.  For example, in C-core, it will
+look like this:
+
+```
+std::set<std::string> ecds_resources_needed;
+```
 
 When validating the entries in the [`HttpConnectionManager.http_filters`
 field](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L436),
@@ -102,12 +136,40 @@ We will change this to instead look like this:
 
 ```c++
 struct HttpFilter {
-  struct EcdsConfig {};
+  struct UseEcds {};
 
   std::string name;
-  std::variant<XdsHttpFilterImpl::FilterConfig, EcdsConfig> config;
+  std::variant<XdsHttpFilterImpl::FilterConfig, UseEcds> config;
 };
 ```
+
+If the `config` field contains a `UseEcds` struct, that means that the
+config for the filter should be obtained from an ECDS resource with name
+from the `name` field.  In this case, the name of the ECDS resource will
+be added to the `ecds_resources_needed` field in the parsed
+`HttpConnectionManager` config.
+
+If the `config` field contains an inline filter config rather than a
+`UseEcds` struct, then we will use the xDS HTTP filter registry to parse
+the specified filter config, just like we do today.  In this case, any
+ECDS resources needed that the filter parsing returned will be added to
+the `ecds_resources_needed` field in the parsed `HttpConnectionManager`
+config.
+
+### RDS Resource Validation Changes
+
+Just like in LDS, we will add a new `ecds_resources_needed` field to
+the parsed representation of the `RouteConfiguration` resource that will
+indicate the set of ECDS resource names that are needed as dependencies.
+This field will have the same type as the corresponding field described
+in the `HttpConnectionManager` config above.
+
+As described in [xDS HTTP Filter API Changes](#xds-http-filter-api-changes)
+above, as we use the xDS HTTP filter registry to parse the configs in
+the various `typed_per_filter_config` fields, the xDS HTTP filter
+implementation will return a list of ECDS resource names that it depends
+on.  This list will be added to the `ecds_resources_needed` field in the
+parsed `RouteConfiguration` resource.
 
 ### xDS Composite Filter Validation Changes
 
@@ -161,30 +223,46 @@ via the xDS HTTP filter registry, just as we do today for the
 [`HttpFilter.typed_config`
 field](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L1233).
 
-The parsed representation of an ECDS resource will be the same as the
-representation of an HTTP filter in the parsed LDS resource.  For
-example, in C-core, the representation will be the
-`XdsHttpFilterImpl::FilterConfig` struct mentioned above.
+The parsed representation of an ECDS resource will have two fields in it:
+- The parsed representation of the enclosed filter config, in the same
+  form as encoded in the parsed `HttpConnectionManager` config.
+- A list of dependent ECDS resources.
+
+As an example, in C-core, the ECDS parsed representation will look
+something like this:
+
+```c++
+struct XdsEcdsResource {
+  XdsHttpFilterImpl::FilterConfig config;
+  std::set<std::string> ecds_resources_needed;
+};
+```
 
 ### gRPC Client-Side Changes
 
 The XdsDependencyManager (see [A74]) will be changed to handle ECDS.
-Specifically, when it receives the LDS resource, it will look through the
-list of HTTP filters to see if any of them use ECDS.  For those that do,
-it will start a watch for the specified ECDS resource.
+ECDS resources will be added to the dependency tree in the following
+cases:
+- From the `ecds_resources_needed` field in a parsed LDS resource.
+- From the `ecds_resources_needed` field in a parsed
+  `RouteConfiguration` resource (regardless of whether it is inlined
+  into LDS or obtained via RDS).
+- From the `ecds_resources_needed` field in a parsed ECDS resource.
 
-TODO: don't want XDM to have specific knowledge of the composite filter,
-so how will it know to start a watch for the required ECDS resource?
+Whenever it sees an update that changes the set of ECDS resources
+needed, it will start watches for any ECDS resource that it is not
+already watching, and it will stop watches for any ECDS resource that it
+had been watching but that is no longer referenced by the configuration.
 
 The XdsDependencyManager will not return any result to the xds resolver
-until all ECDS resources have been obtained.  If an ECDS resource fails
-validation, the XdsDependencyManager will return a transient error to
-the xds resolver, which will cause the channel to stick with its
-previous good config, if any.
+until all ECDS resources have been obtained.  If an ECDS resource returns
+a data error, the XdsDependencyManager will return an error to
+the xds resolver, just as if the LDS or RDS resources had seen the
+error.
 
 A new field will be added to the `XdsConfig` struct returned by the
 XdsDependencyManager to contain all fetched ECDS resources.  This field
-will be a map from resource name to parsed ECDS resource.  The xds
+will be a map from resource name to the parsed ECDS resource.  The xds
 resolver will use that map to get the filter config for any filter in
 the LDS resource that uses ECDS.
 
