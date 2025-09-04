@@ -156,6 +156,15 @@ ECDS resources needed that the filter parsing returned will be added to
 the `ecds_resources_needed` field in the parsed `HttpConnectionManager`
 config.
 
+Note that when a filter's configuration is obtained from a separate ECDS
+resource, that means that the `HttpConnectionManager` validation code
+will not know the type of the filter and therefore will not know whether
+the filter is a terminal filter.  To avoid causing problems after config
+validation time, we will support ECDS only for non-terminal filters.
+This means that in the LDS validation logic, it will be considered an
+error if the last filter in the chain (which must be terminal) uses ECDS
+instead of an inline config.
+
 ### RDS Resource Validation Changes
 
 Just like in LDS, we will add a new `ecds_resources_needed` field to
@@ -222,6 +231,10 @@ field](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb
 via the xDS HTTP filter registry, just as we do today for the
 [`HttpFilter.typed_config`
 field](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#L1233).
+
+As mentioned above, we support ECDS for only non-terminal filters.
+Therefore, if the filter implementation for the filter type indicates
+that it is a terminal filter, the ECDS resource will be NACKed.
 
 The parsed representation of an ECDS resource will have two fields in it:
 - The parsed representation of the enclosed filter config, in the same
