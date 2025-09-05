@@ -97,8 +97,9 @@ resource needed anywhere in that tree will be returned from the
 composite filter's parsing function.
 
 Note that in order to avoid potential circular dependencies or stack
-overflows, we will impose a maximum recursion depth of 8 when parsing
-HTTP filter configs.
+overflows, we will impose a maximum recursion depth of 8 when expanding
+ECDS dependencies.  This will be done both on the client side (in the
+XdsDependencyManager) and on the server side.
 
 ### LDS Resource Validation Changes
 
