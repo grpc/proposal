@@ -120,17 +120,17 @@ attributes](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/adva
 that we expect to be useful for the composite filter.
 
 On both the gRPC client and server sides, we will add support for the
-`xds.route_metadata` attribute.  To support this, we will add support
-for parsing the [`Route.metadata`
+`xds.route_metadata.filter_metadata` attribute.  To support this, we will
+add support for parsing the [`Route.metadata`
 field](https://github.com/envoyproxy/envoy/blob/f384ab2b3e3aa0564ef25f57dc2ed8ad61eaf0cb/api/envoy/config/route/v3/route_components.proto#L319)
 in the xDS RouteConfiguration.  This field will be validated the same
 way as cluster metadata, as described in [A83].  The parsed metadata map
 will be added to the route in the parsed RouteConfiguration resource,
-and that map will be accessed by this CEL attribute.
-
-TODO: from CEL's perspective, the `xds.route_metadata` attribute is
-supposed to be an xDS metadata proto.  how do we make that work without
-depending on protobuf?
+and that map will be accessed by this CEL attribute.  Note that we will
+support only `filter_metadata`, not `typed_filter_metadata`, so that we
+do not have to handle protobuf descriptor functionality; to that end, we
+will use only those entries in the parsed metadata map that correspond
+to `google.protobuf.Struct` type.
 
 We will also add support for the following attributes on the gRPC server
 side only (these attributes are not relevant on the client side):
