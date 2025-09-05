@@ -43,7 +43,7 @@ GRPCAPI grpc_channel_credentials* grpc_google_default_credentials_create(
 
 This new function accepts two arguments:
 
-1.  `tls_credentials`: The primary call credentials, consistent with the 
+1.  `tls_credentials`: The primary call credentials, consistent with the
     existing API. This is usually used for TLS connections.
 2.  `options`: A structure that allows the caller to configure specific parameters  
     for the Default Credentials.
