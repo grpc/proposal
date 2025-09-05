@@ -1,61 +1,74 @@
-# L126: C-core: Support ALTS Hard Bound Call Credentials in Google Default Credentials
+## L126: C-core: Support ALTS Hard Bound Call Credentials in Google Default Credentials
 
 *   Author(s): anniefrchz
 *   Approver: markdroth
 *   Status: In Review
 *   Implemented in: C++
 *   Last updated: 2025-08-22
-*   Discussion at:
+*   Discussion at:  
     https://groups.google.com/g/grpc-io/c/7rRWghiS95E/m/nENwU3BtCgAJ
 
 ## Abstract
 
-This proposal outlines a change to the gRPC Core C-API to support
-alts-credentials configurations within `grpc_google_default_credentials`. This
-enhancement specifically allows a secondary set of call credentials for ALTS to
+This proposal outlines a change to the gRPC Core C-API to support  
+alts-credentials configurations within `grpc_google_default_credentials`. This  
+enhancement specifically allows a secondary set of call credentials for ALTS to  
 be provided alongside the default credentials.
 
 ## Background
 
-The existing `grpc_google_default_credentials_create` function allows the
-configuration of a single set of call credentials. In some scenarios, a client
-would want to communicate with services that support hard bound credentials over
-ALTS. This proposal addresses the possibility to support this use case on a
+The existing `grpc_google_default_credentials_create` function allows the  
+configuration of a single set of call credentials. In some scenarios, a client  
+would want to communicate with services that support hard bound credentials over  
+ALTS. This proposal addresses the possibility to support this use case on a  
 channel initialized with Google's default credentials.
 
 ## Proposal
 
 ### C-Core changes
 
-This proposal modifies the function `grpc_google_default_credentials_create` to
+This proposal modifies the function `grpc_google_default_credentials_create` to  
 add a second set of call credentials.
 
 ```c
+typedef struct {
+  grpc_call_credentials* secondary_credentials,
+  bool create_hard_bound_credentials = false;
+} grpc_google_default_credentials_options;
+
 GRPCAPI grpc_channel_credentials* grpc_google_default_credentials_create(
     grpc_call_credentials* tls_credentials,
-    grpc_call_credentials* alts_credentials);
+    grpc_google_default_credentials_options* options);
 ```
 
 This new function accepts two arguments:
 
-1.  `tls_credentials`: The primary call credentials, consistent with the
+1.  `tls_credentials`: The primary call credentials, consistent with the  
     existing API. This is usually used for TLS connections.
-2.  `alts_credentials`: A secondary set of call credentials to be used
-    specifically for ALTS connections.
+2.  `options`: A structure that allows the caller to configure specific parameters for  
+    the Default Credentials.
 
-After a secure connection is established, the gRPC runtime identifies the
-connection's transport security type, which indicates whether the underlying
-connection is using a protocol like ALTS or TLS. The runtime then selects the
-appropriate call credentials for that connection. If the determined transport
-security type is ALTS, the provided alts_credentials will be used. For all other
-transport types, the primary call_credentials are used, maintaining the default
+The new struct `grpc_google_default_credentials_options` will be able to initially  
+configure the following parameters:
+
+1.  `secondary_credentials`: A secondary set of call credentials to be used  
+    specifically for ALTS connections.
+2.  `create_hard_bound_credentials`: A boolean value that if enabled, allows the   
+    API to create a set of secondary credentials for ALTS Hard Bound connections
+
+After a secure connection is established, the gRPC runtime identifies the  
+connection's transport security type, which indicates whether the underlying  
+connection is using a protocol like ALTS or TLS. The runtime then selects the  
+appropriate call credentials for that connection. If the determined transport  
+security type is ALTS, the provided alts\_credentials will be used. For all other  
+transport types, the primary call\_credentials are used, maintaining the default  
 behavior.
 
-The hard-bound call credentials will be created through
-`grpc_google_compute_engine_credentials_create`. This function will have a
-`grpc_google_compute_engine_credentials_options` parameter. The caller will be
-able to obtain ALTS hard-bound credentials instead of the standard default call
-credentials by toggling the corresponding flag alts_hard_bound in the structure.
+The hard-bound call credentials will be created through  
+`grpc_google_compute_engine_credentials_create`. This function will have a  
+`grpc_google_compute_engine_credentials_options` parameter. The caller will be  
+able to obtain ALTS hard-bound credentials instead of the standard default call  
+credentials by toggling the corresponding flag alts\_hard\_bound in the structure.
 
 ```c
 typedef struct {
@@ -68,54 +81,54 @@ GRPCAPI grpc_call_credentials* grpc_google_compute_engine_credentials_create(
 
 ### C++ Changes
 
-Additionally, external customers for the public C++ library will de able to
-create GoogleDefaultCredentials by setting a GoogleDefaultCredentialsOptions
-value into their standard call. For this addition, the proposed struct
-`GoogleDefaultCredentialsOptions` will hold a boolean that will be default to
-false. Callers of the GoogleDefaultCredentials() API will be able to set
-use_alts_call_credentials to false value, if required to indicate the request
+Additionally, external customers for the public C++ library will de able to  
+create GoogleDefaultCredentials by setting a GoogleDefaultCredentialsOptions  
+value into their standard call. For this addition, the proposed struct  
+`GoogleDefaultCredentialsOptions` will hold a boolean that will be default to  
+false. Callers of the GoogleDefaultCredentials() API will be able to set  
+use\_alts\_call\_credentials to false value, if required to indicate the request  
 for the underlying bound token call credentials.
 
-```c++
+```plaintext
 struct GoogleDefaultCredentialsOptions {
   bool use_alts_call_credentials = false;
 };
 
-std::shared_ptr<ChannelCredentials> GoogleDefaultCredentials(
-    const GoogleDefaultCredentialsOptions& options =
+std::shared_ptr<channelcredentials> GoogleDefaultCredentials(
+    const GoogleDefaultCredentialsOptions&amp; options =
         GoogleDefaultCredentialsOptions());
 ```
 
 ### Other C-Core languages
 
-Other wrapped languages are not in scope for changes to their public API, and
+Other wrapped languages are not in scope for changes to their public API, and  
 further discussion is needed if an implementation is scoped.
 
 ## Rationale
 
-The primary motivation for this change is to enable seamless support for hybrid
+The primary motivation for this change is to enable seamless support for hybrid  
 security environments on a single gRPC channel.
 
 The advantages of this approach are:
 
-*   Consolidated API: It avoids introducing a new function for a closely related
-    feature, keeping the API surface clean and concise. An initial review of the
+*   Consolidated API: It avoids introducing a new function for a closely related  
+    feature, keeping the API surface clean and concise. An initial review of the  
     pull request favored this path to avoid an unnecessary new API.
-*   Improved Discoverability: Developers only need to be aware of a single
-    function for creating Google default credentials. The optional nature of the
-    second parameter would make the basic use case simple while allowing for the
+*   Improved Discoverability: Developers only need to be aware of a single  
+    function for creating Google default credentials. The optional nature of the  
+    second parameter would make the basic use case simple while allowing for the  
     more advanced dual-credential scenario when needed.
-*   Logical Cohesion: Since the new functionality is an extension of the
-    existing credential creation process, incorporating it into the original
-    function maintains logical cohesion. The function's responsibility is
+*   Logical Cohesion: Since the new functionality is an extension of the  
+    existing credential creation process, incorporating it into the original  
+    function maintains logical cohesion. The function's responsibility is  
     expanded rather than duplicated across multiple functions.
-*   Cross-language support: Since wrapper languages like Python use this API,
-    supporting ALTS bound credentials will be straightforward by passing them as
+*   Cross-language support: Since wrapper languages like Python use this API,  
+    supporting ALTS bound credentials will be straightforward by passing them as  
     an argument to the existing API.
 
 ## Implementation
 
-The implementation for this proposal has been completed and merged into the main
+The implementation for this proposal has been completed and merged into the main  
 gRPC repository.
 
 *   Pull Request: grpc/grpc#39770
