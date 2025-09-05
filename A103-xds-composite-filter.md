@@ -4,7 +4,7 @@ A103: xDS Composite Filter
 * Approver: ejona86, dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-08-29
+* Last updated: 2025-09-04
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -108,6 +108,9 @@ matcher tree, using the same unified matcher API implemented for [A77].
 The actions in the matcher tree will be one of two possible values: a
 parsed filter config, or an indication that the filter should be skipped
 (in the case of a `SkipFilter` proto).
+
+Note that in order to avoid potential stack overflows, we will impose
+a maximum recursion depth of 8 when parsing HTTP filter configs.
 
 ### CEL Attributes
 
