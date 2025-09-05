@@ -140,6 +140,17 @@ side only (these attributes are not relevant on the client side):
 - `connection.tls_version`
 - `connection.sha256_peer_certificate_digest`
 
+### Filter Behavior
+
+Because all of the CEL attributes that we are exposing are available
+when we see the client's initial metadata, that is the point at which
+the filter will evaluate the matcher tree and decide which filter chain
+to use.  After that point, all other filter hooks will be delegated to
+the chosen filter chain.
+
+If we ever in the future need to support other attributes that are not
+yet available at this point, we will need to make changes here.
+
 ### Temporary environment variable protection
 
 Support for the composite filter will be guarded by the
