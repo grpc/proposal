@@ -101,6 +101,11 @@ overflows, we will impose a maximum recursion depth of 8 when expanding
 ECDS dependencies.  This will be done both on the client side (in the
 XdsDependencyManager) and on the server side.
 
+TODO: Do we need to take into account the full height of the HTTP
+filter config stack, even if some are inlined and others use ECDS?  Or
+are we okay with imposing separate limits on inline and ECDS resolution,
+so that max is really the product of the two?
+
 ### LDS Resource Validation Changes
 
 We will add a new field to the parsed representation of the
