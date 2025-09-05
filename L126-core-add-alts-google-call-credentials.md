@@ -31,17 +31,31 @@ This proposal modifies the function `grpc_google_default_credentials_create` to
 add a second set of call credentials.
 
 ```c
+typedef struct {
+  bool create_hard_bound_credentials = false;
+  grpc_call_credentials* secondary_credentials,
+} grpc_google_default_credentials_options;
+
 GRPCAPI grpc_channel_credentials* grpc_google_default_credentials_create(
     grpc_call_credentials* tls_credentials,
-    grpc_call_credentials* alts_credentials);
+    grpc_google_default_credentials_options* options);
 ```
 
 This new function accepts two arguments:
 
-1.  `tls_credentials`: The primary call credentials, consistent with the
+1.  `tls_credentials`: The primary call credentials, consistent with the  
     existing API. This is usually used for TLS connections.
-2.  `alts_credentials`: A secondary set of call credentials to be used
-    specifically for ALTS connections.
+2.  `options`: A structure that allows the caller to configure specific parameters  
+    for the Default Credentials.
+
+The new struct `grpc_google_default_credentials_options` will be able to initially  
+configure the following parameters:
+
+1.  `create_hard_bound_credentials`: A boolean value that if enabled, allows the   
+    API to create a set of secondary credentials for ALTS Hard Bound connections.
+2.  `secondary_credentials`: A secondary set of call credentials to be used  
+    specifically for ALTS connections. If create_hard_bound_credentials is true,
+    this field will be ignored.
 
 After a secure connection is established, the gRPC runtime identifies the
 connection's transport security type, which indicates whether the underlying
