@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-08-21
+* Last updated: 2025-09-10
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -132,12 +132,46 @@ example, if there is an override config at the virtual host level that
 disables the filter but then another config at the route level that does
 not disable the filter, the filter will be enabled.
 
-### Communication With the ext_authz Server
+### Filter Behavior
+
+TODO: ExtAuthz channel retention (simple approach for now, probably
+globally shared channel is fine?)
+
+On both the gRPC client and server side, the ext_authz filter will perform
+the per-RPC authorization check when it sees the client's initial metadata
+(i.e., at the start of the stream).
+
+If the `filter_enabled` config field is set to a value less than
+100%, the filter will generate a random number in the range [0,
+100] for the RPC, and if that random number is greater than or
+equal to the configured `filter_enabled` value, then the ext_authz
+filter is not considered enabled for that RPC.  In that case, if
+the `deny_at_disable` config field is set to true, then the RPC
+will be failed with the status derived from the `status_on_error`
+config field, using the normal [HTTP-to-gRPC status conversion
+rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
+Otherwise, the RPC will be passed to the next filter without modification.
+
+If the filter is enabled for the RPC, it will then send an RPC to the
+ext_authz service to determine if the RPC should be allowed.
+
+If the RPC to the ext_authz service fails, then if the
+`failure_mode_allow` config field is set to false, the data plane RPC
+will be failed with the status derived from the `status_on_error`
+config field, using the normal [HTTP-to-gRPC status conversion
+rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
+Otherwise, the data plane RPC will be allowed.  If the
+`failure_mode_allow_header_add` config field is true, then the filter
+will add a `x-envoy-auth-failure-mode-allowed: true` header to the data
+plane RPC.
+
+#### Constructing the ext_authz Request
 
 The [`AttributeContext`
 message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L43)
 sent to the server will be populated as follows:
 - [source](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L192): Will always be set.  Inside it:
+  - TODO: will this be set on client side?
   - [address](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L58)
     will be set to the peer address of the connection that the request
     came in on.
@@ -147,10 +181,13 @@ sent to the server will be populated as follows:
     SAN if set, otherwise the subject field of the certificate in RFC
     2253 format.  If TLS is not used or the client did not provide a
     cert, this field will be unset.
-  - [certificate](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L86): This will be populated if configured.
+  - [certificate](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L86):
+    This will be populated if the `include_peer_certificate` config
+    field is set to true.
   - service, labels: Will *not* be set.
 - [destination](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L197):
   Will always be set.  Inside it:
+  - TODO: will this be set on client side?
   - [address](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L58)
     will be set to the local address of the connection that the request
     came in on.
@@ -169,7 +206,12 @@ sent to the server will be populated as follows:
     - [method](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L115):
       Will always be "POST".
     - [header_map](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L143):
-      Will be set based on config.
+      The filter will iterate through each header on the data plane RPC.
+      For each header, if the header is matched by the `disallowed_headers`
+      config field, it will not be added to this map.  Otherwise,
+      if the `allowed_headers` config field is unset or matches the header,
+      the header will be added to this map.  Otherwise, the header will
+      be excluded from this map.
     - [path](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L148):
       Will always be set.
     - [size](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L165):
@@ -179,6 +221,8 @@ sent to the server will be populated as follows:
     - id, scheme, headers, query, fragment, body, raw_body: Will *not* be set.
 - context_extensions, metadata_context, route_metadata_context,
   tls_session: Will *not* be set.
+
+### Handling the ext_authz Response
 
 We will handle the [`CheckResponse`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L117)
 as follows:
@@ -196,17 +240,15 @@ as follows:
   - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L75),
     [headers_to_remove](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L92),
     [response_headers_to_add](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L104):
-    See [header rewriting](#header-rewriting) below for details.
+    gRPC will not support rewriting the `:scheme`, `:method`, `:path`,
+    `:authority`, or `host` headers, regardless of what settings are present
+    in the filter's config.  If the server specifies a rewrite for one of
+    these headers, that rewrite will be ignored.  Otherwise, header
+    rewriting will be allowed based on the `decoder_header_mutation_rules`
+    config field.
   - query_parameters_to_set, query_parameters_to_remove: Ignored; these
     do not apply to gRPC.
 - dynamic_metadata: Ignored.
-
-### Header Rewriting
-
-gRPC will not support rewriting the `:scheme`, `:method`, `:path`,
-`:authority`, or `host` headers, regardless of what settings are present
-in the ext_authz filter config.  If the server specifies a rewrite for
-one of these headers, that rewrite will be ignored.
 
 ### Temporary environment variable protection
 
