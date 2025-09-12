@@ -231,22 +231,6 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   attributes is the same as what we support for any CEL expression in xDS.
   any unsupported attribute name will be ignored.  See [Attributes Sent to
   ext_proc Server](#attributes-sent-to-the-ext_proc-server) below for details.
-- [message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L205):
-  A timeout to apply between sending an event to the ext_proc server
-  and receiving a response for that event.  If the timeout elapses
-  before a response is received, the filter treats that as if the
-  ext_proc stream failed with a non-OK status.  If unset, defaults to
-  200ms.  If present, the value must obey the restrictions specified in
-  the [`google.protobuf.Duration`
-  documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
-  and it must have a positive value.
-- [max_message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L230):
-  The maximum timeout that the ext_proc server is allowed to request an
-  increase to.  If unset, timeout overrides from the ext_proc server
-  will be ignored.  If present, the value must obey the restrictions
-  specified in the [`google.protobuf.Duration`
-  documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
-  and it must have a positive value.
 - [mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L225):
   Optional.  Inside of it:
   - [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70):
@@ -286,6 +270,8 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   and it must have a positive value.
 
 The following fields will be ignored by gRPC:
+- message_timeout and max_message_timeout: Message timeouts do not make
+  sense in GRPC body send mode.
 - http_service: It doesn't make sense for gRPC to support non-gRPC
   mechanisms for contacting the ext_authz server.
 - stat_prefix: This does not apply to gRPC.
@@ -486,8 +472,8 @@ as follows:
     to gRPC.
 - [mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L189C60-L189C73):
   See [Processing Mode Override](#processing-mode-override) below.
-- [override_message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L204C28-L204C52):
-  TODO: document behavior
+- We will ignore override_message_timeout, since GRPC body send mode
+  does not support timeouts.
 - We ignore the dynamic_metadata field, since it is not relevant to gRPC.
 
 Note that the responses from the ext_proc server must come back in the
