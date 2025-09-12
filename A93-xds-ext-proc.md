@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-08-25
+* Last updated: 2025-09-11
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -25,12 +25,12 @@ Note that this filter will make use of the `allowed_grpc_services` map in
 the bootstrap config, described in [A102].  It will also make use of the
 `trusted_xds_server` server feature introduced in [A81].
 
-### Related Proposals: 
+### Related Proposals:
 * [A39: xDS HTTP Filter Support][A39]
 * [A81: xDS Authority Rewriting][A81]
 * [A102: xDS GrpcService Support][A102] (pending)
 
-[A39]: A39-xds-http-filters.md 
+[A39]: A39-xds-http-filters.md
 [A81]: A81-xds-authority-rewriting.md
 [A102]: https://github.com/grpc/proposal/pull/510
 
@@ -72,10 +72,14 @@ the transport.
 Therefore, we propose adding a new ext_proc `BodySendMode` called
 `GRPC`.  In this mode, the ext_proc client would handle deframing the
 gRPC messages, and it would send each gRPC message to the ext_proc server
-as a separate `request_body`.  This would be the only processing mode
-supported in gRPC.  We would request that Envoy implement the same mode,
-so that users can switch back and forth between proxy and proxyless data
-planes without breaking their ext_proc servers.
+as a separate `request_body`.  This is a streaming mode, meaning that the
+ext_proc client may send a subsequent message to the ext_proc server while
+still waiting for a reply from the ext_proc server for a previous message.
+
+The new `GRPC` mode will be the only processing mode supported in gRPC.
+It would be desirable for Envoy to implement the same mode, so that
+users can switch back and forth between proxy and proxyless data planes
+without breaking their ext_proc servers.
 
 ### Filter Configuration
 
@@ -83,14 +87,18 @@ We will support the following fields in the [`ExternalProcessor`
 proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L101):
 - [grpc_service](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L129):
   This field must be present.  It will be validated as described in [A102].
-- [failure_mode_allow](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L177)
+- [failure_mode_allow](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L177):
+  By default, if the RPC to the ext_proc server fails with a non-OK
+  status, the data plane RPC will be failed with status UNAVAILABLE.  If
+  this field is set to true, then the data plane RPC will instead be
+  allowed to continue, with no further action taken by the ext_proc filter.
 - [processing_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L181):
   Required.  Inside of it:
   - [request_header_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L118),
     [response_header_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L121),
     and
     [response_trailer_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L133)
-    will be supported.
+    will be supported as described in the proto file.
   - [request_body_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L124)
     and
     [response_body_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L127):
@@ -99,10 +107,25 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
     and `GRPC` (to be added).
   - We ignore the request_trailer_mode field, since gRPC never sends
     request trailers.
+- [allow_mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L249):
+  If true, allows the ext_proc server to dynamically override the
+  processing mode for an individual data plane RPC.  TODO: should we
+  support this for GRPC mode?
 - [request_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L188)
   and
-  [response_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L195)
+  [response_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L195):
+  Attributes to be sent to ext_proc server along with client-to-server
+  and server-to-client events, respectively.  The set of supported
+  attributes is the same as what we support for any CEL expression in xDS.
+  any unsupported attribute name will be ignored.  See [Attributes Sent to
+  ext_proc Server](#attributes-sent-to-the-ext_proc-server) below for details.
 - [message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L205):
+  TODO: Describe how this works!
+  If present, the value must obey the restrictions specified in the
+  [`google.protobuf.Duration`
+  documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
+  and it must have a positive value.
+- [max_message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L230):
   If present, the value must obey the restrictions specified in the
   [`google.protobuf.Duration`
   documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
@@ -114,23 +137,21 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79)
   - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87)
   - allow_all_routing, disallow_system, allow_envoy: These fields will be ignored.
-- [max_message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L230):
-  If present, the value must obey the restrictions specified in the
-  [`google.protobuf.Duration`
-  documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
-  and it must have a positive value.
-- [forward_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L237)
-- [allow_mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L249)
-- [disable_immediate_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L256)
+- [forward_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L237):
+  TODO: document
+- [disable_immediate_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L256):
+  TODO: document
 - [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283):
-  See [Observability Mode and Flow
-  Control](#observability-mode-and-flow-control) below.
+  See [Observability Mode](#observability-mode) below.
 - [deferred_close_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L305):
+  TODO: document purpose.
   If present, the value must obey the restrictions specified in the
   [`google.protobuf.Duration`
   documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
   and it must have a positive value.
-- [send_body_without_waiting_for_header_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L321)
+- [send_body_without_waiting_for_header_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L321):
+  TODO: do we need this with GRPC body send mode?  Seems to apply only
+  to STREAMING mode.
 - [allowed_override_modes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L331):
   Same validation rules as processing_mode field above.
 
@@ -180,7 +201,45 @@ example, if there is an override config at the virtual host level that
 disables the filter but then another config at the route level that does
 not disable the filter, the filter will be enabled.
 
-### Communication With the ext_proc Server
+### Filter Behavior
+
+TODO: ExtProc channel retention (simple approach for now, probably
+globally shared channel is fine?)
+
+For every event in the data plane RPC (client headers, client message,
+client half-close, server headers, server message, and server trailers),
+the filter can be configured to send the contents of that event to the
+ext_proc server.  The specific behavior for each event is covered below.
+
+For each data plane RPC, the first time the filter needs to send an
+event to the ext_proc server, the filter will create a stream to the
+ext_proc server.  That ext_proc stream will be associated with that
+data plane RPC, and all communication with the ext_proc server for that
+specific data plane RPC will be done on that ext_proc stream.
+
+The filter can be configured to wait for a response from the ext_proc
+server for a given event before allowing that event to continue on the
+data plane RPC.  Note that even if the filter is waiting for a response
+for a given event, it may be configured to send the next event before it
+has gotten the response to the previous event, in which case there will
+be multiple events in flight on the ext_proc stream at the same time.
+For example, if the filter previously sent a message about client
+headers and is waiting for a response for that event and then sees a
+client message, it may be configured not to wait for the response to
+the client headers event before sending a message on the ext_proc stream
+about the client message.
+
+Note that the stream to the ext_proc server may be terminated at any time.
+If the stream terminates with OK status, that indicates to the filter that
+it no longer needs to send any more events to the ext_proc server for that
+data plane RPC; all remaining events may proceed on the data plane RPC
+without any further action taken by the ext_proc filter.  If the stream
+terminates with a non-OK status, then by default the data plane RPC will
+be failed with UNAVAILABLE status.  However, if the `failure_mode_allow`
+config field is set to true, then the data plane RPC will instead be
+allowed to continue, with no further action taken by the ext_proc filter.
+
+### Messages Sent To the ext_proc Server
 
 The [`ProcessingRequest`
 message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L62)
@@ -188,83 +247,190 @@ sent to the server will be populated as follows:
 - [request_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L76)
   and
   [response_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L81).
+  Populated when sending client headers or server headers, respectively.
   Inside of them:
-  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L216)
-  - [end_of_stream](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L227)
+  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L216):
+    Contains the headers.
+  - [end_of_stream](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L227):
+    This will always be false for client headers.  For server headers,
+    it will be true when the server sends a Trailers-Only response.
 - [request_body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L85)
   and
   [response_body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L89).
+  Populated when sending a client message or server message, respectively.
   Inside of them:
-  - [body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L235)
-  - [end_of_stream](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L239)
+  - [body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L235):
+    Contains the serialized message.  Will be unset if the client sends
+    a half-close when there is no message to send (i.e., if the client
+    never sent any message on the stream, or if the half-close is sent
+    after the filter has already sent the last message to the ext_proc
+    server).
+  - [end_of_stream](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L239):
+    For client messages, may be true if the client sent a half-close at
+    the same time as the last message.  For server messages, will always
+    be false.
 - [response_trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L103).
-  Inside of it:
-  - [trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L247)
-- [attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L113)
-- [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126)
+  Populated when sending server trailers.  Inside of it:
+  - [trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L247):
+    Contains the trailers.
+- [attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L113):
+  See [Attributes Sent to ext_proc
+  Server](#attributes-sent-to-the-ext_proc-server) below.
+- [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126):
+  Will be set to the value of the `observability_mode` config field.
 - Note: We will not populate request_trailers, because gRPC never sends
   request trailers.
 - Note: We will not populate metadata_context, because gRPC does not
   support dynamic metadata.
+
+#### Attributes Sent to ext_proc Server
+
+The
+[`attributes`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L113)
+field in the ext_proc request will be populated based on the filter's
+configuration.  The field will have only one entry, whose key will be
+the fixed string `envoy.filters.http.ext_proc`, and the value will be a
+`google.protobuf.Struct` message that contains a map from attribute name
+to attribute value.
+
+The list of attributes to include is specified by the
+[`request_attributes`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L188)
+config field, for client-to-server events, or the
+[`response_attributes`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L195)
+config field, for server-to-client events.  The set of supported attribute
+names is the same as what we support for any CEL expression in xDS.
+
+For example, consider the case where the `request_attributes` config
+field contains the attribute `request.path` and the filter is processing
+an RPC to the method `Service.Method`.  When sending client headers,
+client messages, or client half-close to the ext_proc server, the
+`google.protobuf.Struct` message will contain an entry with key
+`request.path` and value `/Service/Method`.
+
+### Messages Received From the ext_proc Server
 
 We will handle the [`ProcessingResponse`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L132)
 as follows:
 - [request_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L139)
   and
   [response_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L143).
+  Sent in response to client headers and server headers, respectively.
   Inside of them:
   - [response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L257).
     Inside of it:
     - [status](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L303):
-      This must be `CONTINUE`.  gRPC will not support
-      `CONTINUE_AND_REPLACE`, because those semantics don't work with
-      gRPC.
+      This must be `CONTINUE`.  gRPC will not support `CONTINUE_AND_REPLACE`,
+      because those semantics don't work with gRPC; if that value is seen,
+      the filter will cancel the ext_proc stream and treat it as if it
+      failed with a non-OK status (see above for details).
     - [header_mutation](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L308):
-      Inside of it:
-      - [set_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L375)
-      - [remove_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L379)
+      Header mutations.  See [Header rewriting](#header-rewriting) below.
     - Note: We do not support body_mutation in response to headers.
+      This field will be ignored in this context.
     - Note: We do not support trailers, since that works only with
-      `CONTINUE_AND_REPLACE`.
+      `CONTINUE_AND_REPLACE`.  This field will be ignored.
     - Note: We do not support clear_route_cache.
 - [request_body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L147)
   and
   [response_body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L151):
+  Sent in response to client messages and server messages, respectively.
   Inside of them:
   - [response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L257).
     Inside of it:
-    - [body_mutation](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L317)
-      - [body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L401)
+    - [status](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L303):
+      This must be `CONTINUE`.  gRPC will not support `CONTINUE_AND_REPLACE`,
+      because those semantics don't work with gRPC; if that value is seen,
+      the filter will cancel the ext_proc stream and treat it as if it
+      failed with a non-OK status (see above for details).
+    - [body_mutation](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L317):
+      - [body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L401):
+        Replaces the original serialized message.
       - Note: We do not support clear_body or streamed_response.
-    - Note: We do not support header mutations in response to a body.
+    - Note: We do not support header_mutation in response to a body.
+      This field will be ignored in this context.
     - Note: We do not support trailers, since that works only with
-      `CONTINUE_AND_REPLACE`.
+      `CONTINUE_AND_REPLACE`.  This field will be ignored.
     - Note: We do not support clear_route_cache.
 - [response_trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L159):
-  - [header_mutation](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L273)
-    Inside of it:
-    - [set_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L375)
-    - [remove_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L379)
+  Sent in response to server trailers.  Inside of it:
+  - [header_mutation](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L273):
+    Header mutations.  See [Header rewriting](#header-rewriting) below.
+- [immediate_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L168):
+  May be sent in response to any message from the data plane.  If sent
+  in response to a server trailers event, sets the status and optionally
+  headers to be included in the trailers.  If sent in response to any
+  other event, then the behavior differs depending on whether the
+  ext_proc filter is running on the gRPC client or the gRPC server.  On
+  the gRPC client side, it will cause the data plane RPC to immediately
+  fail with the specified status as if it were an out-of-band
+  cancellation.  On the gRPC server side, it will cause the server to
+  immediately send trailers with the specified status.  The filter may
+  cancel the ext_proc stream after seeing this.  Inside this message:
+  - [grpc_status](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L353):
+    The status code to send on the data plane RPC.
+  - [details](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L358):
+    The status message to send on the data plane RPC.
+  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L346):
+    Headers to modify.  Use of these header modifications is best effort,
+    depending on which event it was sent in response to and whether the
+    filter is running in the gRPC client or server.
+  - We will ignore the status and body fields, since these don't apply
+    to gRPC.
+- [mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L189C60-L189C73):
+  If the `allow_mode_override` config field is set to false, this field
+  will be ignored.
+  TODO: should we support this in GRPC mode?
+- [override_message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L204C28-L204C52):
+  TODO: document behavior
+- We ignore the dynamic_metadata field, since it is not relevant to gRPC.
 
-### Header Rewriting
+#### Header Rewriting
 
-gRPC will not support rewriting the `:scheme`, `:method`, `:path`,
-`:authority`, or `host` headers, regardless of what settings are present
-in the ext_proc filter config. If the server specifies a rewrite for
-one of these headers, that rewrite will be ignored.
+When responding to a client headers, server headers, or server trailers
+event, the ext_proc server can return a
+[`HeaderMutation`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L369)
+message that says how to mutate the headers.  That message will be
+handled as follows:
+- [set_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L375):
+  Headers to set or mutate.  Inside this message:
+  - [header](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L458):
+    Required.  Within it:
+    - [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
+      The header name.  Must be non-empty and all lower-case.  Length
+      must not exceed 16384.  The entry will be ignored if the key is
+      `host` or starts with a `:`.
+    - [raw_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L422):
+      The header value.  Length must not exceed 16384.
+    - The value field will be ignored.
+  - [append_action](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L476):
+    We honor the 4 enum values as described in the proto file.
+  - [keep_empty_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L480):
+    By default, any header mutation that results in a header with an
+    empty value will cause the header key to be removed.  If this field
+    is set to true, then such empty headers will be kept.
+  - We do not support the deprecated append field.
+- [remove_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L379):
+  Header names to remove.  The filter will ignore `host` and any entry
+  that starts with `:`.
 
-### Observability Mode and Flow Control
+### Observability Mode
 
-In observability mode, the contents of the data plane RPC are sent to
-the ext_proc server, but the ext_proc server is not expected to make any
-modifications to the data plane RPC, so the data plane RPC proceeds
-without waiting for a response from the ext_proc server.  One challenge
-in this mode is flow control: if we are blocked sending a message to the
-ext_proc server by flow control, then we need some push-back on the data
-plane RPC, or else we would have to buffer messages to be sent to the
-ext_proc server, which can cause OOMs.  (Envoy has noted this problem in
-https://github.com/envoyproxy/envoy/issues/33319 but has not proposed a
-solution yet.)
+If the
+[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283)
+config field is set to true, the contents of the data plane RPC events
+are sent to the ext_proc server, but the ext_proc server is not expected
+to make any modifications to the data plane RPC, so the data plane
+RPC proceeds without waiting for a response from the ext_proc server.
+Note that in this mode, all messages on the ext_proc stream will have the
+[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126)
+field set.
+
+One challenge in this mode is flow control: if we are blocked sending
+a message to the ext_proc server by flow control, then we need some
+push-back on the data plane RPC, or else we would have to buffer messages
+to be sent to the ext_proc server, which can cause OOMs.  (Envoy has
+noted this problem in https://github.com/envoyproxy/envoy/issues/33319
+but has not proposed a solution yet.)
 
 For gRPC, we will address this problem by requiring the message to the
 ext_proc server to pass flow control before we allow the message to
@@ -282,6 +448,65 @@ one:
   flow control.  So observability mode doesn't need to do anything
   special to handle flow control; it will simply not wait for the
   ext_proc response before sending the message on the data plane stream.
+
+### Sending Client Headers to the ext_proc Server
+
+If the `request_header_mode` config field is set to `SKIP`, then nothing
+will be done for this event.  The headers will be allowed to proceed on
+the data plane RPC immediately.
+
+Otherwise, the filter will create a stream to the ext_proc server for this
+data plane RPC and send a message on that stream, which will populate the
+[`request_headers`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L76)
+field with the client headers.
+
+In observability mode, the client headers will be allowed to continue on
+the data plane RPC.  Otherwise, the client headers will be delayed until
+receiving a response from the ext_proc server.
+
+### ext_proc Response for Client Headers
+
+TODO: fill this in
+
+### Sending Client Message to the ext_proc Server
+
+TODO: fill this in
+
+### ext_proc Response for Client Message
+
+TODO: fill this in
+
+### Sending Client Half-Close to the ext_proc Server
+
+TODO: fill this in
+
+### ext_proc Response for Client Half-Close
+
+TODO: fill this in
+
+### Sending Server Headers to the ext_proc Server
+
+TODO: fill this in
+
+### ext_proc Response for Server Headers
+
+TODO: fill this in
+
+### Sending Server Message to the ext_proc Server
+
+TODO: fill this in
+
+### ext_proc Response for Server Message
+
+TODO: fill this in
+
+### Sending Server Trailers to the ext_proc Server
+
+TODO: fill this in
+
+### ext_proc Response for Server Trailers
+
+TODO: fill this in
 
 ### Temporary environment variable protection
 
