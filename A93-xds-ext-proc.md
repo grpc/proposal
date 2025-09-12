@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-11
+* Last updated: 2025-09-12
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -39,6 +39,85 @@ the bootstrap config, described in [A102].  It will also make use of the
 We will support the ext_proc filter in gRPC on both the client and
 server side.
 
+### Filter Behavior
+
+TODO: ExtProc channel retention (simple approach for now, probably
+globally shared channel is fine?)
+
+For every event in the data plane RPC (client headers, client message,
+client half-close, server headers, server message, and server trailers),
+the filter can be configured to send the contents of that event to the
+ext_proc server.  The specific behavior for each event is covered below.
+
+For each data plane RPC, the first time the filter needs to send an
+event to the ext_proc server, the filter will create a stream to the
+ext_proc server.  That ext_proc stream will be associated with that
+data plane RPC, and all communication with the ext_proc server for that
+specific data plane RPC will be done on that ext_proc stream.
+
+If not in [observability mode](#observability-mode), then for each event
+that the filter sends to the ext_proc server, it will wait for a response
+from the ext_proc server before allowing that event to proceed on the data
+plane RPC.  The response from the ext_proc server will tell the filter
+what modifications to make to the event before allowing it to proceed
+on the data plane RPC (e.g., it may modify headers or message bodies).
+
+Each event should be sent on the ext_proc stream as it occurs, even if
+the filter has not yet received a response from the ext_proc server
+for a previous event, which means that there may be multiple events
+in flight on the ext_proc stream at the same time.  For example,
+if the filter previously sent a message about client headers and is
+waiting for a response for that event and then sees a client message,
+it should immediately send the message on the ext_proc stream about the
+client message event (assuming that it is configured to send the client
+message event).
+
+Note that the stream to the ext_proc server may be terminated at any time.
+If the stream terminates with OK status, that indicates to the filter that
+it no longer needs to send any more events to the ext_proc server for that
+data plane RPC; all remaining events may proceed on the data plane RPC
+without any further action taken by the ext_proc filter.  If the stream
+terminates with a non-OK status, then by default the data plane RPC will
+be failed with UNAVAILABLE status.  However, if the `failure_mode_allow`
+config field is set to true, then the data plane RPC will instead be
+allowed to continue, with no further action taken by the ext_proc filter.
+
+### Observability Mode
+
+If the
+[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283)
+config field is set to true, the contents of the data plane RPC events
+are sent to the ext_proc server, but the ext_proc server is not expected
+to make any modifications to the data plane RPC, so the data plane
+RPC proceeds without waiting for a response from the ext_proc server.
+Note that in this mode, all messages on the ext_proc stream will have the
+[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126)
+field set.
+
+One challenge in this mode is flow control: if we are blocked sending
+a message to the ext_proc server by flow control, then we need some
+push-back on the data plane RPC, or else we would have to buffer messages
+to be sent to the ext_proc server, which can cause OOMs.  (Envoy has
+noted this problem in https://github.com/envoyproxy/envoy/issues/33319
+but has not proposed a solution yet.)
+
+For gRPC, we will address this problem by requiring the message to the
+ext_proc server to pass flow control before we allow the message to
+proceed on the data plane RPC.  Due to differences in flow control
+semantics across languages, this will look a little different in each
+one:
+
+- In C-core, we will wait for the write to complete on the ext_proc
+  stream before we allow the message to continue on the data plane RPC.
+- In Java, the application has to explicitly check whether there is flow
+  control push-back before doing a write.  For the purposes of that API,
+  Java will not consider the flow control available until it passes flow
+  control on both the ext_proc stream and on the data plane stream.
+- In Go, a write is blocking and doesn't return until the write passed
+  flow control.  So observability mode doesn't need to do anything
+  special to handle flow control; it will simply not wait for the
+  ext_proc response before sending the message on the data plane stream.
+
 ### Payload Handling
 
 The existing ext_proc protocol's handling of request payloads has a
@@ -51,7 +130,7 @@ messages inside of the HTTP/2 DATA frames.  An ext_proc server accessing
 the payload for a gRPC stream is really going to be interested only in
 the deframed gRPC messages, one at a time, not the raw DATA frames.
 
-This means that any existing ext_proc server that was designed to handle
+This means that any existing ext_proc server that wants to handle
 gRPC traffic is going to have to handle deframing the gRPC messages from
 the HTTP/2 DATA frames.  It will also need to handle buffering while
 the payload is sent to it in chunks, because a single gRPC message could
@@ -60,28 +139,42 @@ work for the ext_proc server to do, so it seems better for the ext_proc
 client to do the work of deframing the gRPC messages, and sending only
 complete deframed messages to the ext_proc server, one at a time.
 
+More seriously, ext_proc currently assumes that all of the contents of
+the DATA frames are a single payload, and the ext_proc server is only
+allowed to send a single response to modify that payload.  That model is
+incompatible with gRPC streaming semantics, where the ext_proc server
+may need to modify each message individually and cannot wait until the
+end of the stream to do so.
+
 Furthermore, the ext_proc filter in gRPC will not actually have access
 to the raw HTTP/2 DATA frames in the first place.  In our architecture,
-filters see individual gRPC messages, and the framing/deframing is handled
-in the transport layer.  This means that an ext_proc filter running on the
-gRPC client side will see the messages before they have been framed to be
-sent by the transport, and an ext_proc filter running on the gRPC server
-side will see the messages after they have been received and deframed by
-the transport.
+the framing/deframing is handled in the transport layer, and filters
+see only individual gRPC messages.  This means that an ext_proc filter
+running on the gRPC client side will see the messages before they have
+been framed to be sent by the transport, and an ext_proc filter running on
+the gRPC server side will see the messages after they have been received
+and deframed by the transport.
 
-Therefore, we propose adding a new ext_proc `BodySendMode` called
-`GRPC`.  In this mode, the ext_proc client would handle deframing the
-gRPC messages, and it would send each gRPC message to the ext_proc server
-as a separate `request_body`.  This is a streaming mode, meaning that the
-ext_proc client may send a subsequent message to the ext_proc server while
-still waiting for a reply from the ext_proc server for a previous message.
+Therefore, we propose adding a new ext_proc `BodySendMode` called `GRPC`
+(see https://github.com/envoyproxy/envoy/pull/38753).  In this mode, the
+ext_proc client would handle deframing the gRPC messages.  It will send
+each gRPC message to the ext_proc server as a separate `request_body`,
+and the ext_proc server will send a separate response for each one.
+This is a streaming mode, meaning that the ext_proc client may send
+a subsequent message to the ext_proc server while still waiting for a
+reply from the ext_proc server for a previous message.
 
 The new `GRPC` mode will be the only processing mode supported in gRPC.
-It would be desirable for Envoy to implement the same mode, so that
-users can switch back and forth between proxy and proxyless data planes
-without breaking their ext_proc servers.
+It is be desirable for Envoy to implement the same mode, so that users
+can switch back and forth between proxy and proxyless data planes without
+breaking their ext_proc servers.
 
 ### Filter Configuration
+
+The filter supports both a top-level configuration and an override
+config.
+
+#### Top-Level Configuration
 
 We will support the following fields in the [`ExternalProcessor`
 proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L101):
@@ -109,8 +202,11 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
     request trailers.
 - [allow_mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L249):
   If true, allows the ext_proc server to dynamically override the
-  processing mode for an individual data plane RPC.  TODO: should we
-  support this for GRPC mode?
+  processing mode for an individual data plane RPC.
+- [allowed_override_modes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L331):
+  Ignored unless `allow_mode_override` is true.  This list indicates the
+  set of allowed override modes, ignoring the request header mode.  If
+  this list is empty, then any override sent by the server is honored.
 - [request_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L188)
   and
   [response_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L195):
@@ -120,40 +216,58 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   any unsupported attribute name will be ignored.  See [Attributes Sent to
   ext_proc Server](#attributes-sent-to-the-ext_proc-server) below for details.
 - [message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L205):
-  TODO: Describe how this works!
-  If present, the value must obey the restrictions specified in the
-  [`google.protobuf.Duration`
+  A timeout to apply between sending an event to the ext_proc server
+  and receiving a response for that event.  If the timeout elapses
+  before a response is received, the filter treats that as if the
+  ext_proc stream failed with a non-OK status.  If unset, defaults to
+  200ms.  If present, the value must obey the restrictions specified in
+  the [`google.protobuf.Duration`
   documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
   and it must have a positive value.
 - [max_message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L230):
-  If present, the value must obey the restrictions specified in the
-  [`google.protobuf.Duration`
+  The maximum timeout that the ext_proc server is allowed to request an
+  increase to.  If unset, timeout overrides from the ext_proc server
+  will be ignored.  If present, the value must obey the restrictions
+  specified in the [`google.protobuf.Duration`
   documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
   and it must have a positive value.
 - [mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L225):
   Optional.  Inside of it:
-  - [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70)
-  - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75)
-  - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79)
-  - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87)
+  - [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70):
+    If true, disallows all header mutations from the ext_proc server.
+  - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75):
+    If set, specifically allows any matching header that is not also
+    matched by `disallow_expression`.  Note that regexes should be checked
+    for validity as part of resource validation.
+  - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79):
+    If set, specifically disallows any matching header.  Note that regexes
+    should be checked for validity as part of resource validation.
+  - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87):
+    If true, a disallowed header will cause the filter to fail the data
+    plane RPC with INTERNAL status.
   - allow_all_routing, disallow_system, allow_envoy: These fields will be ignored.
 - [forward_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L237):
-  TODO: document
+  Configures which headers from the data plane RPC will be included in
+  the message to the ext_proc server.  In this message:
+  - [allowed_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L386)
+    and
+    [disallowed_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L390):
+    These fields behave as documented in the proto file.
 - [disable_immediate_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L256):
-  TODO: document
+  If true, then if the ext_proc server sends a message with the
+  `immediate_response` field populated, the filter will act as if the
+  ext_proc stream terminated with a non-OK status.
 - [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283):
   See [Observability Mode](#observability-mode) below.
 - [deferred_close_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L305):
-  TODO: document purpose.
-  If present, the value must obey the restrictions specified in the
-  [`google.protobuf.Duration`
+  In observability mode, the data plane stream may terminate before the
+  ext_proc server has finished reading all data off of the ext_proc
+  stream.  To avoid that, we delay closing the ext_proc stream from the
+  client side for a short time after the data plane stream is destroyed.
+  If unset, the delay is 5 seconds.  If present, the value must obey the
+  restrictions specified in the [`google.protobuf.Duration`
   documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
   and it must have a positive value.
-- [send_body_without_waiting_for_header_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L321):
-  TODO: do we need this with GRPC body send mode?  Seems to apply only
-  to STREAMING mode.
-- [allowed_override_modes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L331):
-  Same validation rules as processing_mode field above.
 
 The following fields will be ignored by gRPC:
 - http_service: It doesn't make sense for gRPC to support non-gRPC
@@ -164,8 +278,10 @@ The following fields will be ignored by gRPC:
 - disable_clear_route_cache, route_cache_action: We don't currently support
   recomputing the route.  We could consider adding this in the future if we
   have a use-case for it.
+- send_body_without_waiting_for_header_response: This is relevant only
+  in `STREAMED` body send mode, which gRPC does not support.
 
-### Filter Configuration Overrides
+#### Override Configuration
 
 We will support `typed_per_filter_config` config overrides for this
 filter, as described in [A39].
@@ -201,45 +317,12 @@ example, if there is an override config at the virtual host level that
 disables the filter but then another config at the route level that does
 not disable the filter, the filter will be enabled.
 
-### Filter Behavior
+### Communication With the ext_proc Server
 
-TODO: ExtProc channel retention (simple approach for now, probably
-globally shared channel is fine?)
+This section describes the protocol for communication with the ext_proc
+server.
 
-For every event in the data plane RPC (client headers, client message,
-client half-close, server headers, server message, and server trailers),
-the filter can be configured to send the contents of that event to the
-ext_proc server.  The specific behavior for each event is covered below.
-
-For each data plane RPC, the first time the filter needs to send an
-event to the ext_proc server, the filter will create a stream to the
-ext_proc server.  That ext_proc stream will be associated with that
-data plane RPC, and all communication with the ext_proc server for that
-specific data plane RPC will be done on that ext_proc stream.
-
-The filter can be configured to wait for a response from the ext_proc
-server for a given event before allowing that event to continue on the
-data plane RPC.  Note that even if the filter is waiting for a response
-for a given event, it may be configured to send the next event before it
-has gotten the response to the previous event, in which case there will
-be multiple events in flight on the ext_proc stream at the same time.
-For example, if the filter previously sent a message about client
-headers and is waiting for a response for that event and then sees a
-client message, it may be configured not to wait for the response to
-the client headers event before sending a message on the ext_proc stream
-about the client message.
-
-Note that the stream to the ext_proc server may be terminated at any time.
-If the stream terminates with OK status, that indicates to the filter that
-it no longer needs to send any more events to the ext_proc server for that
-data plane RPC; all remaining events may proceed on the data plane RPC
-without any further action taken by the ext_proc filter.  If the stream
-terminates with a non-OK status, then by default the data plane RPC will
-be failed with UNAVAILABLE status.  However, if the `failure_mode_allow`
-config field is set to true, then the data plane RPC will instead be
-allowed to continue, with no further action taken by the ext_proc filter.
-
-### Messages Sent To the ext_proc Server
+#### Messages Sent To the ext_proc Server
 
 The [`ProcessingRequest`
 message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L62)
@@ -260,7 +343,7 @@ sent to the server will be populated as follows:
   Populated when sending a client message or server message, respectively.
   Inside of them:
   - [body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L235):
-    Contains the serialized message.  Will be unset if the client sends
+    Contains the serialized message.  Will be empty if the client sends
     a half-close when there is no message to send (i.e., if the client
     never sent any message on the stream, or if the half-close is sent
     after the filter has already sent the last message to the ext_proc
@@ -278,6 +361,15 @@ sent to the server will be populated as follows:
   Server](#attributes-sent-to-the-ext_proc-server) below.
 - [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126):
   Will be set to the value of the `observability_mode` config field.
+- [protocol_config](https://github.com/envoyproxy/envoy/blob/564612e32eafc10a7a7fd490cdb5cc7149e5802b/api/envoy/service/ext_proc/v3/external_processor.proto#L153):
+  Populated only on the first message that the filter sends on the
+  ext_proc stream.  Inside of it:
+  - [request_body_mode](https://github.com/envoyproxy/envoy/blob/564612e32eafc10a7a7fd490cdb5cc7149e5802b/api/envoy/service/ext_proc/v3/external_processor.proto#L67)
+    and
+    [response_body_mode](https://github.com/envoyproxy/envoy/blob/564612e32eafc10a7a7fd490cdb5cc7149e5802b/api/envoy/service/ext_proc/v3/external_processor.proto#L72):
+    Populated from the filter config's processing mode.
+  - The send_body_without_waiting_for_header_response field will never
+    be set, since that applies only in STREAMED body send mode.
 - Note: We will not populate request_trailers, because gRPC never sends
   request trailers.
 - Note: We will not populate metadata_context, because gRPC does not
@@ -307,7 +399,7 @@ client messages, or client half-close to the ext_proc server, the
 `google.protobuf.Struct` message will contain an entry with key
 `request.path` and value `/Service/Method`.
 
-### Messages Received From the ext_proc Server
+#### Messages Received From the ext_proc Server
 
 We will handle the [`ProcessingResponse`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L132)
 as follows:
@@ -377,9 +469,7 @@ as follows:
   - We will ignore the status and body fields, since these don't apply
     to gRPC.
 - [mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L189C60-L189C73):
-  If the `allow_mode_override` config field is set to false, this field
-  will be ignored.
-  TODO: should we support this in GRPC mode?
+  See [Processing Mode Override](#processing-mode-override) below.
 - [override_message_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L204C28-L204C52):
   TODO: document behavior
 - We ignore the dynamic_metadata field, since it is not relevant to gRPC.
@@ -413,43 +503,59 @@ handled as follows:
   Header names to remove.  The filter will ignore `host` and any entry
   that starts with `:`.
 
-### Observability Mode
+#### Processing Mode Override
 
-If the
-[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283)
-config field is set to true, the contents of the data plane RPC events
-are sent to the ext_proc server, but the ext_proc server is not expected
-to make any modifications to the data plane RPC, so the data plane
-RPC proceeds without waiting for a response from the ext_proc server.
-Note that in this mode, all messages on the ext_proc stream will have the
-[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126)
-field set.
+The `mode_override` field in the ext_proc response allows the ext_proc
+server to tell the client to change its behavior for the duration of
+the RPC.  For example, the ext_proc server may decide after seeing the
+client headers event that it does not actually need to see the client
+message events.
 
-One challenge in this mode is flow control: if we are blocked sending
-a message to the ext_proc server by flow control, then we need some
-push-back on the data plane RPC, or else we would have to buffer messages
-to be sent to the ext_proc server, which can cause OOMs.  (Envoy has
-noted this problem in https://github.com/envoyproxy/envoy/issues/33319
-but has not proposed a solution yet.)
+If the `allow_mode_override` config field is set to false, then the
+`mode_override` field will be ignored.
 
-For gRPC, we will address this problem by requiring the message to the
-ext_proc server to pass flow control before we allow the message to
-proceed on the data plane RPC.  Due to differences in flow control
-semantics across languages, this will look a little different in each
-one:
+If the `allowed_override_modes` config field is non-empty and
+the value of the `mode_override` field does not match any entry in
+`allowed_override_modes`, the mode override will be ignored.  Note that
+this matching will ignore the value of the `request_header_mode` field,
+since that mode cannot be overridden.  (The filter will already have
+sent the request headers to the ext_proc server before the ext_proc
+server can send back a response changing the processing mode.)
 
-- In C-core, we will wait for the write to complete on the ext_proc
-  stream before we allow the message to continue on the data plane RPC.
-- In Java, the application has to explicitly check whether there is flow
-  control push-back before doing a write.  For the purposes of that API,
-  Java will not consider the flow control available until it passes flow
-  control on both the ext_proc stream and on the data plane stream.
-- In Go, a write is blocking and doesn't return until the write passed
-  flow control.  So observability mode doesn't need to do anything
-  special to handle flow control; it will simply not wait for the
-  ext_proc response before sending the message on the data plane stream.
+Otherwise, when the filter receives a response from the ext_proc server
+with `mode_override` set, it will comply with the requested change for
+all subsequent events on the data plane RPC.  However, note that due to
+the streaming nature of the ext_proc communication, there is no
+guarantee that the filter will see the message before it has already
+processed events from the data plane RPC that would have been affected
+by the change.
 
-### Sending Client Headers to the ext_proc Server
+A common use-case for this is when the filter is configured to send
+client messages, and in the response to the client headers event, the
+ext_proc server uses `mode_override` to set `request_body_mode` to
+`NONE`.  The filter may have already sent one or more client message
+events by the time it sees this override.  In this case, the ext_proc
+server will ignore those client message events, and the filter should (a)
+stop sending any subsequent client message events and (b) stop waiting
+for responses to any client message events that it has already sent and
+allow those client messages to proceed on the data plane RPC.
+
+Note that when using `mode_override` to *enable* sending an event that the
+filter was configured to *disable*, the event may have already occurred
+by the time the filter sees the `mode_override`.  For example, if the
+filter was originally configured to not send server headers and the
+ext_proc server tries to enable that in a response to a client message
+event, it's possible that the filter has already allowed server headers
+to proceed on the data plane RPC before it saw that `mode_override`.
+Therefore, ext_proc servers should be aware that this usage is
+best-effort and not guaranteed.
+
+### Event Handling
+
+This section documents the handling of each event in the data plane RPC
+and each response from the ext_proc server.
+
+#### Sending Client Headers to the ext_proc Server
 
 If the `request_header_mode` config field is set to `SKIP`, then nothing
 will be done for this event.  The headers will be allowed to proceed on
@@ -464,51 +570,53 @@ In observability mode, the client headers will be allowed to continue on
 the data plane RPC.  Otherwise, the client headers will be delayed until
 receiving a response from the ext_proc server.
 
-### ext_proc Response for Client Headers
+#### ext_proc Response for Client Headers
 
 TODO: fill this in
 
-### Sending Client Message to the ext_proc Server
+#### Sending Client Message to the ext_proc Server
 
 TODO: fill this in
 
-### ext_proc Response for Client Message
+#### ext_proc Response for Client Message
 
 TODO: fill this in
 
-### Sending Client Half-Close to the ext_proc Server
+#### Sending Client Half-Close to the ext_proc Server
 
 TODO: fill this in
 
-### ext_proc Response for Client Half-Close
+#### ext_proc Response for Client Half-Close
 
 TODO: fill this in
 
-### Sending Server Headers to the ext_proc Server
+#### Sending Server Headers to the ext_proc Server
 
 TODO: fill this in
 
-### ext_proc Response for Server Headers
+#### ext_proc Response for Server Headers
 
 TODO: fill this in
 
-### Sending Server Message to the ext_proc Server
+#### Sending Server Message to the ext_proc Server
 
 TODO: fill this in
 
-### ext_proc Response for Server Message
+#### ext_proc Response for Server Message
 
 TODO: fill this in
 
-### Sending Server Trailers to the ext_proc Server
+#### Sending Server Trailers to the ext_proc Server
 
 TODO: fill this in
 
-### ext_proc Response for Server Trailers
+#### ext_proc Response for Server Trailers
 
 TODO: fill this in
 
 ### Temporary environment variable protection
+
+TODO: do we need separate env vars for client and server sides?
 
 Support for the ext_proc filter will be guarded by the
 `GRPC_EXPERIMENTAL_XDS_EXT_PROC` environment variable. This guard will
@@ -519,12 +627,16 @@ be removed once the feature passes interop tests.
 For payload handling, we could have considered having the gRPC ext_proc
 filter artificially add the 5-byte gRPC frame header to each message
 that we send to the ext_proc server.  However, this seems like a
-sub-optimal approach, because (a) it would waste bandwidth sending data
-that really isn't useful, (b) it would not avoid the need for the
-ext_proc server to handle the gRPC framing, and (c) it would further
-spread use of the gRPC framing to ext_proc servers, which will make it
-awkward for gRPC to support other transports with different framing in
-the future.
+sub-optimal approach, for the following reasons:
+- It would still not work for streaming cases, where the ext_proc server
+  needs to be able to modify individual messages as they are sent,
+  rather than only modifying the entire stream as a single payload.
+- It would waste bandwidth sending data that really isn't useful.
+- It would not avoid the need for the ext_proc server to handle the
+  gRPC framing.
+- It would further spread use of the gRPC framing to ext_proc servers,
+  which will make it awkward for gRPC to support other transports with
+  different framing in the future.
 
 ## Implementation
 
