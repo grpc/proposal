@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-10
+* Last updated: 2025-09-12
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -153,7 +153,10 @@ rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md)
 Otherwise, the RPC will be passed to the next filter without modification.
 
 If the filter is enabled for the RPC, it will then send an RPC to the
-ext_authz service to determine if the RPC should be allowed.
+ext_authz service to determine if the RPC should be allowed.  The filter
+will pass the trace context from the data plane RPC to the ext_authz
+RPC, so that the ext_authz RPC appears as a child span on the data plane
+RPC's trace.
 
 If the RPC to the ext_authz service fails, then if the
 `failure_mode_allow` config field is set to false, the data plane RPC
