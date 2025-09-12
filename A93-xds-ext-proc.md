@@ -82,7 +82,7 @@ be failed with UNAVAILABLE status.  However, if the `failure_mode_allow`
 config field is set to true, then the data plane RPC will instead be
 allowed to continue, with no further action taken by the ext_proc filter.
 
-### Observability Mode
+#### Observability Mode
 
 If the
 [`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283)
@@ -118,7 +118,7 @@ one:
   special to handle flow control; it will simply not wait for the
   ext_proc response before sending the message on the data plane stream.
 
-### Payload Handling
+#### Payload Handling
 
 The existing ext_proc protocol's handling of request payloads has a
 significant impedence mismatch with gRPC.
