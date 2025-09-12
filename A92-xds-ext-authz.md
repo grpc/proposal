@@ -40,7 +40,50 @@ the bootstrap config, described in [A102].  It will also make use of the
 
 ## Proposal
 
+We will support the ext_authz filter on both the gRPC client and server
+side.
+
+### Filter Behavior
+
+TODO: ExtAuthz channel retention (simple approach for now, probably
+globally shared channel is fine?)
+
+On both the gRPC client and server side, the ext_authz filter will perform
+the per-RPC authorization check when it sees the client's initial metadata
+(i.e., at the start of the stream).
+
+If the `filter_enabled` config field is set to a value less than
+100%, the filter will generate a random number in the range [0,
+100] for the RPC, and if that random number is greater than or
+equal to the configured `filter_enabled` value, then the ext_authz
+filter is not considered enabled for that RPC.  In that case, if
+the `deny_at_disable` config field is set to true, then the RPC
+will be failed with the status derived from the `status_on_error`
+config field, using the normal [HTTP-to-gRPC status conversion
+rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
+Otherwise, the RPC will be passed to the next filter without modification.
+
+If the filter is enabled for the RPC, it will then send an RPC to the
+ext_authz service to determine if the RPC should be allowed.  The filter
+will pass the trace context from the data plane RPC to the ext_authz
+RPC, so that the ext_authz RPC appears as a child span on the data plane
+RPC's trace.
+
+If the RPC to the ext_authz service fails, then if the
+`failure_mode_allow` config field is set to false, the data plane RPC
+will be failed with the status derived from the `status_on_error`
+config field, using the normal [HTTP-to-gRPC status conversion
+rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
+Otherwise, the data plane RPC will be allowed.  If the
+`failure_mode_allow_header_add` config field is true, then the filter
+will add a `x-envoy-auth-failure-mode-allowed: true` header to the data
+plane RPC.
+
 ### Filter Configuration
+
+The filter supports both a top-level configuration and an override config.
+
+#### Top-Level Configuration
 
 We will support the following fields in the [`ExtAuthz`
 proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L34):
@@ -106,7 +149,7 @@ The following fields will be ignored by gRPC:
   we could consider adding it in the future if we do encounter such a
   use-case.
 
-### Filter Configuration Overrides
+#### Override Configuration
 
 We will support `typed_per_filter_config` config overrides for this
 filter, as described in [A39].
@@ -132,41 +175,9 @@ example, if there is an override config at the virtual host level that
 disables the filter but then another config at the route level that does
 not disable the filter, the filter will be enabled.
 
-### Filter Behavior
+### The ext_authz Protocol
 
-TODO: ExtAuthz channel retention (simple approach for now, probably
-globally shared channel is fine?)
-
-On both the gRPC client and server side, the ext_authz filter will perform
-the per-RPC authorization check when it sees the client's initial metadata
-(i.e., at the start of the stream).
-
-If the `filter_enabled` config field is set to a value less than
-100%, the filter will generate a random number in the range [0,
-100] for the RPC, and if that random number is greater than or
-equal to the configured `filter_enabled` value, then the ext_authz
-filter is not considered enabled for that RPC.  In that case, if
-the `deny_at_disable` config field is set to true, then the RPC
-will be failed with the status derived from the `status_on_error`
-config field, using the normal [HTTP-to-gRPC status conversion
-rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-Otherwise, the RPC will be passed to the next filter without modification.
-
-If the filter is enabled for the RPC, it will then send an RPC to the
-ext_authz service to determine if the RPC should be allowed.  The filter
-will pass the trace context from the data plane RPC to the ext_authz
-RPC, so that the ext_authz RPC appears as a child span on the data plane
-RPC's trace.
-
-If the RPC to the ext_authz service fails, then if the
-`failure_mode_allow` config field is set to false, the data plane RPC
-will be failed with the status derived from the `status_on_error`
-config field, using the normal [HTTP-to-gRPC status conversion
-rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-Otherwise, the data plane RPC will be allowed.  If the
-`failure_mode_allow_header_add` config field is true, then the filter
-will add a `x-envoy-auth-failure-mode-allowed: true` header to the data
-plane RPC.
+This section describes the ext_authz protocol.
 
 #### Constructing the ext_authz Request
 
@@ -225,7 +236,7 @@ sent to the server will be populated as follows:
 - context_extensions, metadata_context, route_metadata_context,
   tls_session: Will *not* be set.
 
-### Handling the ext_authz Response
+#### Handling the ext_authz Response
 
 We will handle the [`CheckResponse`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L117)
 as follows:
@@ -254,6 +265,8 @@ as follows:
 - dynamic_metadata: Ignored.
 
 ### Temporary environment variable protection
+
+TODO: do we need a separate env var for client and server sides?
 
 Support for the `ext_authz` filter will be guarded by the
 `GRPC_EXPERIMENTAL_XDS_EXT_AUTHZ` environment variable.  This guard will
