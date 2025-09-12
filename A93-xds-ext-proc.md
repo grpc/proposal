@@ -120,6 +120,20 @@ one:
   special to handle flow control; it will simply not wait for the
   ext_proc response before sending the message on the data plane stream.
 
+#### Flow Control and Streaming RPCs
+
+If not in observability mode, if the data plane RPC is a streaming RPC,
+then there may be multiple client messages or server messages queued up
+at the same time waiting for responses from the ext_proc server.  Note
+that we specifically do *not* want to wait until we see a response from
+one message before sending the next message to the ext_proc server,
+because that would add per-message latency for a full round-trip to the
+ext_proc server, which would dramatically affect streaming performance.
+
+Implementations must ensure proper flow control for this situation.
+
+TODO: figure out details of how this will work
+
 #### Payload Handling
 
 The existing ext_proc protocol's handling of request payloads has a
@@ -476,6 +490,13 @@ as follows:
   TODO: document behavior
 - We ignore the dynamic_metadata field, since it is not relevant to gRPC.
 
+Note that the responses from the ext_proc server must come back in the
+same order that the events were sent by the filter.  For example, if the
+client sends a client headers event and a client message event and the
+ext_proc server responds to the client message event first, that is
+considered a protocol error.  The filter will treat that as if the
+ext_proc stream failed with a non-OK status.
+
 #### Header Rewriting
 
 When responding to a client headers, server headers, or server trailers
@@ -552,69 +573,10 @@ to proceed on the data plane RPC before it saw that `mode_override`.
 Therefore, ext_proc servers should be aware that this usage is
 best-effort and not guaranteed.
 
-### Event Handling
-
-This section documents the handling of each event in the data plane RPC
-and each response from the ext_proc server.
-
-#### Sending Client Headers to the ext_proc Server
-
-If the `request_header_mode` config field is set to `SKIP`, then nothing
-will be done for this event.  The headers will be allowed to proceed on
-the data plane RPC immediately.
-
-Otherwise, the filter will create a stream to the ext_proc server for this
-data plane RPC and send a message on that stream, which will populate the
-[`request_headers`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L76)
-field with the client headers.
-
-In observability mode, the client headers will be allowed to continue on
-the data plane RPC.  Otherwise, the client headers will be delayed until
-receiving a response from the ext_proc server.
-
-#### ext_proc Response for Client Headers
-
-TODO: fill this in
-
-#### Sending Client Message to the ext_proc Server
-
-TODO: fill this in
-
-#### ext_proc Response for Client Message
-
-TODO: fill this in
-
-#### Sending Client Half-Close to the ext_proc Server
-
-TODO: fill this in
-
-#### ext_proc Response for Client Half-Close
-
-TODO: fill this in
-
-#### Sending Server Headers to the ext_proc Server
-
-TODO: fill this in
-
-#### ext_proc Response for Server Headers
-
-TODO: fill this in
-
-#### Sending Server Message to the ext_proc Server
-
-TODO: fill this in
-
-#### ext_proc Response for Server Message
-
-TODO: fill this in
-
-#### Sending Server Trailers to the ext_proc Server
-
-TODO: fill this in
-
-#### ext_proc Response for Server Trailers
-
-TODO: fill this in
+To implement this, the filter will store the processing mode separately
+for each data plane RPC.  The processing mode for an RPC will be
+initialized based on the filter's config, but it may be modified later
+by subsequent overrides.
 
 ### Temporary environment variable protection
 
