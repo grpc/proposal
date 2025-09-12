@@ -185,6 +185,15 @@ It is be desirable for Envoy to implement the same mode, so that users
 can switch back and forth between proxy and proxyless data planes without
 breaking their ext_proc servers.
 
+#### Metrics
+
+TODO: define metrics for tracking time between entering and exiting the
+ext_proc filter for the following events:
+- client headers
+- client half-close
+- server headers
+- server trailers
+
 ### Filter Configuration
 
 The filter supports both a top-level configuration and an override
