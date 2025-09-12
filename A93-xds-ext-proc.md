@@ -49,11 +49,13 @@ client half-close, server headers, server message, and server trailers),
 the filter can be configured to send the contents of that event to the
 ext_proc server.  The specific behavior for each event is covered below.
 
-For each data plane RPC, the first time the filter needs to send an
-event to the ext_proc server, the filter will create a stream to the
-ext_proc server.  That ext_proc stream will be associated with that
-data plane RPC, and all communication with the ext_proc server for that
-specific data plane RPC will be done on that ext_proc stream.
+For each data plane RPC, the first time the filter needs to send an event
+to the ext_proc server, the filter will create a stream to the ext_proc
+server.  That ext_proc stream will be associated with that data plane RPC,
+and all communication with the ext_proc server for that specific data
+plane RPC will be done on that ext_proc stream.  The filter will pass
+the trace context from the data plane RPC to the ext_proc RPC, so that
+the ext_proc RPC appears as a child span on the data plane RPC's trace.
 
 If not in [observability mode](#observability-mode), then for each event
 that the filter sends to the ext_proc server, it will wait for a response
