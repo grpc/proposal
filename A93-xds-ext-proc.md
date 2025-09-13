@@ -47,7 +47,9 @@ globally shared channel is fine?)
 For every event in the data plane RPC (client headers, client message,
 client half-close, server headers, server message, and server trailers),
 the filter can be configured to send the contents of that event to the
-ext_proc server.  The specific behavior for each event is covered below.
+ext_proc server.  The responses from the ext_proc server will indicate
+what modifications to make to the data plane RPC before allowing it to
+proceed.  The specific behavior for each event is covered below.
 
 For each data plane RPC, the first time the filter needs to send an event
 to the ext_proc server, the filter will create a stream to the ext_proc
@@ -56,23 +58,6 @@ and all communication with the ext_proc server for that specific data
 plane RPC will be done on that ext_proc stream.  The filter will pass
 the trace context from the data plane RPC to the ext_proc RPC, so that
 the ext_proc RPC appears as a child span on the data plane RPC's trace.
-
-If not in [observability mode](#observability-mode), then for each event
-that the filter sends to the ext_proc server, it will wait for a response
-from the ext_proc server before allowing that event to proceed on the data
-plane RPC.  The response from the ext_proc server will tell the filter
-what modifications to make to the event before allowing it to proceed
-on the data plane RPC (e.g., it may modify headers or message bodies).
-
-Each event should be sent on the ext_proc stream as it occurs, even if
-the filter has not yet received a response from the ext_proc server
-for a previous event, which means that there may be multiple events
-in flight on the ext_proc stream at the same time.  For example,
-if the filter previously sent a message about client headers and is
-waiting for a response for that event and then sees a client message,
-it should immediately send the message on the ext_proc stream about the
-client message event (assuming that it is configured to send the client
-message event).
 
 Note that the stream to the ext_proc server may be terminated at any time.
 If the stream terminates with OK status, that indicates to the filter that
@@ -83,6 +68,48 @@ terminates with a non-OK status, then by default the data plane RPC will
 be failed with UNAVAILABLE status.  However, if the `failure_mode_allow`
 config field is set to true, then the data plane RPC will instead be
 allowed to continue, with no further action taken by the ext_proc filter.
+
+#### Events on the ext_proc Stream
+
+On the ext_proc stream, the events sent and received must be in the same
+order as on the data plane.  For client-to-server events, the order must
+be headers, followed by zero or more messages, followed by a half-close.
+For server-to-client events, the order must be headers, followed by zero
+or more messages, followed by trailers.  It is fine to interleave
+client-to-server events with server-to-client events, since the two
+directions are independent of each other.  It is also fine for some of
+the events to be missing on the ext_proc stream; for example, if the
+filter is not configured to send client headers but is configured to
+send client messages, then it can start by sending a client message.
+But if two different events are sent on the stream, they must be in the
+correct order relative to each other, both to and from the ext_proc
+server.
+
+When sending client headers, server headers, and server trailers events to
+the ext_proc server, if not in [observability mode](#observability-mode),
+the filter will hold on to the headers and wait for a response for that
+event from the ext_proc server before allowing the event to proceed on
+the data plane RPC.  The response from the ext_proc server will tell
+the filter what modifications to make to the headers before allowing
+them to proceed on the data plane RPC.
+
+In contrast, when sending client or server messages to the ext_proc
+server, if not in [observability mode](#observability-mode), the
+filter will *not* hold on to the contents of those messages.  Instead,
+the ext_proc server will be responsible for sending back the full set of
+messages to be used on the data plane RPC.  That set of messages may have
+absolutely no relationship to the messages originally sent to the ext_proc
+server; the ext_proc server may decide to drop messages, modify messages,
+pass messages back unmodified, or completely replace all of the messages
+on the stream.  Note that the number of messages produced by the ext_proc
+server may not match the number of messages originally sent to it.
+
+Events on the data plane RPC should be sent on the ext_proc stream as
+they occur, even if the filter has not yet received a response from the
+ext_proc server for a previous event.  For example, if the filter is
+waiting for a response for client headers, if it sees a client message,
+it can send the client message event on the ext_proc stream immediately
+(assuming it is configured to send client messages).
 
 #### Observability Mode
 
@@ -119,20 +146,6 @@ one:
   flow control.  So observability mode doesn't need to do anything
   special to handle flow control; it will simply not wait for the
   ext_proc response before sending the message on the data plane stream.
-
-#### Flow Control and Streaming RPCs
-
-If not in observability mode, if the data plane RPC is a streaming RPC,
-then there may be multiple client messages or server messages queued up
-at the same time waiting for responses from the ext_proc server.  Note
-that we specifically do *not* want to wait until we see a response from
-one message before sending the next message to the ext_proc server,
-because that would add per-message latency for a full round-trip to the
-ext_proc server, which would dramatically affect streaming performance.
-
-Implementations must ensure proper flow control for this situation.
-
-TODO: figure out details of how this will work
 
 #### Payload Handling
 
@@ -176,9 +189,8 @@ Therefore, we propose adding a new ext_proc `BodySendMode` called `GRPC`
 ext_proc client would handle deframing the gRPC messages.  It will send
 each gRPC message to the ext_proc server as a separate `request_body`,
 and the ext_proc server will send a separate response for each one.
-This is a streaming mode, meaning that the ext_proc client may send
-a subsequent message to the ext_proc server while still waiting for a
-reply from the ext_proc server for a previous message.
+This is a streaming mode similar to the existing `FULL_DUPLEX_STREAMED`
+mode.
 
 The new `GRPC` mode will be the only processing mode supported in gRPC.
 It is be desirable for Envoy to implement the same mode, so that users
@@ -596,6 +608,17 @@ sub-optimal approach, for the following reasons:
 - It would further spread use of the gRPC framing to ext_proc servers,
   which will make it awkward for gRPC to support other transports with
   different framing in the future.
+
+We considered supporting non-streaming body send modes, but that would
+have significantly increased latency for streaming RPCs, because we would
+have needed to wait a full RTT with the ext_proc server between each
+message on the stream.  We also considered a more pipelined approach
+where the data plane would have queued the messages and the ext_proc
+server would have been required to send back a response for each message
+indicating an optional replacement, but that approach would have (a)
+not allowed the ext_proc server to modify the number of messages on
+the stream and (b) would have required implementing some form of flow
+control to impose push-back upon hitting some maximum buffer size.
 
 ## Implementation
 
