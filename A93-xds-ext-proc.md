@@ -458,9 +458,14 @@ as follows:
       the filter will cancel the ext_proc stream and treat it as if it
       failed with a non-OK status (see above for details).
     - [body_mutation](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L317):
-      - [body](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L401):
-        Replaces the original serialized message.
-      - Note: We do not support clear_body or streamed_response.
+      - [streamed_response](https://github.com/envoyproxy/envoy/blob/564612e32eafc10a7a7fd490cdb5cc7149e5802b/api/envoy/service/ext_proc/v3/external_processor.proto#L447):
+        Replaces the original serialized message.  Within it:
+        - [body](https://github.com/envoyproxy/envoy/blob/564612e32eafc10a7a7fd490cdb5cc7149e5802b/api/envoy/service/ext_proc/v3/external_processor.proto#L419):
+          The serialized message body.
+        - [end_of_stream](https://github.com/envoyproxy/envoy/blob/564612e32eafc10a7a7fd490cdb5cc7149e5802b/api/envoy/service/ext_proc/v3/external_processor.proto#L424C8-L424C21):
+          If true, indicates that a half-close should be sent after the
+          message.  Honored only on client-to-server messages.
+      - Note: We do not support body or clear_body.
     - Note: We do not support header_mutation in response to a body.
       This field will be ignored in this context.
     - Note: We do not support trailers, since that works only with
@@ -493,6 +498,12 @@ as follows:
     to gRPC.
 - [mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L189C60-L189C73):
   See [Processing Mode Override](#processing-mode-override) below.
+- request_drain (new field being added in
+  https://github.com/envoyproxy/envoy/pull/38753): If true, the filter
+  will send a half-close on the ext_proc stream.  It will then continue
+  sending message bodies received from the ext_proc server until the
+  ext_proc stream terminates with OK status.  After that, any subsequent
+  message on the stream will be passed through as-is.
 - We will ignore override_message_timeout, since GRPC body send mode
   does not support timeouts.
 - We ignore the dynamic_metadata field, since it is not relevant to gRPC.
