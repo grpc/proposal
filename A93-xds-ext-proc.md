@@ -209,44 +209,6 @@ It is be desirable for Envoy to implement the same mode, so that users
 can switch back and forth between proxy and proxyless data planes without
 breaking their ext_proc servers.
 
-#### Metrics
-
-The ext_authz filter will export metrics using the non-per-call metrics
-architecture defined in [A79].  There will be a separate set of metrics
-on client side and server side, because (a) there are additional labels
-that are relevant on the client but not on the server, and (b) it may be
-useful to differentiate between authorization behavior on the client vs.
-the server.
-
-##### Client-Side Metrics
-
-The client-side metrics will have the following labels:
-
-| Name        | Disposition | Description |
-| ----------- | ----------- | ----------- |
-| grpc.target | required | The target of the gRPC channel in which ext_authz is used, as the defined in [A66]. |
-| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as defined in [A89].  This will be populated from the xDS cluster name, which will be passed to the ext_authz filter as described in [A60]. |
-
-The following client-side metrics will be exported:
-
-| Name          | Type  | Unit  | Labels  | Description |
-| ------------- | ----- | ----- | ------- | ----------- |
-| grpc.client_ext_proc.client_headers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the client's headers and when it allows those headers to continue on to the next filter. |
-| grpc.client_ext_proc.client_half_close_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the client's half-close and when it allows that half-close to continue on to the next filter. |
-| grpc.client_ext_proc.server_headers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the server's headers and when it allows those headers to continue on to the next filter. |
-| grpc.client_ext_proc.server_trailers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the server's trailers and when it allows those trailers to continue on to the next filter. |
-
-##### Server-Side Metrics
-
-The following server-side metrics will be exported:
-
-| Name          | Type  | Unit  | Labels  | Description |
-| ------------- | ----- | ----- | ------- | ----------- |
-| grpc.server_ext_proc.client_headers_duration | Histogram | s | | Time between when the ext_proc filter sees the client's headers and when it allows those headers to continue on to the next filter. |
-| grpc.server_ext_proc.client_half_close_duration | Histogram | s | | Time between when the ext_proc filter sees the client's half-close and when it allows that half-close to continue on to the next filter. |
-| grpc.server_ext_proc.server_headers_duration | Histogram | s | | Time between when the ext_proc filter sees the server's headers and when it allows those headers to continue on to the next filter. |
-| grpc.server_ext_proc.server_trailers_duration | Histogram | s | | Time between when the ext_proc filter sees the server's trailers and when it allows those trailers to continue on to the next filter. |
-
 ### Filter Configuration
 
 The filter supports both a top-level configuration and an override
@@ -645,6 +607,44 @@ To implement this, the filter will store the processing mode separately
 for each data plane RPC.  The processing mode for an RPC will be
 initialized based on the filter's config, but it may be modified later
 by subsequent overrides.
+
+### Metrics
+
+The ext_authz filter will export metrics using the non-per-call metrics
+architecture defined in [A79].  There will be a separate set of metrics
+on client side and server side, because (a) there are additional labels
+that are relevant on the client but not on the server, and (b) it may be
+useful to differentiate between authorization behavior on the client vs.
+the server.
+
+#### Client-Side Metrics
+
+The client-side metrics will have the following labels:
+
+| Name        | Disposition | Description |
+| ----------- | ----------- | ----------- |
+| grpc.target | required | The target of the gRPC channel in which ext_authz is used, as the defined in [A66]. |
+| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as defined in [A89].  This will be populated from the xDS cluster name, which will be passed to the ext_authz filter as described in [A60]. |
+
+The following client-side metrics will be exported:
+
+| Name          | Type  | Unit  | Labels  | Description |
+| ------------- | ----- | ----- | ------- | ----------- |
+| grpc.client_ext_proc.client_headers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the client's headers and when it allows those headers to continue on to the next filter. |
+| grpc.client_ext_proc.client_half_close_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the client's half-close and when it allows that half-close to continue on to the next filter. |
+| grpc.client_ext_proc.server_headers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the server's headers and when it allows those headers to continue on to the next filter. |
+| grpc.client_ext_proc.server_trailers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the server's trailers and when it allows those trailers to continue on to the next filter. |
+
+#### Server-Side Metrics
+
+The following server-side metrics will be exported:
+
+| Name          | Type  | Unit  | Labels  | Description |
+| ------------- | ----- | ----- | ------- | ----------- |
+| grpc.server_ext_proc.client_headers_duration | Histogram | s | | Time between when the ext_proc filter sees the client's headers and when it allows those headers to continue on to the next filter. |
+| grpc.server_ext_proc.client_half_close_duration | Histogram | s | | Time between when the ext_proc filter sees the client's half-close and when it allows that half-close to continue on to the next filter. |
+| grpc.server_ext_proc.server_headers_duration | Histogram | s | | Time between when the ext_proc filter sees the server's headers and when it allows those headers to continue on to the next filter. |
+| grpc.server_ext_proc.server_trailers_duration | Histogram | s | | Time between when the ext_proc filter sees the server's trailers and when it allows those trailers to continue on to the next filter. |
 
 ### Temporary environment variable protection
 
