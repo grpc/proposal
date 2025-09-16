@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-12
+* Last updated: 2025-09-16
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -29,10 +29,18 @@ the bootstrap config, described in [A102].  It will also make use of the
 * [A39: xDS HTTP Filter Support][A39]
 * [A81: xDS Authority Rewriting][A81]
 * [A102: xDS GrpcService Support][A102] (pending)
+* [A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
+* [A79: Non-Per-Call Metrics Architecture][A79]
+* [A66: OpenTelemetry Metrics][A66]
+* [A89: Backend Service Metric Label][A89]
 
 [A39]: A39-xds-http-filters.md
 [A81]: A81-xds-authority-rewriting.md
 [A102]: https://github.com/grpc/proposal/pull/510
+[A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
+[A79]: A79-non-per-call-metrics-architecture.md
+[A89]: A89-backend-service-metric-label.md
+[A66]: A66-otel-stats.md
 
 ## Proposal
 
@@ -199,12 +207,41 @@ breaking their ext_proc servers.
 
 #### Metrics
 
-TODO: define metrics for tracking time between entering and exiting the
-ext_proc filter for the following events:
-- client headers
-- client half-close
-- server headers
-- server trailers
+The ext_authz filter will export metrics using the non-per-call metrics
+architecture defined in [A79].  There will be a separate set of metrics
+on client side and server side, because (a) there are additional labels
+that are relevant on the client but not on the server, and (b) it may be
+useful to differentiate between authorization behavior on the client vs.
+the server.
+
+##### Client-Side Metrics
+
+The client-side metrics will have the following labels:
+
+| Name        | Disposition | Description |
+| ----------- | ----------- | ----------- |
+| grpc.target | required | The target of the gRPC channel in which ext_authz is used, as the defined in [A66]. |
+| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as defined in [A89].  This will be populated from the xDS cluster name, which will be passed to the ext_authz filter as described in [A60]. |
+
+The following client-side metrics will be exported:
+
+| Name          | Type  | Unit  | Labels  | Description |
+| ------------- | ----- | ----- | ------- | ----------- |
+| grpc.client_ext_proc.client_headers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the client's headers and when it allows those headers to continue on to the next filter. |
+| grpc.client_ext_proc.client_half_close_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the client's half-close and when it allows that half-close to continue on to the next filter. |
+| grpc.client_ext_proc.server_headers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the server's headers and when it allows those headers to continue on to the next filter. |
+| grpc.client_ext_proc.server_trailers_duration | Histogram | s | grpc.target, grpc.lb.backend_service | Time between when the ext_proc filter sees the server's trailers and when it allows those trailers to continue on to the next filter. |
+
+##### Server-Side Metrics
+
+The following server-side metrics will be exported:
+
+| Name          | Type  | Unit  | Labels  | Description |
+| ------------- | ----- | ----- | ------- | ----------- |
+| grpc.server_ext_proc.client_headers_duration | Histogram | s | | Time between when the ext_proc filter sees the client's headers and when it allows those headers to continue on to the next filter. |
+| grpc.server_ext_proc.client_half_close_duration | Histogram | s | | Time between when the ext_proc filter sees the client's half-close and when it allows that half-close to continue on to the next filter. |
+| grpc.server_ext_proc.server_headers_duration | Histogram | s | | Time between when the ext_proc filter sees the server's headers and when it allows those headers to continue on to the next filter. |
+| grpc.server_ext_proc.server_trailers_duration | Histogram | s | | Time between when the ext_proc filter sees the server's trailers and when it allows those trailers to continue on to the next filter. |
 
 ### Filter Configuration
 
