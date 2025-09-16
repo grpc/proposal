@@ -67,16 +67,6 @@ plane RPC will be done on that ext_proc stream.  The filter will pass
 the trace context from the data plane RPC to the ext_proc RPC, so that
 the ext_proc RPC appears as a child span on the data plane RPC's trace.
 
-Note that the stream to the ext_proc server may be terminated at any time.
-If the stream terminates with OK status, that indicates to the filter that
-it no longer needs to send any more events to the ext_proc server for that
-data plane RPC; all remaining events may proceed on the data plane RPC
-without any further action taken by the ext_proc filter.  If the stream
-terminates with a non-OK status, then by default the data plane RPC will
-be failed with UNAVAILABLE status.  However, if the `failure_mode_allow`
-config field is set to true, then the data plane RPC will instead be
-allowed to continue, with no further action taken by the ext_proc filter.
-
 #### Events on the ext_proc Stream
 
 On the ext_proc stream, the events sent and received must be in the same
@@ -112,7 +102,7 @@ pass messages back unmodified, or completely replace all of the messages
 on the stream.  Note that the number of messages produced by the ext_proc
 server may not match the number of messages originally sent to it.
 
-A client half-close is typically represented to the ext_proc server as an
+A client half-close is represented to the ext_proc server as an
 end-of-stream indicator on a header or message event, rather than being
 a discrete event.
 
@@ -123,41 +113,40 @@ waiting for a response for client headers, if it sees a client message,
 it can send the client message event on the ext_proc stream immediately
 (assuming it is configured to send client messages).
 
-#### Observability Mode
+#### Early Termination of ext_proc Stream
 
-If the
-[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283)
-config field is set to true, the contents of the data plane RPC events
-are sent to the ext_proc server, but the ext_proc server is not expected
-to make any modifications to the data plane RPC, so the data plane
-RPC proceeds without waiting for a response from the ext_proc server.
-Note that in this mode, all messages on the ext_proc stream will have the
-[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126)
-field set.
+The stream to the ext_proc server may be terminated at any time.
 
-One challenge in this mode is flow control: if we are blocked sending
-a message to the ext_proc server by flow control, then we need some
-push-back on the data plane RPC, or else we would have to buffer messages
-to be sent to the ext_proc server, which can cause OOMs.  (Envoy has
-noted this problem in https://github.com/envoyproxy/envoy/issues/33319
-but has not proposed a solution yet.)
+If the stream terminates with a non-OK status, then by default the
+data plane RPC will be failed with UNAVAILABLE status.  However, if the
+`failure_mode_allow` config field is set to true, then the data plane
+RPC will instead be allowed to continue, with no further action taken
+by the ext_proc filter.
 
-For gRPC, we will address this problem by requiring the message to the
-ext_proc server to pass flow control before we allow the message to
-proceed on the data plane RPC.  Due to differences in flow control
-semantics across languages, this will look a little different in each
-one:
+If the stream terminates with OK status, that indicates to the filter that
+it no longer needs to send any more events to the ext_proc server for that
+data plane RPC; all remaining events may proceed on the data plane RPC
+without any further action taken by the ext_proc filter.  However, in
+streaming RPCs, it may be necessary for the ext_proc server to drain the
+stream before terminating.  This is because the filter may have already sent
+messages on the stream that the server has not yet seen, and if the
+server never echoes them back, then the messages will simply be dropped
+from the stream.  In order to avoid that, the following drain procedure
+will be used:
 
-- In C-core, we will wait for the write to complete on the ext_proc
-  stream before we allow the message to continue on the data plane RPC.
-- In Java, the application has to explicitly check whether there is flow
-  control push-back before doing a write.  For the purposes of that API,
-  Java will not consider the flow control available until it passes flow
-  control on both the ext_proc stream and on the data plane stream.
-- In Go, a write is blocking and doesn't return until the write passes
-  flow control.  So observability mode doesn't need to do anything
-  special to handle flow control; it will simply not wait for the
-  ext_proc response before sending the message on the data plane stream.
+1. The ext_proc server will send an ext_proc response with the
+   `request_drain` field (see https://github.com/envoyproxy/envoy/pull/38753)
+   set to true.  The filter will react by sending a half-close on the
+   ext_proc stream.  Note that at this point, the filter must stop
+   reading messages from the data plane stream, so that flow control
+   push-back occurs.
+2. The ext_proc server will echo all messages received from the filter
+   back to the filter without modification, until it sees the half close
+   from the filter.  It will then terminate the ext_proc stream with OK
+   status.
+3. When the filter sees the ext_proc stream terminate with OK status, it
+   will resume reading messages from the data plane stream, and all such
+   messages will proceed on the data plane stream without modification.
 
 #### Payload Handling
 
@@ -208,6 +197,42 @@ The new `GRPC` mode will be the only processing mode supported in gRPC.
 It is be desirable for Envoy to implement the same mode, so that users
 can switch back and forth between proxy and proxyless data planes without
 breaking their ext_proc servers.
+
+#### Observability Mode
+
+If the
+[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283)
+config field is set to true, the contents of the data plane RPC events
+are sent to the ext_proc server, but the ext_proc server is not expected
+to make any modifications to the data plane RPC, so the data plane
+RPC proceeds without waiting for a response from the ext_proc server.
+Note that in this mode, all messages on the ext_proc stream will have the
+[`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126)
+field set.
+
+One challenge in this mode is flow control: if we are blocked sending
+a message to the ext_proc server by flow control, then we need some
+push-back on the data plane RPC, or else we would have to buffer messages
+to be sent to the ext_proc server, which can cause OOMs.  (Envoy has
+noted this problem in https://github.com/envoyproxy/envoy/issues/33319
+but has not proposed a solution yet.)
+
+For gRPC, we will address this problem by requiring the message to the
+ext_proc server to pass flow control before we allow the message to
+proceed on the data plane RPC.  Due to differences in flow control
+semantics across languages, this will look a little different in each
+one:
+
+- In C-core, we will wait for the write to complete on the ext_proc
+  stream before we allow the message to continue on the data plane RPC.
+- In Java, the application has to explicitly check whether there is flow
+  control push-back before doing a write.  For the purposes of that API,
+  Java will not consider the flow control available until it passes flow
+  control on both the ext_proc stream and on the data plane stream.
+- In Go, a write is blocking and doesn't return until the write passes
+  flow control.  So observability mode doesn't need to do anything
+  special to handle flow control; it will simply not wait for the
+  ext_proc response before sending the message on the data plane stream.
 
 ### Filter Configuration
 
