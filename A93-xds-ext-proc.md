@@ -112,6 +112,10 @@ pass messages back unmodified, or completely replace all of the messages
 on the stream.  Note that the number of messages produced by the ext_proc
 server may not match the number of messages originally sent to it.
 
+A client half-close is typically represented to the ext_proc server as an
+end-of-stream indicator on a header or message event, rather than being
+a discrete event.
+
 Events on the data plane RPC should be sent on the ext_proc stream as
 they occur, even if the filter has not yet received a response from the
 ext_proc server for a previous event.  For example, if the filter is
@@ -412,6 +416,12 @@ sent to the server will be populated as follows:
     For client messages, may be true if the client sent a half-close at
     the same time as the last message.  For server messages, will always
     be false.
+  - end_of_stream_without_message (new field being added in
+    https://github.com/envoyproxy/envoy/pull/38753): Will be set to true
+    if the client sends a half-close when there is no message to send
+    (i.e., if the client never sent any message on the stream, or if
+    the half-close is sent after the filter has already sent the last
+    message to the ext_proc server).
 - [response_trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L103).
   Populated when sending server trailers.  Inside of it:
   - [trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L247):
@@ -502,6 +512,9 @@ as follows:
         - [end_of_stream](https://github.com/envoyproxy/envoy/blob/564612e32eafc10a7a7fd490cdb5cc7149e5802b/api/envoy/service/ext_proc/v3/external_processor.proto#L424C8-L424C21):
           If true, indicates that a half-close should be sent after the
           message.  Honored only on client-to-server messages.
+        - end_of_stream_without_message (new field being added in
+          https://github.com/envoyproxy/envoy/pull/38753): Will be set to true
+          to indicate a half-close with no message to send.
       - Note: We do not support body or clear_body.
     - Note: We do not support header_mutation in response to a body.
       This field will be ignored in this context.
