@@ -150,7 +150,7 @@ one:
   control push-back before doing a write.  For the purposes of that API,
   Java will not consider the flow control available until it passes flow
   control on both the ext_proc stream and on the data plane stream.
-- In Go, a write is blocking and doesn't return until the write passed
+- In Go, a write is blocking and doesn't return until the write passes
   flow control.  So observability mode doesn't need to do anything
   special to handle flow control; it will simply not wait for the
   ext_proc response before sending the message on the data plane stream.
