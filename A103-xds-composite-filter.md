@@ -63,7 +63,7 @@ Within it, gRPC will look at the following fields:
   Specifies a unified matcher tree indicating the config of the filter
   to use.  The actions in this tree must be one of two types:
   - [`envoy.extensions.filters.common.matcher.action.v3.SkipFilter`](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/common/matcher/action/v3/skip_action.proto#L24):
-    This indicates that the no filter will be executed.
+    This indicates that no filter will be executed.
   - [`envoy.extensions.filters.http.composite.v3.ExecuteFilterAction`](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/http/composite/v3/composite.proto#L49):
     This indicates which filter should be executed.  Within it:
     - [typed_config](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/http/composite/v3/composite.proto#L54C39-L54C51):
