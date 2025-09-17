@@ -4,7 +4,7 @@ Title
 * Approver: sergiitk, asheshvidyut
 * Status: Draft
 * Implemented in: Python
-* Last updated: 04-07-2025
+* Last updated: 17-09-2025
 * Discussion at: <google group thread> (filled after thread exists) xxxxxxx
 
 ## Abstract
@@ -53,7 +53,7 @@ However, abseil-cpp currently
 and will result in an error like:
 
 ```
-[globals.cc : 105] RAW: absl::log_internal::SetTimeZone() has already been called
+[globals.cc : 104] RAW: absl::log_internal::SetTimeZone() has already been called
 ```
 
 The above changes may hence cause problems to a small percentage of users who
@@ -120,6 +120,35 @@ cdef _initialize():
 
 _initialize()
 ```
+
+### Behaviour with multiple imports of gRPC
+
+Given that `absl::InitializeLog()` must be called exactly once, we had to
+consider if this current implementation can cause any issues with multiple calls
+to `import grpc` in scenarios like:
+
+1. multiple imports for type checking
+2. multiple imports in a multi-threaded scenario
+3. consequent imports to `grpc` and `grpc.experimental` (which implicitly
+imports cygrpc again)
+4. manual reload of the imported modules
+5. multiprocessing environments with imports to grpc in the parent and child
+process.
+6. multiprocessing environments with imports to grpc only in multiple child
+processes.
+
+All the above scenarios were tested and found safe. As the InitializeLog()
+function is a part of the Cython layer (which is compiled into a C binary at
+build time), Python's import system guarantees that it will run only once when
+a process first imports grpc even on manual reload.
+
+All other tested scenarios like threads or child processes — either reuse this
+single, first-time setup or (if they are a new, clean process) safely run their
+own single setup. In all cases, the function is never run twice in a way that
+would cause an error.
+
+(For a more detailed explanation and examples of each scenario tested,
+see [PR #40724](https://github.com/grpc/grpc/pull/40724/).)
 
 ### Implemented in PR:
 https://github.com/grpc/grpc/pull/39779/
