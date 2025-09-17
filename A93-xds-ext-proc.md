@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-16
+* Last updated: 2025-09-17
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -28,6 +28,7 @@ the bootstrap config, described in [A102].  It will also make use of the
 ### Related Proposals:
 * [A39: xDS HTTP Filter Support][A39]
 * [A81: xDS Authority Rewriting][A81]
+* [A83: xDS GCP Authentication Filter][A83]
 * [A102: xDS GrpcService Support][A102] (pending)
 * [A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
 * [A79: Non-Per-Call Metrics Architecture][A79]
@@ -36,6 +37,7 @@ the bootstrap config, described in [A102].  It will also make use of the
 
 [A39]: A39-xds-http-filters.md
 [A81]: A81-xds-authority-rewriting.md
+[A83]: A83-xds-gcp-authn-filter.md
 [A102]: https://github.com/grpc/proposal/pull/510
 [A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
 [A79]: A79-non-per-call-metrics-architecture.md
@@ -48,9 +50,6 @@ We will support the ext_proc filter in gRPC on both the client and
 server side.
 
 ### Filter Behavior
-
-TODO: ExtProc channel retention (simple approach for now, probably
-globally shared channel is fine?)
 
 For every event in the data plane RPC (client headers, client message,
 client half-close, server headers, server message, and server trailers),
@@ -66,6 +65,19 @@ and all communication with the ext_proc server for that specific data
 plane RPC will be done on that ext_proc stream.  The filter will pass
 the trace context from the data plane RPC to the ext_proc RPC, so that
 the ext_proc RPC appears as a child span on the data plane RPC's trace.
+
+#### ExtProc Side Channel
+
+The ext_proc filter will create a gRPC channel to the ext_proc server.
+It will use the mechanism described in [A102] to determine the server to
+talk to and the channel credentials to use.
+
+We do not want to recreate this channel on LDS updates, unless the
+target URI or channel credentials changes.  The ext_proc filter will
+use the filter state retention mechanism described in [A83] to retain
+the channel across updates.
+
+TODO: stats plugin propagation?
 
 #### Events on the ext_proc Stream
 
