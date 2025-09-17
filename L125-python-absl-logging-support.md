@@ -92,9 +92,9 @@ variable was chosen.
 ## Implementation
 
 `absl::InitializeLog()` will be imported in
-`src/python/grpcio/grpc/_cython/_cygrpc/grpc.pxi`, and the automatic call to it
-will then be included in the `_initialize()` Cython function of
-`src/python/grpcio/grpc/_cython/cygrpc.pyx` file as follows:
+`_cython/_cygrpc/grpc.pxi`, and the automatic call to it
+will then be included in the `_initialize()` function of
+`_cython/cygrpc.pyx` file as follows:
 
 ```pxi
 ## src/python/grpcio/grpc/_cython/_cygrpc/grpc.pxi
