@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-16
+* Last updated: 2025-09-17
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -29,6 +29,7 @@ the bootstrap config, described in [A102].  It will also make use of the
 * [A39: xDS HTTP Filter Support][A39]
 * [A36: xDS-Enabled Servers][A36]
 * [A81: xDS Authority Rewriting][A81]
+* [A83: xDS GCP Authentication Filter][A83]
 * [A33: xDS Fault Injection][A33]
 * [A102: xDS GrpcService Support][A102] (pending)
 * [A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
@@ -39,6 +40,7 @@ the bootstrap config, described in [A102].  It will also make use of the
 [A36]: A36-xds-for-servers.md
 [A39]: A39-xds-http-filters.md 
 [A81]: A81-xds-authority-rewriting.md
+[A83]: A83-xds-gcp-authn-filter.md
 [A33]: A33-Fault-Injection.md
 [A102]: https://github.com/grpc/proposal/pull/510
 [A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
@@ -52,9 +54,6 @@ We will support the ext_authz filter on both the gRPC client and server
 side.
 
 ### Filter Behavior
-
-TODO: ExtAuthz channel retention (simple approach for now, probably
-globally shared channel is fine?)
 
 On both the gRPC client and server side, the ext_authz filter will perform
 the per-RPC authorization check when it sees the client's initial metadata
@@ -86,6 +85,19 @@ Otherwise, the data plane RPC will be allowed.  If the
 `failure_mode_allow_header_add` config field is true, then the filter
 will add a `x-envoy-auth-failure-mode-allowed: true` header to the data
 plane RPC.
+
+#### ExtAuthz Side Channel
+
+The ext_authz filter will create a gRPC channel to the ext_authz server.
+It will use the mechanism described in [A102] to determine the server to
+talk to and the channel credentials to use.
+
+We do not want to recreate this channel on LDS updates, unless the
+target URI or channel credentials changes.  The ext_authz filter will
+use the filter state retention mechanism described in [A83] to retain
+the channel across updates.
+
+TODO: stats plugin propagation?
 
 ### Filter Configuration
 
@@ -192,8 +204,8 @@ This section describes the ext_authz protocol.
 The [`AttributeContext`
 message](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L43)
 sent to the server will be populated as follows:
-- [source](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L192): Will always be set.  Inside it:
-  - TODO: will this be set on client side?
+- [source](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L192):
+  Will be set only on gRPC server side.  Inside it:
   - [address](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L58)
     will be set to the peer address of the connection that the request
     came in on.
@@ -208,8 +220,7 @@ sent to the server will be populated as follows:
     field is set to true.
   - service, labels: Will *not* be set.
 - [destination](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L197):
-  Will always be set.  Inside it:
-  - TODO: will this be set on client side?
+  Will be set only on gRPC server side.  Inside it:
   - [address](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L58)
     will be set to the local address of the connection that the request
     came in on.
