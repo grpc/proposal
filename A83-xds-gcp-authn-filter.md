@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-12-04
+* Last updated: 2025-09-17
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -265,9 +265,24 @@ filter stack (i.e., upon receiving an LDS or RDS update), each filter
 has access to both the previous blackboard (if any) and to a new
 blackboard, which starts empty.  As each filter is initialized, it can
 look for entries in the old blackboard to reuse, and any such entry is
-added to the new blackboard.  The channel then destroys the old
-blackboard and replaces it with the new one, which it will retain until
-the next time it creates a new filter stack.
+added to the new blackboard.  We then destroy the old blackboard and
+replace it with the new one, which we will retain until the next time
+we create a new filter stack.
+
+On the client side, there will be exactly one HTTP connection manager
+config and therefore exactly one list of xDS HTTP filters, so the
+channel will have a single blackboard instance to track the filter
+state across updates.
+
+On the server side, we will initially have a separate blackboard instance
+for each xDS Listener.  Note that a single Listener can contain multiple
+L4 filter chains, each of which will have its own HTTP connection
+manager and therefore its own HTTP filter stack, so it is possible to
+share state across multiple HTTP filter stacks in the same xDS Listener.
+However, implementations should not rely on having separate state for
+each Listener, because we may in the future switch to having a separate
+blackboard for the entire server instance, thus combining state for
+multiple xDS Listeners.
 
 The GCP Authentication filter will use this mechanism for the call
 credentials cache.  The blackboard key string will be the filter's
@@ -382,7 +397,9 @@ C-core implementation:
 - validate Audience cluster metadata (https://github.com/grpc/grpc/pull/37566)
 - implement GCP auth filter (https://github.com/grpc/grpc/pull/37550)
 - mechanism for retaining cache across xDS updates
-  (https://github.com/grpc/grpc/pull/37646)
+  (https://github.com/grpc/grpc/pull/37646,
+  https://github.com/grpc/grpc/pull/39964, and
+  https://github.com/grpc/grpc/pull/39983)
   
 Java implementation:
 - implement GCP auth filter (https://github.com/grpc/grpc-java/pull/11638)
