@@ -136,7 +136,7 @@ process.
 6. multiprocessing environments with imports to grpc only in multiple child
 processes.
 
-All the above scenarios were tested and found safe. As the InitializeLog()
+All the above scenarios were tested and found safe. As the `InitializeLog()`
 function is a part of the Cython layer (which is compiled into a C binary at
 build time), Python's import system guarantees that it will run only once when
 a process first imports grpc even on manual reload.
