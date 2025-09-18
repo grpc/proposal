@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-08-21
+* Last updated: 2025-09-18
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -99,7 +99,7 @@ bootstrap config:
 // The list of side-channel services allowed to be configured via xDS.
 "allowed_grpc_services": {
   // The key is fully-qualified target URI.
-  "dns:///xds.example.org:443": {
+  "dns:///ratelimit.example.org:443": {
     // List of channel creds.  Client will stop at the first type it
     // supports.  This field is required and must contain at least one
     // channel creds type that the client supports.
@@ -187,7 +187,13 @@ introduces the following new fields:
   resource will be NACKed.  The following extensions will be supported
   in this field:
 
-  - `envoy.extensions.grpc_service.call_credentials.google_compute_engine.v3.GoogleComputeEngineCredentials`
+  - `envoy.extensions.grpc_service.call_credentials.access_token.v3.AccessTokenCredentials`:
+    In this message:
+    - `token`: Required.  The access token.  The token will be added as
+      an `authorization` header with header `Bearer ` (note trailing
+      space) followed by the value of this field.  Note that the
+      token will not be sent on the wire unless the connection has
+      security level PRIVACY_AND_INTEGRITY.
 
 Note that this will require extending the channel credentials and call
 credentials registries to support configuration via these protos, in
