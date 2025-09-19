@@ -84,7 +84,7 @@ If no SNI value is determined, then it will not set SNI for the Tls handshake.
 ##### Language specific example
 As an example, in Java, the ClusterImpl LB policy creates the `SslContextProviderSuppler` wrapping the
 `UpstreamTlsContext` and puts it in the subchannel wrapper when its child policy creates a subchannel. At the time of Tls protocol negotiation
-for the subchannel, the Tls handling code should use the hostname from the endpoint address attributes and the SNI related fields in `UpstreamTlsContext`
+for the subchannel, the Tls handling code should use the hostname from the endpoint attributes and the SNI related fields in `UpstreamTlsContext`
 to determine the SNI to be used for the Tls handshake. This SNI will also be passed to the the `SslContextProviderSupplier`, in addition to the 
 callback to be invoked to provide the `SslContext` when it is available. The `ClientCertificateSslContextProvider` instantiated by the `SslContextProviderSupplier`
 will be passed both the callback argument and the SNI value to use, that will be used in the `XdsX509TrustManager` it creates to perform the SAN - SNI
