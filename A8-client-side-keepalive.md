@@ -26,7 +26,7 @@ connection being idle on the network doesn't imply that no RPCs are outstanding.
 
 We want gRPC to be reliable in these situations, which necessitates some form of
 keepalive mechanism. We want to support avoiding connection breaks and detecting
-them when the occur. But it is important to minimize accidental DDoS risk.
+them when they occur. But it is important to minimize accidental DDoS risk.
 
 ## Background
 
@@ -50,7 +50,7 @@ exist at a higher level and is usually whether a _service_ is healthy (vs a
 specific hop-by-hop connection). As such, keepalive and health checking have
 different failure models and are independent (keepalive failing implies nothing
 about health checking, and vise versa). However, in some common failure cases
-the two are coorelated.
+the two are correlated.
 
 To be scalable, health checking should generally be centralized and interact
 with the name resolution or load balancing systems. However, such systems take
