@@ -127,9 +127,8 @@ SNI to validate the SANs against and set it in the `SslContext` it provides.
 The Cds update will be NACKed if `UpstreamTlsContext.sni` exceeds 255 characters, similar to Envoy.
 
 ### Environment variable protections
-Setting SNI and performing the SAN validation against SNI will be guarded by the `GRPC_EXPERIMENTAL_XDS_SNI`
-env variable. The env variable guard will be present for several releases for the following reason. When the SNI value 
-to be used for the Tls handshake is not determined based on the described rules, no SNI will be
-sent. Some language implementations are sending the xds channel authority today, and some customers may see
-breaking behavior if no SNI is sent now. In that case they can revert back to the old behavior by turning off
-the env variable.
+Setting SNI and performing the SAN validation against SNI will be guarded by the GRPC_EXPERIMENTAL_XDS_SNI env var. The env var guard will be removed once 
+the feature passes interop tests. When the SNI value to be used for the Tls handshake is not determined based on the described rules, no SNI will be sent. 
+Some language implementations are sending the xds channel authority today, and some customers may see breaking behavior if no SNI is sent now. To mitigate
+this, an env var GRPC_USE_CHANNEL_AUTHORITY_IF_NO_SNI_APPLICABLE will be provided to revert back to the old behavior of sending the xds channel authority
+when no SNI is determined.
