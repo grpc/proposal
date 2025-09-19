@@ -330,6 +330,7 @@ tracked independently.
 Filter instances are shut down when either they are removed from their
 `HttpConnectionManager` or when their `HttpConnectionManager` is removed (which
 may happen at client or server shutdown).
+
 ##### Go
 
 TODO(dfawley): Fill this in.
