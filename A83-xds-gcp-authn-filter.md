@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-17
+* Last updated: 2025-09-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -298,9 +298,60 @@ a cache size change will wind up affecting the old filter instance,
 which in principle it shouldn't, but that is considered acceptable for
 this type of change.
 
-##### Java and Go
+##### Java
 
-TODO(sergiitk, ejona86, dfawley): Fill this in.
+In Java, xDS HTTP Filter objects will be responsible for retaining their own
+state.
+
+The GCP Authentication filter will store the call credentials cache as a regular
+field on a `GcpAuthenticationFilter` object. No in-filter logic will be needed
+to separate caches per filter instance name, as Java's implementation
+will produce distinct `GcpAuthenticationFilter` instances, and therefore,
+different caches.
+
+To achieve this, we need to make several key changes to the class design.
+
+In Java, each xDS HTTP Filter has a corresponding concrete implementation of the
+`io.grpc.xds.Filter` interface. We will refer these classes as "Filters" from
+here.
+
+Currently, Filter classes are stateless singletons, registered by type URL in a
+global `FilterRegistry`. We will make Filter classes stateful and use the
+concrete instances to retain data across LDS / RDS updates as necessary.
+
+We will introduce a new interface `Filter.Provider` with a `newInstance`
+method to instantiate Filter classes. All stateless `Filter` methods, such as
+config parsing, will be moved to `Filter.Provider`.
+
+We will implement `Filter.Provider` in each existing Filter class (as an
+inner static class). Filters that do not need to retain filter state
+may implement `newInstance` to keep returning a singleton instance of self.
+
+We will update `FilterRegistry` to register `Filter.Provider` instances instead
+of `Filter` instances.
+
+Next, we will implement the lifecycle of Filter objects, which differs between
+client-side and server-side Filters. This will be implemented separately in
+`XdsNameResolver` and `XdsServerWrapper` respectively, due to the structural
+differences in their configurations.
+
+The filter state is scoped to `HttpConnectionManager` (HCM) instance.
+
+On the client-side, each `XdsNameResolver` has a single HCM, which contains a
+single list of L7 filters.
+
+Server-side, however, may have multiple `FilterChain` instances (from the
+`filter_chains` repeated field and an optional `default_filter_chain`), each
+with its own HCM and L7 filters. To keep track of individual L4 filter chains
+across LDS updates, we'll use their unique names. The state will not be retained
+for any unnamed L4 filter chain.
+
+Filter instances are shut down when they are removed from their HCM, or when the
+HCM itself is removed (e.g., during client or server shutdown).
+
+##### Go
+
+TODO(dfawley, easwars): Fill this in.
 
 ### Filter Behavior
 
@@ -405,5 +456,8 @@ Java implementation:
 - implement GCP auth filter (https://github.com/grpc/grpc-java/pull/11638)
 - xDS cluster metadata parsing (https://github.com/grpc/grpc-java/pull/11741)
 - propagate audience from cluster resource in gcp auth filter (https://github.com/grpc/grpc-java/pull/11972)
+- filter state retention:
+  - make Filter objects stateful (https://github.com/grpc/grpc-java/pull/11883)
+  - implement the lifecycle of Filter objects (https://github.com/grpc/grpc-java/pull/11936)
 
 Will be implemented in all other languages, timelines TBD.
