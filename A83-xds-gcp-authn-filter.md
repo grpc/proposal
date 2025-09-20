@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-17
+* Last updated: 2025-09-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -300,7 +300,8 @@ this type of change.
 
 ##### Java
 
-In Java, filter state will be retained by the xDS HTTP Filter objects themselves.
+In Java, xDS HTTP Filter objects will be responsible for retaining their own
+state.
 
 The GCP Authentication filter will store the call credentials cache as a regular
 field on a `GcpAuthenticationFilter` object. No in-filter logic will be needed
@@ -311,7 +312,8 @@ different caches.
 To achieve this, we need to make several key changes to the class design.
 
 In Java, each xDS HTTP Filter has a corresponding concrete implementation of the
-`io.grpc.xds.Filter` interface. We will refer these classes as "Filters" from here.
+`io.grpc.xds.Filter` interface. We will refer these classes as "Filters" from
+here.
 
 Currently, Filter classes are stateless singletons, registered by type URL in a
 global `FilterRegistry`. We will make Filter classes stateful and use the
@@ -331,24 +333,25 @@ of `Filter` instances.
 Next, we will implement the lifecycle of Filter objects, which differs between
 client-side and server-side Filters. This will be implemented separately in
 `XdsNameResolver` and `XdsServerWrapper` respectively, due to the structural
-differences in configuration: client-side has a single `HttpConnectionManager`
-directly containing filters, while server-side can have multiple `FilterChain`
-and an optional `default_filter_chain`, each containing an
-`HttpConnectionManager` and its filters.
+differences in their configurations.
 
-To keep track of track of individual filter chains across LDS updates, we'll be
-using their unique names. Since filter chain names are optional but must be
-unique if provided, the implementation will generates names based on the list
-order (e.g., `chain_0`, `chain_1`). If present, `default_filter_chain` is
-tracked independently.
+The filter state is scoped to `HttpConnectionManager` (HCM) instance.
 
-Filter instances are shut down when either they are removed from their
-`HttpConnectionManager` or when their `HttpConnectionManager` is removed (which
-may happen at client or server shutdown).
+On the client-side, each `XdsNameResolver` has a single HCM, which contains a
+single list of L7 filters.
+
+Server-side, however, may have multiple `FilterChain` instances (from the
+`filter_chains` repeated field and an optional `default_filter_chain`), each
+with its own HCM and L7 filters. To keep track of individual L4 filter chains
+across LDS updates, we'll use their unique names. The state will not be retained
+for any unnamed L4 filter chain.
+
+Filter instances are shut down when they are removed from their HCM, or when the
+HCM itself is removed (e.g., during client or server shutdown).
 
 ##### Go
 
-TODO(dfawley): Fill this in.
+TODO(dfawley, easwars): Fill this in.
 
 ### Filter Behavior
 
