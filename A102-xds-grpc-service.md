@@ -1,6 +1,6 @@
 A102: xDS `GrpcService` Support
 ----
-* Author(s): @markdroth
+* Author(s): @markdroth, @sergiitk
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
