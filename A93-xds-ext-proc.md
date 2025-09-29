@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-17
+* Last updated: 2025-09-29
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -181,13 +181,6 @@ work for the ext_proc server to do, so it seems better for the ext_proc
 client to do the work of deframing the gRPC messages, and sending only
 complete deframed messages to the ext_proc server, one at a time.
 
-More seriously, ext_proc currently assumes that all of the contents of
-the DATA frames are a single payload, and the ext_proc server is only
-allowed to send a single response to modify that payload.  That model is
-incompatible with gRPC streaming semantics, where the ext_proc server
-may need to modify each message individually and cannot wait until the
-end of the stream to do so.
-
 Furthermore, the ext_proc filter in gRPC will not actually have access
 to the raw HTTP/2 DATA frames in the first place.  In our architecture,
 the framing/deframing is handled in the transport layer, and filters
@@ -198,12 +191,14 @@ the gRPC server side will see the messages after they have been received
 and deframed by the transport.
 
 Therefore, we propose adding a new ext_proc `BodySendMode` called `GRPC`
-(see https://github.com/envoyproxy/envoy/pull/38753).  In this mode, the
-ext_proc client would handle deframing the gRPC messages.  It will send
-each gRPC message to the ext_proc server as a separate `request_body`,
-and the ext_proc server will send a separate response for each one.
-This is a streaming mode similar to the existing `FULL_DUPLEX_STREAMED`
-mode.
+(see https://github.com/envoyproxy/envoy/pull/38753).  This mode will
+be similar to the existing `FULL_DUPLEX_STREAMED` mode, in which the
+ext_proc client sends body chunks from the data plane stream to the
+ext_proc server as it sees them, and the ext_proc server sends back body
+chunks to be used on the data plane stream.  However, in the new `GRPC`
+mode, the ext_proc client will handle the framing and deframing of gRPC
+messages, so each body chunk sent to or from the ext_proc server will
+be a complete, deframed gRPC message.
 
 The new `GRPC` mode will be the only processing mode supported in gRPC.
 It is be desirable for Envoy to implement the same mode, so that users
