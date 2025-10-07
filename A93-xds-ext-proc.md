@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-29
+* Last updated: 2025-10-07
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -204,6 +204,40 @@ The new `GRPC` mode will be the only processing mode supported in gRPC.
 It is be desirable for Envoy to implement the same mode, so that users
 can switch back and forth between proxy and proxyless data planes without
 breaking their ext_proc servers.
+
+#### Interaction With Compression
+
+There are a couple of unfortunate interactions between ext_proc and
+compression.
+
+In gRPC, the ext_proc filter will be above the compression code, which
+means that messages sent to the ext_proc server will always be
+uncompressed: for sent messages, compression will not happen until after
+the ext_proc filter runs, and for received messages, decompression will
+happen before the ext_proc filter runs.  However, in Envoy, the messages
+may be either compressed or uncompressed, depending on whether the
+sender compressed them before sending them to Envoy.  To expose this
+difference to the ext_proc server, we have added a new field called
+`grpc_message_compressed` in both the ext_proc request and response
+message (see https://github.com/envoyproxy/envoy/pull/38753).  Envoy
+will set this bit in the ext_authz request based on the corresponding
+bit in the gRPC framing header, and it will propagate the bit from the
+ext_proc response back to the gRPC framing header.  In gRPC, if an
+ext_proc response sets this bit, the ext_proc filter will cancel the
+ext_proc stream and treat it as if it failed with a non-OK status.
+
+Note that there are security reasons why some messages should not be
+compressed: it is insecure to compress sensitive payloads, as it provides
+a side-channel to determine the unencrypted contents.  To address this,
+gRPC's API allows applications to indicate that a given message should not
+be compressed.  However, because the messages sent back by the ext_proc
+server are not required to map one-to-one to the messages sent to the
+ext_proc server, there is currently no way to preserve the bit set
+by the application.  For now, the ext_proc server will be required to
+disable compression for messages received back from the ext_proc server.
+If this becomes a problem in the future, we can consider adding yet
+another knob to the ext_proc protocol to pass this bit from the data
+plane to the ext_proc server and back.
 
 #### Observability Mode
 
@@ -416,6 +450,8 @@ sent to the server will be populated as follows:
     (i.e., if the client never sent any message on the stream, or if
     the half-close is sent after the filter has already sent the last
     message to the ext_proc server).
+  - grpc_message_compressed (new field being added in
+    https://github.com/envoyproxy/envoy/pull/38753): Never set.
 - [response_trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L103).
   Populated when sending server trailers.  Inside of it:
   - [trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L247):
@@ -509,6 +545,10 @@ as follows:
         - end_of_stream_without_message (new field being added in
           https://github.com/envoyproxy/envoy/pull/38753): Will be set to true
           to indicate a half-close with no message to send.
+        - grpc_message_compressed (new field being added in
+          https://github.com/envoyproxy/envoy/pull/38753): If set to
+          true, the filter will cancel the ext_proc stream and treat it
+          as if it failed with a non-OK status (see above for details).
       - Note: We do not support body or clear_body.
     - Note: We do not support header_mutation in response to a body.
       This field will be ignored in this context.
