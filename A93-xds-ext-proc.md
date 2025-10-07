@@ -233,7 +233,7 @@ gRPC's API allows applications to indicate that a given message should not
 be compressed.  However, because the messages sent back by the ext_proc
 server are not required to map one-to-one to the messages sent to the
 ext_proc server, there is currently no way to preserve the bit set
-by the application.  For now, the ext_proc server will be required to
+by the application.  For now, the ext_proc filter will be required to
 disable compression for messages received back from the ext_proc server.
 If this becomes a problem in the future, we can consider adding yet
 another knob to the ext_proc protocol to pass this bit from the data
