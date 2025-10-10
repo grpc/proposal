@@ -298,11 +298,13 @@ message, which will be used as follows:
   setting.
 - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79):
   Optional.  If a header name matches this regex, then it will be disallowed,
-  regardless of any other setting.
+  regardless of any other setting.  Note that regexes should be checked for
+  validity as part of resource validation.
 - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75):
   Optional.  If a header name matches this regex and does not match
   `disallow_expression`, it will be allowed.  If unset, then all headers
-  not matching `disallow_expression` are allowed.
+  not matching `disallow_expression` are allowed.  Note that regexes
+  should be checked for validity as part of resource validation.
 - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87):
   If false, a disallowed header mutation will simply be ignored.  If
   true, the data plane RPC will be failed.
