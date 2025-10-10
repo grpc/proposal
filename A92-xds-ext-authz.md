@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-17
+* Last updated: 2025-10-10
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
 
 ## Abstract
@@ -267,21 +267,62 @@ as follows:
     The HTTP status to fail the RPC with.  We apply the normal
     [HTTP-to-gRPC status conversion
     rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L55)
+  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L55):
+    In gRPC, failing an RPC involves sending a Trailers-Only response,
+    so this field will be used to modify trailers on the data plane RPC
+    rather than response headers.  See [Header Rewriting](#header-rewriting)
+    below.
   - body: Ignored; does not apply to gRPC.
 - [ok_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L134):
-  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L75),
-    [headers_to_remove](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L92),
-    [response_headers_to_add](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L104):
-    gRPC will not support rewriting the `:scheme`, `:method`, `:path`,
-    `:authority`, or `host` headers, regardless of what settings are present
-    in the filter's config.  If the server specifies a rewrite for one of
-    these headers, that rewrite will be ignored.  Otherwise, header
-    rewriting will be allowed based on the `decoder_header_mutation_rules`
-    config field.
-  - query_parameters_to_set, query_parameters_to_remove: Ignored; these
-    do not apply to gRPC.
+  - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L75)
+    and
+    [headers_to_remove](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L92):
+    Modifications to the data plane RPC's request headers.  See
+    [Header Rewriting](#header-rewriting) below.
+  - [response_headers_to_add](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L104):
+    Modifications to the data plane RPC's response headers.  See
+    [Header Rewriting](#header-rewriting) below.
+  - query_parameters_to_set, query_parameters_to_remove, dynamic_metadata:
+    Ignored; these do not apply to gRPC.
 - dynamic_metadata: Ignored.
+
+##### Header Rewriting
+
+The response from the ext_authz server may indicate header modifications
+to make on the data plane RPC.  When the data plane RPC is allowed,
+modifications may be made to the data plane RPC's request headers or
+response headers.  And when the data plane RPC is denied, modifications
+may be made to the response trailers as part of a Trailers-Only response.
+
+gRPC will not support modifying or removing any header name starting with
+`:` or the `host` header, regardless of what settings are present in
+the filter's config.  If the server specifies a rewrite for one of these
+headers, that rewrite will be ignored.  Otherwise, header rewriting will
+be allowed based on the `decoder_header_mutation_rules` config field.
+
+Header additions and modifications are expressed via an
+[`envoy.config.core.v3.HeaderValueOption`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L429)
+message, which is not specific to the ext_authz filter and will be used
+in other places in the future.  We will validate this message as follows:
+- [header](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L458):
+  Required.  Within it:
+  - [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
+    The header name.  Must be non-empty and all lower-case.  Length
+    must not exceed 16384.  The entry will be ignored if the key is
+    `host` or starts with a `:`.
+  - [value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L415):
+    The header value, used when the header name does not end with `-bin`.
+    Length must not exceed 16384.
+  - [raw_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L422):
+    The header value, used when the header name ends with `-bin`.  Length
+    must not exceed 16384.
+- [append_action](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L476):
+  We honor the 4 enum values as described in the proto file.
+- [keep_empty_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L480):
+  By default, any header mutation that results in a header with an
+  empty value will cause the header key to be removed.  If this field
+  is set to true, then such empty headers will be kept.
+- We do not support the deprecated append field.
 
 ### Metrics
 
