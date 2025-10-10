@@ -324,20 +324,7 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   any unsupported attribute name will be ignored.  See [Attributes Sent to
   ext_proc Server](#attributes-sent-to-the-ext_proc-server) below for details.
 - [mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L225):
-  Optional.  Inside of it:
-  - [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70):
-    If true, disallows all header mutations from the ext_proc server.
-  - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75):
-    If set, specifically allows any matching header that is not also
-    matched by `disallow_expression`.  Note that regexes should be checked
-    for validity as part of resource validation.
-  - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79):
-    If set, specifically disallows any matching header.  Note that regexes
-    should be checked for validity as part of resource validation.
-  - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87):
-    If true, a disallowed header will cause the filter to fail the data
-    plane RPC with INTERNAL status.
-  - allow_all_routing, disallow_system, allow_envoy: These fields will be ignored.
+  Optional.  See [Header Mutations](#header-mutations) for details.
 - [forward_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L237):
   Configures which headers from the data plane RPC will be included in
   the message to the ext_proc server.  In this message:
@@ -518,7 +505,7 @@ as follows:
       the filter will cancel the ext_proc stream and treat it as if it
       failed with a non-OK status (see above for details).
     - [header_mutation](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L308):
-      Header mutations.  See [Header rewriting](#header-rewriting) below.
+      Header mutations.  See [Header Mutations](#header-mutations) below.
     - Note: We do not support body_mutation in response to headers.
       This field will be ignored in this context.
     - Note: We do not support trailers, since that works only with
@@ -560,7 +547,7 @@ as follows:
 - [response_trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L159):
   Sent in response to server trailers.  Inside of it:
   - [header_mutation](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L273):
-    Header mutations.  See [Header rewriting](#header-rewriting) below.
+    Header mutations.  See [Header Mutations](#header-mutations) below.
 - [immediate_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L168):
   May be sent in response to any message from the data plane.  If sent
   in response to a server trailers event, sets the status and optionally
@@ -601,7 +588,10 @@ ext_proc server responds to the client message event first, that is
 considered a protocol error.  The filter will treat that as if the
 ext_proc stream failed with a non-OK status.
 
-#### Header Rewriting
+#### Header Mutations
+
+The ext_proc filter will leverage the same header mutation types as
+defined in the ext_authz filter in [A92].
 
 When responding to a client headers, server headers, or server trailers
 event, the ext_proc server can return a
@@ -609,10 +599,16 @@ event, the ext_proc server can return a
 message that says how to mutate the headers.  That message will be
 handled as follows:
 - [set_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L375):
-  Headers to set or mutate.  This will be handled as described in [A92].
+  Headers to add or modify.  This is a repeated
+  `envoy.config.core.v3.HeaderValueOption` message, which will be handled
+  as described in [A92].
 - [remove_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L379):
-  Header names to remove.  The filter will ignore `host` and any entry
-  that starts with `:`.
+  Headers to remove.
+
+All mutations (additions, modifications, and removals) are subject to the
+rules in the `mutation_rules` field in the filter config.  This field is
+an `envoy.config.common.mutation_rules.v3.HeaderMutationRules` message,
+which will be handled as described in [A92].
 
 #### Processing Mode Override
 
