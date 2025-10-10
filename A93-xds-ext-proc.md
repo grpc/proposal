@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-07
+* Last updated: 2025-10-10
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -34,6 +34,7 @@ the bootstrap config, described in [A102].  It will also make use of the
 * [A79: Non-Per-Call Metrics Architecture][A79]
 * [A66: OpenTelemetry Metrics][A66]
 * [A89: Backend Service Metric Label][A89]
+* [A92: xDS ExtAuthz][A92] (WIP)
 
 [A39]: A39-xds-http-filters.md
 [A81]: A81-xds-authority-rewriting.md
@@ -43,6 +44,7 @@ the bootstrap config, described in [A102].  It will also make use of the
 [A79]: A79-non-per-call-metrics-architecture.md
 [A89]: A89-backend-service-metric-label.md
 [A66]: A66-otel-stats.md
+[A92]: https://github.com/grpc/proposal/pull/481
 
 ## Proposal
 
@@ -607,23 +609,7 @@ event, the ext_proc server can return a
 message that says how to mutate the headers.  That message will be
 handled as follows:
 - [set_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L375):
-  Headers to set or mutate.  Inside this message:
-  - [header](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L458):
-    Required.  Within it:
-    - [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
-      The header name.  Must be non-empty and all lower-case.  Length
-      must not exceed 16384.  The entry will be ignored if the key is
-      `host` or starts with a `:`.
-    - [raw_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L422):
-      The header value.  Length must not exceed 16384.
-    - The value field will be ignored.
-  - [append_action](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L476):
-    We honor the 4 enum values as described in the proto file.
-  - [keep_empty_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L480):
-    By default, any header mutation that results in a header with an
-    empty value will cause the header key to be removed.  If this field
-    is set to true, then such empty headers will be kept.
-  - We do not support the deprecated append field.
+  Headers to set or mutate.  This will be handled as described in [A92].
 - [remove_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L379):
   Header names to remove.  The filter will ignore `host` and any entry
   that starts with `:`.
