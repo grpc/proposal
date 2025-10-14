@@ -51,9 +51,8 @@ Tls connections using the fields from [UpstreamTlsContext][UTC] in the CDS updat
 [A81-hostname]: A81-xds-authority-rewriting.md#xds-resource-validation
 
 2. Server SAN validation against SNI used: If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
-gRPC client will perform matching for a SAN against the SNI used for the handshake. The normal matching when using
-`TlsCredentials` for the channel only checks against DNS SANs in the certificate, but with `XdsChannelCredentials`
-matching will be done using any of DNS / URI / IPA SAN types in the server certificate.
+gRPC client will perform matching for a SAN against the SNI used for the handshake. While `XdsChannelCredentials` without `auto_sni_san_validation` performs matching using any of DNS / URI / IPA SAN matchers specified in the validation context,
+when `auto_sni_san_validation` is set, validation will be performed using exact DNS matcher.
 
 ### Related Proposals:
 * [gRFC A29: xDS-Based Security for gRPC Clients and Servers][A29]
