@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-13
+* Last updated: 2025-10-14
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -79,6 +79,8 @@ There are several parts to this proposal:
 - Functionality to pick a connection for each RPC in the subchannel,
   including the ability to queue RPCs while waiting for new connections
   to be established.
+- Modify pick_first to handle the subchannel transitioning from READY to
+  CONNECTING state.
 
 ### Configuration
 
@@ -246,7 +248,7 @@ performance unless it is actually enabled.
 When max_connections_per_subchannel is greater than 1, the subchannel will
 contain up to that number of established connections.  The connections
 will be stored in a list ordered by the time at which the connection was
-established, so that the oldest connections are at the start of the list.
+established, so that the oldest connection is at the start of the list.
 
 Each connection will store the peer's MAX_CONCURRENT_STREAMS setting
 reported by the transport.  It will also track how many RPCs are
@@ -280,7 +282,9 @@ started:
   or a connection attempt fails.
 - RPCs were already queued on the subchannel and a new connection was just
   created that did not provide enough available streams for all pending RPCs.
-- The value of the max_connections_per_subchannel attribute increases.
+- The value of the max_connections_per_subchannel attribute increases,
+  all existing connections are already at their MAX_CONCURRENT_STREAMS
+  limit, and there are queued RPCs.
 
 #### Backoff Behavior and Connectivity State
 
@@ -326,12 +330,8 @@ transitions are possible:
   connection fails, the subchannel will transition from READY directly
   to TRANSIENT_FAILURE.
 
-Implementations should ensure that LB policies can handle these state
-transitions.
-
-TODO: What happens if there are RPCs queued in the subchannel when the
-last connection fails?  then we report non-READY to the LB policy, but
-we need to deal with the queued RPCs somehow...
+See [PickFirst Changes](#pickfirst-changes) below for details on how
+pick_first will handle these new transitions.
 
 TODO: update client channel spec with this info
 
@@ -358,27 +358,45 @@ but may be considered in the future.  For the purposes of this design,
 it is acceptable to queue RPCs on a connection due to this race, which
 is expected to be rare.
 
-If no connection is available for an RPC, the RPC must be queued in the
-subchannel until a connection is available for it.  This queue must be
-roughly fair: RPCs must be dispatched in the order in which they are
-received into the queue, acknowledging that timing between threads may
-lead to concurrent RPCs being added to the queue in an arbitrary order.
+When choosing a connection for an RPC within a subchannel, the following
+algorithm will be used (first match wins):
+1. If the subchannel has no working connections, then the RPC will be
+   failed with status UNAVAILABLE.
+2. Look through all working connections in order from the oldest to the
+   newest.  For each connection, if the number of RPCs in flight on the
+   connection is lower than the peer's MAX_CONCURRENT_STREAMS setting,
+   then the RPC will be dispatched on that connection.
+3. If the number of existing connections is equal to the
+   max_connections_per_subchannel value, the RPC will be queued.
+4. If the number of existing connections is less than the
+   max_connections_per_subchannel value and the subchannel is in backoff
+   delay due to the last connection attempt failing, the RPC will be
+   failed with status UNAVAILABLE.
+5. If the number of existing connections is less than the
+   max_connections_per_subchannel value and no connection attempt is
+   currently in flight, a new connection attempt will be started, and
+   the RPC will be queued.
+
+When queueing an RPC, the queue must be roughly fair: RPCs must
+be dispatched in the order in which they are received into the
+queue, acknowledging that timing between threads may lead to
+concurrent RPCs being added to the queue in an arbitrary order.
 See [Rationale](#rationale) below for a possible adjustment to this
 queuing strategy.
 
-When a connection attempt fails and the subchannel is in backoff, all
-RPCs (both those already queued and any new RPC that is started on the
-subchannel after that) will be failed with UNAVAILABLE status.  These
-RPCs are be eligible for transparent retries (see [A6]), because no wire
-traffic was produced for them.
+When retrying a queued RPC, the subchannel will use the same algorithm
+described above that it will when it first sees the RPC.  RPCs will be
+drained from the queue upon the following events:
+- When a connection attempt completes, whether successfully or not.
+- When the backoff timer fires.
+- When an existing connection fails.
+- When the transport for a connection reports a new value for
+  MAX_CONCURRENT_STREAMS.
+- When an RPC dispatched on one of the connections completes.
 
-When an RPC completes, if there are queued RPCs in the subchannel, the
-subchannel should check to see if the connection that that RPC was sent
-on is below its MAX_CONCURRENT_STREAMS limit.  If so, it should start
-the next queued RPC on that connection.  Note that it's possible that
-the connection is not actually below its MAX_CONCURRENT_STREAMS limit,
-because the peer may have lowered the MAX_CONCURRENT_STREAMS limit after
-that RPC was started.
+When failing an RPC due to all connections failing or due to being in
+backoff, note that the RPC will be eligible for transparent retries (see
+[A6]), because no wire traffic was produced for it.
 
 #### Subchannel Pseudo-Code
 
@@ -386,33 +404,44 @@ The following pseudo-code illustrates the expected functionality in the
 subchannel:
 
 ```
-# Starts an RPC on the subchannel.
-def StartRpc(self, rpc):
+# Returns True if the RPC has been handled, False if it needs to be queued.
+def MaybeDispatchRpc(self, rpc):
+  # If there are no connections, fail the RPC.
+  # Note that the RPC will be eligible for transparent retries.
+  if len(self.connections) == 0:
+    rpc.Fail(UNAVAILABLE)
+    return True
   # Use the oldest connection that can accept a new stream, if any.
   for connection in self.connections:
     if connection.rpcs_in_flight < connection.max_concurrent_streams:
       connection.rpcs_in_flight += 1
       connection.StartRpc(rpc)
-      return
+      return True
   # If we aren't yet at the max number of connections, see if we can
   # create a new one.
   if len(self.connections) < self.max_connections_per_subchannel:
     # If we're in backoff delay, fail the RPC.
+    # Note that the RPC will be eligible for transparent retries.
     if self.pending_backoff_timer is not None:
       rpc.Fail(UNAVAILABLE)
-      return
+      return True
     # If there is no connection attempt in flight, start one.
     if self.connection_attempt is None:
       self.StartConnectionAttempt()
-  # Queue the RPC until we have a connection to send it on.
-  self.queue.append(rpc)
+  # RPC not handled -- needs to be queued.
+  return False
+
+# Starts an RPC on the subchannel.
+def StartRpc(self, rpc):
+  if not self.MaybeDispatchRpc(rpc):
+    self.queue.append(rpc)
 
 # Retries RPCs from the queue, in order.
 def RetryRpcsFromQueue(self):
-  queue = self.queue
-  self.queue = []
-  for rpc in queue:
-    self.StartRpc(rpc)
+  while len(self.queue) > 0:
+    if not self.MaybeDispatchRpc(self.queue[-1]):
+      break
+    self.queue.pop()
 
 # Starts a new connection attempt.
 def StartConnectionAttempt(self):
@@ -461,6 +490,23 @@ def OnMaxConnectionsPerSubchannelChanged(self, max_connections_per_subchannel):
   self.max_connections_per_subchannel = max_connections_per_subchannel
   self.RetryRpcsFromQueue()
 ```
+
+### PickFirst Changes
+
+As mentioned above, the pick_first LB policy will need to handle two new
+state transitions from subchannels.  Previously, a subchannel in READY
+state could transition only to IDLE state; now it will be possible for
+the subchannel to instead transition to CONNECTING or TRANSIENT_FAILURE
+states.
+
+If the selected (READY) subchannel transitions to CONNECTING state,
+then pick_first will go back into CONNECTING state.  It will start the
+happy eyeballs pass across all subchannels, as described in [A61].
+
+If the selected (READY) subchannel transitions to TRANSIENT_FAILURE
+state, then pick_first will...
+
+TODO: figure out TF behavior
 
 ### Metrics
 
