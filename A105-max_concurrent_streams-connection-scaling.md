@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-14
+* Last updated: 2025-10-15
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -482,7 +482,8 @@ def OnConnectionReportsNewMaxConcurrentStreams(
   self.RetryRpcsFromQueue()
 
 # Called when an RPC completes on one of the subchannel's connections.
-def OnRpcComplete(self):
+def OnRpcComplete(self, connection):
+  connection.rpcs_in_flight -= 1
   self.RetryRpcsFromQueue()
 
 # Called when the max_connections_per_subchannel value changes.
