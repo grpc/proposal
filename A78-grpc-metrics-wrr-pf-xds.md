@@ -6,7 +6,7 @@ A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 * Implemented in: <language, ...>
 * Last updated: 2025-07-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/A2Mqz8OMDys
-* Updated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md), [A94: OTel metrics for Subchannels](A94-subchannel-otel-metrics.md)
+* Updated by: [A88: xDS Data Error Handling](A88-xds-data-error-handling.md), [A94: OTel metrics for Subchannels](A94-subchannel-otel-metrics.md), [A100: Client-side weighted round-robin slow start configuration](A100-client-side-weighted-round-robin-slow-start.md)
 
 ## Abstract
 
