@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-15
+* Last updated: 2025-10-20
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -371,7 +371,7 @@ algorithm will be used (first match wins):
 4. If the number of existing connections is less than the
    max_connections_per_subchannel value and the subchannel is in backoff
    delay due to the last connection attempt failing, the RPC will be
-   failed with status UNAVAILABLE.
+   queued.
 5. If the number of existing connections is less than the
    max_connections_per_subchannel value and no connection attempt is
    currently in flight, a new connection attempt will be started, and
@@ -394,9 +394,33 @@ drained from the queue upon the following events:
   MAX_CONCURRENT_STREAMS.
 - When an RPC dispatched on one of the connections completes.
 
-When failing an RPC due to all connections failing or due to being in
-backoff, note that the RPC will be eligible for transparent retries (see
-[A6]), because no wire traffic was produced for it.
+When failing an RPC due to the subchannel not having any established
+connections, note that the RPC will be eligible for transparent retries
+(see [A6]), because no wire traffic was produced for it.
+
+#### Interaction Between Channel and Subchannel
+
+Today, when the channel does an LB pick and gets back a subchannel,
+it calls a method on that subchannel to get its underlying connection.
+There are only two possible results:
+
+1. The subchannel returns a ref to the underlying connection.
+2. The subchannel returns null to indicate that it no longer has a working
+   connection.  This case can happen due to a race between the LB policy
+   picking the subchannel and the transport seeing a GOAWAY or disconnection;
+   when that occurs, the channel will queue the RPC (i.e., it is treated
+   the same as if the picker indicated to queue the RPC) in the expectation
+   that the LB policy will soon see the subchannel report the disconnection
+   and will return a new picker, at which point a new pick will be done for
+   the queued RPC.
+
+With this design, the API used for this interaction between the channel
+and the subchannel will need to change.
+
+TODO: figure out details, then revise pseudo-code below
+
+TODO: interaction with circuit breaking -- i.e., when we do call the
+call tracker to indicate that the RPC has started?
 
 #### Subchannel Pseudo-Code
 
@@ -419,16 +443,11 @@ def MaybeDispatchRpc(self, rpc):
       return True
   # If we aren't yet at the max number of connections, see if we can
   # create a new one.
-  if len(self.connections) < self.max_connections_per_subchannel:
-    # If we're in backoff delay, fail the RPC.
-    # Note that the RPC will be eligible for transparent retries.
-    if self.pending_backoff_timer is not None:
-      rpc.Fail(UNAVAILABLE)
-      return True
-    # If there is no connection attempt in flight, start one.
-    if self.connection_attempt is None:
-      self.StartConnectionAttempt()
-  # RPC not handled -- needs to be queued.
+  if (len(self.connections) < self.max_connections_per_subchannel and
+      self.connection_attempt is None and
+      self.pending_backoff_timer is None):
+    self.StartConnectionAttempt()
+  # Didn't find a connection for the RPC, so queue it.
   return False
 
 # Starts an RPC on the subchannel.
@@ -439,13 +458,15 @@ def StartRpc(self, rpc):
 # Retries RPCs from the queue, in order.
 def RetryRpcsFromQueue(self):
   while len(self.queue) > 0:
+    # Stop at the first RPC that gets queued.
     if not self.MaybeDispatchRpc(self.queue[-1]):
       break
     self.queue.pop()
 
 # Starts a new connection attempt.
 def StartConnectionAttempt(self):
-  self.backoff_state = BackoffState()
+  if self.backoff_state is None:
+    self.backoff_state = BackoffState()
   self.connection_attempt = ConnectionAttempt()
 
 # Called when a connection attempt succeeds.
@@ -500,14 +521,10 @@ state could transition only to IDLE state; now it will be possible for
 the subchannel to instead transition to CONNECTING or TRANSIENT_FAILURE
 states.
 
-If the selected (READY) subchannel transitions to CONNECTING state,
-then pick_first will go back into CONNECTING state.  It will start the
-happy eyeballs pass across all subchannels, as described in [A61].
-
-If the selected (READY) subchannel transitions to TRANSIENT_FAILURE
-state, then pick_first will...
-
-TODO: figure out TF behavior
+If the selected (READY) subchannel transitions to CONNECTING or
+TRANSIENT_FAILURE state, then pick_first will go back into CONNECTING
+state.  It will start the happy eyeballs pass across all subchannels,
+as described in [A61].
 
 ### Metrics
 
