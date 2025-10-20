@@ -415,12 +415,35 @@ There are only two possible results:
    the queued RPC.
 
 With this design, the API used for this interaction between the channel
-and the subchannel will need to change.
+and the subchannel will need to change.  Instead of the channel getting
+a connection from the subchannel, the channel will simply send the RPC
+to the subchannel, and the subchannel will be responsible for picking a
+connection or queuing the RPC if there is no connection immediately
+available.
 
-TODO: figure out details, then revise pseudo-code below
+One consequence of this is that when we hit the race condition between
+the LB policy picking the subchannel and the transport seeing a GOWAWAY
+or disconnection, we will now rely on transparent retries (see [A6])
+instead of just having the channel re-queue the LB pick to be tried
+again the next time the LB policy updates the picker.
 
-TODO: interaction with circuit breaking -- i.e., when we do call the
-call tracker to indicate that the RPC has started?
+#### Interaction with xDS Circuit Breaking
+
+gRPC currently supports xDS circuit breaking as described in [A32].
+Specifically, we support configuring the max number of RPCs in flight
+to each cluster.  This is done by having the xds_cluster_impl LB policy
+increment an atomic counter that tracks the number of RPCs currently in
+flight to the cluster, which is later decremented when the RPC ends.
+
+Some gRPC implementations don't actually increment the counter until
+after a connection is chosen for the RPC, so that they won't erroneously
+increment the counter when the picker returns a subchannel for which no
+connection is available (the race condition described above).  However,
+now that there could be a longer delay between when the picker returns
+and when a connection is chosen for the RPC, implementations will need
+to increment the counter in the picker.  It will then be necessary to
+decrement the counter when the RPC finishes, regardless of whether it
+was actually sent out or whether the subchannel failed it.
 
 #### Subchannel Pseudo-Code
 
