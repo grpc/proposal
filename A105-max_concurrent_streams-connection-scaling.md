@@ -172,7 +172,7 @@ To support this, the implementation will be as follows:
   value of max_connections_per_subchannel is removed.  Whenever the set
   of entries changes, the subchannel will do a pass over the map to find
   the new max value to use.
-- We will create a new channel arg called
+- We will create a new internal-only channel arg called
   `GRPC_ARG_MAX_CONNECTIONS_PER_SUBCHANNEL`, which will be treated
   specially by the channel.  Specifically, when this attribute is passed
   to `CreateSubchannel()`, it will be excluded from the channel args
