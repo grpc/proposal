@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-20
+* Last updated: 2025-10-24
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -112,11 +112,24 @@ message ServiceConfig {
 ```
 
 In the subchannel, connection scaling will be configured via a parameter
-called max_connections_per_subchannel, which be passed into the subchannel
-via a per-endpoint attribute.  Configuring this via the service config
-will effectively set that per-endpoint attribute before passing the list
-of endpoints into the LB policy, but the attribute can also be set or
-modified by the LB policy.
+called max_connections_per_subchannel.  That parameter will be set
+either via the service config or via a per-endpoint attribute in the LB
+policy tree.  The approach for plumbing this parameter into the
+subchannel will be different in C-core than in Java and Go; see below
+for details.
+
+The max_connections_per_subchannel attribute can change with each resolver
+update, regardless of whether it is set via the service config or via an
+LB policy.  When this happens, we do not want to throw away the subchannel
+and create a new one, since that would cause unnecessary connection churn.
+This means that the max_connections_per_subchannel parameter must not
+be considered part of the subchannel's unique identity that is set only
+at subchannel creation time; instead, it must be changeable over the life
+of a subchannel.
+
+If the max_connections_per_subchannel attribute is unset, the subchannel
+will assume a default of 1, which effectively means the same behavior
+as before this gRFC.
 
 As indicated in the comment above, the channel will enforce a maximum
 limit for the max_connections_per_subchannel attribute.  This limit
@@ -126,20 +139,6 @@ max_connections_per_subchannel attribute is larger than the channel's
 limit, it will be capped to that limit.  This capping will be performed
 in the subchannel itself, so that it will apply regardless of where the
 attribute is set.
-
-The max_connections_per_subchannel attribute can change with each resolver
-update, regardless of whether it is set via the service config or via an
-LB policy.  When this happens, we do not want to throw away the subchannel
-and create a new one, since that would cause unnecessary connection churn.
-This means that the max_connections_per_subchannel attribute must not
-be considered part of the subchannel's unique identity that is set only
-at subchannel creation time; instead, it must be an attribute that can
-be changed over the life of a subchannel.  The approach for this will be
-different in C-core than in Java and Go.
-
-If the max_connections_per_subchannel attribute is unset, the subchannel
-will assume a default of 1, which effectively means the same behavior
-as before this gRFC.
 
 #### C-core
 
@@ -190,11 +189,33 @@ In Java and Go, there is no subchannel pool, and LB policies will not
 call `CreateSubchannel()` for any address for which they already have a
 subchannel from the previous address list.  There is also no need to
 deal with the case of multiple channels sharing the same subchannel.
-Therefore, a different approach is called for.  However, it seems
-desirable to design this API such that it leaves open the possibility of
-Java and Go introducing a subchannel pool at some point in the future.
+Therefore, a different approach is called for.
 
-TODO: flesh this out, maybe use some sort of injector approach?
+A notification object will be used to notify the subchannel of the value
+of the max_connections_per_subchannel attribute.  This object will be
+passed into the subchannel at creation time via a resolver attribute.
+
+When a channel is constructed, it will create a single notification
+object to be used for all subchannels for the lifetime of the channel.
+This notification object will be added to the resolver attributes before
+the resolver update is passed to the LB policy, so that it will propagate
+through to the `CreateSubchannel()` call.  Whenever the resolver returns
+a service config that sets max_connections_per_subchannel, the channel will
+tell the notification object to use that value, which will then be
+communicated to the subchannels.
+
+For the case where an LB policy wants to override the value of
+max_connections_per_subchannel, it can create its own notification
+object and replace the channel's notification object with its own in the
+resolver attributes.  It can then tell the notification object what
+value to use whenever it gets a config update.
+
+Because the notification object is passed to the subchannel only at
+creation time, which means that the LB policy must decide whether
+to inject its own notification object at that time.  If an LB policy
+initially wants to just use the default value from the channel, it would
+need to proxy that value from the original notification object that was
+passed down from the channel.
 
 Note that this approach assumes that Java and Go have switched to a
 model where there is only one address per subchannel, as per [A61].
