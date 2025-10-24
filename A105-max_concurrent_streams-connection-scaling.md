@@ -52,7 +52,6 @@ channels it uses.
 * [A61: IPv4 and IPv6 Dualstack Backend Support][A61]
 * [A74: xDS Config Tears][A74]
 * [A75: xDS Aggregate Cluster Behavior Fixes][A74]
-* [A79: Non-per-call Metrics Architecture][A79]
 * [A94: OTel Metrics for Subchannels][A94]
 
 [A6]: A6-client-retries.md
@@ -61,7 +60,6 @@ channels it uses.
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
 [A74]: A74-xds-config-tears.md
 [A75]: A75-xds-aggregate-cluster-behavior-fixes.md
-[A79]: A79-non-per-call-metrics-architecture.md
 [A94]: A94-subchannel-otel-metrics.md
 [H2MCS]: https://httpwg.org/specs/rfc7540.html#SETTINGS_MAX_CONCURRENT_STREAMS
 
@@ -585,7 +583,9 @@ as described in [A61].
 
 ### Metrics
 
-TODO: define metrics
+No new metrics will be defined for this feature.  However,
+note that the additional connections will show up in the
+`grpc.subchannel.open_connections` metric defined in [A94].
 
 ### Temporary environment variable protection
 
