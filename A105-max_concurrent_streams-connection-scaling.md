@@ -50,6 +50,8 @@ channels it uses.
 * [A9: Server-side Connection Management][A9]
 * [A32: xDS Circuit Breaking][A32]
 * [A61: IPv4 and IPv6 Dualstack Backend Support][A61]
+* [A74: xDS Config Tears][A74]
+* [A75: xDS Aggregate Cluster Behavior Fixes][A74]
 * [A79: Non-per-call Metrics Architecture][A79]
 * [A94: OTel Metrics for Subchannels][A94]
 
@@ -57,6 +59,8 @@ channels it uses.
 [A9]: A9-server-side-conn-mgt.md
 [A32]: A32-xds-circuit-breaking.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
+[A74]: A74-xds-config-tears.md
+[A75]: A75-xds-aggregate-cluster-behavior-fixes.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A94]: A94-subchannel-otel-metrics.md
 [H2MCS]: https://httpwg.org/specs/rfc7540.html#SETTINGS_MAX_CONCURRENT_STREAMS
@@ -242,6 +246,15 @@ field, we will now add support for the following field:
 
 A new field will be added to the parsed CDS resource representation
 containing the value of this field.
+
+The xds_cluster_impl LB policy will be responsible for setting the
+max_connections_per_subchannel attribute based on this xDS configuration.
+Note that it makes sense to do this in the xds_cluster_impl LB policy
+instead of the cds policy for two reasons: first, this is where circuit
+breaking is already configured, and second, this policy is in the right
+location in the LB policy tree regardless of whether [A75] has been
+implemented yet.  Note that post-[A74], this will not require adding
+any new fields in the xds_cluster_impl LB policy configuration.
 
 ### Transport Reporting Current MAX_CONCURRENT_STREAMS
 
