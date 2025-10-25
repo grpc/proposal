@@ -361,8 +361,6 @@ transitions are possible:
 See [PickFirst Changes](#pickfirst-changes) below for details on how
 pick_first will handle these new transitions.
 
-TODO: update client channel spec with this info
-
 #### Picking a Connection for Each RPC
 
 When an RPC is started and a subchannel is picked for that RPC, the
@@ -628,8 +626,6 @@ Enabling this feature via either the gRPC service config or xDS will
 initially be guarded via the environment variable
 `GRPC_EXPERIMENTAL_MAX_CONCURRENT_STREAMS_CONNECTION_SCALING`.  The
 feature will be enabled by default once it has passed interop tests.
-
-TODO: define interop tests?
 
 ## Rationale
 
