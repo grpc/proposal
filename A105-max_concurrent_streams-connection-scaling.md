@@ -113,34 +113,34 @@ message ServiceConfig {
 }
 ```
 
-In the subchannel, connection scaling will be configured via a parameter
-called max_connections_per_subchannel.  That parameter will be set
+In the subchannel, connection scaling will be configured via a setting
+called max_connections_per_subchannel.  That setting will be set
 either via the service config or via a per-endpoint attribute in the LB
-policy tree.  The approach for plumbing this parameter into the
+policy tree.  The approach for plumbing this setting into the
 subchannel will be different in C-core than in Java and Go; see below
 for details.
 
-The max_connections_per_subchannel attribute can change with each resolver
-update, regardless of whether it is set via the service config or via an
-LB policy.  When this happens, we do not want to throw away the subchannel
-and create a new one, since that would cause unnecessary connection churn.
-This means that the max_connections_per_subchannel parameter must not
-be considered part of the subchannel's unique identity that is set only
-at subchannel creation time; instead, it must be changeable over the life
-of a subchannel.
+The max_connections_per_subchannel setting for a given subchannel can
+change with each resolver update, regardless of whether it is set
+via the service config or via an LB policy.  When this happens, we
+do not want to throw away the subchannel and create a new one, since
+that would cause unnecessary connection churn.  This means that the
+max_connections_per_subchannel setting must not be considered part of
+the subchannel's unique identity that is set only at subchannel creation
+time; instead, it must be changeable over the life of a subchannel.
 
-If the max_connections_per_subchannel attribute is unset, the subchannel
+If the max_connections_per_subchannel setting is unset, the subchannel
 will assume a default of 1, which effectively means the same behavior
 as before this gRFC.
 
 As indicated in the comment above, the channel will enforce a maximum
-limit for the max_connections_per_subchannel attribute.  This limit
+limit for the max_connections_per_subchannel setting.  This limit
 will be 10 by default, but gRPC will provide a channel-level setting to
 allow a client application to raise or lower that limit.  Whenever the
-max_connections_per_subchannel attribute is larger than the channel's
+max_connections_per_subchannel setting is larger than the channel's
 limit, it will be capped to that limit.  This capping will be performed
 in the subchannel itself, so that it will apply regardless of where the
-attribute is set.
+setting is set.
 
 #### C-core
 
@@ -153,7 +153,7 @@ subchannel is created only if it doesn't already exist in the pool;
 otherwise, the returned subchannel wrapper will hold a new ref to the
 existing subchannel, so that it doesn't actually wind up creating a new
 subchannel (only a new subchannel wrapper).  This means that we do not
-want the max_connections_per_subchannel attribute to be part of the
+want the max_connections_per_subchannel setting to be part of the
 subchannel's key in the subchannel pool, or else we will wind up
 recreating the subchannel whenever the attribute's value changes.
 
@@ -161,12 +161,12 @@ In addition, by default, C-core's subchannel pool is shared between
 channels, meaning that if two channels attempt to create the same
 subchannel, they will wind up sharing a single subchannel.  In this
 case, each channel using a given subchannel may have a different value
-for the max_connections_per_subchannel attribute.  The subchannel will
-use the maximum value set for this attribute across all channels.
+for the max_connections_per_subchannel setting.  The subchannel will
+use the maximum value set for this setting across all channels.
 
 To support this, the implementation will be as follows:
 - The subchannel will store a map from max_connections_per_subchannel
-  value to the number of subchannel wrappers currently holding a ref to
+  setting to the number of subchannel wrappers currently holding a ref to
   it with that value.  Entries are added to the map whenever the first
   ref for a given value of max_connections_per_subchannel is taken, and
   entries are removed from the map whenever the last ref for a given
@@ -199,7 +199,7 @@ deal with the case of multiple channels sharing the same subchannel.
 Therefore, a different approach is called for.
 
 A notification object will be used to notify the subchannel of the value
-of the max_connections_per_subchannel attribute.  This object will be
+of the max_connections_per_subchannel setting.  This object will be
 passed into the subchannel at creation time via a resolver attribute.
 
 When a channel is constructed, it will create a single notification
@@ -229,7 +229,7 @@ model where there is only one address per subchannel, as per [A61].
 
 #### xDS Configuration
 
-In xDS, the max_connections_per_subchannel value will be configured via
+In xDS, the max_connections_per_subchannel setting will be configured via
 a per-host circuit breaker in the CDS resource.  This uses a similar
 structure to the circuit breaker described in [A32].
 
@@ -242,16 +242,16 @@ field, we will now add support for the following field:
   If that entry is found, then within that entry:
   - [max_connections](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/circuit_breaker.proto#L59):
     If this field is set, then its value will be used to set the
-    max_connections_per_subchannel attribute for all endpoints for that
+    max_connections_per_subchannel setting for all endpoints for that
     xDS cluster.  If it is unset, then the
-    max_connections_per_subchannel attribute will remain unset.  A value
+    max_connections_per_subchannel setting will remain unset.  A value
     of 0 will be rejected at resource validation time.
 
 A new field will be added to the parsed CDS resource representation
 containing the value of this field.
 
 The xds_cluster_impl LB policy will be responsible for setting the
-max_connections_per_subchannel attribute based on this xDS configuration.
+max_connections_per_subchannel setting based on this xDS configuration.
 Note that it makes sense to do this in the xds_cluster_impl LB policy
 instead of the cds policy for two reasons: first, this is where circuit
 breaking is already configured, and second, this policy is in the right
@@ -262,7 +262,7 @@ any new fields in the xds_cluster_impl LB policy configuration.
 ### Subchannel Behavior
 
 The connection scaling functionality in the subchannel will be used if
-the max_connections_per_subchannel attribute is greater than 1.
+the max_connections_per_subchannel setting is greater than 1.
 
 If the value is 1 (or unset), then implementations must not impose any
 additional per-RPC overhead at this layer beyond what already exists
@@ -293,7 +293,7 @@ following are true:
   i.e., the number of RPCs currently in flight on each connection is
   greater than or equal to the connection's MAX_CONCURRENT_STREAMS.
 - The number of existing connections in the subchannel is fewer than the
-  max_connections_per_subchannel value.
+  max_connections_per_subchannel setting.
 - There is no connection attempt currently in flight on the subchannel.
 
 The subchannel will never close a connection once it has been established.
@@ -310,7 +310,7 @@ started:
   or a connection attempt fails.
 - RPCs were already queued on the subchannel and a new connection was just
   created that did not provide enough available streams for all pending RPCs.
-- The value of the max_connections_per_subchannel attribute increases,
+- The value of the max_connections_per_subchannel setting increases,
   all existing connections are already at their MAX_CONCURRENT_STREAMS
   limit, and there are queued RPCs.
 
@@ -395,13 +395,13 @@ algorithm will be used (first match wins):
    connection is lower than the peer's MAX_CONCURRENT_STREAMS setting,
    then the RPC will be dispatched on that connection.
 3. If the number of existing connections is equal to the
-   max_connections_per_subchannel value, the RPC will be queued.
+   max_connections_per_subchannel setting, the RPC will be queued.
 4. If the number of existing connections is less than the
-   max_connections_per_subchannel value and the subchannel is in backoff
+   max_connections_per_subchannel setting and the subchannel is in backoff
    delay due to the last connection attempt failing, the RPC will be
    queued.
 5. If the number of existing connections is less than the
-   max_connections_per_subchannel value and no connection attempt is
+   max_connections_per_subchannel setting and no connection attempt is
    currently in flight, a new connection attempt will be started, and
    the RPC will be queued.
 
