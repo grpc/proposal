@@ -5,7 +5,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2025-10-24
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/n9Mi7ZODReE
 
 ## Abstract
 
