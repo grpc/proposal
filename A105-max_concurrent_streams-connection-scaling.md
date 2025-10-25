@@ -184,6 +184,11 @@ To support this, the implementation will be as follows:
   is orphaned, it will call a new API on the underlying subchannel
   to tell it that the ref is going away for a particular value of
   max_connections_per_subchannel.
+- If max_connections_per_subchannel is configured via the service
+  config, the `GRPC_ARG_MAX_CONNECTIONS_PER_SUBCHANNEL` channel arg will
+  be set by the channel before passing the resolver update to the LB
+  policy tree.  Individual LB policies may override this channel arg
+  before `CreateSubchannel()` is called.
 
 #### Java and Go
 
@@ -254,17 +259,6 @@ location in the LB policy tree regardless of whether [A75] has been
 implemented yet.  Note that post-[A74], this will not require adding
 any new fields in the xds_cluster_impl LB policy configuration.
 
-### Transport Reporting Current MAX_CONCURRENT_STREAMS
-
-In order for the subchannel to know when to create a new connection, the
-transport will need to report the current value of the peer's
-MAX_CONCURRENT_STREAMS setting up to the subchannel.
-
-TODO: in C-core, maybe revamp the connectivity state API between transport
-and subchannel?  was thinking about doing this anyway for subchannel
-metrics disconnection reason -- but need to figure out a plan for
-direct channels
-
 ### Subchannel Behavior
 
 The connection scaling functionality in the subchannel will be used if
@@ -283,8 +277,10 @@ will be stored in a list ordered by the time at which the connection was
 established, so that the oldest connection is at the start of the list.
 
 Each connection will store the peer's MAX_CONCURRENT_STREAMS setting
-reported by the transport.  It will also track how many RPCs are
-currently in flight on the connection.
+reported by the transport (see [Interaction Between Transport and
+Subchannel](#interaction-between-transport-and-subchannel) below for
+details).  It will also track how many RPCs are currently in flight on
+the connection.
 
 The subchannel will also track one in-flight connection attempt, which
 will be unset if no connection attempt is currently in flight.
@@ -430,34 +426,73 @@ When failing an RPC due to the subchannel not having any established
 connections, note that the RPC will be eligible for transparent retries
 (see [A6]), because no wire traffic was produced for it.
 
+### Interaction Between Transport and Subchannel
+
+In order for the subchannel to know when to create a new connection, the
+transport will need to report the peer's MAX_CONCURRENT_STREAMS setting
+to the subchannel.  The transport will need to first report this value
+immediately after receiving the initial SETTINGS frame from the peer,
+and then it will need to send an update any time it receives a SETTINGS
+frame from the peer that changes this particular setting.
+
+Implementations should consider providing some mechanism for flow
+control for these updates, to prevent sending updates to the subchannel
+faster than it can process them.  One possible simple approach would be
+for the transport to have only one in-flight update to the subchannel at
+any given time, which could be implemented as follows:
+- When sending an update to the subchannel, the transport will record
+  the MAX_CONCURRENT_STREAMS value that it is reporting to the
+  subchannel.  It will include a callback with the update, which the
+  subchannel must invoke when it has finished processing the update.
+- If the transport receives a new MAX_CONCURRENT_STREAMS value from the
+  peer before it receives the callback from the subchannel, it will
+  not send another update to the subchannel.
+- When the transport receives the callback from the subchannel, it will
+  check whether the peer's current MAX_CONCURRENT_STREAMS value is
+  different from the last value it reported to the subchannel.  If so,
+  it will start a new update.
+
+Note that this approach means that there may be a noticeable delay
+between when the transport sees an update and when the subchannel sees
+the update.  If the update is an *increase* in MAX_CONCURRENT_STREAMS,
+that won't cause any problems (the worst case is that the subchannel
+may create a new connection that it might have been able to avoid).
+If the update is a *decrease* in MAX_CONCURRENT_STREAMS, then the
+subchannel may dispatch RPCs to the connection that will wind up being
+queued in the transport, which is sub-optimal.  However, this design
+already has a race condition in that case (see [Picking a Connection
+for Each RPC](#picking-a-connection-for-each-rpc) above for details),
+so this is not an additional problem.
+
 #### Interaction Between Channel and Subchannel
 
 Today, when the channel does an LB pick and gets back a subchannel,
 it calls a method on that subchannel to get its underlying connection.
 There are only two possible results:
 
-1. The subchannel returns a ref to the underlying connection.
-2. The subchannel returns null to indicate that it no longer has a working
-   connection.  This case can happen due to a race between the LB policy
-   picking the subchannel and the transport seeing a GOAWAY or disconnection;
-   when that occurs, the channel will queue the RPC (i.e., it is treated
-   the same as if the picker indicated to queue the RPC) in the expectation
-   that the LB policy will soon see the subchannel report the disconnection
-   and will return a new picker, at which point a new pick will be done for
-   the queued RPC.
+1. The subchannel returns a ref to the underlying connection.  In this
+   case, the channel starts a stream on the returned connection and
+   forwards the RPC to that stream.
+2. The subchannel returns null to indicate that it no longer has a
+   working connection.  This case can happen due to a race between the
+   LB policy picking the subchannel and the transport seeing a GOAWAY
+   or disconnection.  When this occurs, the channel will queue the RPC
+   (i.e., it is treated the same as if the picker indicated to queue
+   the RPC) in the expectation that the LB policy will soon see the
+   subchannel report the disconnection and will return a new picker,
+   at which point a new pick will be done for the queued RPC.
 
-With this design, the API used for this interaction between the channel
-and the subchannel will need to change.  Instead of the channel getting
-a connection from the subchannel, the channel will simply send the RPC
-to the subchannel, and the subchannel will be responsible for picking a
-connection or queuing the RPC if there is no connection immediately
-available.
+With this design, there is a third outcome possible: the subchannel may
+not have a set of working connections, but they may all already be at
+their MAX_CONCURRENT_STREAMS limits, so the RPC may need to be queued
+until the subchannel has a connection that it can send it on.  This case
+can be handled by having the subchannel return a fake connection object
+that queues the RPC in the subchannel.
 
-One consequence of this is that when we hit the race condition between
-the LB policy picking the subchannel and the transport seeing a GOWAWAY
-or disconnection, we will now rely on transparent retries (see [A6])
-instead of just having the channel re-queue the LB pick to be tried
-again the next time the LB policy updates the picker.
+Note that the race condition described in case 2 above will now happen
+only if the subchannel has no working connections.  If there is at least
+one working connection, then even if the RPC cannot be sent immediately,
+the RPC will be queued in the subchannel instead.
 
 #### Interaction with xDS Circuit Breaking
 
