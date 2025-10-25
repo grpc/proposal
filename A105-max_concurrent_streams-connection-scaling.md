@@ -426,7 +426,7 @@ When failing an RPC due to the subchannel not having any established
 connections, note that the RPC will be eligible for transparent retries
 (see [A6]), because no wire traffic was produced for it.
 
-### Interaction Between Transport and Subchannel
+#### Interaction Between Transport and Subchannel
 
 In order for the subchannel to know when to create a new connection, the
 transport will need to report the peer's MAX_CONCURRENT_STREAMS setting
@@ -493,24 +493,6 @@ Note that the race condition described in case 2 above will now happen
 only if the subchannel has no working connections.  If there is at least
 one working connection, then even if the RPC cannot be sent immediately,
 the RPC will be queued in the subchannel instead.
-
-#### Interaction with xDS Circuit Breaking
-
-gRPC currently supports xDS circuit breaking as described in [A32].
-Specifically, we support configuring the max number of RPCs in flight
-to each cluster.  This is done by having the xds_cluster_impl LB policy
-increment an atomic counter that tracks the number of RPCs currently in
-flight to the cluster, which is later decremented when the RPC ends.
-
-Some gRPC implementations don't actually increment the counter until
-after a connection is chosen for the RPC, so that they won't erroneously
-increment the counter when the picker returns a subchannel for which no
-connection is available (the race condition described above).  However,
-now that there could be a longer delay between when the picker returns
-and when a connection is chosen for the RPC, implementations will need
-to increment the counter in the picker.  It will then be necessary to
-decrement the counter when the RPC finishes, regardless of whether it
-was actually sent out or whether the subchannel failed it.
 
 #### Subchannel Pseudo-Code
 
@@ -615,6 +597,24 @@ If the selected (READY) subchannel transitions to CONNECTING or
 TRANSIENT_FAILURE state, then pick_first will go back into CONNECTING
 state.  It will start the happy eyeballs pass across all subchannels,
 as described in [A61].
+
+### Interaction with xDS Circuit Breaking
+
+gRPC currently supports xDS circuit breaking as described in [A32].
+Specifically, we support configuring the max number of RPCs in flight
+to each cluster.  This is done by having the xds_cluster_impl LB policy
+increment an atomic counter that tracks the number of RPCs currently in
+flight to the cluster, which is later decremented when the RPC ends.
+
+Some gRPC implementations don't actually increment the counter until
+after a connection is chosen for the RPC, so that they won't erroneously
+increment the counter when the picker returns a subchannel for which no
+connection is available (the race condition described above).  However,
+now that there could be a longer delay between when the picker returns
+and when a connection is chosen for the RPC, implementations will need
+to increment the counter in the picker.  It will then be necessary to
+decrement the counter when the RPC finishes, regardless of whether it
+was actually sent out or whether the subchannel failed it.
 
 ### Metrics
 
