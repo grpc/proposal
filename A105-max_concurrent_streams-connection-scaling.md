@@ -218,11 +218,11 @@ resolver attributes.  It can then tell the notification object what
 value to use whenever it gets a config update.
 
 Because the notification object is passed to the subchannel only at
-creation time, which means that the LB policy must decide whether
-to inject its own notification object at that time.  If an LB policy
-initially wants to just use the default value from the channel, it would
-need to proxy that value from the original notification object that was
-passed down from the channel.
+creation time, the LB policy must decide whether to inject its own
+notification object at that time.  If an LB policy initially wants to
+just use the default value from the channel, it would need to proxy that
+value from the original notification object that was passed down from
+the channel.
 
 Note that this approach assumes that Java and Go have switched to a
 model where there is only one address per subchannel, as per [A61].
