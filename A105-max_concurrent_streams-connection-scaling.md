@@ -333,7 +333,7 @@ Instead, it must wait for the in-flight connection attempt to finish.
 If that attempt fails, then backoff must be performed before starting the
 next connection attempt.  But if that attempt succeeds, backoff state
 will be reset, so if there are still enough queued RPCs to warrant a
-second connection, then the subchannel may immediately start another
+third connection, then the subchannel may immediately start another
 connection attempt.
 
 The connectivity state of the subchannel should be determined as follows
