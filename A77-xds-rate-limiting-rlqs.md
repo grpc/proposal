@@ -5,7 +5,7 @@ A77: xDS Server-Side Rate Limiting
 * Approver: Mark Roth (@markdroth)
 * Status: In Review
 * Implemented in:
-* Last updated: 2025-10-03
+* Last updated: 2025-10-27
 * Discussion at:
   - [ ] TODO(sergiitk): insert google group thread
 
@@ -194,11 +194,14 @@ We will support the following fields in the
 message:
 
 -   [`bucket_id_builder`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L348):
-    If present, must be a valid `BucketIdBuilder` message. This is used to
-    construct a `BucketId` for each request, which may involve dynamic values
-    from request metadata. If not set, requests are not reported to the RLQS
-    server and are handled according to `no_assignment_behavior`.
-    -   `bucket_id_builder`: A map from string to
+    If present, must be a valid
+    [`BucketIdBuilder`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L262)
+    message. This is used to construct a `BucketId` for each request, which may
+    involve dynamic values from request metadata. If not set, requests are not
+    reported to the RLQS server and are handled according to
+    `no_assignment_behavior`.
+    -   [`bucket_id_builder`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L293):
+        A map from string to
         [`ValueBuilder`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.proto#L265).
         Must contain at least one entry. In addition to the specification, gRPC
         will restrict the total number of key-value pairs to 30.
