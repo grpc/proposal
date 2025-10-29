@@ -413,7 +413,7 @@ queuing strategy.
 When retrying a queued RPC, the subchannel will use the same algorithm
 described above that it will when it first sees the RPC.  RPCs will be
 drained from the queue upon the following events:
-- When a connection attempt completes, whether successfully or not.
+- When a connection attempt completes successfully.
 - When the backoff timer fires.
 - When an existing connection fails.
 - When the transport for a connection reports a new value for
@@ -523,13 +523,13 @@ def MaybeDispatchRpc(self, rpc):
 # Starts an RPC on the subchannel.
 def StartRpc(self, rpc):
   if not self.MaybeDispatchRpc(rpc):
-    self.queue.append(rpc)
+    self.queue.add(rpc)
 
 # Retries RPCs from the queue, in order.
 def RetryRpcsFromQueue(self):
   while len(self.queue) > 0:
     # Stop at the first RPC that gets queued.
-    if not self.MaybeDispatchRpc(self.queue[-1]):
+    if not self.MaybeDispatchRpc(self.queue.front()):
       break
     self.queue.pop()
 
@@ -550,7 +550,6 @@ def OnConnectionAttemptSucceeded(self, new_connection):
 def OnConnectionAttemptFailed(self):
   self.connection_attempt = None
   self.pending_backoff_timer = Timer(self.backoff_state.NextBackoffDelay())
-  self.RetryRpcsFromQueue()
 
 # Called when the backoff timer fires.  Will trigger a new connection
 # attempt if there are RPCs in the queue.
