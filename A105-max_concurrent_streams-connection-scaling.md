@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-29
+* Last updated: 2025-10-31
 * Discussion at: https://groups.google.com/g/grpc-io/c/n9Mi7ZODReE
 
 ## Abstract
@@ -498,19 +498,14 @@ The following pseudo-code illustrates the expected functionality in the
 subchannel:
 
 ```
-# Returns True if the RPC has been handled, False if it needs to be queued.
-def MaybeDispatchRpc(self, rpc):
-  # If there are no connections, fail the RPC.
-  # Note that the RPC will be eligible for transparent retries.
-  if len(self.connections) == 0:
-    rpc.Fail(UNAVAILABLE)
-    return True
+# Returns a connection to use for an RPC, or None if no connection is
+# currently available to send an RPC on.
+def ChooseConnection(self):
   # Use the oldest connection that can accept a new stream, if any.
   for connection in self.connections:
     if connection.rpcs_in_flight < connection.max_concurrent_streams:
       connection.rpcs_in_flight += 1
-      connection.StartRpc(rpc)
-      return True
+      return connection
   # If we aren't yet at the max number of connections, see if we can
   # create a new one.
   if (len(self.connections) < self.max_connections_per_subchannel and
@@ -518,19 +513,29 @@ def MaybeDispatchRpc(self, rpc):
       self.pending_backoff_timer is None):
     self.StartConnectionAttempt()
   # Didn't find a connection for the RPC, so queue it.
-  return False
+  return None
 
-# Starts an RPC on the subchannel.
-def StartRpc(self, rpc):
-  if not self.MaybeDispatchRpc(rpc):
-    self.queue.add(rpc)
+# Get a connection to start a new RPC.
+def GetConnection(self):
+  # If there are no connections, tell the channel to queue the LB pick.
+  if len(self.connections) == 0:
+    return None
+  connection = self.ChooseConnection()
+  # If we didn't find a connection to use, return a fake connection that
+  # adds all RPCs to self.queue.
+  if connection is None:
+    return FakeConnectionThatQueuesRpcs()
+  return connection
 
 # Retries RPCs from the queue, in order.
 def RetryRpcsFromQueue(self):
   while len(self.queue) > 0:
+    connection = self.ChooseConnection()
     # Stop at the first RPC that gets queued.
-    if not self.MaybeDispatchRpc(self.queue.front()):
+    if connection is None:
       break
+    # Otherwise, send the RPC on the connection.
+    connection.SendRpc(self.queue.front())
     self.queue.pop()
 
 # Starts a new connection attempt.
@@ -561,7 +566,13 @@ def OnBackoffTimer(self):
 # connection attempt if there are RPCs in the queue.
 def OnConnectionFailed(self, failed_connection):
   self.connections.remove(failed_connection)
-  self.RetryRpcsFromQueue()
+  if len(self.connections) == 0:
+    for rpc in self.queue:
+      # RPC will be eligible for transparent retries.
+      rpc.Fail(UNAVAILABLE)
+    self.queue = []
+  else:
+    self.RetryRpcsFromQueue()  # Maybe trigger new connection attempt.
 
 # Called when a connection reports a new MAX_CONCURRENT_STREAMS value.
 # May send RPCs on the connection if there are any queued and the
