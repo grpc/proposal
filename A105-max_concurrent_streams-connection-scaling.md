@@ -296,12 +296,6 @@ following are true:
   max_connections_per_subchannel setting.
 - There is no connection attempt currently in flight on the subchannel.
 
-The subchannel will never close a connection once it has been established.
-However, when a connection is closed for any reason, it is removed from
-the subchannel.  If the application wishes to garbage collect unused
-connections, it should configure MAX_CONNECTION_IDLE on the server side,
-as described in [A9].
-
 Some examples of cases that can trigger a new connection attempt to be
 started:
 - A new RPC is started on the subchannel and all existing connections
@@ -313,6 +307,17 @@ started:
 - The value of the max_connections_per_subchannel setting increases,
   all existing connections are already at their MAX_CONCURRENT_STREAMS
   limit, and there are queued RPCs.
+
+The subchannel will never close a connection once it has been established.
+However, when a connection is closed for any reason, it is removed from
+the subchannel.  If the application wishes to garbage collect unused
+connections, it should configure MAX_CONNECTION_IDLE on the server side,
+as described in [A9].
+
+If all working connections are terminated, the subchannel will fail
+all queued RPCs with status UNAVAILABLE.  Note that these RPCs will be
+eligible for transparent retries (see [A6]), because no wire traffic
+was produced for them.
 
 #### Backoff Behavior and Connectivity State
 
@@ -386,19 +391,17 @@ is expected to be rare.
 
 When choosing a connection for an RPC within a subchannel, the following
 algorithm will be used (first match wins):
-1. If the subchannel has no working connections, then the RPC will be
-   failed with status UNAVAILABLE.
-2. Look through all working connections in order from the oldest to the
+1. Look through all working connections in order from the oldest to the
    newest.  For each connection, if the number of RPCs in flight on the
    connection is lower than the peer's MAX_CONCURRENT_STREAMS setting,
    then the RPC will be dispatched on that connection.
-3. If the number of existing connections is equal to the
+2. If the number of existing connections is equal to the
    max_connections_per_subchannel setting, the RPC will be queued.
-4. If the number of existing connections is less than the
+3. If the number of existing connections is less than the
    max_connections_per_subchannel setting and the subchannel is in backoff
    delay due to the last connection attempt failing, the RPC will be
    queued.
-5. If the number of existing connections is less than the
+4. If the number of existing connections is less than the
    max_connections_per_subchannel setting and no connection attempt is
    currently in flight, a new connection attempt will be started, and
    the RPC will be queued.
@@ -419,10 +422,6 @@ drained from the queue upon the following events:
 - When the transport for a connection reports a new value for
   MAX_CONCURRENT_STREAMS.
 - When an RPC dispatched on one of the connections completes.
-
-When failing an RPC due to the subchannel not having any established
-connections, note that the RPC will be eligible for transparent retries
-(see [A6]), because no wire traffic was produced for it.
 
 #### Interaction Between Transport and Subchannel
 
