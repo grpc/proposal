@@ -263,19 +263,18 @@ any new fields in the xds_cluster_impl LB policy configuration.
 
 ### Subchannel Behavior
 
-The connection scaling functionality in the subchannel will be used if
-the max_connections_per_subchannel setting is greater than 1.
-
-If the value is 1 (or unset), then implementations must not impose any
-additional per-RPC overhead at this layer beyond what already exists
-today.  In other words, the connection scaling feature must not affect
-performance unless it is actually enabled.
+If max_connections_per_subchannel is 1, the subchannel will provide
+essentially the same behavior as before this gRFC.  In that case,
+implementations should minimize any additional per-RPC overhead at this
+layer beyond what already existed prior to this design.  In other words,
+the connection scaling feature should ideally not affect performance
+unless it is actually enabled.
 
 #### Connection Management
 
-When max_connections_per_subchannel is greater than 1, the subchannel will
-contain up to that number of established connections.  The connections
-will be stored in a list ordered by the time at which the connection was
+The subchannel will establish up to the number of established connections
+specified by max_connections_per_subchannel.  The connections will
+be stored in a list ordered by the time at which the connection was
 established, so that the oldest connection is at the start of the list.
 
 Each connection will store the peer's MAX_CONCURRENT_STREAMS setting
@@ -370,27 +369,6 @@ pick_first will handle these new transitions.
 
 #### Picking a Connection for Each RPC
 
-When an RPC is started and a subchannel is picked for that RPC, the
-subchannel will find the first available connection for the RPC, in
-order of connection creation.
-
-The subchannel must ensure that races do not happen while dispatching
-RPCs to a connection that will lead to one or more RPCs being queued in
-the connection despite having available quota elsewhere.  For example,
-if two RPCs are initiated at the same time and one stream is available
-in a connection, both RPCs must not choose the same connection, or else
-one will queue.  This race can be avoided with locks or atomics.
-
-One race that may lead to RPCs being queued in a connection is if the
-MAX_CONCURRENT_STREAMS setting of a connection is lowered by the server
-after RPCs are dispatched to the connection.  This race can be avoided
-if the connection is modified to not queue RPCs but instead report the
-scenario back to the subchannel, or to coordinate the SETTINGS frame ACK
-with the subchannel.  Such changes are out of scope for this design,
-but may be considered in the future.  For the purposes of this design,
-it is acceptable to queue RPCs on a connection due to this race, which
-is expected to be rare.
-
 When choosing a connection for an RPC within a subchannel, the following
 algorithm will be used (first match wins):
 1. Look through all working connections in order from the oldest to the
@@ -424,6 +402,32 @@ drained from the queue upon the following events:
 - When the transport for a connection reports a new value for
   MAX_CONCURRENT_STREAMS.
 - When an RPC dispatched on one of the connections completes.
+
+Because we are now handling queuing in the subchannel, transport
+implementations no longer need to handle this queuing.  Instead, when
+a transport sees an RPC and does not have quota to send it on the wire,
+the transport may fail the RPC in a way that is eligible for transparent
+retries (see [A6]).  Note that implementations should make sure that they
+do not introduce an infinite loop here: the transparent retry must not
+block the subchannel from processing the subsequent MAX_CONCURRENT_STREAMS
+update from the transport, although no explicit synchronization is needed
+to ensure that the first transparent retry must not happen until the
+subchannel has seen that update.
+
+The subchannel must ensure that races do not happen while dispatching
+RPCs to a connection.  For example, if two RPCs are initiated at the same
+time and one stream is available in a connection, both RPCs must not choose
+the same connection.  This race can be avoided with locks or atomics.
+
+One race that may lead to an RPC being sent on a connection with
+insufficient quota is if the MAX_CONCURRENT_STREAMS setting of a
+connection is lowered by the server after RPCs are dispatched to the
+connection.  This is expected to be a rare case, so for this design,
+we do not attempt to address this race, with the understanding that
+transport implementations will either queue the RPC or fail it in a
+way that causes it to be transparently retried.  In the future, we may
+improve the handling of this race by coordinating the SETTINGS frame
+ACK with the subchannel.
 
 #### Interaction Between Transport and Subchannel
 
