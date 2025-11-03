@@ -386,6 +386,11 @@ algorithm will be used (first match wins):
    currently in flight, a new connection attempt will be started, and
    the RPC will be queued.
 
+The subchannel must ensure that races do not happen while dispatching
+RPCs to a connection.  For example, if two RPCs are initiated at the same
+time and one stream is available in a connection, both RPCs must not choose
+the same connection.  This race can be avoided with locks or atomics.
+
 When queueing an RPC, the queue must be roughly fair: RPCs must
 be dispatched in the order in which they are received into the
 queue, acknowledging that timing between threads may lead to
@@ -404,30 +409,18 @@ drained from the queue upon the following events:
 - When an RPC dispatched on one of the connections completes.
 
 Because we are now handling queuing in the subchannel, transport
-implementations no longer need to handle this queuing.  Instead, when
-a transport sees an RPC and does not have quota to send it on the wire,
-the transport may fail the RPC in a way that is eligible for transparent
-retries (see [A6]).  Note that implementations should make sure that they
-do not introduce an infinite loop here: the transparent retry must not
-block the subchannel from processing the subsequent MAX_CONCURRENT_STREAMS
-update from the transport, although no explicit synchronization is needed
-to ensure that the first transparent retry must not happen until the
-subchannel has seen that update.
-
-The subchannel must ensure that races do not happen while dispatching
-RPCs to a connection.  For example, if two RPCs are initiated at the same
-time and one stream is available in a connection, both RPCs must not choose
-the same connection.  This race can be avoided with locks or atomics.
-
-One race that may lead to an RPC being sent on a connection with
-insufficient quota is if the MAX_CONCURRENT_STREAMS setting of a
-connection is lowered by the server after RPCs are dispatched to the
-connection.  This is expected to be a rare case, so for this design,
-we do not attempt to address this race, with the understanding that
-transport implementations will either queue the RPC or fail it in a
-way that causes it to be transparently retried.  In the future, we may
-improve the handling of this race by coordinating the SETTINGS frame
-ACK with the subchannel.
+implementations should no longer need to handle this queuing.  The only
+case where a transport may see an RPC that it does not have quota to send
+is if the MAX_CONCURRENT_STREAMS setting of a connection is lowered by
+the server after RPCs are dispatched to the connection.  Transports are
+encouraged to handle this case by failing RPCs in a way that is eligible
+for transparent retries (see [A6]) rather than by queueing the RPC.
+Note that implementations should make sure that they do not introduce an
+infinite loop here: the transparent retry must not block the subchannel
+from processing the subsequent MAX_CONCURRENT_STREAMS update from the
+transport, although no explicit synchronization is needed to ensure
+that the first transparent retry must not happen until the subchannel
+has seen that update.
 
 #### Interaction Between Transport and Subchannel
 
