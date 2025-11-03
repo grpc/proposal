@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-31
+* Last updated: 2025-11-03
 * Discussion at: https://groups.google.com/g/grpc-io/c/n9Mi7ZODReE
 
 ## Abstract
@@ -48,6 +48,7 @@ channels it uses.
 ### Related Proposals:
 * [A6: gRPC Retry Design][A6]
 * [A9: Server-side Connection Management][A9]
+* [A14: Channelz][A14]
 * [A32: xDS Circuit Breaking][A32]
 * [A61: IPv4 and IPv6 Dualstack Backend Support][A61]
 * [A74: xDS Config Tears][A74]
@@ -56,6 +57,7 @@ channels it uses.
 
 [A6]: A6-client-retries.md
 [A9]: A9-server-side-conn-mgt.md
+[A14]: A14-channelz.md
 [A32]: A32-xds-circuit-breaking.md
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
 [A74]: A74-xds-config-tears.md
@@ -622,6 +624,45 @@ and when a connection is chosen for the RPC, implementations will need
 to increment the counter in the picker.  It will then be necessary to
 decrement the counter when the RPC finishes, regardless of whether it
 was actually sent out or whether the subchannel failed it.
+
+### Channelz Changes
+
+The channelz API defined in [A14] will need some changes to expose the
+state of connection scaling.
+
+In the `ChannelData` message, we will add a new `uint32
+max_connections_per_subchannel` field, which will be populated only for
+subchannels, not channels.
+
+The channelz data model already supports [multiple sockets per
+subchannel](https://github.com/grpc/grpc-proto/blob/23f5b568eefcb876e6ebc3b01725f1f20cff999e/grpc/channelz/v1/channelz.proto#L80).
+Today, a subchannel can have more than one socket when a connection
+receives a GOAWAY but remains open until already-in-flight RPCs finish,
+while at the same time a new connection is established to send new RPCs.
+The current channelz data model does not explicitly indicate which
+connection has received the GOAWAY, although that can be inferred from
+the channelz socket ID, since the lower ID is older and will therefore
+be the one that received the GOAWAY.  With this design, that inference
+will no longer be possible, because there can now be more than one
+established connection in a subchannel.  Therefore, we will add a new
+`google.protobuf.UInt32Value received_goaway_error` field to the channelz
+`SocketData` message, which will be populated if a GOAWAY has been
+received, in which case its value will be the HTTP/2 error code from
+the received GOAWAY.
+
+The `SocketData` message already contains
+[`streams_started`](https://github.com/grpc/grpc-proto/blob/23f5b568eefcb876e6ebc3b01725f1f20cff999e/grpc/channelz/v1/channelz.proto#L252),
+[`streams_succeeded`](https://github.com/grpc/grpc-proto/blob/23f5b568eefcb876e6ebc3b01725f1f20cff999e/grpc/channelz/v1/channelz.proto#L256),
+and
+[`streams_failed`](https://github.com/grpc/grpc-proto/blob/23f5b568eefcb876e6ebc3b01725f1f20cff999e/grpc/channelz/v1/channelz.proto#L260)
+fields, which enable computing the number of streams currently in
+flight.  However, we will add a new `uint32 peer_max_concurrent_streams`
+field that will report the value of the peer's MAX_CONCURRENT_STREAMS
+setting; note that this field does not need to be populated in the gRPC
+server, only the client.
+
+Note that all data in `SocketNode` will be reported from the perspective
+of the transport, not the perspective of the subchannel.
 
 ### Metrics
 
