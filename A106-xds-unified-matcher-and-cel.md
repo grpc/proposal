@@ -11,15 +11,23 @@ A106: xDS Unified Matcher and CEL Integration
 
 ## Abstract
 
-TODO(sergiitk): new abstract
+We will add support for the xDS [Unified Matcher API] and
+[Common Expression Language](cel.dev) (CEL) within gRPC. This integration will
+enable advanced, flexible matching capabilities for various xDS-managed
+features, such as server-side rate limiting (RLQS, [A77]), external
+authorization (ExtAuthz, [A92]), and external processing (ExtProc, [A93]).
+
+TODO(sergiitk): q: is this really needed for ExtAuthz, ExtProc?
 
 ## Background
 
-TODO(sergiitk): new background
+[Unified Matcher API] is an adaptable framework that can be used in any xDS
+component that needs matching features. Historically, xDS filters implemented
+its custom mechanisms for performing assertion against response/request
+metadata. The Unified Matcher API was introduced to standardize and unify these
+matching capabilities across various xDS components.
 
-1.  [Unified Matcher API].
-2.  One of the matching mechanisms will be [CEL](https://cel.dev/) (Common
-    Expression Language).
+TODO(sergiitk): finish
 
 ### Related Proposals
 
@@ -56,9 +64,6 @@ TODO(sergiitk): new background
 
 ### Unified Matcher API Support
 
-[Unified Matcher API] is an adaptable framework that can be used in any xDS
-component that needs matching features.
-
 Envoy provides two syntactically equivalent Unified Matcher definitions:
 [`envoy.config.common.matcher.v3.Matcher`](https://github.com/envoyproxy/envoy/blob/e3da7ebb16ad01c2ac7662758a75dba5cdc024ce/api/envoy/config/common/matcher/v3/matcher.proto)
 and
@@ -86,7 +91,7 @@ When implementing Unified Matcher API, a filter must define the following:
     limitations on their inputs.
 -   Filter-specific default no-match behavior (f.e. xDS resource NACK).
 
-##### Unified Matcher: `Matcher`
+#### Unified Matcher: `Matcher`
 
 While the Unified Matcher API allows for matcher trees of arbitrary depth, gRPC
 will reject any matcher definition with a tree depth greater than 100, NACKing
@@ -106,7 +111,7 @@ message:
     `matcher_tree`. If set, must be a valid [Unified Matcher: `OnMatch`].
     If not set, refer to filter's default no-match behavior.
 
-##### Unified Matcher: `OnMatch`
+#### Unified Matcher: `OnMatch`
 
 We will support the following fields in the
 [`xds.type.matcher.v3.Matcher.OnMatch`](https://github.com/cncf/xds/blob/b4127c9b8d78b77423fd25169f05b7476b6ea932/xds/type/matcher/v3/matcher.proto#L24)
@@ -125,7 +130,7 @@ The following fields will be ignored by gRPC:
 -   `keep_matching`: Not supported in the initial implementation, may be added
     later.
 
-##### Unified Matcher: `MatcherList`
+#### Unified Matcher: `MatcherList`
 
 We will support the following fields in the
 [`xds.type.matcher.v3.Matcher.MatcherList`](https://github.com/cncf/xds/blob/b4127c9b8d78b77423fd25169f05b7476b6ea932/xds/type/matcher/v3/matcher.proto#L43)
@@ -182,7 +187,7 @@ message:
     -   [`on_match`](https://github.com/cncf/xds/blob/b4127c9b8d78b77423fd25169f05b7476b6ea932/xds/type/matcher/v3/matcher.proto#L92):
         Must be set and contain a valid [Unified Matcher: `OnMatch`] message.
 
-##### Unified Matcher: `MatcherTree`
+#### Unified Matcher: `MatcherTree`
 
 We will support the following fields in the
 [`xds.type.matcher.v3.Matcher.MatcherTree`](https://github.com/cncf/xds/blob/b4127c9b8d78b77423fd25169f05b7476b6ea932/xds/type/matcher/v3/matcher.proto#L99)
@@ -215,9 +220,9 @@ message:
         have input type compatible with the `input`. Must return a boolean
         indicating the status of the match.
 
-##### Unified Matcher: Input Extensions
+#### Unified Matcher: Input Extensions
 
-###### Unified Matcher: `HttpRequestHeaderMatchInput`
+##### Unified Matcher: `HttpRequestHeaderMatchInput`
 
 Returns a `string` containing the value of the header with name specified in
 `header_name`.
@@ -230,7 +235,7 @@ message:
     Must be present. Value length must be in the range `[1, 16384)`. Must be a
     valid HTTP/2 header name.
 
-###### Unified Matcher: `HttpAttributesCelMatchInput`
+##### Unified Matcher: `HttpAttributesCelMatchInput`
 
 Returns a language-specific interface that allows to access request RPC metadata
 as defined in [Supported CEL Variables].
@@ -241,9 +246,9 @@ message:
 
 -   no fields.
 
-##### Unified Matcher: Matching Extensions
+#### Unified Matcher: Matching Extensions
 
-###### Unified Matcher: `StringMatcher`
+##### Unified Matcher: `StringMatcher`
 
 Compatible with [Unified Matcher: Input Extensions] that return a `string`.
 
@@ -269,7 +274,7 @@ result in xDS resource NACK:
 -   `safe_regex`
 -   `custom`
 
-###### Unified Matcher: `CelMatcher`
+##### Unified Matcher: `CelMatcher`
 
 Compatible with [Unified Matcher: `HttpAttributesCelMatchInput`].
 
@@ -301,7 +306,7 @@ The following fields will be ignored by gRPC:
 -   `CelExpression.cel_expr_parsed` - only Checked CEL expressions are
     supported.
 
-#### CEL Integration
+### CEL Integration
 
 We will support request metadata matching via CEL expressions. Only Canonical
 CEL and only checked expressions will be supported [`cel.expr.CheckedExpr`].
@@ -311,7 +316,7 @@ functions in a CEL program. We will match
 [Envoy CEL environment](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes)
 and CEL interpreter configuration.
 
-##### CEL Runtime Restrictions
+#### CEL Runtime Restrictions
 
 Certain CEL features can lead to superlinear time complexity or memory
 exhaustion. To ensure consistent behavior with Envoy and maintain security,
@@ -335,7 +340,7 @@ options.enable_string_concat = false;
 options.enable_list_concat = false;
 ```
 
-##### Supported CEL Functions
+#### Supported CEL Functions
 
 Similar to Envoy, we will
 support [standard CEL functions](https://github.com/google/cel-spec/blob/c629b2be086ed6b4c44ef4975e56945f66560677/doc/langdef.md#standard-definitions)
@@ -357,7 +362,7 @@ except comprehension-style macros.
 
 [RE2_wiki]: https://en.wikipedia.org/wiki/RE2_(software)
 
-##### Supported CEL Variables
+#### Supported CEL Variables
 
 In the initial implementation only the `request` variable is supported in CEL
 expressions. We will adapt
@@ -379,7 +384,7 @@ for gRPC.
 | `request.protocol`  | `string`              | Not set                      | Request protocol.                                           |
 | `request.query`     | `string`              | `""`                         | The query portion of the URL.                               |
 
-###### Footnotes
+##### Footnotes
 
 **<sup>1</sup> `request.method`**\
 Hard-coded to `"POST"` if unavailable and a code audit confirms the server
@@ -388,7 +393,7 @@ denies requests for all other method types.
 **<sup>2</sup> `request.headers`**\
 As defined in [A41], "header" field.
 
-###### CEL Variable Implementation Details
+##### CEL Variable Implementation Details
 
 For performance reasons, CEL variables should be resolved on demand. CEL Runtime
 provides the different variable resolving approaches based on the language:
@@ -405,6 +410,7 @@ variable protection will be removed once the feature has proven stable.
 
 ## Rationale
 
+TODO(sergiitk): rationale
 
 ## Implementation
 
