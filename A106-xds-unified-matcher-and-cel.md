@@ -4,7 +4,6 @@ A106: xDS Unified Matcher and CEL Integration
 * Author(s): Sergii Tkachenko (@sergiitk)
 * Approver: Mark Roth (@markdroth)
 * Status: In Review
-* Implemented in:
 * Last updated: 2025-11-03
 * Discussion at:
   - [ ] TODO(sergiitk): insert google group thread
@@ -17,7 +16,9 @@ enable advanced, flexible matching capabilities for various xDS-managed
 features, such as server-side rate limiting (RLQS, [A77]), external
 authorization (ExtAuthz, [A92]), and external processing (ExtProc, [A93]).
 
-TODO(sergiitk): q: is this really needed for ExtAuthz, ExtProc?
+> [!WARNING] TODO(sergiitk): q: is this really needed for ExtAuthz, ExtProc?
+> a: no, needed for composite filter, https://github.com/grpc/proposal/pull/511
+
 
 ## Background
 
@@ -27,7 +28,7 @@ its custom mechanisms for performing assertion against response/request
 metadata. The Unified Matcher API was introduced to standardize and unify these
 matching capabilities across various xDS components.
 
-TODO(sergiitk): finish
+> [!WARNING] TODO(sergiitk): finish
 
 ### Related Proposals
 
@@ -64,13 +65,24 @@ TODO(sergiitk): finish
 
 ### Unified Matcher API Support
 
+> [!WARNING] TODO(sergiitk): good idea to executing parse matching tree, add a few examples. here's how matching should work in these cases.
+>
+> implementation and test suite:
+> https://github.com/grpc/grpc/blob/master/test/core/xds/xds_matcher_test.cc
+> https://github.com/grpc/grpc/blob/master/test/core/xds/xds_matcher_parse_test.cc
+
+
 Envoy provides two syntactically equivalent Unified Matcher definitions:
 [`envoy.config.common.matcher.v3.Matcher`](https://github.com/envoyproxy/envoy/blob/e3da7ebb16ad01c2ac7662758a75dba5cdc024ce/api/envoy/config/common/matcher/v3/matcher.proto)
 and
 [`xds.type.matcher.v3.Matcher`](https://github.com/cncf/xds/blob/b4127c9b8d78b77423fd25169f05b7476b6ea932/xds/type/matcher/v3/matcher.proto),
-which is the preferred version for all new APIs using Unified Matcher. If
+which is the preferred version for all new APIs using Unified Matcher.
+
+Will produce the same form for either one.
+
+ <!-- If
 `envoy.config.common.matcher.v3.Matcher` is provided, we will interpret it as is
-`xds.type.matcher.v3.Matcher`.
+`xds.type.matcher.v3.Matcher`. -->
 
 In this iteration the following Unified Mather extensions will be supported:
 
@@ -79,7 +91,7 @@ In this iteration the following Unified Mather extensions will be supported:
     2.  [Unified Matcher: `HttpAttributesCelMatchInput`]
 2.  Matchers:
     1.  [Unified Matcher: `StringMatcher`] (standard matcher)
-    1.  [Unified Matcher: `CelMatcher`]
+    2.  [Unified Matcher: `CelMatcher`]
 
 #### Unified Matcher: Filter Integration
 
@@ -89,12 +101,13 @@ When implementing Unified Matcher API, a filter must define the following:
 -   Supported [Unified Matcher: Input Extensions].
 -   Supported [Unified Matcher: Matching Extensions], including any additional
     limitations on their inputs.
+    > [!WARNING] TODO(sergiitk): remove, clarify this is based on return type of the input
 -   Filter-specific default no-match behavior (f.e. xDS resource NACK).
 
 #### Unified Matcher: `Matcher`
 
 While the Unified Matcher API allows for matcher trees of arbitrary depth, gRPC
-will reject any matcher definition with a tree depth greater than 100, NACKing
+will reject any matcher definition with a tree depth greater than `16`, NACKing
 the xDS resource.
 
 We will support the following fields in the
@@ -130,7 +143,11 @@ The following fields will be ignored by gRPC:
 -   `keep_matching`: Not supported in the initial implementation, may be added
     later.
 
+> [!WARNING] TODO(sergiitk): consider
+
 #### Unified Matcher: `MatcherList`
+
+> [!WARNING] TODO(sergiitk): format: no need to specify "valid" message when it's already implied
 
 We will support the following fields in the
 [`xds.type.matcher.v3.Matcher.MatcherList`](https://github.com/cncf/xds/blob/b4127c9b8d78b77423fd25169f05b7476b6ea932/xds/type/matcher/v3/matcher.proto#L43)
@@ -393,6 +410,8 @@ denies requests for all other method types.
 **<sup>2</sup> `request.headers`**\
 As defined in [A41], "header" field.
 
+> [!WARNING] TODO(sergiitk): comment: Response attributes are needed for ext_proc
+
 ##### CEL Variable Implementation Details
 
 For performance reasons, CEL variables should be resolved on demand. CEL Runtime
@@ -404,15 +423,19 @@ provides the different variable resolving approaches based on the language:
 
 ### Temporary Environment Variable Protection
 
+> [!WARNING] TODO(sergiitk): update env var
+
 During initial development, this feature will be enabled via
 the `GRPC_EXPERIMENTAL_XDS_ENABLE_RLQS` environment variable. This environment
 variable protection will be removed once the feature has proven stable.
 
 ## Rationale
 
-TODO(sergiitk): rationale
+> [!WARNING] TODO(sergiitk): rationale
 
 ## Implementation
+
+> [!WARNING] TODO(sergiitk): update impl notes
 
 Will be implemented in C-core, Java, Go, and Node as part of either RLQS
 ([A77]), ExtAuthz ([A92]), or ExtProc ([A93]), whichever happens to be
