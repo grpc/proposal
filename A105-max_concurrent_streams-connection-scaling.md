@@ -140,7 +140,9 @@ limit for the max_connections_per_subchannel setting.  This limit
 will be 10 by default, but gRPC will provide a channel-level setting to
 allow a client application to raise or lower that limit.  Whenever the
 max_connections_per_subchannel setting is larger than the channel's
-limit, it will be capped to that limit.
+limit, it will be capped to that limit.  This capping will be performed
+in the subchannel itself, so that it will apply regardless of where the
+setting is set.
 
 #### C-core
 
