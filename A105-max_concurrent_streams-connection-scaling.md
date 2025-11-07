@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-11-03
+* Last updated: 2025-11-07
 * Discussion at: https://groups.google.com/g/grpc-io/c/n9Mi7ZODReE
 
 ## Abstract
@@ -109,7 +109,7 @@ message ServiceConfig {
     //
     // Values higher than the client-enforced limit (by default, 10)
     // will be clamped to that limit.
-    google.protobuf.UInt32Value max_connections_per_subchannel = 1;
+    uint32 max_connections_per_subchannel = 1;
   }
   ConnectionScaling connection_scaling = N;
 }
