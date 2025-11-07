@@ -669,10 +669,16 @@ note that the additional connections will show up in the
 
 ### Temporary environment variable protection
 
-Enabling this feature via either the gRPC service config or xDS will
-initially be guarded via the environment variable
-`GRPC_EXPERIMENTAL_MAX_CONCURRENT_STREAMS_CONNECTION_SCALING`.  The
-feature will be enabled by default once it has passed interop tests.
+Enabling this feature via the gRPC service config will initially be
+guarded via the environment variable
+`GRPC_EXPERIMENTAL_MAX_CONCURRENT_STREAMS_CONNECTION_SCALING`.
+
+Enabling this feature via xDS will initially be
+guarded via the environment variable
+`GRPC_EXPERIMENTAL_XDS_MAX_CONCURRENT_STREAMS_CONNECTION_SCALING`.
+
+Each of the two configuration mechanisms will be enabled by default once
+it has passed interop tests.
 
 ## Rationale
 
