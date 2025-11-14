@@ -5,7 +5,7 @@
     (@dfawley)
 *   Status: Ready for Implementation
 *   Implemented in:
-*   Last updated: 2025-08-12
+*   Last updated: 2025-11-14
 *   Discussion at: https://groups.google.com/g/grpc-io/c/iMdK7r4E5tU
 
 ## Abstract
@@ -71,7 +71,7 @@ Label Name              | Disposition | Description
 ----------------------- | ----------- | -----------
 grpc.target             | Required    | Indicates the target of the gRPC channel (defined in [A66].)
 grpc.lb.backend_service | Optional    | The backend service to which the RPC was routed (defined in [A89].)
-grpc.lb.locality        | Optional    | The locality to which the traffic is being sent. This will be set to the resolver attribute passed down from the weighted_target policy, or the empty string if the resolver attribute is unset (defined in [A78].)
+grpc.lb.locality        | Optional    | The locality to which the traffic is being sent (defined in [A78] -- but see below for differences.)
 grpc.disconnect_error   | Optional    | Reason for disconnection.
 grpc.security_level     | Optional    | Denotes the security level of the connection. Allowed values - "none", "integrity_only" and "privacy_and_integrity".
 
@@ -81,6 +81,20 @@ The subchannel needs to be passed attributes with the values for the
 these attributes change. Since currently, only xDS is using these labels, the
 attributes will be set for each endpoint or address by cds (post-[A74]) or
 xds_cluster_resolver (pre-[A74]) LB policies.
+
+Note that for the `grpc.lb.locality` label, we cannot simply reuse the
+top-level attribute passed down from the weighted_target policy to the
+WRR policy, as described in [A78].  The WRR policy needs a top-level
+attribute rather than a per-endpoint attribute, since it needs a single
+value to use for all endpoints.  However, in this case, we are populating
+the attribute at a point in the LB policy tree where we have endpoints
+for multiple localities, which necessitates the use of a per-endpoint
+attribute.  Also, in Java and Go, only per-endpoint attributes are
+passed to the subchannel, so even if we set the attribute further down
+in the tree, we would still need it to be per-endpoint.  As a result,
+although the WRR policy will continue to use the top-level attribute set
+by the weighted_target policy, we will need to create a new per-endpoint
+attribute with the same value for use by the subchannel.
 
 List of allowed values for `grpc.disconnect_error` -
 
