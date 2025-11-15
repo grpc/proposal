@@ -83,18 +83,27 @@ attributes will be set for each endpoint or address by cds (post-[A74]) or
 xds_cluster_resolver (pre-[A74]) LB policies.
 
 Note that for the `grpc.lb.locality` label, we cannot simply reuse the
-top-level attribute passed down from the weighted_target policy to the
-WRR policy, as described in [A78].  The WRR policy needs a top-level
-attribute rather than a per-endpoint attribute, since it needs a single
-value to use for all endpoints.  However, in this case, we are populating
-the attribute at a point in the LB policy tree where we have endpoints
-for multiple localities, which necessitates the use of a per-endpoint
-attribute.  Also, in Java and Go, only per-endpoint attributes are
-passed to the subchannel, so even if we set the attribute further down
-in the tree, we would still need it to be per-endpoint.  As a result,
-although the WRR policy will continue to use the top-level attribute set
-by the weighted_target policy, we will need to create a new per-endpoint
-attribute with the same value for use by the subchannel.
+top-level attribute passed down from the weighted_target policy to the WRR
+policy, as described in [A78].  The WRR policy needs a top-level attribute
+rather than a per-endpoint attribute, since it needs a single value
+to use for all endpoints.  However, in Java and Go, only per-endpoint
+attributes are passed to the subchannel, so the subchannel cannot use
+the top-level attribute.  Furthermore, even in C-core, where top-level
+attributes are passed to the subchannel, we are populating the attribute
+at a point in the LB policy tree where we have endpoints for multiple
+localities, which necessitates the use of a per-endpoint attribute.
+As a result, although the WRR policy will continue to use the top-level
+attribute set by the weighted_target policy, we will need to create a
+new per-endpoint attribute with the same value for use by the subchannel.
+
+Similarly, for the `grpc.lb.backend_service` label, Java and Go will not
+be able to simply reuse the existing top-level attribute passed down from
+the cds (post-[A75]) or xds_cluster_impl (pre-[A75]) policies to the WRR
+policy, as described in [A89], since that top-level attribute will not be
+passed to the subchannel.  Therefore, those implementations will need
+to create a duplicate of this attribute as a per-endpoint attribute.
+However, for this label, the attribute will apply to all endpoints,
+so C-core can continue to set it as a top-level attribute.
 
 List of allowed values for `grpc.disconnect_error` -
 
