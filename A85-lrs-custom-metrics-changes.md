@@ -156,4 +156,6 @@ both per-subchannel and per-call, which would increase memory usage.
 
 C-core implementation in grpc/grpc#37467.
 
-Will also be implemented in Java and Go.
+Java implementation in https://github.com/grpc/grpc-java/pull/12203.
+
+Will also be implemented in Go.
