@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-11-07
+* Last updated: 2025-11-20
 * Discussion at: https://groups.google.com/g/grpc-io/c/n9Mi7ZODReE
 
 ## Abstract
@@ -244,10 +244,11 @@ field, we will now add support for the following field:
   If that entry is found, then within that entry:
   - [max_connections](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/circuit_breaker.proto#L59):
     If this field is set, then its value will be used to set the
-    max_connections_per_subchannel setting for all endpoints for that
-    xDS cluster.  If it is unset, then the
-    max_connections_per_subchannel setting will remain unset.  A value
-    of 0 will be rejected at resource validation time.
+    max_connections_per_subchannel setting for all endpoints for the
+    cluster.  If it is unset, then no max_connections_per_subchannel
+    setting will be set for the cluster's endpoints (i.e., the subchannel
+    will assume a value of 1 by default).  A value of 0 will be rejected
+    at resource validation time.
 
 A new field will be added to the parsed CDS resource representation
 containing the value of this field.
@@ -398,9 +399,9 @@ concurrent RPCs being added to the queue in an arbitrary order.
 See [Rationale](#rationale) below for a possible adjustment to this
 queuing strategy.
 
-When retrying a queued RPC, the subchannel will use the same algorithm
+When dequeuing an RPC, the subchannel will use the same algorithm
 described above that it will when it first sees the RPC.  RPCs will be
-drained from the queue upon the following events:
+dequeued upon the following events:
 - When a connection attempt completes successfully.
 - When the backoff timer fires.
 - When an existing connection fails.
@@ -479,11 +480,11 @@ There are only two possible results:
    at which point a new pick will be done for the queued RPC.
 
 With this design, there is a third outcome possible: the subchannel may
-not have a set of working connections, but they may all already be at
-their MAX_CONCURRENT_STREAMS limits, so the RPC may need to be queued
-until the subchannel has a connection that it can send it on.  This case
-can be handled by having the subchannel return a fake connection object
-that queues the RPC in the subchannel.
+have a set of working connections, but they may all already be at their
+MAX_CONCURRENT_STREAMS limits, so the RPC may need to be queued until
+the subchannel has a connection that it can send it on.  This case can
+be handled by having the subchannel return a fake connection object that
+queues the RPC in the subchannel.
 
 Note that the race condition described in case 2 above will now happen
 only if the subchannel has no working connections.  If there is at least
@@ -602,7 +603,8 @@ states.
 If the selected (READY) subchannel transitions to CONNECTING or
 TRANSIENT_FAILURE state, then pick_first will go back into CONNECTING
 state.  It will start the happy eyeballs pass across all subchannels,
-as described in [A61].
+as described in [A61].  Note that this will trigger a re-resolution
+request, just as the existing transition from READY to IDLE does.
 
 ### Interaction with xDS Circuit Breaking
 
