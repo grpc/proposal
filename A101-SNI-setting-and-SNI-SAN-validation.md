@@ -45,13 +45,14 @@ Tls connections using the fields from [UpstreamTlsContext][UTC] in the CDS updat
 
    ii. Else, if `UpstreamTlsContext.sni` specifies the SNI to use, then it will be used.
 
-   iii. Else, no SNI will be set for the Tls handshake.
+   iii. Else, no SNI will be set for the Tls handshake. An empty string for SNI value will be treated as SNI not specified.
 
 [UTC]: https://github.com/envoyproxy/envoy/blob/ee2bab9e40e7d7649cc88c5e1098c74e0c79501d/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29
 [A81-hostname]: A81-xds-authority-rewriting.md#xds-resource-validation
 
 2. Server SAN validation against SNI used: If `auto_sni_san_validation` is true in the [UpstreamTlsContext][UTC] 
-gRPC client will perform matching for a SAN against the SNI used for the handshake. While `XdsChannelCredentials` without `auto_sni_san_validation` performs matching using any of DNS / URI / IPA SAN matchers specified in the validation context,
+gRPC client will perform matching for a SAN against the SNI used for the handshake if any. If `auto_sni_san_validation` is true but no SNI was sent, then validation will use any SAN matchers specified in the validation context instead.
+While `XdsChannelCredentials` without `auto_sni_san_validation` performs matching using any of DNS / URI / IPA SAN matchers specified in the validation context,
 when `auto_sni_san_validation` is set, validation will be performed using exact DNS matcher.
 
 ### Related Proposals:
