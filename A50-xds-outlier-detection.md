@@ -188,7 +188,7 @@ The subchannel wrapper will track the latest state update from the underlying su
  3. For each address:
     1. If the percentage of ejected addresses is greater than or equal to `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `success_rate_ejection.request_volume`, continue to the next address.
-    3. If the address's success rate is less than `(mean - stdev * (success_rate_ejection.stdev_factor / 1000))`, then choose a random integer in `[0, 100)`. If that number is less than `success_rate_ejection.enforcement_percentage`, eject that address.
+    3. If the address's success rate is zero or is less than `(mean - stdev * (success_rate_ejection.stdev_factor / 1000))`, then choose a random integer in `[0, 100)`. If that number is less than `success_rate_ejection.enforcement_percentage`, eject that address.
 
 ### Failure Percentage Algorithm
 
