@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-11-20
+* Last updated: 2025-12-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/n9Mi7ZODReE
 
 ## Abstract
@@ -76,7 +76,7 @@ There are several parts to this proposal:
 - Configuration for the max number of connections per subchannel, via
   either the [service
   config](https://github.com/grpc/grpc/blob/master/doc/service_config.md)
-  or via a per-endpoint attribute in the LB policy tree.
+  or via xDS.
 - A mechanism for the transport to report the current MAX_CONCURRENT_STREAMS
   setting to the subchannel layer.
 - Connection scaling functionality in the subchannel.
@@ -88,9 +88,39 @@ There are several parts to this proposal:
 
 ### Configuration
 
-Connection scaling will be configured via a new service config field,
-as follows (schema shown in protobuf form, although gRPC actually accepts
-the service config in JSON form):
+In the subchannel, connection scaling will be configured via a setting
+called max_connections_per_subchannel.  That setting will be set either
+via the service config or via xDS.  The approach for plumbing this
+setting into the subchannel will be different in C-core than in Java
+and Go; see below for details.
+
+The max_connections_per_subchannel setting for a given subchannel
+can change with each resolver update, regardless of whether it is
+set via the service config or via xDS.  When this happens, we do
+not want to throw away the subchannel and create a new one, since
+that would cause unnecessary connection churn.  This means that the
+max_connections_per_subchannel setting must not be considered part of
+the subchannel's unique identity that is set only at subchannel creation
+time; instead, it must be changeable over the life of a subchannel.
+
+If the max_connections_per_subchannel setting is unset, the subchannel
+will assume a default of 1, which effectively means the same behavior
+as before this gRFC.
+
+The channel will enforce a maximum limit for the
+max_connections_per_subchannel setting.  This limit will be 10 by
+default, but gRPC will provide a channel-level setting to allow
+a client application to raise or lower that limit.  Whenever the
+max_connections_per_subchannel setting is larger than the channel's limit,
+it will be capped to that limit.  This capping will be performed in the
+subchannel itself, so that it will apply regardless of where the setting
+is set.
+
+#### gRPC Service Config
+
+In the gRPC service config, connection scaling will be configured via
+a new field, as follows (schema shown in protobuf form, although gRPC
+actually accepts the service config in JSON form):
 
 ```proto
 message ServiceConfig {
@@ -115,36 +145,40 @@ message ServiceConfig {
 }
 ```
 
-In the subchannel, connection scaling will be configured via a setting
-called max_connections_per_subchannel.  That setting will be set
-either via the service config or via a per-endpoint attribute in the LB
-policy tree.  The approach for plumbing this setting into the
-subchannel will be different in C-core than in Java and Go; see below
-for details.
+#### xDS Configuration
 
-The max_connections_per_subchannel setting for a given subchannel can
-change with each resolver update, regardless of whether it is set
-via the service config or via an LB policy.  When this happens, we
-do not want to throw away the subchannel and create a new one, since
-that would cause unnecessary connection churn.  This means that the
-max_connections_per_subchannel setting must not be considered part of
-the subchannel's unique identity that is set only at subchannel creation
-time; instead, it must be changeable over the life of a subchannel.
+In xDS, the max_connections_per_subchannel setting will be configured via
+a per-host circuit breaker in the CDS resource.  This uses a similar
+structure to the circuit breaker described in [A32].
 
-If the max_connections_per_subchannel setting is unset, the subchannel
-will assume a default of 1, which effectively means the same behavior
-as before this gRFC.
+In the CDS resource, in the
+[circuit_breakers](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/cluster.proto#L885)
+field, we will now add support for the following field:
+- [per_host_thresholds](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/circuit_breaker.proto#L120):
+  As in [A32], gRPC will look only at the first entry for priority
+  [DEFAULT](https://github.com/envoyproxy/envoy/blob/6ab1e7afbfda48911e187c9d653a46b8bca98166/api/envoy/config/core/v3/base.proto#L39).
+  If that entry is found, then within that entry:
+  - [max_connections](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/circuit_breaker.proto#L59):
+    If this field is set, then its value will be used to set the
+    max_connections_per_subchannel setting for all endpoints for the
+    cluster.  If it is unset, then no max_connections_per_subchannel
+    setting will be set for the cluster's endpoints (i.e., the subchannel
+    will assume a value of 1 by default).  A value of 0 will be rejected
+    at resource validation time.
 
-As indicated in the comment above, the channel will enforce a maximum
-limit for the max_connections_per_subchannel setting.  This limit
-will be 10 by default, but gRPC will provide a channel-level setting to
-allow a client application to raise or lower that limit.  Whenever the
-max_connections_per_subchannel setting is larger than the channel's
-limit, it will be capped to that limit.  This capping will be performed
-in the subchannel itself, so that it will apply regardless of where the
-setting is set.
+A new field will be added to the parsed CDS resource representation
+containing the value of this field.
 
-#### C-core
+The xds_cluster_impl LB policy will be responsible for setting the
+max_connections_per_subchannel setting based on this xDS configuration.
+Note that it makes sense to do this in the xds_cluster_impl LB policy
+instead of the cds policy for two reasons: first, this is where circuit
+breaking is already configured, and second, this policy is in the right
+location in the LB policy tree regardless of whether [A75] has been
+implemented yet.  Note that post-[A74], this will not require adding
+any new fields in the xds_cluster_impl LB policy configuration.
+
+#### Config Plumbing in C-core
 
 In C-core, every time there is a resolver update, the LB policy
 calls `CreateSubchannel()` for every address in the new address list.
@@ -189,10 +223,11 @@ To support this, the implementation will be as follows:
 - If max_connections_per_subchannel is configured via the service
   config, the `GRPC_ARG_MAX_CONNECTIONS_PER_SUBCHANNEL` channel arg will
   be set by the channel before passing the resolver update to the LB
-  policy tree.  Individual LB policies may override this channel arg
-  before `CreateSubchannel()` is called.
+  policy tree.  Individual LB policies (such as the xds_cluster_impl
+  policy) may override this channel arg before `CreateSubchannel()`
+  is called.
 
-#### Java and Go
+#### Config Plumbing in Java and Go
 
 In Java and Go, there is no subchannel pool, and LB policies will not
 call `CreateSubchannel()` for any address for which they already have a
@@ -202,65 +237,39 @@ Therefore, a different approach is called for.
 
 A notification object will be used to notify the subchannel of the value
 of the max_connections_per_subchannel setting.  This object will be
-passed into the subchannel at creation time via a resolver attribute.
+passed into the subchannel at creation time and will be used for the
+life of the subchannel (i.e., there is no way for the subchannel to swap
+to a different notification object later).  Multiple subchannels can
+share the same notification object; whenever the notification object is
+told to use a new value for max_connections_per_subchannel, all
+subchannels using that object will be notified of the change.
 
-When a channel is constructed, it will create a single notification
-object to be used for all subchannels for the lifetime of the channel.
-This notification object will be added to the resolver attributes before
-the resolver update is passed to the LB policy, so that it will propagate
-through to the `CreateSubchannel()` call.  Whenever the resolver returns
-a service config that sets max_connections_per_subchannel, the channel will
-tell the notification object to use that value, which will then be
-communicated to the subchannels.
+The notification object can come from one of two places, depending on
+whether the configuration comes from the gRPC service config or from xDS.
 
-For the case where an LB policy wants to override the value of
-max_connections_per_subchannel, it can create its own notification
-object and replace the channel's notification object with its own in the
-resolver attributes.  It can then tell the notification object what
-value to use whenever it gets a config update.
+For the service config case, when the channel is constructed, it will
+create a single notification object to be used for all subchannels for
+the lifetime of the channel.  Whenever the resolver returns a service
+config, the channel will tell the notification object to use the new
+value of max_connections_per_subchannel.
 
-Because the notification object is passed to the subchannel only at
-creation time, the LB policy must decide whether to inject its own
-notification object at that time.  If an LB policy initially wants to
-just use the default value from the channel, it would need to proxy that
-value from the original notification object that was passed down from
-the channel.
+For the xDS case, when the xds_cluster_impl LB policy is constructed, it
+will create a single notification object to used for all subchannels
+for the lifetime of that xds_cluster_impl policy instance.  Whenever the
+xds_cluster_impl policy receives an xDS update, it will tell the
+notification object to use the new value of
+max_connections_per_subchannel.  The notification object will be passed
+to the child policy via an attribute that will be passed into the
+`CreateSubchannel()` call.
+
+The channel's implementation of `CreateSubchannel()` will check to see
+if the LB policy included a notification object in an attribute.  If it
+did, that notification object will be used when creating the subchannel;
+otherwise, the channel-level notification object fed from the service
+config will be used.
 
 Note that this approach assumes that Java and Go have switched to a
 model where there is only one address per subchannel, as per [A61].
-
-#### xDS Configuration
-
-In xDS, the max_connections_per_subchannel setting will be configured via
-a per-host circuit breaker in the CDS resource.  This uses a similar
-structure to the circuit breaker described in [A32].
-
-In the CDS resource, in the
-[circuit_breakers](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/cluster.proto#L885)
-field, we will now add support for the following field:
-- [per_host_thresholds](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/circuit_breaker.proto#L120):
-  As in [A32], gRPC will look only at the first entry for priority
-  [DEFAULT](https://github.com/envoyproxy/envoy/blob/6ab1e7afbfda48911e187c9d653a46b8bca98166/api/envoy/config/core/v3/base.proto#L39).
-  If that entry is found, then within that entry:
-  - [max_connections](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/circuit_breaker.proto#L59):
-    If this field is set, then its value will be used to set the
-    max_connections_per_subchannel setting for all endpoints for the
-    cluster.  If it is unset, then no max_connections_per_subchannel
-    setting will be set for the cluster's endpoints (i.e., the subchannel
-    will assume a value of 1 by default).  A value of 0 will be rejected
-    at resource validation time.
-
-A new field will be added to the parsed CDS resource representation
-containing the value of this field.
-
-The xds_cluster_impl LB policy will be responsible for setting the
-max_connections_per_subchannel setting based on this xDS configuration.
-Note that it makes sense to do this in the xds_cluster_impl LB policy
-instead of the cds policy for two reasons: first, this is where circuit
-breaking is already configured, and second, this policy is in the right
-location in the LB policy tree regardless of whether [A75] has been
-implemented yet.  Note that post-[A74], this will not require adding
-any new fields in the xds_cluster_impl LB policy configuration.
 
 ### Subchannel Behavior
 
@@ -496,7 +505,7 @@ the RPC will be queued in the subchannel instead.
 The following pseudo-code illustrates the expected functionality in the
 subchannel:
 
-```
+```python
 # Returns a connection to use for an RPC, or None if no connection is
 # currently available to send an RPC on.
 def ChooseConnection(self):
