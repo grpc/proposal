@@ -4,7 +4,7 @@ A103: xDS Composite Filter
 * Approver: ejona86, dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-04
+* Last updated: 2025-12-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/es5taH0OZS8
 
 ## Abstract
@@ -116,7 +116,7 @@ a maximum recursion depth of 8 when parsing HTTP filter configs.
 
 In addition to the CEL request attributes described in [A77], we will
 also add support for some additional [CEL
-attributes](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.html#configuration-attributes)
+attributes](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.html)
 that we expect to be useful for the composite filter.
 
 On both the gRPC client and server sides, we will add support for the
@@ -134,7 +134,7 @@ to `google.protobuf.Struct` type.
 
 We will also add support for the following attributes on the gRPC server
 side only (these attributes are not relevant on the client side):
-- `source.ip`
+- `source.address`
 - `source.port`
 - `connection.requested_server_name`
 - `connection.tls_version`
