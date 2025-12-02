@@ -1,10 +1,11 @@
 # A80: Export TCP Telemetry from gRPC
 
-**Author(s)**: Aananth V (@aananthv), Nana Pang (@nanahpang), Yash Tibrewal (@yashykt), Yousuk Seung  (@yousukseung)
-**Approver(s)**: Craig Tiller (@ctiller), Mark Roth (@markdroth)  
-**Status**: In Review  
-**Implemented in**: C-Core  
-**Last updated**: Oct 21, 2025
+* Author(s): Aananth V (@aananthv), Nana Pang (@nanahpang), Yash Tibrewal (@yashykt), Yousuk Seung  (@yousukseung)
+* Approver(s): Craig Tiller (@ctiller), Mark Roth (@markdroth)  
+* Status: In Review  
+* Implemented in: C-Core  
+* Last updated: 2025-10-21
+* Discussion at: https://groups.google.com/g/grpc-io/c/MoLrWPsFB3s
 
 ## Abstract
 
@@ -25,28 +26,57 @@ The Linux Kernel exposes two telemetry hooks that can be used to collect TCP-lev
 
 ## Proposal
 
-This document proposes exporting the following TCP metrics from gRPC to improve the network debugging capabilities for gRPC users.
+This document proposes exporting the following TCP metrics from gRPC to improve the network debugging capabilities for gRPC users. These metrics will be implemented inside the gRPC endpoint layer. All metrics have the following optional labels:
+* network.local.address
+* network.local.port
+* network.peer.address
+* network.peer.port
 
-| Name | Type | Unit | Labels | Optional Labels | Description |
-| ----- | :---- | :---- | :---- | :---- | :---- |
-| **Per-Connection Metrics** |  |  |  |  |  |
-| grpc.tcp.min\_rtt | Histogram (floating-point) | {s} | None | network.local.address network.local.port network.peer.address network.peer.port | TCP's current estimate of minimum round trip time (RTT). It can be used as an indication of the network health between two endpoints. Corresponds to `tcpi_min_rtt` from `struct tcp_info`. |
-| grpc.tcp.delivery\_rate | Histogram (floating-point) | By/s | None | network.local.address network.local.port network.peer.address network.peer.port | TCP’s most recent measure of the connection’s "non-app-limited" throughput. The term non-app-limited means that the link is saturated by the application. The delivery rate is only reported when it is non-app-limited.  Corresponds to `tcpi_delivery_rate` from `tcp_info` when `tcpi_delivery_rate_app_limited` is `false`. |
-| grpc.tcp.packets\_sent  | Counter (integer) | {packet}  | None | network.local.address network.local.port network.peer.address network.peer.port | Total packets sent by TCP including retransmissions and spurious retransmissions.  Corresponds to `tcpi_data_segs_out` from `struct tcp_info`. |
-| grpc.tcp.packets\_retransmitted | Counter (integer) | {packet} | None | network.local.address network.local.port network.peer.address network.peer.port | Total packets sent by TCP except those sent for the first time. A packet may be retransmitted multiple times and will be counted multiple times as retransmitted. Retransmission counts include spurious retransmissions.  Corresponds to `tcpi_total_retrans` from `struct tcp_info`. |
-| grpc.tcp.packets\_spurious\_retransmitted | Counter (integer) | {packet}  | None | network.local.address network.local.port network.peer.address network.peer.port | Total packets retransmitted by TCP that were later found to be unnecessary. These packets are acknowledged for the second time or more. Multiple spurious retransmissions for the same packet are counted multiple times.  Corresponds to `tcpi_dsack_dups` from `struct tcp_info`. |
-| grpc.tcp.recurring\_retransmits | Counter (integer) | {packet} | None | network.local.address network.local.port network.peer.address network.peer.port | The number of times the latest TCP packet ( TCP sequence) was retransmitted due to expiration of TCP retransmission timer (RTO), and not acknowledged at the time the connection was closed.  Corresponds to `tcpi_retransmits` at connection close time. |
-| grpc.tcp.bytes\_sent | Counter (integer) | By | None | network.local.address network.local.port network.peer.address network.peer.port | Total bytes sent by TCP including retransmissions and spurious retransmissions.  Corresponds to `tcpi_bytes_sent` from `struct tcp_info`. |
-| grpc.tcp.bytes\_retransmitted | Counter (integer) | By | None | network.local.address network.local.port network.peer.address network.peer.port | Total bytes sent by TCP except those sent for the first time. A byte sequence may be retransmitted multiple times and will be counted multiple times as retransmitted. Retransmission counts include spurious retransmissions.  Corresponds to `tcpi_bytes_retrans` from `struct tcp_info`. |
-| **Per-Connection Op Metrics** |  |  |  |  |  |
-| grpc.tcp.connection\_count | Gauge (integer) | {connection} | None | network.local.address network.local.port network.peer.address network.peer.port | Number of active TCP connections. |
-| grpc.tcp.syscall\_writes | Counter (integer) | {syscall} | None | network.local.address network.local.port network.peer.address network.peer.port | The number of times we invoked the sendmsg (or sendmmsg) syscall and wrote data to the TCP socket. Measured at the endpoint level. |
-| grpc.tcp.write\_size | Histogram (floating-point) | By | None | network.local.address network.local.port network.peer.address network.peer.port | The number of bytes offered to each syscall\_write. Measured at the endpoint level. |
-| grpc.tcp.syscall\_reads | Counter (integer) | {syscall} | None | network.local.address network.local.port network.peer.address network.peer.port | The number of times we invoked the recvmsg (or recvmmsg or zero copy getsockopt) syscall and read data from the TCP socket. Measured at the endpoint level. |
-| grpc.tcp.read\_size | Histogram (floating-point) | By | None | network.local.address network.local.port network.peer.address network.peer.port | The number of bytes received by each syscall\_read. Measured at the endpoint level. |
-| **Per-Write Metrics** |  |  |  |  |  |
-| grpc.tcp.sender\_latency | Histogram (floating-point) | {s} | None | network.local.address network.local.port network.peer.address network.peer.port | Time taken by the TCP socket to write the first byte of a write onto the NIC. This includes the latency incurred by traffic shaping, qdisc, throttling, and pacing at the sender. Corresponds to the time taken between the final `SCHED` timestamp and the `SENT` timestamp. Sampled periodically. |
-| grpc.tcp.transfer\_latency | Histogram (floating-point) | {s} | size (Bytes)<sup>1</sup> | network.local.address network.local.port network.peer.address network.peer.port | Time taken to transmit the first size bytes of a write. Transfer latency is measured from when the first byte is handed to the NIC until TCP receives the acknowledgement for the last byte. Corresponds to the time taken between the `SENT` timestamp and the `ACKED` timestamp. Sampled periodically. |
+### Per-Connection Metrics
+
+| Name | Type | Unit | Description |
+| ----- | :---- | :---- | :---- |
+| grpc.tcp.min\_rtt | Histogram (floating-point) | {s} | TCP's current estimate of minimum round trip time (RTT). It can be used as an indication of the network health between two endpoints. Corresponds to `tcpi_min_rtt` from `struct tcp_info`. |
+| grpc.tcp.delivery\_rate | Histogram (floating-point) | By/s | TCP’s most recent measure of the connection’s "non-app-limited" throughput. The term non-app-limited means that the link is saturated by the application. The delivery rate is only reported when it is non-app-limited.  Corresponds to `tcpi_delivery_rate` from `tcp_info` when `tcpi_delivery_rate_app_limited` is `false`. |
+| grpc.tcp.packets\_sent  | Counter (integer) | {packet}  | Total packets sent by TCP including retransmissions and spurious retransmissions.  Corresponds to `tcpi_data_segs_out` from `struct tcp_info`. |
+| grpc.tcp.packets\_retransmitted | Counter (integer) | {packet} | Total packets sent by TCP except those sent for the first time. A packet may be retransmitted multiple times and will be counted multiple times as retransmitted. Retransmission counts include spurious retransmissions.  Corresponds to `tcpi_total_retrans` from `struct tcp_info`. |
+| grpc.tcp.packets\_spurious\_retransmitted | Counter (integer) | {packet}  | Total packets retransmitted by TCP that were later found to be unnecessary. These packets are acknowledged for the second time or more. Multiple spurious retransmissions for the same packet are counted multiple times.  Corresponds to `tcpi_dsack_dups` from `struct tcp_info`. |
+| grpc.tcp.recurring\_retransmits | Counter (integer) | {packet} | The number of times the latest TCP packet ( TCP sequence) was retransmitted due to expiration of TCP retransmission timer (RTO), and not acknowledged at the time the connection was closed.  Corresponds to `tcpi_retransmits` at connection close time. |
+| grpc.tcp.bytes\_sent | Counter (integer) | By | Total bytes sent by TCP including retransmissions and spurious retransmissions.  Corresponds to `tcpi_bytes_sent` from `struct tcp_info`. |
+| grpc.tcp.bytes\_retransmitted | Counter (integer) | By | Total bytes sent by TCP except those sent for the first time. A byte sequence may be retransmitted multiple times and will be counted multiple times as retransmitted. Retransmission counts include spurious retransmissions.  Corresponds to `tcpi_bytes_retrans` from `struct tcp_info`. |
+
+#### Suggested Metric Collection Algorithm
+
+* Set TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL to a default of 5 minutes.  
+  * Implementations can choose to make it configurable.  
+* For each new connected TCP socket, set an initial alarm of 10% to 110% (randomly selected) of TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL.  
+* When the alarm fires \-  
+  * Use `getsockopt(TCP_INFO)` or equivalent method to retrieve and record connection metrics.  
+  * Re-arm the alarm with TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL and repeat.  
+  * Before the socket is closed, cancel the alarm set above, and retrieve and record connection metrics, providing observability for short-lived connections as well. This will also allow collection of `grpc.tcp.recurring_retransmits`
+
+### Per-Connection Op Metrics
+
+| Name | Type | Unit | Description |
+| ----- | :---- | :---- | :---- |
+| grpc.tcp.connection\_count | UpDownCounter (integer) | {connection} | Number of active TCP connections. |
+| grpc.tcp.syscall\_writes | Counter (integer) | {syscall} | The number of times we invoked the sendmsg (or sendmmsg) syscall and wrote data to the TCP socket. Measured at the endpoint level. |
+| grpc.tcp.write\_size | Histogram (floating-point) | By | The number of bytes offered to each syscall\_write. Measured at the endpoint level. |
+| grpc.tcp.syscall\_reads | Counter (integer) | {syscall} | The number of times we invoked the recvmsg (or recvmmsg or zero copy getsockopt) syscall and read data from the TCP socket. Measured at the endpoint level. |
+| grpc.tcp.read\_size | Histogram (floating-point) | By | The number of bytes received by each syscall\_read. Measured at the endpoint level. |
+
+#### Suggested Metric Collection Algorithm
+
+* `grpc.tcp.connection_count` will be incremented when a connection is created and decremented when it is destroyed.  
+* The `grpc.tcp.syscall_writes` and `grpc.tcp.write_size` metrics will be updated whenever we write to the socket.  
+* The `grpc.tcp.syscall_reads` and `grpc.tcp.read_size` metrics will be updated whenever we read from the socket.
+
+### Per-Write Metrics
+
+| Name | Type | Unit | Labels | Description |
+| ----- | :---- | :---- | :---- | :---- |
+| grpc.tcp.sender\_latency | Histogram (floating-point) | {s} | None | Time taken by the TCP socket to write the first byte of a write onto the NIC. This includes the latency incurred by traffic shaping, qdisc, throttling, and pacing at the sender. Corresponds to the time taken between the final `SCHED` timestamp and the `SENT` timestamp. Sampled periodically. |
+| grpc.tcp.transfer\_latency | Histogram (floating-point) | {s} | size (Bytes)<sup>1</sup> | Time taken to transmit the first size bytes of a write. Transfer latency is measured from when the first byte is handed to the NIC until TCP receives the acknowledgement for the last byte. Corresponds to the time taken between the `SENT` timestamp and the `ACKED` timestamp. Sampled periodically. |
 
 <sup>1</sup> Since transfer latency is strongly affected by the write size, it is broken down into different buckets based on the size of the write. Further, we will only measure the latencies of certain benchmark sample sizes to get measurements that are unaffected by the write sizes. The proposed buckets are:
 
@@ -59,25 +89,7 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 | \[256KiB, 2MiB) | First 256KiB | 262144 |
 | \[2MiB, \+inf) | First 2MiB | 2097152 |
 
-### *Suggested Metric Collection Algorithms*
-
-#### Per-Connection Metrics
-
-* Set TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL to a default of 5 minutes.  
-  * Implementations can choose to make it configurable.  
-* For each new connected TCP socket, set an initial alarm of 10% to 110% (randomly selected) of TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL.  
-* When the alarm fires \-  
-  * Use `getsockopt(TCP_INFO)` or equivalent method to retrieve and record connection metrics.  
-  * Re-arm the alarm with TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL and repeat.  
-  * Before the socket is closed, cancel the alarm set above, and retrieve and record connection metrics, providing observability for short-lived connections as well. This will also allow collection of `grpc.tcp.recurring_retransmits`
-
-#### Per-Connection Op Metrics
-
-* `grpc.tcp.connection_count` will be incremented when a connection is created and decremented when it is destroyed.  
-* The `grpc.tcp.syscall_writes` and `grpc.tcp.write_size` metrics will be updated whenever we write to the socket.  
-* The `grpc.tcp.syscall_reads` and `grpc.tcp.read_size` metrics will be updated whenever we read from the socket.
-
-#### Per-Write Metrics
+#### Suggested Metric Collection Algorithm
 
 * Set TCP\_LATENCY\_RECORD\_FREQUENCY to a default of 1 in 1000 writes.  
   * Implementations can choose to make it configurable.  
@@ -90,6 +102,12 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
     * For Linux TCP, this involves splitting the write into two chunks based on the buckets listed above and adding a SO\_TIMESTAMPING cmsg header to the sendmsg call with the flags SOF\_TIMESTAMPING\_TX\_SCHED | SOF\_TIMESTAMPING\_TX\_SOFTWARE on the sampled chunk and SOF\_TIMESTAMPING\_TX\_ACK on the other chunk.   
     * There is only one chunk if the write is less than 1024 bytes, in that case all three flags are set on this chunk.  
   * Set `writes_since_last_latency_measurement_` to 1 and repeat.
+
+### Metric Stability
+All metrics added in this proposal will start as experimental. The long term goal will be to de-experimentalize them and have them be on by default, but the exact criteria for that change are TBD.
+
+### Temporary environment variable protection
+This proposal does not include any features enabled via external I/O, so it does not need environment variable protection.
 
 ## Implementation
 
