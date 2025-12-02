@@ -254,7 +254,7 @@ config, the channel will tell the notification object to use the new
 value of max_connections_per_subchannel.
 
 For the xDS case, when the xds_cluster_impl LB policy is constructed, it
-will create a single notification object to used for all subchannels
+will create a single notification object to use for all subchannels
 for the lifetime of that xds_cluster_impl policy instance.  Whenever the
 xds_cluster_impl policy receives an xDS update, it will tell the
 notification object to use the new value of
