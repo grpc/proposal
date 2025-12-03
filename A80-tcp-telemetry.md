@@ -18,11 +18,11 @@ The Linux Kernel exposes two telemetry hooks that can be used to collect TCP-lev
 1. **TCP socket state** can be retrieved using the `getsockopt()` system call with `level` set to `IPPROTO_TCP` and `optname` set to `TCP_INFO`. The state is returned in a `struct tcp_info` which gives details about the TCP connection. At present, the machinery to collect such information is available on Linux 2.6 or later kernels.  
 2. **Per-message transmission timestamps** can be collected from TCP sockets using the [SO\_TIMESTAMPING](https://docs.kernel.org/networking/timestamping.html) interface. At present, this is available on Linux 2.6 or later kernels. These timestamps can be very valuable for diagnosing network level issues and can be used to break down the time spent in the "network".
 
-\[[A79](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)\] provides a framework for adding non-per-call metrics in gRPC. This document uses that framework to expose the proposed TCP Latency metrics.
+\[[gRFC A79](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)\] provides a framework for adding non-per-call metrics in gRPC. This document uses that framework to expose the proposed TCP Latency metrics.
 
 ### *Related Proposals:*
 
-\*   \[[A79](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)\]: gRPC Non-Per-Call Metrics Framework
+*   \[[gRFC A79](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)\]: gRPC Non-Per-Call Metrics Framework
 
 ## Proposal
 
@@ -36,7 +36,7 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 
 | Name | Type | Unit | Description |
 | ----- | :---- | :---- | :---- |
-| grpc.tcp.min\_rtt | Histogram (floating-point) | {s} | TCP's current estimate of minimum round trip time (RTT). It can be used as an indication of the network health between two endpoints. Corresponds to `tcpi_min_rtt` from `struct tcp_info`. |
+| grpc.tcp.min\_rtt | Histogram (floating-point) | s | TCP's current estimate of minimum round trip time (RTT). It can be used as an indication of the network health between two endpoints. Corresponds to `tcpi_min_rtt` from `struct tcp_info`. |
 | grpc.tcp.delivery\_rate | Histogram (floating-point) | By/s | TCP’s most recent measure of the connection’s "non-app-limited" throughput. The term non-app-limited means that the link is saturated by the application. The delivery rate is only reported when it is non-app-limited.  Corresponds to `tcpi_delivery_rate` from `tcp_info` when `tcpi_delivery_rate_app_limited` is `false`. |
 | grpc.tcp.packets\_sent  | Counter (integer) | {packet}  | Total packets sent by TCP including retransmissions and spurious retransmissions.  Corresponds to `tcpi_data_segs_out` from `struct tcp_info`. |
 | grpc.tcp.packets\_retransmitted | Counter (integer) | {packet} | Total packets sent by TCP except those sent for the first time. A packet may be retransmitted multiple times and will be counted multiple times as retransmitted. Retransmission counts include spurious retransmissions.  Corresponds to `tcpi_total_retrans` from `struct tcp_info`. |
@@ -75,12 +75,12 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 
 | Name | Type | Unit | Labels | Description |
 | ----- | :---- | :---- | :---- | :---- |
-| grpc.tcp.sender\_latency | Histogram (floating-point) | {s} | None | Time taken by the TCP socket to write the first byte of a write onto the NIC. This includes the latency incurred by traffic shaping, qdisc, throttling, and pacing at the sender. Corresponds to the time taken between the final `SCHED` timestamp and the `SENT` timestamp. Sampled periodically. |
-| grpc.tcp.transfer\_latency | Histogram (floating-point) | {s} | size (Bytes)<sup>1</sup> | Time taken to transmit the first size bytes of a write. Transfer latency is measured from when the first byte is handed to the NIC until TCP receives the acknowledgement for the last byte. Corresponds to the time taken between the `SENT` timestamp and the `ACKED` timestamp. Sampled periodically. |
+| grpc.tcp.sender\_latency | Histogram (floating-point) | s | None | Time taken by the TCP socket to write the first byte of a write onto the NIC. This includes the latency incurred by traffic shaping, qdisc, throttling, and pacing at the sender. Corresponds to the time taken between the final `SCHED` timestamp and the `SENT` timestamp. Sampled periodically. |
+| grpc.tcp.transfer\_latency | Histogram (floating-point) | s | size<sup>1</sup> | Time taken to transmit the first size bytes of a write. Transfer latency is measured from when the first byte is handed to the NIC until TCP receives the acknowledgement for the last byte. Corresponds to the time taken between the `SENT` timestamp and the `ACKED` timestamp. Sampled periodically. |
 
 <sup>1</sup> Since transfer latency is strongly affected by the write size, it is broken down into different buckets based on the size of the write. Further, we will only measure the latencies of certain benchmark sample sizes to get measurements that are unaffected by the write sizes. The proposed buckets are:
 
-| Buffered Size | Benchmark Size | `Size (Bytes)` |
+| Buffered Size | Benchmark Size | `size` (Bytes) |
 | :---- | :---- | :---- |
 | \[0, 1KiB) | Whole buffer | 1024 |
 | \[1KiB, 8KiB) | First 1KiB | 1024 |
@@ -88,6 +88,8 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 | \[64KiB, 256KiB) | First 64KiB | 65536 |
 | \[256KiB, 2MiB) | First 256KiB | 262144 |
 | \[2MiB, \+inf) | First 2MiB | 2097152 |
+
+Writes smaller than 1024 Bytes are labelled with `size=1024` to reduce cardinality. Further, their size does not have a big impact on transfer latency since they are able to fit inside a single TCP packet.
 
 #### Suggested Metric Collection Algorithm
 
@@ -111,4 +113,4 @@ This proposal does not include any features enabled via external I/O, so it does
 
 ## Implementation
 
-Will be implemented in C-Core to start with.
+Will be implemented in C-Core to start with. Other languages may implement only a subset of the metrics based on Kernel API availability.
