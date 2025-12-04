@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-10
+* Last updated: 2025-12-04
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
 
 ## Abstract
@@ -61,7 +61,7 @@ the per-RPC authorization check when it sees the client's initial metadata
 
 If the `filter_enabled` config field is set to a value less than
 100%, the filter will generate a random number in the range [0,
-100] for the RPC, and if that random number is greater than or
+100) for the RPC, and if that random number is greater than or
 equal to the configured `filter_enabled` value, then the ext_authz
 filter is not considered enabled for that RPC.  In that case, if
 the `deny_at_disable` config field is set to true, then the RPC
