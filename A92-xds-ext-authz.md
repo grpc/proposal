@@ -320,15 +320,15 @@ message, which will be used as follows:
 - [header](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L458):
   Required.  Within it:
   - [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
-    The header name.  Must be non-empty and all lower-case.  Length
-    must not exceed 16384.  The entry will be ignored if the key is
-    `host` or starts with a `:`.
+    The header name.  The entry will be ignored if empty, if not all
+    lower-case, if length exceeds 16384, if the key is `host`, or if it
+    starts with `:`.
   - [value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L415):
     The header value, used when the header name does not end with `-bin`.
-    Length must not exceed 16384.
+    The entry will be ignored if the length exceeds 16384.
   - [raw_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L422):
-    The header value, used when the header name ends with `-bin`.  Length
-    must not exceed 16384.
+    The header value, used when the header name ends with `-bin`.  The
+    entry will be ignored if the length exceeds 16384.
 - [append_action](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L476):
   We honor the 4 enum values as described in the proto file.
 - [keep_empty_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L480):
