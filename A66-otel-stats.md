@@ -7,6 +7,8 @@
 *   Implemented in: <language, ...>
 *   Last updated: Sep 28, 2023
 *   Discussion at: https://groups.google.com/g/grpc-io/c/po-deqYEQzE
+*   Updated by: [gRFC A108: OpenTelemetry Custom Per-Call Metric
+    Label](A108-otel-custom-per-rpc-label.md)
 
 ## Abstract
 
