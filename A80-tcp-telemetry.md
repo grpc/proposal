@@ -18,11 +18,13 @@ The Linux Kernel exposes two telemetry hooks that can be used to collect TCP-lev
 1. **TCP socket state** can be retrieved using the `getsockopt()` system call with `level` set to `IPPROTO_TCP` and `optname` set to `TCP_INFO`. The state is returned in a `struct tcp_info` which gives details about the TCP connection. At present, the machinery to collect such information is available on Linux 2.6 or later kernels.  
 2. **Per-message transmission timestamps** can be collected from TCP sockets using the [SO\_TIMESTAMPING](https://docs.kernel.org/networking/timestamping.html) interface. At present, this is available on Linux 2.6 or later kernels. These timestamps can be very valuable for diagnosing network level issues and can be used to break down the time spent in the "network".
 
-\[[gRFC A79](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)\] provides a framework for adding non-per-call metrics in gRPC. This document uses that framework to expose the proposed TCP Latency metrics.
+\[[gRFC A79][A79]\] provides a framework for adding non-per-call metrics in gRPC. This document uses that framework to expose the proposed TCP Latency metrics.
 
 ### *Related Proposals:*
 
-*   \[[gRFC A79](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)\]: gRPC Non-Per-Call Metrics Framework
+*   \[[gRFC A79][A79]\]: gRPC Non-Per-Call Metrics Framework
+
+[A79]: A79-non-per-call-metrics-architecture.md
 
 ## Proposal
 
@@ -52,7 +54,7 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 * For each new connected TCP socket, set an initial alarm of 10% to 110% (randomly selected) of TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL.  
 * When the alarm fires \-  
   * Use `getsockopt(TCP_INFO)` or equivalent method to retrieve and record connection metrics.  
-  * Re-arm the alarm with TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL and repeat.  
+  * Re-arm the alarm with 10% to 110% (randomly selected) of TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL and repeat.  
   * Before the socket is closed, cancel the alarm set above, and retrieve and record connection metrics, providing observability for short-lived connections as well. This will also allow collection of `grpc.tcp.recurring_retransmits`
 
 ### Per-Connection Op Metrics
