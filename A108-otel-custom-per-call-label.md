@@ -5,7 +5,7 @@ A108: OpenTelemetry Custom Per-Call Metric Label
 * Status: Ready for Implementation
 * Implemented in: <language, ...>
 * Last updated: 2025-12-05
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/hdilgI6WibY
 
 ## Abstract
 
