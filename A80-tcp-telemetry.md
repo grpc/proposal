@@ -4,7 +4,7 @@
 * Approver(s): Craig Tiller (@ctiller), Mark Roth (@markdroth)  
 * Status: In Review  
 * Implemented in: C-Core  
-* Last updated: 2025-10-21
+* Last updated: 2025-12-16
 * Discussion at: https://groups.google.com/g/grpc-io/c/MoLrWPsFB3s
 
 ## Abstract
@@ -61,6 +61,7 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 
 | Name | Type | Unit | Description |
 | ----- | :---- | :---- | :---- |
+| grpc.tcp.connections\_created | Counter (integer) | {connection} | Number of TCP connections created. |
 | grpc.tcp.connection\_count | UpDownCounter (integer) | {connection} | Number of active TCP connections. |
 | grpc.tcp.syscall\_writes | Counter (integer) | {syscall} | The number of times we invoked the sendmsg (or sendmmsg) syscall and wrote data to the TCP socket. Measured at the endpoint level. |
 | grpc.tcp.write\_size | Histogram (floating-point) | By | The number of bytes offered to each syscall\_write. Measured at the endpoint level. |
@@ -69,6 +70,7 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 
 #### Suggested Metric Collection Algorithm
 
+* `grpc.tcp.connections_created`  will be incremented when a connection is created.
 * `grpc.tcp.connection_count` will be incremented when a connection is created and decremented when it is destroyed.  
 * The `grpc.tcp.syscall_writes` and `grpc.tcp.write_size` metrics will be updated whenever we write to the socket.  
 * The `grpc.tcp.syscall_reads` and `grpc.tcp.read_size` metrics will be updated whenever we read from the socket.
@@ -108,7 +110,7 @@ Writes smaller than 1024 Bytes are labelled with `size=1024` to reduce cardinali
   * Set `writes_since_last_latency_measurement_` to 1 and repeat.
 
 ### Metric Stability
-All metrics added in this proposal will start as experimental. The long term goal will be to de-experimentalize them and have them be on by default, but the exact criteria for that change are TBD.
+All metrics added in this proposal will start as experimental. The long term goal will be to de-experimentalize them and potentially have some metrics be on by default, but the exact criteria for that change are TBD. We may also add new labels (eg: `grpc.lb.locality`, `grpc.lb.backend_service`) in the future. This gRFC will be amended when this happens.
 
 ### Temporary environment variable protection
 This proposal does not include any features enabled via external I/O, so it does not need environment variable protection.
