@@ -18,11 +18,11 @@ The Linux Kernel exposes two telemetry hooks that can be used to collect TCP-lev
 1. **TCP socket state** can be retrieved using the `getsockopt()` system call with `level` set to `IPPROTO_TCP` and `optname` set to `TCP_INFO`. The state is returned in a `struct tcp_info` which gives details about the TCP connection. At present, the machinery to collect such information is available on Linux 2.6 or later kernels.  
 2. **Per-message transmission timestamps** can be collected from TCP sockets using the [SO\_TIMESTAMPING](https://docs.kernel.org/networking/timestamping.html) interface. At present, this is available on Linux 2.6 or later kernels. These timestamps can be very valuable for diagnosing network level issues and can be used to break down the time spent in the "network".
 
-\[[gRFC A79][A79]\] provides a framework for adding non-per-call metrics in gRPC. This document uses that framework to expose the proposed TCP Latency metrics.
+[gRFC A79][A79] provides a framework for adding non-per-call metrics in gRPC. This document uses that framework to expose the proposed TCP Latency metrics.
 
 ### *Related Proposals:*
 
-*   \[[gRFC A79][A79]\]: gRPC Non-Per-Call Metrics Framework
+*   [gRFC A79][A79]: gRPC Non-Per-Call Metrics Framework
 
 [A79]: A79-non-per-call-metrics-architecture.md
 
@@ -97,13 +97,13 @@ Writes smaller than 1024 Bytes are labelled with `size=1024` to reduce cardinali
 
 #### Suggested Metric Collection Algorithm
 
-* Set TCP\_LATENCY\_RECORD\_FREQUENCY to a default of 1 in 1000 writes.  
+* Set TCP\_LATENCY\_RECORD\_PERIOD to a default of 1000 to denote a frequency of 1 per 1000 writes.  
   * Implementations can choose to make it configurable.  
 * For each new connected TCP socket,   
-  * Set `writes_since_last_latency_measurement_` to a random integer in \[0, TCP\_LATENCY\_RECORD\_FREQUENCY). Increment this value for every write.  
+  * Set `writes_since_last_latency_measurement_` to a random integer in \[0, TCP\_LATENCY\_RECORD\_PERIOD). Increment this value for every write.  
   * Perform any prerequisites needed for the socket to support timestamping.   
     * For Linux TCP, this involves making a setsockopt(SO\_TIMESTAMPING) call with the flag value set to SOF\_TIMESTAMPING\_SOFTWARE | SOF\_TIMESTAMPING\_OPT\_ID | SOF\_TIMESTAMPING\_OPT\_TSONLY | SOF\_TIMESTAMPING\_OPT\_ID\_TCP | SOF\_TIMESTAMPING\_OPT\_STATS.  
-* If `writes_since_last_latency_measurement_` % TCP\_LATENCY\_RECORD\_FREQUENCY \= 0  
+* If `writes_since_last_latency_measurement_` % TCP\_LATENCY\_RECORD\_PERIOD \= 0  
   * Enable latency measurement for the write.   
     * For Linux TCP, this involves splitting the write into two chunks based on the buckets listed above and adding a SO\_TIMESTAMPING cmsg header to the sendmsg call with the flags SOF\_TIMESTAMPING\_TX\_SCHED | SOF\_TIMESTAMPING\_TX\_SOFTWARE on the sampled chunk and SOF\_TIMESTAMPING\_TX\_ACK on the other chunk.   
     * There is only one chunk if the write is less than 1024 bytes, in that case all three flags are set on this chunk.  
