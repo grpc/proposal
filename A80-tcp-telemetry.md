@@ -80,11 +80,11 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 | Name | Type | Unit | Labels | Description |
 | ----- | :---- | :---- | :---- | :---- |
 | grpc.tcp.sender\_latency | Histogram (floating-point) | s | None | Time taken by the TCP socket to write the first byte of a write onto the NIC. This includes the latency incurred by traffic shaping, qdisc, throttling, and pacing at the sender. Corresponds to the time taken between the final `SCHED` timestamp and the `SENT` timestamp. Sampled periodically. |
-| grpc.tcp.transfer\_latency | Histogram (floating-point) | s | size<sup>1</sup> | Time taken to transmit the first size bytes of a write. Transfer latency is measured from when the first byte is handed to the NIC until TCP receives the acknowledgement for the last byte. Corresponds to the time taken between the `SENT` timestamp and the `ACKED` timestamp. Sampled periodically. |
+| grpc.tcp.transfer\_latency | Histogram (floating-point) | s | grpc.transfer\_size<sup>1</sup> | Time taken to transmit the first size bytes of a write. Transfer latency is measured from when the first byte is handed to the NIC until TCP receives the acknowledgement for the last byte. Corresponds to the time taken between the `SENT` timestamp and the `ACKED` timestamp. Sampled periodically. |
 
 <sup>1</sup> Since transfer latency is strongly affected by the write size, it is broken down into different buckets based on the size of the write. Further, we will only measure the latencies of certain benchmark sample sizes to get measurements that are unaffected by the write sizes. The proposed buckets are:
 
-| Buffered Size | Benchmark Size | `size` (Bytes) |
+| Buffered Size | Benchmark Size | `grpc.transfer_size` (Bytes) |
 | :---- | :---- | :---- |
 | \[0, 1KiB) | Whole buffer | 1024 |
 | \[1KiB, 8KiB) | First 1KiB | 1024 |
