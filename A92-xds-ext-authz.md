@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-12-04
+* Last updated: 2025-12-18
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
 
 ## Abstract
@@ -284,10 +284,18 @@ as follows:
 
 The response from the ext_authz server may indicate header mutations
 (additions, modifications, or removals) to make on the data plane RPC.
+
 When the data plane RPC is allowed, mutations may be made to the data
-plane RPC's request headers or response headers.  And when the data
-plane RPC is denied, mutations may be made to the response trailers as
-part of a Trailers-Only response.
+plane RPC's request headers or response headers.  Note that response
+header mutations will be ignored if gRPC winds up sending a
+Trailers-Only response after the ext_authz filter has received the
+response from the ext_authz server.
+
+When the data plane RPC is denied, the ext_authz filter is generating
+a new set of trailers for a Trailers-Only response, and any header
+mutations specified by the ext_authz server will be applied to that
+initially-empty set of trailers.  In this case, the mutations can
+effectively only specify additions.
 
 The `decoder_header_mutation_rules` config field controls which header
 mutations are allowed.  This field is an
