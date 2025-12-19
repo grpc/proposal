@@ -5,7 +5,7 @@ L125: Python Abseil Logging Support
 * Status: Draft
 * Implemented in: Python
 * Last updated: 2025-12-09
-* Discussion at: <google group thread> (filled after thread exists) xxxxxxx
+* Discussion at: https://groups.google.com/g/grpc-io/c/OL9MimSiflo/m/PWjcm97NAgAJ
 
 ## Abstract
 
