@@ -1,4 +1,4 @@
-# **gRFC AXX: Child Channel Configuration Plugins**
+# **A110: Child Channel Configuration Plugins**
 
 * **Author(s)**: [Abhishek Agrawal](mailto:agrawalabhi@google.com)
 * **Status**: Draft
