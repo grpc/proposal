@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-10-10
+* Last updated: 2025-12-23
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -702,11 +702,15 @@ The following server-side metrics will be exported:
 
 ### Temporary environment variable protection
 
-TODO: do we need separate env vars for client and server sides?
+Because implementations are likely to add support for ext_proc on the
+client and server sides at different times, we will have a separate
+environment variable guarding the functionality on each side.
 
-Support for the ext_proc filter will be guarded by the
-`GRPC_EXPERIMENTAL_XDS_EXT_PROC` environment variable. This guard will
-be removed once the feature passes interop tests.
+Support for the ext_proc filter will be guarded
+by the `GRPC_EXPERIMENTAL_XDS_EXT_PROC_ON_CLIENT` and
+`GRPC_EXPERIMENTAL_XDS_EXT_PROC_ON_SERVER` environment variables on the
+client and server sides respectively.  These guards will be removed once
+the feature passes interop tests.
 
 ## Rationale
 
