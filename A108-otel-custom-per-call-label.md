@@ -115,6 +115,13 @@ diminishing returns. Also, more custom labels can be added in a future gRFC with
 no additional complexity in gRPC compared to defining them now; it is a
 deferrable decision.
 
+Since per-RPC metrics do not use the gRFC A79 metric architecture, it would
+technically be possible to support arbitrary user-defined labels. However, that
+adds implementation complexity and introduces inefficiencies in a hot path. We'd
+also like to leave open the door of implementations using the gRFC A79 metric
+architecture for per-RPC metrics, and supporting arbitrary user-defined metrics
+would be a significant a change to that API that wouldn't be taken lightly.
+
 There is obvious overlap with baggage. As discussed in the Background section,
 baggage is relevant, but is considered a future enhancement for expediency.
 
