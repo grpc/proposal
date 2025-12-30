@@ -197,7 +197,7 @@ introduces the following new fields:
 
 Note that this will require extending the channel credentials and call
 credentials registries to support configuration via these protos, in
-additional to the JSON formats that they already support for the gRPC
+addition to the JSON formats that they already support for the gRPC
 xDS bootstrap config.
 
 ### `GrpcService` Proto Validation
