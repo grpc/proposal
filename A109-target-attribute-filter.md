@@ -159,7 +159,7 @@ the target:
 
 ```java
 String recordTarget(String target) {
-  if (targetAttributeFilter == null) {
+  if (targetAttributeFilter == null || target == null) {
     return target;
   }
   return targetAttributeFilter.test(target) ? target : "other";
