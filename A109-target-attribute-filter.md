@@ -76,12 +76,14 @@ The filter is stored in the plugin state and applied when creating
 ### Java
 
 gRPC Java will add a new method `targetAttributeFilter` to
-`GrpcOpenTelemetry.Builder` that accepts a `Predicate<String>`. The filter
-defaults to `null` when unset, meaning all targets are recorded as-is.
+`GrpcOpenTelemetry.Builder` that accepts a `Predicate<String>`. To ensure compatibility with Android
+API levels < 24 (where `Predicate` is not available), the filter is converted and stored internally
+using a package-private interface.
+The filter defaults to `null` when unset, meaning all targets are recorded as-is.
 
 ```java
 public Builder targetAttributeFilter(@Nullable Predicate<String> filter)
-````
+```
 
 When a filter is provided, `filter.test(target)` is called when the client interceptor is created
 for a channel. If  the predicate returns `true`, the original target string is used as
@@ -144,12 +146,25 @@ absl::StatusOr<OpenTelemetryClientFilter> OpenTelemetryClientFilter::Create(
 
 ### Java
 
-The implementation adds `targetAttributeFilter` to
-`GrpcOpenTelemetry.Builder`:
+The implementation adds `targetAttributeFilter` to `GrpcOpenTelemetry.Builder` and uses an internal
+interface for storage.
 
 ```java
+interface TargetFilter {
+  boolean test(String target);
+}
+
 public Builder targetAttributeFilter(@Nullable Predicate<String> filter) {
-  this.targetAttributeFilter = filter;
+  if (filter == null) {
+    this.targetFilter = null;
+  } else {
+    this.targetFilter = new TargetFilter() {
+      @Override
+      public boolean test(String target) {
+        return filter.test(target);
+      }
+    };
+  }
   return this;
 }
 ```
