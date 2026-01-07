@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-09-18
+* Last updated: 2026-01-06
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -160,7 +160,6 @@ introduces the following new fields:
 
   - `envoy.extensions.grpc_service.channel_credentials.google_default.v3.GoogleDefaultCredentials`
   - `envoy.extensions.grpc_service.channel_credentials.insecure.v3.InsecureCredentials`
-  - `envoy.extensions.grpc_service.channel_credentials.local.v3.LocalCredentials`
   - `envoy.extensions.grpc_service.channel_credentials.tls.v3.TlsCredentials`:
     In this message:
     - `root_certificate_provider`: Required.  References certificate
