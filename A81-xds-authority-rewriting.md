@@ -30,7 +30,7 @@ umbrella as mTLS configuration.  As a result, if we add support for this
 feature, we must do so in a way that allows disabling the feature for
 these security-sensitive use-cases.
 
-### Related Proposals: 
+### Related Proposals:
 * [gRFC A27: xDS-Based Global Load Balancing][A27]
 * [gRFC A28: xDS Traffic Splitting and Routing][A28]
 * [gRFC A29: xDS mTLS Security][A29]
@@ -93,7 +93,8 @@ hostnames in channelz (see [gRFC A14][A14]).
 
 For Logical DNS clusters (see [gRFC A37][A37]), the same `hostname`
 resolver attribute will be added to all endpoints.  It will be set to
-the name that is resolved for the Logical DNS cluster.
+the name that is resolved for the Logical DNS cluster, including the port
+number.
 
 ### xDS ConfigSelector Changes
 
