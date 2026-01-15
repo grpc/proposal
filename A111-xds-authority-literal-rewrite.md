@@ -4,7 +4,7 @@ Title
 * Approver: TBD
 * Status: Draft
 * Implemented in: Go
-* Last updated: 2026-01-14
+* Last updated: 2026-01-15
 * Discussion at: TBD (filled after thread exists)
 
 ## Abstract
@@ -114,7 +114,7 @@ migrating to or using both systems concurrently.
 
 ## Implementation
 
-[Go implementation](https://github.com/grppc/grpc-go/pull/XXX).
+[Go implementation](https://github.com/grpc/grpc-go/pull/8838).
 
 [A29]: A29-xds-tls-security.md
 [A81]: A81-xds-authority-rewriting.md
