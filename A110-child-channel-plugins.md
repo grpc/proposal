@@ -5,7 +5,7 @@
 * Status: In Review
 * Implemented in: Core, Java, Go
 * Last updated: 2025-12-24
-* Discussion at: [Mailing List Link TBD]
+* Discussion at: https://groups.google.com/g/grpc-io/c/EBIp3uud-Bo
 
 ## Abstract
 
@@ -13,11 +13,13 @@ This proposal introduces a mechanism to configure "child channels", channels cre
 
 ## Background
 
-Complex gRPC ecosystems often require the creation of auxiliary channels that are not directly instantiated by the user application. Two primary examples are:
+Complex gRPC ecosystems often require the creation of auxiliary channels that are not directly instantiated by the 
+user application. The primary examples are:
 
 1. xDS (Extensible Discovery Service): When a user creates a channel with an xDS target, the gRPC library internally creates a separate channel to communicate with the xDS control plane.
 2. External Authorization (ext_authz): As described in [gRFC A92](https://github.com/grpc/proposal/pull/481), the gRPC server or client may create an internal channel to contact an external authorization service.
-3.  External Processing (ext_proc): As described in [gRFC A93](https://github.com/grpc/proposal/pull/484), filters may create internal channels to call external processing servers.
+3. External Processing (ext_proc): As described in [gRFC A93](https://github.com/grpc/proposal/pull/484), filters may 
+   create internal channels to call external processing servers.
 
 ### Related Proposals
 
@@ -32,7 +34,7 @@ Complex gRPC ecosystems often require the creation of auxiliary channels that ar
 The primary motivation for this feature is the need to configure observability on a per-child-channel basis.
 
 * StatsPlugins & Tracing: Users need to configure metric sinks (as described in gRFC [A66](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md) and [A72](https://github.com/grpc/proposal/blob/master/A72-open-telemetry-tracing.md)) so that telemetry from internal channels is correctly tagged and exported.
-* Interceptors: Users may need to apply specific interceptors (e.g., for authentication, logging, or tracing) to internal traffic.
+* Interceptors: Users may need to apply specific interceptors (e.g., for logging, or tracing) to internal traffic.
 
 These configurations cannot be set globally because different parts of an application may require different configurations, such as different metric backends or security credentials.
 
@@ -66,7 +68,7 @@ If multiple Parent Channels (`P1`, `P2`) point to the same xDS target but provid
 
 #### Java
 
-In Java, the configuration will be achieved by accepting functions (callbacks). The API allows users to pass a `Consumer<ManagedChannelBuilder<?>>` (or a similar functional interface). When an internal library (e.g., xDS, gRPCLB) creates a child channel, it applies this user-provided function to the builder before building the channel.
+In Java, the configuration will be achieved by accepting functions (callbacks). The API allows users to pass a `Consumer<ManagedChannelBuilder<?>>` (or a similar functional interface). When an internal library (e.g., xDS, gRPCLB) creates a child channel, it applies this user-provided function to the builder before further configuring the channel.
 
 * ##### Configuration Interface
 
@@ -78,21 +80,28 @@ In Java, the configuration will be achieved by accepting functions (callbacks). 
 
   // Captures the intent of the plugin.
   // Consumes a builder to modify it before the channel is built
-  public interface ChildChannelConfigurer extends Consumer<ManagedChannelBuilder<?>> {
-      // Inherits accept(T t) from Consumer
+  public interface ChannelConfigurer {
+     /**
+     * Configures the given channel builder.
+     *
+     * @param builder the channel builder to configure
+     */
+    void configure(ManagedChannelBuilder<?> builder);
   }
   ``` 
 
 * ##### API Changes
 
-  * ManagedChannelBuilder: Add `ManagedChannelBuilder#childChannelConfigurer(ChildChannelConfigurer childChannelConfigurer)` to allow users to register this configurer.
-  * ServerBuilder: Add `ServerBuilder#childChannelConfigurer(ChildChannelConfigurer configurer)` to allow users to provide configuration for any internal channels created by the server (e.g., connections to external authorization or processing services).
+  * ManagedChannelBuilder: Add `ManagedChannelBuilder#childChannelConfigurer(ChannelConfigurer channelConfigurer)` to 
+    allow users to register this configurer.
+  * XdsServerBuilder: Add `XdsServerBuilder#childChannelConfigurer(ChannelConfigurer configurer)` to allow users to 
+    provide configuration for any internal channels created by the server (e.g., connections to external authorization or processing services).
 
 * ##### Usage Example
 
   ```java
   // Define the configurer for internal child channels
-  ChildChannelConfigurer myInternalConfig = (builder) -> {
+  ChannelConfigurer myInternalConfig = (builder) -> {
       builder.addMetricSink(sink);
   };
 
@@ -101,12 +110,6 @@ In Java, the configuration will be achieved by accepting functions (callbacks). 
       .childChannelConfigurer(myInternalConfig) // <--- Configuration injected here
       .build();    
   ```
-
-* ##### Out-of-Band (OOB) Channels
-
-  We do not propose applying child channel configurations to Out-of-Band (OOB) channels at this time. To maintain architectural flexibility and avoid breaking changes in the future, we will modify the implementation to use a `noOp()` MetricSink for OOB channels rather than inheriting the parent channel's sink.
-
-  Furthermore, we acknowledge that certain configurations will not function out-of-the-box for `resolvingOobChannel` due to its specific initialization requirements.
 
 #### Go
 
