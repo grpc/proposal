@@ -15,7 +15,7 @@ Provide an option to send keepalive PINGs at a fixed interval (boolean default f
 
 Keepalive PINGs are only sent when the HTTP/2 connection did not receive data for `KEEPALIVE_TIME`.
 
-L7 load balancers may be configured to load balance the HTTP/2 streams inside the HTTP/2 connection to different servers. Although HTTP/2 PINGS are forwarded in both directions by the L7 load balancer unexpected connection drops can occur because a keepalive PING is not sent.
+L7 load balancers may be configured to load balance the HTTP/2 streams inside the HTTP/2 connection to different servers. A L7 load balancer can execute some logic to keep connections open when recieving an HTTP/2 PING. Unexpected connection drops can occur because a keepalive PING is not sent.
 
 A connection drop by the L7 load balancer will for example occur when all conditions below are true:
 * 2 HTTP/2 streams of 1 HTTP/2 connection are load balanced to 2 servers
