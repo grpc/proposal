@@ -2,10 +2,10 @@ A113: pick_first: Weighted Random Shuffling
 ----
 * Author(s): Alex Polcyn (@apolcyn)
 * Approver: Mark Roth (@markdroth), Eric Anderson (@ejona86), Doug Fawley (@dfawley), Easwar Swaminathan (@easwars)
-* Status: Draft
+* Status: In Review
 * Implemented in: <language, ...>
 * Last updated: Jan 26, 2026
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/iCsweGDmUU4
 
 ## Abstract
 
