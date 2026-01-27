@@ -28,11 +28,22 @@ balancing control plane delivers varied weights and expects them to be followed.
 ### Changes within Pick First
 
 Modify behavior of pick_first when the `shuffle_address_list` option is set, and
-perform a weighted random sort *based on per-endpoint weights*:
-* Use the [Weighted Random Sampling](https://utopia.duth.gr/~pefraimi/research/data/2007EncOfAlg.pdf) algorithm
-proposed by Efraimidis, Spirakis.
-* Set the weight of each endpoint to `u ^ (1 / weight)`, where `u` is a uniform random number in `(0, 1)` and weight
-is the weight of the endpoint (as present in a weight attribute). Default to 1 if no weight attribute is present.
+perform a weighted random sort *based on per-endpoint weights*. To do this, we will
+use the [Weighted Random Sampling](https://utopia.duth.gr/~pefraimi/research/data/2007EncOfAlg.pdf) algorithm
+proposed by Efraimidis, Spirakis:
+
+1) Assign a key to each endpoint, `u ^ (1 / weight)`, where `u` is a uniform random number in `(0, 1)` and weight
+is the weight of the endpoint (as present in a weight attribute). Default `weight` to 1 if no weight attribute is
+present.
+
+2) Sort endpoints by key in *descending* order.
+
+Note: the paper suggests `u` be in `(0, 1)` *exclusive*. Random numbers *on* zero or one effectively
+drop their weight. Zero will technically not transform to the exponential distribution that we are trying
+to create. However, load balancing skew introduced by such edge cases is unlikely to be noticeable, and so
+implementations are free to include these bounds so long as it does not cause other problems
+(e.g. crashes).
+
 
 ### CDS LB Policy changes: Computing Endpoint Weights
 
@@ -44,13 +55,14 @@ product of the two normalized weights (i.e. a logical AND of the two selection e
 
 The CDS LB policy currently calculates per-endpoint weight attributes. It will continue to do so however
 we need to fix the mechanics: an endpoint's final weight should be a product of its *normalized* locality
-weight and *normalized* endpoint weight, rather than their product outright. Note: as a side effect this
-will fix per-endpoint weights in Ring Hash LB, which
-[currently](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md) multiply
-*raw* locality and endpoint weights.
+weight and *normalized* endpoint weight, rather than their product outright.
+
+Note: as a side effect this will fix per-endpoint weights in Ring Hash LB, which
+[currently](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md#change-child-policy-config-generation-in-xds_cluster_resolver-policy) are a product of the initial *raw* locality and endpoint weights.
+This "fix" will not require any changes within Ring Hash LB itself.
 
 We can continue to represent weights as integers if we represent their normalized values in
-fixed point Q31 format. Math as follows (citation due for @ejona):
+fixed point Q1.31 format. Math as follows (citation due for @ejona):
 
 ```
 // To normalize:
@@ -62,9 +74,18 @@ weight = ((uint64_t) locality_weight * weight) >> 31;
 if (weight == 0) weight = 1;
 ```
 
+Note: currently we round down to zero (and then up if we hit zero).
+We *could* use more accurate rounding schemes. However, rounding down
+is simple and should provide enough precision for load balancing
+purposes. For example, we only round down to zero if the product of
+two normalized weight probabilities is less than `2 ^ -31`, this kind
+of error is unlikely to cause noticeable skew in load balancing.
+
 ### Temporary environment variable protection
 
 CDS LB policy and Pick First LB policy behavior changes will be guarded by `GRPC_EXPERIMENTAL_PF_WEIGHTED_SHUFFLING`.
+
+Barring unexpected issues, this should be enabled by default.
 
 ## Rationale
 
