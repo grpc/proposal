@@ -39,7 +39,7 @@ present.
 2) Sort endpoints by key in *descending* order.
 
 Note: the paper suggests `u` be in `(0, 1)` *exclusive*. Random numbers *on* zero or one effectively
-drop their weight. Zero will technically not transform to the exponential distribution that we are trying
+drop their weight. Also, technically zero will not transform to the exponential distribution that we are trying
 to create. However, load balancing skew introduced by such edge cases is unlikely to be noticeable, and so
 implementations are free to include these bounds so long as it does not cause other problems
 (e.g. crashes).
@@ -62,7 +62,7 @@ Note: as a side effect this will fix per-endpoint weights in Ring Hash LB, which
 This "fix" will not require any changes within Ring Hash LB itself.
 
 We can continue to represent weights as integers if we represent their normalized values in
-fixed point Q1.31 format. Math as follows (citation due for @ejona):
+fixed point UQ1.31 format. Math as follows (citation due for @ejona):
 
 ```
 // To normalize:
@@ -85,15 +85,21 @@ of error is unlikely to cause noticeable skew in load balancing.
 
 CDS LB policy and Pick First LB policy behavior changes will be guarded by `GRPC_EXPERIMENTAL_PF_WEIGHTED_SHUFFLING`.
 
-Barring unexpected issues, this should be enabled by default.
+This should be enabled by default, after testing.
 
 ## Rationale
 
-* CDS LB policy changes are needed to generate correct weight distributions, not only for Pick First but
-  also for Ring Hash
-* Using fixed point Q31 format has predictable bounds on precision, and allows us to continue representing
-  weights as integers. Note our math assumes the sum of weights within a grouping does not exceed max uint32,
-  which is mandated in the XDS protocol.
+CDS LB policy changes are needed to generate correct weight distributions, not only for Pick First but
+also for Ring Hash.
+
+Reasons for UQ1.31?
+
+- Predictable and acceptable bounds on precision.
+- Allows us to continue representing weights as integers internally.
+- Avoids risk of overflow bugs by preserving the (XDS) property that the sum of all weights within
+  a "grouping" does not exceed max uint32. For example note how if we used UQ32, *after*
+  normalization and multiplication a subsequent summation of endpoint weights in a locality may
+  result in uint32 overflow due to contributions of rounding errors.
 
 ## Implementation
 
