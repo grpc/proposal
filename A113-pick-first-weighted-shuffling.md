@@ -92,7 +92,7 @@ This should be enabled by default, after testing.
 CDS LB policy changes are needed to generate correct weight distributions, not only for Pick First but
 also for Ring Hash.
 
-Reasons for UQ1.31?
+Reasons for UQ1.31 fixed point integers:
 
 - Predictable and acceptable bounds on precision.
 - Allows us to continue representing weights as integers internally.
