@@ -4,7 +4,7 @@ A105: MAX_CONCURRENT_STREAMS Connection Scaling
 * Approver: @ejona86
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-12-01
+* Last updated: 2026-01-30
 * Discussion at: https://groups.google.com/g/grpc-io/c/n9Mi7ZODReE
 
 ## Abstract
@@ -338,8 +338,8 @@ state](https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md)
 will be used for all connection attempts in the subchannel, regardless
 of how many established connections there are.  If a connection attempt
 fails, the backoff period must be respected and scale accordingly before
-starting the next attempt on any connection.  When a connection attempt
-succeeds, backoff state will be reset, just as it is today.
+starting the next connection attempt.  When a connection attempt succeeds,
+backoff state will be reset, just as it is today.
 
 For example, if the subchannel has both two existing connections and a
 pending connection attempt for a third connection, if one of the original
