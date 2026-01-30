@@ -4,7 +4,7 @@ A103: xDS Composite Filter
 * Approver: ejona86, dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2025-12-01
+* Last updated: 2026-01-29
 * Discussion at: https://groups.google.com/g/grpc-io/c/es5taH0OZS8
 
 ## Abstract
@@ -21,19 +21,19 @@ xDS support in the gRPC client and server are described in [A27] and
 [A36], respectively.  xDS HTTP filter support is described in [A39].
 
 The composite filter will make use of the Unified Matching API and CEL
-support described in [A77].
+support described in [A106].
 
 ### Related Proposals: 
 * [A27: xDS-Based Global Load Balancing][A27]
 * [A39: xDS HTTP Filter Support][A39]
 * [A36: xDS-Enabled Servers][A36]
-* [A77: xDS Server-Side Rate Limiting][A77] (pending)
 * [A83: xDS GCP Authentication Filter][A83]
+* [A106: xDS Unified Matcher and CEL Integration][A106] (pending)
 
 [A27]: A27-xds-global-load-balancing.md
 [A36]: A36-xds-for-servers.md
 [A39]: A39-xds-http-filters.md
-[A77]: https://github.com/grpc/proposal/pull/414
+[A106]: https://github.com/grpc/proposal/pull/520
 [A83]: A83-xds-gcp-authn-filter.md
 
 ## Proposal
@@ -104,7 +104,7 @@ top-level config.  The value of this field will replace the value of the
 field in the top-level config.
 
 The parsed representation of the composite filter's config will be a
-matcher tree, using the same unified matcher API implemented for [A77].
+matcher tree, using the unified matcher API described in [A106].
 The actions in the matcher tree will be one of two possible values: a
 parsed filter config, or an indication that the filter should be skipped
 (in the case of a `SkipFilter` proto).
@@ -114,7 +114,7 @@ a maximum recursion depth of 8 when parsing HTTP filter configs.
 
 ### CEL Attributes
 
-In addition to the CEL request attributes described in [A77], we will
+In addition to the CEL request attributes described in [A106], we will
 also add support for some additional [CEL
 attributes](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.html)
 that we expect to be useful for the composite filter.
