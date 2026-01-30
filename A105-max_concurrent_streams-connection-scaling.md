@@ -408,15 +408,26 @@ concurrent RPCs being added to the queue in an arbitrary order.
 See [Rationale](#rationale) below for a possible adjustment to this
 queuing strategy.
 
-When dequeuing an RPC, the subchannel will use the same algorithm
-described above that it will when it first sees the RPC.  RPCs will be
-dequeued upon the following events:
+When reprocessing the queue, the subchannel will iterate over the
+queued RPCs from oldest to newest.  For each RPC, it will apply the
+same algorithm to choose a connection as when it first sees the RPC,
+described above.  If that algorithm indicates that the RPC should be
+queued, the subchannel will leave the RPC in the queue and stop
+iterating over the queue, because it knows that it cannot dispatch any
+more of the queued RPCs.  See [Subchannel
+Psuedo-Code](#subchannel-pseudo-code) below for details.
+
+The subchannel will reprocess the queued RPCs upon the following events:
 - When a connection attempt completes successfully.
 - When the backoff timer fires.
 - When an existing connection fails.
 - When the transport for a connection reports a new value for
   MAX_CONCURRENT_STREAMS.
 - When an RPC dispatched on one of the connections completes.
+
+Note that in some of those cases, we know that we will not be able to
+actually dispatch any of the queued RPCs, but reprocessing the queue
+may cause us to trigger a new connection attempt.
 
 Because we are now handling queuing in the subchannel, transport
 implementations should no longer need to handle this queuing.  The only
