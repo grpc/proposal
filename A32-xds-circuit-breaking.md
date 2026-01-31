@@ -6,7 +6,7 @@
 * Implemented in: C-core, Java, Go 
 * Last updated: 2021-02-12
 * Discussion at: https://groups.google.com/g/grpc-io/c/NEx70p8mcjg
-
+* Updated by: [gRFC A105: MAX_CONCURRENT_STREAMS Connection Scaling](A105-max_concurrent_streams-connection-scaling.md)
 
 ## Abstract
 

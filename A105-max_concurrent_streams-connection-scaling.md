@@ -1,0 +1,772 @@
+A105: MAX_CONCURRENT_STREAMS Connection Scaling
+----
+* Author(s): @markdroth, @dfawley
+* Approver: @ejona86
+* Status: {Draft, In Review, Ready for Implementation, Implemented}
+* Implemented in: <language, ...>
+* Last updated: 2026-01-30
+* Discussion at: https://groups.google.com/g/grpc-io/c/n9Mi7ZODReE
+
+## Abstract
+
+We propose allowing gRPC clients to automatically establish new
+connections to the same endpoint address when it hits the HTTP/2
+MAX_CONCURRENT_STREAMS limit for an existing connection.
+
+## Background
+
+HTTP/2 contains a connection-level setting called
+[MAX_CONCURRENT_STREAMS][H2MCS] that limits the number of streams a peer
+may initiate.  This is often set by servers or proxies to protect against
+a single client using too many resources.  However, in an environment with
+reverse proxies or virtual IPs, it may be possible to create multiple
+connections to the same IP address that lead to different physical
+servers, and this can be a feasible way for a client to achieve more
+throughput (QPS) without overloading any server.
+
+Today, the MAX_CONCURRENT_STREAMS limit is visible only inside the
+transport, not to anything at the channel layer.  This means that the
+channel may dispatch an RPC to a subchannel that is already at its
+MAX_CONCURRENT_STREAMS limit, even if there are other subchannels that
+are not at that limit and would be able to accept the RPC.  In this
+situation, the transport normally queues the RPC until it can start
+another stream (i.e., either when one of the existing streams ends or
+when the server increases its MAX_CONCURRENT_STREAMS limit).
+
+Applications today are typically forced to deal with this problem
+by creating multiple gRPC channels to the same target (and disabling
+subchannel sharing, for implementations that share subchannels between
+channels) and doing their own load balancing across those channels.
+This is an obvious flaw in the gRPC channel abstraction, because the
+channel is intended to hide connection management details like this so
+that the application doesn't have to know about it.  It is also not a
+very flexible solution for the application in a case where the server is
+dynamically tuning its MAX_CONCURRENT_STREAMS setting, because the
+application cannot see that setting in order to tune the number of
+channels it uses.
+
+### Related Proposals:
+* [A6: gRPC Retry Design][A6]
+* [A9: Server-side Connection Management][A9]
+* [A14: Channelz][A14]
+* [A32: xDS Circuit Breaking][A32]
+* [A61: IPv4 and IPv6 Dualstack Backend Support][A61]
+* [A74: xDS Config Tears][A74]
+* [A75: xDS Aggregate Cluster Behavior Fixes][A74]
+* [A94: OTel Metrics for Subchannels][A94]
+
+[A6]: A6-client-retries.md
+[A9]: A9-server-side-conn-mgt.md
+[A14]: A14-channelz.md
+[A32]: A32-xds-circuit-breaking.md
+[A61]: A61-IPv4-IPv6-dualstack-backends.md
+[A74]: A74-xds-config-tears.md
+[A75]: A75-xds-aggregate-cluster-behavior-fixes.md
+[A94]: A94-subchannel-otel-metrics.md
+[H2MCS]: https://httpwg.org/specs/rfc7540.html#SETTINGS_MAX_CONCURRENT_STREAMS
+
+## Proposal
+
+We will add a mechanism for the gRPC client to dynamically scale up the
+number of connections to a particular endpoint address when it hits the
+MAX_CONCURRENT_STREAMS limit.  This functionality will be implemented at
+the subchannel layer.
+
+There are several parts to this proposal:
+- Configuration for the max number of connections per subchannel, via
+  either the [service
+  config](https://github.com/grpc/grpc/blob/master/doc/service_config.md)
+  or via xDS.
+- A mechanism for the transport to report the current MAX_CONCURRENT_STREAMS
+  setting to the subchannel layer.
+- Connection scaling functionality in the subchannel.
+- Functionality to pick a connection for each RPC in the subchannel,
+  including the ability to queue RPCs while waiting for new connections
+  to be established.
+- Modify pick_first to handle the subchannel transitioning from READY to
+  CONNECTING state.
+
+### Configuration
+
+In the subchannel, connection scaling will be configured via a setting
+called max_connections_per_subchannel.  That setting will be set either
+via the service config or via xDS.  The approach for plumbing this
+setting into the subchannel will be different in C-core than in Java
+and Go; see below for details.
+
+The max_connections_per_subchannel setting for a given subchannel
+can change with each resolver update, regardless of whether it is
+set via the service config or via xDS.  When this happens, we do
+not want to throw away the subchannel and create a new one, since
+that would cause unnecessary connection churn.  This means that the
+max_connections_per_subchannel setting must not be considered part of
+the subchannel's unique identity that is set only at subchannel creation
+time; instead, it must be changeable over the life of a subchannel.
+
+If the max_connections_per_subchannel setting is unset, the subchannel
+will assume a default of 1, which effectively means the same behavior
+as before this gRFC.
+
+The channel will enforce a maximum limit for the
+max_connections_per_subchannel setting.  This limit will be 10 by
+default, but gRPC will provide a channel-level setting to allow
+a client application to raise or lower that limit.  Whenever the
+max_connections_per_subchannel setting is larger than the channel's limit,
+it will be capped to that limit.  This capping will be performed in the
+subchannel itself, so that it will apply regardless of where the setting
+is set.
+
+#### gRPC Service Config
+
+In the gRPC service config, connection scaling will be configured via
+a new field, as follows (schema shown in protobuf form, although gRPC
+actually accepts the service config in JSON form):
+
+```proto
+message ServiceConfig {
+  // ...existing fields...
+
+  // Settings to control dynamic connection scaling.
+  message ConnectionScaling {
+    // Maximum connections gRPC will maintain for each subchannel in
+    // this channel.  When no streams are available for an RPC in a
+    // subchannel, gRPC will automatically create new connections up
+    // to this limit.  If this value changes during the life of a
+    // channel, existing subchannels will be updated to reflect
+    // the change.  No connections will be closed as a result of
+    // lowering this value; down-scaling will only happen as
+    // connections are lost naturally.
+    //
+    // Values higher than the client-enforced limit (by default, 10)
+    // will be clamped to that limit.
+    uint32 max_connections_per_subchannel = 1;
+  }
+  ConnectionScaling connection_scaling = N;
+}
+```
+
+#### xDS Configuration
+
+In xDS, the max_connections_per_subchannel setting will be configured via
+a per-host circuit breaker in the CDS resource.  This uses a similar
+structure to the circuit breaker described in [A32].
+
+In the CDS resource, in the
+[circuit_breakers](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/cluster.proto#L885)
+field, we will now add support for the following field:
+- [per_host_thresholds](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/circuit_breaker.proto#L120):
+  As in [A32], gRPC will look only at the first entry for priority
+  [DEFAULT](https://github.com/envoyproxy/envoy/blob/6ab1e7afbfda48911e187c9d653a46b8bca98166/api/envoy/config/core/v3/base.proto#L39).
+  If that entry is found, then within that entry:
+  - [max_connections](https://github.com/envoyproxy/envoy/blob/ed76c2e81f428248f682a9a380a4eef476ea4349/api/envoy/config/cluster/v3/circuit_breaker.proto#L59):
+    If this field is set, then its value will be used to set the
+    max_connections_per_subchannel setting for all endpoints for the
+    cluster.  If it is unset, then no max_connections_per_subchannel
+    setting will be set for the cluster's endpoints (i.e., the subchannel
+    will assume a value of 1 by default).  A value of 0 will be rejected
+    at resource validation time.
+
+A new field will be added to the parsed CDS resource representation
+containing the value of this field.
+
+The xds_cluster_impl LB policy will be responsible for setting the
+max_connections_per_subchannel setting based on this xDS configuration.
+Note that it makes sense to do this in the xds_cluster_impl LB policy
+instead of the cds policy for two reasons: first, this is where circuit
+breaking is already configured, and second, this policy is in the right
+location in the LB policy tree regardless of whether [A75] has been
+implemented yet.  Note that post-[A74], this will not require adding
+any new fields in the xds_cluster_impl LB policy configuration.
+
+#### Config Plumbing in C-core
+
+In C-core, every time there is a resolver update, the LB policy
+calls `CreateSubchannel()` for every address in the new address list.
+The `CreateSubchannel()` call returns a subchannel wrapper that holds
+a ref to the underlying subchannel.  The channel uses a subchannel
+pool to store the set of currently existing subchannels: the requested
+subchannel is created only if it doesn't already exist in the pool;
+otherwise, the returned subchannel wrapper will hold a new ref to the
+existing subchannel, so that it doesn't actually wind up creating a new
+subchannel (only a new subchannel wrapper).  This means that we do not
+want the max_connections_per_subchannel setting to be part of the
+subchannel's key in the subchannel pool, or else we will wind up
+recreating the subchannel whenever the attribute's value changes.
+
+In addition, by default, C-core's subchannel pool is shared between
+channels, meaning that if two channels attempt to create the same
+subchannel, they will wind up sharing a single subchannel.  In this
+case, each channel using a given subchannel may have a different value
+for the max_connections_per_subchannel setting.  The subchannel will
+use the maximum value set for this setting across all channels.
+
+To support this, the implementation will be as follows:
+- The subchannel will store a map from max_connections_per_subchannel
+  setting to the number of subchannel wrappers currently holding a ref to
+  it with that value.  Entries are added to the map whenever the first
+  ref for a given value of max_connections_per_subchannel is taken, and
+  entries are removed from the map whenever the last ref for a given
+  value of max_connections_per_subchannel is removed.  Whenever the set
+  of entries changes, the subchannel will do a pass over the map to find
+  the new max value to use.
+- We will create a new internal-only channel arg called
+  `GRPC_ARG_MAX_CONNECTIONS_PER_SUBCHANNEL`, which will be treated
+  specially by the channel.  Specifically, when this attribute is passed
+  to `CreateSubchannel()`, it will be excluded from the channel args
+  that are used as a key in the subchannel pool.  Instead, when the
+  subchannel wrapper is instantiated, it will call a new API on the
+  underlying subchannel to tell it that a new ref is being held for this
+  value of max_connections_per_subchannel.  When the subchannel wrapper
+  is orphaned, it will call a new API on the underlying subchannel
+  to tell it that the ref is going away for a particular value of
+  max_connections_per_subchannel.
+- If max_connections_per_subchannel is configured via the service
+  config, the `GRPC_ARG_MAX_CONNECTIONS_PER_SUBCHANNEL` channel arg will
+  be set by the channel before passing the resolver update to the LB
+  policy tree.  Individual LB policies (such as the xds_cluster_impl
+  policy) may override this channel arg before `CreateSubchannel()`
+  is called.
+
+#### Config Plumbing in Java and Go
+
+In Java and Go, there is no subchannel pool, and LB policies will not
+call `CreateSubchannel()` for any address for which they already have a
+subchannel from the previous address list.  There is also no need to
+deal with the case of multiple channels sharing the same subchannel.
+Therefore, a different approach is called for.
+
+A notification object will be used to notify the subchannel of the value
+of the max_connections_per_subchannel setting.  This object will be
+passed into the subchannel at creation time and will be used for the
+life of the subchannel (i.e., there is no way for the subchannel to swap
+to a different notification object later).  Multiple subchannels can
+share the same notification object; whenever the notification object is
+told to use a new value for max_connections_per_subchannel, all
+subchannels using that object will be notified of the change.
+
+The notification object can come from one of two places, depending on
+whether the configuration comes from the gRPC service config or from xDS.
+
+For the service config case, when the channel is constructed, it will
+create a single notification object to be used for all subchannels for
+the lifetime of the channel.  Whenever the resolver returns a service
+config, the channel will tell the notification object to use the new
+value of max_connections_per_subchannel.
+
+For the xDS case, when the xds_cluster_impl LB policy is constructed, it
+will create a single notification object to use for all subchannels
+for the lifetime of that xds_cluster_impl policy instance.  Whenever the
+xds_cluster_impl policy receives an xDS update, it will tell the
+notification object to use the new value of
+max_connections_per_subchannel.  The notification object will be passed
+to the child policy via an attribute that will be passed into the
+`CreateSubchannel()` call.
+
+The channel's implementation of `CreateSubchannel()` will check to see
+if the LB policy included a notification object in an attribute.  If it
+did, that notification object will be used when creating the subchannel;
+otherwise, the channel-level notification object fed from the service
+config will be used.
+
+Note that this approach assumes that Java and Go have switched to a
+model where there is only one address per subchannel, as per [A61].
+
+### Subchannel Behavior
+
+If max_connections_per_subchannel is 1, the subchannel will provide
+essentially the same behavior as before this gRFC.  In that case,
+implementations should minimize any additional per-RPC overhead at this
+layer beyond what already existed prior to this design.  In other words,
+the connection scaling feature should ideally not affect performance
+unless it is actually enabled.
+
+#### Connection Management
+
+The subchannel will establish up to the number of established connections
+specified by max_connections_per_subchannel.  The connections will
+be stored in a list ordered by the time at which the connection was
+established, so that the oldest connection is at the start of the list.
+
+Each connection will store the peer's MAX_CONCURRENT_STREAMS setting
+reported by the transport (see [Interaction Between Transport and
+Subchannel](#interaction-between-transport-and-subchannel) below for
+details).  It will also track how many RPCs are currently in flight on
+the connection.
+
+The subchannel will also track one in-flight connection attempt, which
+will be unset if no connection attempt is currently in flight.
+
+A new connection attempt will be started when all of the
+following are true:
+- One or more RPCs are queued in the subchannel, waiting for a
+  connection to be sent on.
+- No existing connection in the subchannel has any available streams --
+  i.e., the number of RPCs currently in flight on each connection is
+  greater than or equal to the connection's MAX_CONCURRENT_STREAMS.
+- The number of existing connections in the subchannel is fewer than the
+  max_connections_per_subchannel setting.
+- There is no connection attempt currently in flight on the subchannel.
+
+Some examples of cases that can trigger a new connection attempt to be
+started:
+- A new RPC is started on the subchannel and all existing connections
+  are already at their MAX_CONCURRENT_STREAMS limit.
+- RPCs were already queued on the subchannel and a connection was lost
+  or a connection attempt fails.
+- RPCs were already queued on the subchannel and a new connection was just
+  created that did not provide enough available streams for all pending RPCs.
+- The value of the max_connections_per_subchannel setting increases,
+  all existing connections are already at their MAX_CONCURRENT_STREAMS
+  limit, and there are queued RPCs.
+
+The subchannel will never close a connection once it has been established.
+However, when a connection is closed for any reason, it is removed from
+the subchannel.  If the application wishes to garbage collect unused
+connections, it should configure MAX_CONNECTION_IDLE on the server side,
+as described in [A9].
+
+If all working connections are terminated, the subchannel will fail
+all queued RPCs with status UNAVAILABLE.  Note that these RPCs will be
+eligible for transparent retries (see [A6]), because no wire traffic
+was produced for them.
+
+#### Backoff Behavior and Connectivity State
+
+The subchannel must have no more than one connection
+attempt in progress at any given time.  The [backoff
+state](https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md)
+will be used for all connection attempts in the subchannel, regardless
+of how many established connections there are.  If a connection attempt
+fails, the backoff period must be respected and scale accordingly before
+starting the next connection attempt.  When a connection attempt succeeds,
+backoff state will be reset, just as it is today.
+
+For example, if the subchannel has both two existing connections and a
+pending connection attempt for a third connection, if one of the original
+connections fails, the subchannel may not start a new connection attempt
+immediately, because it already has a connection attempt in progress.
+Instead, it must wait for the in-flight connection attempt to finish.
+If that attempt fails, then backoff must be performed before starting the
+next connection attempt.  But if that attempt succeeds, backoff state
+will be reset, so if there are still enough queued RPCs to warrant a
+third connection, then the subchannel may immediately start another
+connection attempt.
+
+The connectivity state of the subchannel should be determined as follows
+(first match wins):
+- If there is at least one connection established, report READY.
+- If there is at least one connection attempt in flight, report
+  CONNECTING.
+- If the subchannel is in backoff after a failed connection attempt,
+  report TRANSIENT_FAILURE.
+- Otherwise, report IDLE.
+
+Note that subchannels may exhibit two new state transitions that have not
+previously been possible.  Today, the only possible transition from state
+READY is to state IDLE, but with this design, the following additional
+transitions are possible:
+- If the subchannel has an existing connection and has a connection
+  attempt in flight for a second connection, and then the first
+  connection fails before the in-flight connection attempt completes,
+  then the subchannel will transition from READY to CONNECTING.
+- If the subchannel has an existing connection but is in backoff after
+  failing to establish a second connection attempt, and then the original
+  connection fails, the subchannel will transition from READY directly
+  to TRANSIENT_FAILURE.
+
+See [PickFirst Changes](#pickfirst-changes) below for details on how
+pick_first will handle these new transitions.
+
+#### Picking a Connection for Each RPC
+
+When choosing a connection for an RPC within a subchannel, the following
+algorithm will be used (first match wins):
+1. Look through all working connections in order from the oldest to the
+   newest.  For each connection, if the number of RPCs in flight on the
+   connection is lower than the peer's MAX_CONCURRENT_STREAMS setting,
+   then the RPC will be dispatched on that connection.
+2. If the number of existing connections is equal to the
+   max_connections_per_subchannel setting, the RPC will be queued.
+3. If the number of existing connections is less than the
+   max_connections_per_subchannel setting and the subchannel is in backoff
+   delay due to the last connection attempt failing, the RPC will be
+   queued.
+4. If the number of existing connections is less than the
+   max_connections_per_subchannel setting and no connection attempt is
+   currently in flight, a new connection attempt will be started, and
+   the RPC will be queued.
+
+The subchannel must ensure that races do not happen while dispatching
+RPCs to a connection.  For example, if two RPCs are initiated at the same
+time and one stream is available in a connection, both RPCs must not choose
+the same connection.  This race can be avoided with locks or atomics.
+
+When queueing an RPC, the queue must be roughly fair: RPCs must
+be dispatched in the order in which they are received into the
+queue, acknowledging that timing between threads may lead to
+concurrent RPCs being added to the queue in an arbitrary order.
+See [Rationale](#rationale) below for a possible adjustment to this
+queuing strategy.
+
+When reprocessing the queue, the subchannel will iterate over the
+queued RPCs from oldest to newest.  For each RPC, it will apply the
+same algorithm to choose a connection as when it first sees the RPC,
+described above.  If that algorithm indicates that the RPC should be
+queued, the subchannel will leave the RPC in the queue and stop
+iterating over the queue, because it knows that it cannot dispatch any
+more of the queued RPCs.  See [Subchannel
+Psuedo-Code](#subchannel-pseudo-code) below for details.
+
+The subchannel will reprocess the queued RPCs upon the following events:
+- When a connection attempt completes successfully.
+- When the backoff timer fires.
+- When an existing connection fails, but there is still at least one
+  working connection.  (If there are no working connections, then all
+  queued RPCs are failed instead of being reprocessed, as described in
+  [Connection Management](#connection-management) above.)
+- When the transport for a connection reports a new value for
+  MAX_CONCURRENT_STREAMS.
+- When an RPC dispatched on one of the connections completes.
+
+Note that in some of those cases, we know that we will not be able to
+actually dispatch any of the queued RPCs, but reprocessing the queue
+may cause us to trigger a new connection attempt.
+
+Because we are now handling queuing in the subchannel, transport
+implementations should no longer need to handle this queuing.  The only
+case where a transport may see an RPC that it does not have quota to send
+is if the MAX_CONCURRENT_STREAMS setting of a connection is lowered by
+the server after RPCs are dispatched to the connection.  Transports are
+encouraged to handle this case by failing RPCs in a way that is eligible
+for transparent retries (see [A6]) rather than by queueing the RPC.
+Note that implementations should make sure that they do not introduce an
+infinite loop here: the transparent retry must not block the subchannel
+from processing the subsequent MAX_CONCURRENT_STREAMS update from the
+transport, although no explicit synchronization is needed to ensure
+that the first transparent retry must not happen until the subchannel
+has seen that update.
+
+#### Interaction Between Transport and Subchannel
+
+In order for the subchannel to know when to create a new connection, the
+transport will need to report the peer's MAX_CONCURRENT_STREAMS setting
+to the subchannel.  The transport will need to first report this value
+immediately after receiving the initial SETTINGS frame from the peer,
+and then it will need to send an update any time it receives a SETTINGS
+frame from the peer that changes this particular setting.
+
+Implementations should consider providing some mechanism for flow
+control for these updates, to prevent sending updates to the subchannel
+faster than it can process them.  One possible simple approach would be
+for the transport to have only one in-flight update to the subchannel at
+any given time, which could be implemented as follows:
+- When sending an update to the subchannel, the transport will record
+  the MAX_CONCURRENT_STREAMS value that it is reporting to the
+  subchannel.  It will include a callback with the update, which the
+  subchannel must invoke when it has finished processing the update.
+- If the transport receives a new MAX_CONCURRENT_STREAMS value from the
+  peer before it receives the callback from the subchannel, it will
+  not send another update to the subchannel.
+- When the transport receives the callback from the subchannel, it will
+  check whether the peer's current MAX_CONCURRENT_STREAMS value is
+  different from the last value it reported to the subchannel.  If so,
+  it will start a new update.
+
+Note that this approach means that there may be a noticeable delay
+between when the transport sees an update and when the subchannel sees
+the update.  If the update is an *increase* in MAX_CONCURRENT_STREAMS,
+that won't cause any problems (the worst case is that the subchannel
+may create a new connection that it might have been able to avoid).
+If the update is a *decrease* in MAX_CONCURRENT_STREAMS, then the
+subchannel may dispatch RPCs to the connection that will wind up being
+queued in the transport, which is sub-optimal.  However, this design
+already has a race condition in that case (see [Picking a Connection
+for Each RPC](#picking-a-connection-for-each-rpc) above for details),
+so this is not an additional problem.
+
+#### Interaction Between Channel and Subchannel
+
+Today, when the channel does an LB pick and gets back a subchannel,
+it calls a method on that subchannel to get its underlying connection.
+There are only two possible results:
+
+1. The subchannel returns a ref to the underlying connection.  In this
+   case, the channel starts a stream on the returned connection and
+   forwards the RPC to that stream.
+2. The subchannel returns null to indicate that it no longer has a
+   working connection.  This case can happen due to a race between the
+   LB policy picking the subchannel and the transport seeing a GOAWAY
+   or disconnection.  When this occurs, the channel will queue the RPC
+   (i.e., it is treated the same as if the picker indicated to queue
+   the RPC) in the expectation that the LB policy will soon see the
+   subchannel report the disconnection and will return a new picker,
+   at which point a new pick will be done for the queued RPC.
+
+With this design, there is a third outcome possible: the subchannel may
+have a set of working connections, but they may all already be at their
+MAX_CONCURRENT_STREAMS limits, so the RPC may need to be queued until
+the subchannel has a connection that it can send it on.  This case can
+be handled by having the subchannel return a fake connection object that
+queues the RPC in the subchannel.
+
+Note that the race condition described in case 2 above will now happen
+only if the subchannel has no working connections.  If there is at least
+one working connection, then even if the RPC cannot be sent immediately,
+the RPC will be queued in the subchannel instead.
+
+#### Subchannel Pseudo-Code
+
+The following pseudo-code illustrates the expected functionality in the
+subchannel:
+
+```python
+# Returns a connection to use for an RPC, or None if no connection is
+# currently available to send an RPC on.
+def ChooseConnection(self):
+  # Use the oldest connection that can accept a new stream, if any.
+  for connection in self.connections:
+    if connection.rpcs_in_flight < connection.max_concurrent_streams:
+      connection.rpcs_in_flight += 1
+      return connection
+  # If we aren't yet at the max number of connections, see if we can
+  # create a new one.
+  if (len(self.connections) < self.max_connections_per_subchannel and
+      self.connection_attempt is None and
+      self.pending_backoff_timer is None):
+    self.StartConnectionAttempt()
+  # Didn't find a connection for the RPC, so queue it.
+  return None
+
+# Get a connection to start a new RPC.
+def GetConnection(self):
+  # If there are no connections, tell the channel to queue the LB pick.
+  if len(self.connections) == 0:
+    return None
+  connection = self.ChooseConnection()
+  # If we didn't find a connection to use, return a fake connection that
+  # adds all RPCs to self.queue.
+  if connection is None:
+    return FakeConnectionThatQueuesRpcs()
+  return connection
+
+# Retries RPCs from the queue, in order.
+def RetryRpcsFromQueue(self):
+  while len(self.queue) > 0:
+    connection = self.ChooseConnection()
+    # Stop at the first RPC that gets queued.
+    if connection is None:
+      break
+    # Otherwise, send the RPC on the connection.
+    connection.SendRpc(self.queue.front())
+    self.queue.pop()
+
+# Starts a new connection attempt.
+def StartConnectionAttempt(self):
+  if self.backoff_state is None:
+    self.backoff_state = BackoffState()
+  self.connection_attempt = ConnectionAttempt()
+
+# Called when a connection attempt succeeds.
+def OnConnectionAttemptSucceeded(self, new_connection):
+  self.connections.append(new_connection)
+  self.pending_backoff_timer = None
+  self.backoff_state = None
+  self.RetryRpcsFromQueue()
+
+# Called when a connection attempt fails.  This puts us in backoff.
+def OnConnectionAttemptFailed(self):
+  self.connection_attempt = None
+  self.pending_backoff_timer = Timer(self.backoff_state.NextBackoffDelay())
+
+# Called when the backoff timer fires.  Will trigger a new connection
+# attempt if there are RPCs in the queue.
+def OnBackoffTimer(self):
+  self.pending_backoff_timer = None
+  self.RetryRpcsFromQueue()
+
+# Called when an established connection fails.  Will trigger a new
+# connection attempt if there are RPCs in the queue.
+def OnConnectionFailed(self, failed_connection):
+  self.connections.remove(failed_connection)
+  if len(self.connections) == 0:
+    for rpc in self.queue:
+      # RPC will be eligible for transparent retries.
+      rpc.Fail(UNAVAILABLE)
+    self.queue = []
+  else:
+    self.RetryRpcsFromQueue()  # Maybe trigger new connection attempt.
+
+# Called when a connection reports a new MAX_CONCURRENT_STREAMS value.
+# May send RPCs on the connection if there are any queued and the
+# MAX_CONCURRENT_STREAMS value has increased.
+def OnConnectionReportsNewMaxConcurrentStreams(
+    self, connection, max_concurrent_streams):
+  connection.max_concurrent_streams = max_concurrent_streams
+  self.RetryRpcsFromQueue()
+
+# Called when an RPC completes on one of the subchannel's connections.
+def OnRpcComplete(self, connection):
+  connection.rpcs_in_flight -= 1
+  self.RetryRpcsFromQueue()
+
+# Called when the max_connections_per_subchannel value changes.
+def OnMaxConnectionsPerSubchannelChanged(self, max_connections_per_subchannel):
+  self.max_connections_per_subchannel = max_connections_per_subchannel
+  self.RetryRpcsFromQueue()
+```
+
+### PickFirst Changes
+
+As mentioned above, the pick_first LB policy will need to handle two new
+state transitions from subchannels.  Previously, a subchannel in READY
+state could transition only to IDLE state; now it will be possible for
+the subchannel to instead transition to CONNECTING or TRANSIENT_FAILURE
+states.
+
+If the selected (READY) subchannel transitions to CONNECTING or
+TRANSIENT_FAILURE state, then pick_first will go back into CONNECTING
+state.  It will start the happy eyeballs pass across all subchannels,
+as described in [A61].  Note that this will trigger a re-resolution
+request, just as the existing transition from READY to IDLE does.
+
+### Interaction with xDS Circuit Breaking
+
+gRPC currently supports xDS circuit breaking as described in [A32].
+Specifically, we support configuring the max number of RPCs in flight
+to each cluster.  This is done by having the xds_cluster_impl LB policy
+increment an atomic counter that tracks the number of RPCs currently in
+flight to the cluster, which is later decremented when the RPC ends.
+
+Some gRPC implementations don't actually increment the counter until
+after a connection is chosen for the RPC, so that they won't erroneously
+increment the counter when the picker returns a subchannel for which no
+connection is available (the race condition described above).  However,
+now that there could be a longer delay between when the picker returns
+and when a connection is chosen for the RPC, implementations will need
+to increment the counter in the picker.  It will then be necessary to
+decrement the counter when the RPC finishes, regardless of whether it
+was actually sent out or whether the subchannel failed it.
+
+### Channelz Changes
+
+The channelz API defined in [A14] will need some changes to expose the
+state of connection scaling.
+
+In the `ChannelData` message, we will add a new `uint32
+max_connections_per_subchannel` field, which will be populated only for
+subchannels, not channels.
+
+The channelz data model already supports [multiple sockets per
+subchannel](https://github.com/grpc/grpc-proto/blob/23f5b568eefcb876e6ebc3b01725f1f20cff999e/grpc/channelz/v1/channelz.proto#L80).
+Today, a subchannel can have more than one socket when a connection
+receives a GOAWAY but remains open until already-in-flight RPCs finish,
+while at the same time a new connection is established to send new RPCs.
+The current channelz data model does not explicitly indicate which
+connection has received the GOAWAY, although that can be inferred from
+the channelz socket ID, since the lower ID is older and will therefore
+be the one that received the GOAWAY.  With this design, that inference
+will no longer be possible, because there can now be more than one
+established connection in a subchannel.  Therefore, we will add a new
+`google.protobuf.UInt32Value received_goaway_error` field to the channelz
+`SocketData` message, which will be populated if a GOAWAY has been
+received, in which case its value will be the HTTP/2 error code from
+the received GOAWAY.
+
+The `SocketData` message already contains
+[`streams_started`](https://github.com/grpc/grpc-proto/blob/23f5b568eefcb876e6ebc3b01725f1f20cff999e/grpc/channelz/v1/channelz.proto#L252),
+[`streams_succeeded`](https://github.com/grpc/grpc-proto/blob/23f5b568eefcb876e6ebc3b01725f1f20cff999e/grpc/channelz/v1/channelz.proto#L256),
+and
+[`streams_failed`](https://github.com/grpc/grpc-proto/blob/23f5b568eefcb876e6ebc3b01725f1f20cff999e/grpc/channelz/v1/channelz.proto#L260)
+fields, which enable computing the number of streams currently in
+flight.  However, we will add a new `uint32 peer_max_concurrent_streams`
+field that will report the value of the peer's MAX_CONCURRENT_STREAMS
+setting; note that this field does not need to be populated in the gRPC
+server, only the client.
+
+Note that all data in `SocketNode` will be reported from the perspective
+of the transport, not the perspective of the subchannel.
+
+### Metrics
+
+No new metrics will be defined for this feature.  However,
+note that the additional connections will show up in the
+`grpc.subchannel.open_connections` metric defined in [A94].
+
+### Temporary environment variable protection
+
+Enabling this feature via the gRPC service config will initially be
+guarded via the environment variable
+`GRPC_EXPERIMENTAL_MAX_CONCURRENT_STREAMS_CONNECTION_SCALING`.
+
+Enabling this feature via xDS will initially be
+guarded via the environment variable
+`GRPC_EXPERIMENTAL_XDS_MAX_CONCURRENT_STREAMS_CONNECTION_SCALING`.
+
+Each of the two configuration mechanisms will be enabled by default once
+it has passed interop tests.
+
+## Rationale
+
+We considered several different approaches as part of this design process.
+
+We considered putting the connection scaling functionality in an LB
+policy instead of in the subchannel, but we rejected that approach for
+several reasons:
+- The LB policy API is designed around the idea that returning a new
+  picker will cause queued RPCs to be replayed, which works fine when an
+  updated picker is likely to allow most of the queued RPCs to proceed.
+  However, in a case where the workload is hitting the
+  MAX_CONCURRENT_STREAMS limit across all connections, we would wind up
+  updating the picker as each RPC finishes, which would allow only one
+  of the queued RPCs to continue, thus exhibiting O(n^2) behavior.  We
+  concluded that the LB policy API is simply not well-suited to solve
+  this particular problem.
+- There were some concerns about possibly exposing the
+  MAX_CONCURRENT_STREAMS setting from the transport to the LB policy
+  API.  However, this particular concern could have been ameliorated
+  by initially using an internal or experimental API.
+- Putting this functionality in the LB policy would have added
+  complexity due to subchannels being shared between channels in C-core,
+  where each channel can see only the RPCs that that channel is sending
+  to the subchannel.
+
+Given that we decided to add this new functionality in the subchannel,
+we intentionally elected to keep it simple, at least to start with.
+We considered a design incorporating a more sophisticated -- or pluggable
+-- connection selection method but rejected it due to the complexity
+of such a mechanism and the desire to avoid creating a duplicate load
+balancing ecosystem within the subchannel.
+
+Potential future improvements that we could consider:
+- Additional configuration knobs:
+  - min_connections_per_subchannel to force clients to create a minimum
+    number of connections, even if they are not necessary.
+  - min_available_streams_per_subchannel to allow clients to create new
+    connections before the hard MAX_CONCURRENT_STREAMS setting is reached.
+- Channel arg to limit streams per connection lower than
+  MAX_CONCURRENT_STREAMS.
+- Instead of queuing RPCs in the subchannel, it may be possible to improve
+  aggregate performance by failing the RPC, resulting in transparent retry
+  and a re-pick.  Without other systems in place, this would lead to a
+  busy-loop if the same subchannel is picked repeatedly, so this is not
+  included in this design.
+
+This design does not handle connection affinity; there is no way to
+ensure related RPCs end up on the same connection without setting
+max_connections_per_subchannel to 1.  For use cases where connection
+affinity is important, multiple channels will continue to be necessary
+for now.
+
+This design also does not attempt to maximize throughput of connections,
+which would be a far more complex problem.  To maximize throughput
+effectively, more information about the nature of RPCs would need to
+be exposed; e.g., how much bandwidth they may require and how long they
+might be expected to last.  And unlike this connection scaling design,
+that functionality might actually want to be implemented in the LB policy
+layer, since it would be totally compatible with the LB policy API.
+The goal of *this* design is to simply overcome the stream limits on
+connections, hence the simple and greedy connection selection mechanism.
+
+## Implementation
+
+Will be implemented in C-core, Java, and Go.
