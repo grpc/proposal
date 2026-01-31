@@ -420,7 +420,10 @@ Psuedo-Code](#subchannel-pseudo-code) below for details.
 The subchannel will reprocess the queued RPCs upon the following events:
 - When a connection attempt completes successfully.
 - When the backoff timer fires.
-- When an existing connection fails.
+- When an existing connection fails, but there is still at least one
+  working connection.  (If there are no working connections, then all
+  queued RPCs are failed instead of being reprocessed, as described in
+  [Connection Management](#connection-management) above.)
 - When the transport for a connection reports a new value for
   MAX_CONCURRENT_STREAMS.
 - When an RPC dispatched on one of the connections completes.
