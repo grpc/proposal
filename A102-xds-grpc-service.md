@@ -189,7 +189,7 @@ introduces the following new fields:
   - `envoy.extensions.grpc_service.call_credentials.access_token.v3.AccessTokenCredentials`:
     In this message:
     - `token`: Required.  The access token.  The token will be added as
-      an `authorization` header with header `Bearer ` (note trailing
+      an `authorization` header with value `Bearer ` (note trailing
       space) followed by the value of this field.  Note that the
       token will not be sent on the wire unless the connection has
       security level PRIVACY_AND_INTEGRITY.
