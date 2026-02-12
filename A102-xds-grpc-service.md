@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-01-06
+* Last updated: 2026-02-12
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -238,10 +238,11 @@ When validating a `GrpcService` proto, the following fields will be used:
     Will be base64-encoded on the wire, unless the pure binary metadata
     extension from [gRFC G1: True Binary
     Metadata](G1-true-binary-metadata.md) is used.
-- `envoy_grpc`: This field is not used.  See "Rationale" section below
-  for details.
-- `retry_policy`: This field is not used.  If retries are needed, they
-  should be configured in the [service
+
+The following fields will *not* be used:
+- `envoy_grpc`: See "Rationale" section below for details.
+- `retry_policy`: If retries are needed, they should be configured in
+  the [service
   config](https://github.com/grpc/grpc/blob/master/doc/service_config.md)
   for the side-channel service, or by using xDS in the side-channel.
 
