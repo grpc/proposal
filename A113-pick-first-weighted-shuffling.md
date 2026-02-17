@@ -53,16 +53,16 @@ reflected by per-endpoint weights must reflect this. As such, we need to normali
 each priority and endpoint weights within locality; the final weight provided to `pick_first` should be a
 product of the two normalized weights (i.e. a logical AND of the two selection events).
 
-The CDS LB policy currently calculates per-endpoint weight attributes. It will continue to do so however
-we need to fix the mechanics: an endpoint's final weight should be a product of its *normalized* locality
-weight and *normalized* endpoint weight, rather than their product outright.
+The CDS LB policy currently calculates per-endpoint weight attributes, and it will continue to do so.
+However, we need to fix the mechanics: an endpoint's final weight should be the product of its *normalized*
+locality weight and *normalized* endpoint weight, rather than their product outright.
 
 Note: as a side effect this will fix per-endpoint weights in Ring Hash LB, which
 [currently](https://github.com/grpc/proposal/blob/master/A42-xds-ring-hash-lb-policy.md#change-child-policy-config-generation-in-xds_cluster_resolver-policy) are a product of the initial *raw* locality and endpoint weights.
 This "fix" will not require any changes within Ring Hash LB itself.
 
 We can continue to represent weights as integers if we represent their normalized values in
-fixed point UQ1.31 format. Math as follows (citation due for @ejona):
+fixed point UQ1.31 format. Math as follows:
 
 ```
 // To normalize:
