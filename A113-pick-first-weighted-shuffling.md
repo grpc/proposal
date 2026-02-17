@@ -62,7 +62,7 @@ Note: as a side effect this will fix per-endpoint weights in Ring Hash LB, which
 This "fix" will not require any changes within Ring Hash LB itself.
 
 We can continue to represent weights as integers if we represent their normalized values in
-fixed point UQ1.31 format. Math as follows:
+fixed point UQ1.31 format. Math as follows (credit @ejona):
 
 ```
 // To normalize:
