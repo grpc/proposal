@@ -1,6 +1,6 @@
 A113: pick_first: Weighted Random Shuffling
 ----
-* Author(s): Alex Polcyn (@apolcyn)
+* Author(s): Alex Polcyn (@apolcyn), Eric Anderson (@ejona86)
 * Approver: Mark Roth (@markdroth), Eric Anderson (@ejona86), Doug Fawley (@dfawley), Easwar Swaminathan (@easwars)
 * Status: In Review
 * Implemented in: <language, ...>
@@ -62,7 +62,7 @@ Note: as a side effect this will fix per-endpoint weights in Ring Hash LB, which
 This "fix" will not require any changes within Ring Hash LB itself.
 
 We can continue to represent weights as integers if we represent their normalized values in
-fixed point UQ1.31 format. Math as follows (credit to @ejona for this idea):
+fixed point UQ1.31 format. Math as follows:
 
 ```
 // To normalize:
