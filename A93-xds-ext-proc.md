@@ -86,16 +86,16 @@ TODO: stats plugin propagation?
 On the ext_proc stream, the events sent and received must be in the same
 order as on the data plane.  For client-to-server events, the order must
 be headers, followed by zero or more messages, followed by a half-close.
-For server-to-client events, the order must be headers, followed by zero
-or more messages, followed by trailers.  It is fine to interleave
-client-to-server events with server-to-client events, since the two
-directions are independent of each other.  It is also fine for some of
-the events to be missing on the ext_proc stream; for example, if the
-filter is not configured to send client headers but is configured to
-send client messages, then it can start by sending a client message.
-But if two different events are sent on the stream, they must be in the
-correct order relative to each other, both to and from the ext_proc
-server.
+For server-to-client events, the order must be headers (skipped for
+Trailers-Only), followed by zero or more messages, followed by trailers.
+It is fine to interleave client-to-server events with server-to-client
+events, since the two directions are independent of each other.  It is
+also fine for some of the events to be missing on the ext_proc stream;
+for example, if the filter is not configured to send client headers but
+is configured to send client messages, then it can start by sending a
+client message.  But if two different events are sent on the stream,
+they must be in the correct order relative to each other, both to and
+from the ext_proc server.
 
 When sending client headers, server headers, and server trailers events to
 the ext_proc server, if not in [observability mode](#observability-mode),
@@ -729,6 +729,11 @@ sub-optimal approach, for the following reasons:
 - It would further spread use of the gRPC framing to ext_proc servers,
   which will make it awkward for gRPC to support other transports with
   different framing in the future.
+- It would fail to represent the actual data as sent on the wire when
+  compression is used, because the "is_compressed" byte wouldn't be set
+  correctly, and the bytes themselves will not actually be compressed.
+  (See [Interaction With Compression](#interaction-with-compression)
+  above for details.)
 
 We considered supporting non-streaming body send modes, but that would
 have significantly increased latency for streaming RPCs, because we would
