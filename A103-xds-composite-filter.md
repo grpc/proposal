@@ -4,7 +4,7 @@ A103: xDS Composite Filter
 * Approver: ejona86, dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-02-12
+* Last updated: 2026-02-23
 * Discussion at: https://groups.google.com/g/grpc-io/c/es5taH0OZS8
 
 ## Abstract
@@ -150,17 +150,19 @@ attributes](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/adva
 that we expect to be useful for the composite filter.
 
 On both the gRPC client and server sides, we will add support for the
-`xds.route_metadata.filter_metadata` attribute.  To support this, we will
-add support for parsing the [`Route.metadata`
-field](https://github.com/envoyproxy/envoy/blob/f384ab2b3e3aa0564ef25f57dc2ed8ad61eaf0cb/api/envoy/config/route/v3/route_components.proto#L319)
-in the xDS RouteConfiguration.  This field will be validated the same
-way as cluster metadata, as described in [A83].  The parsed metadata map
-will be added to the route in the parsed RouteConfiguration resource,
-and that map will be accessed by this CEL attribute.  Note that we will
-support only `filter_metadata`, not `typed_filter_metadata`, so that we
-do not have to handle protobuf descriptor functionality; to that end, we
-will use only those entries in the parsed metadata map that correspond
-to `google.protobuf.Struct` type.
+`xds.cluster_metadata.filter_metadata` attribute.  This will be backed
+by the same cluster metadata whose parsing was added in [A83].  Note that
+we will support only `xds.cluster_metadata.filter_metadata`, not
+`xds.cluster_metadata.typed_filter_metadata`, so that we do not have to
+handle protobuf descriptor functionality; to that end, we will use only
+those entries in the parsed metadata map that correspond to
+`google.protobuf.Struct` type.  The actual CEL expression we see will be
+something like `xds.cluster_metadata.filter_metadata['%s']['%s']`, where
+the first `%s` indicates the key of the entry in the parsed metadata map
+and the second `%s` indicates the key in the JSON object.  If the JSON
+value is not an object, this will not resolve.  The type of the CEL
+value will be based on the type of the underlying JSON value, either
+string or integer.
 
 We will also add support for the following attributes on the gRPC server
 side only (these attributes are not relevant on the client side):
