@@ -15,7 +15,7 @@ This proposal updates the client-side `weighted_round_robin` (WRR) load balancin
 
 The existing `weighted_round_robin` policy (defined in [gRFC A58][A58]) calculates endpoint weights based on standard metrics provided by the backend via ORCA (Open Request Cost Aggregation) load reports. Specifically, it uses `application_utilization` if available, and falls back to `cpu_utilization`.
 
-However, services may want to drive load balancing decisions based on other resources, such as memory utilization, queue depth, or custom application-defined metrics. The [xDS Custom Backend Metrics][A51] specification (ORCA) supports reporting arbitrary named metrics, and xDS has updated its WRR implementation to allow selecting these metrics for utilization calculation.
+However, services may want to drive load balancing decisions based on other resources, such as memory utilization, queue depth, or custom application-defined metrics. The [Custom Backend Metrics][A51] specification (ORCA) supports reporting arbitrary named metrics, and xDS has updated its WRR implementation to allow selecting these metrics for utilization calculation.
 
 To support advanced load balancing scenarios, gRPC's WRR policy needs to support this flexibility.
 
@@ -62,6 +62,11 @@ The weight calculation logic in the WRR policy will be updated to determine the 
     - **Resolve Metric Value**:
       - If the name is of the format `field.key` (e.g., `named_metrics.foo`), look up the map field `field` and retrieve the value for `key`.
       - If the name is a simple field name (e.g., `cpu_utilization`, `mem_utilization`), look up the `field`.
+      - **Only the following fields are supported:**
+        - `application_utilization`
+        - `cpu_utilization`
+        - `mem_utilization`
+        - `named_metrics.*`
     - **Compute Max**: Track the maximum value among all successfully resolved, positive ( > 0), finite metrics.
     - If a max value is found, use it as the `utilization`.
 3.  **Fallback to `cpu_utilization`**: If neither of the above yields a value, use `cpu_utilization` (utilizing the existing logic).
@@ -104,12 +109,9 @@ function GetUtilization(report, configured_metrics):
 
 #### Implementation Notes
 
-Since `OrcaLoadReport` is often exposed as a language-specific proxy object rather than a raw Protobuf message (e.g., in Java and C++), implementations are **not** expected to use Protobuf reflection to look up arbitrary fields. Instead, implementations should manually handle:
+Since `OrcaLoadReport` is often exposed as a language-specific proxy object rather than a raw Protobuf message (e.g., in Java and C++), implementations are **not** expected to use Protobuf reflection to look up arbitrary fields. Instead, implementations should manually handle the supported metric list specified above.
 
-- **Map Fields**: Lookups in the `named_metrics` map (e.g., `named_metrics.foo`). The string is split on the first dot: `foo.bar.baz` looks up key `bar.baz` in map `foo`.
-- **Standard Fields**: Explicit lookups for known fields (e.g., `cpu_utilization`).
-
-Support for any new standard fields added to `OrcaLoadReport` in the future will require explicit code changes in the implementation. This behavior is consistent with the [current Envoy implementation](https://github.com/envoyproxy/envoy/blob/35749578db375f5fe8ac5dd293cb7c4efb689611/source/common/orca/orca_load_metrics.cc#L47-L73).
+As a consequence, support for any new standard fields added to `OrcaLoadReport` in the future will require explicit code changes in the implementation. This behavior is consistent with the [current Envoy implementation](https://github.com/envoyproxy/envoy/blob/35749578db375f5fe8ac5dd293cb7c4efb689611/source/common/orca/orca_load_metrics.cc#L47-L73).
 
 #### Validity and Edge Cases
 
