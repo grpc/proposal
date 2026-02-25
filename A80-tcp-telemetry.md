@@ -54,7 +54,7 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 * For each new connected TCP socket, set an initial alarm of 10% to 110% (randomly selected) of TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL.  
 * When the alarm fires \-  
   * Use `getsockopt(TCP_INFO)` or equivalent method to retrieve and record connection metrics.  
-  * Re-arm the alarm with 10% to 110% (randomly selected) of TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL and repeat.  
+  * Re-arm the alarm with 90% to 110% (randomly selected) of TCP\_CONNECTION\_METRICS\_RECORD\_INTERVAL and repeat.  
   * Before the socket is closed, cancel the alarm set above, and retrieve and record connection metrics, providing observability for short-lived connections as well. This will also allow collection of `grpc.tcp.recurring_retransmits`
 
 ### Per-Connection Op Metrics
