@@ -136,11 +136,12 @@ RDS instead of LDS, it will in this case not be possible for gRPC to
 detect that a filter is being configured on an unsupported side when
 validating the RDS resource.  Instead, the composite filter will need
 to handle this on a per-RPC basis: if a nested filter chain includes a
-filter that is not supported on the side that it is running on, it will
+filter that is not supported on the side that it is running on, we will
 fail the RPC with status UNAVAILABLE.  Note that if the problematic
 filter is not the first filter in the nested filter chain, implementations
 may fail the RPC without ever starting to process the RPC on that filter
-chain.
+chain, or they may wait to fail the RPC until it gets to the problematic
+filter.
 
 ### CEL Attributes
 
