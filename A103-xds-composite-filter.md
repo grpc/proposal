@@ -4,7 +4,7 @@ A103: xDS Composite Filter
 * Approver: ejona86, dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-02-23
+* Last updated: 2026-02-27
 * Discussion at: https://groups.google.com/g/grpc-io/c/es5taH0OZS8
 
 ## Abstract
@@ -97,8 +97,8 @@ message.  Within it, gRPC will look at the following fields:
 
 We will also support per-route overrides via the
 [`envoy.extensions.common.matching.v3.ExtensionWithMatcherPerRoute`
-proto](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/common/matching/v3/extension_matcher.proto#L39C9-L39C37)
-proto.  In this proto, the
+proto](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/common/matching/v3/extension_matcher.proto#L39C9-L39C37).
+In this proto, the
 [xds_matcher](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/common/matching/v3/extension_matcher.proto#L41)
 field must be validated the same way as the corresponding field in the
 top-level config.  The value of this field will replace the value of the
