@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-02-12
+* Last updated: 2026-02-27
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -228,10 +228,10 @@ When validating a `GrpcService` proto, the following fields will be used:
   service.  Inside of each entry:
   - [`key`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/base.proto#L404):
     Value length must be in the range [1, 16384).  Must be a valid
-    HTTP/2 header name.
+    gRPC header name.  Must not start with `:` and must not be `host`.
   - [`value`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/base.proto#L415):
     Specifies the header value.  Must be shorter than 16384 bytes.  Must
-    be a valid HTTP/2 header value.  Not used if `key` ends in `-bin`
+    be a valid gRPC header value.  Not used if `key` ends in `-bin`
     and `raw_value` is set.
   - [`raw_value`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/base.proto#L422):
     Used only if `key` ends in `-bin`.  Must be shorter than 16384 bytes.
