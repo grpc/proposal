@@ -4,7 +4,7 @@ A103: xDS Composite Filter
 * Approver: ejona86, dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-02-27
+* Last updated: 2026-03-02
 * Discussion at: https://groups.google.com/g/grpc-io/c/es5taH0OZS8
 
 ## Abstract
@@ -61,7 +61,8 @@ message.  Within it, gRPC will look at the following fields:
   message, which has no fields.
 - [xds_matcher](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/common/matching/v3/extension_matcher.proto#L31):
   Specifies a unified matcher tree indicating the config of the filter
-  to use, as described in [A106].  Validation will fail if `keep_matching`
+  to use, as described in [A106].  May be unset, in which case the
+  filter is a no-op.  If set, validation will fail if `keep_matching`
   is enabled anywhere in the matcher tree.  The actions in this tree must
   be one of two types:
   - [`envoy.extensions.filters.common.matcher.action.v3.SkipFilter`](https://github.com/envoyproxy/envoy/blob/0685d7bf568485eb112df2a9c73248cb8bfc1c37/api/envoy/extensions/filters/common/matcher/action/v3/skip_action.proto#L24):
