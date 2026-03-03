@@ -36,18 +36,15 @@ message WeightedRoundRobinLbConfig {
 
   // A list of metric names to use for computing utilization.
   //
-  // By default, endpoint weight is computed based on the 'application_utilization'
-  // field reported by the endpoint.
-  //
-  // If 'application_utilization' is not set, then utilization will instead be
-  // computed by taking the max of the values of the metrics specified here.
-  //
   // For map fields in the ORCA proto, the string will be of the form
   // "<map_field_name>.<map_key>". For example, the string "named_metrics.foo"
   // will mean to look for the key "foo" in the ORCA "named_metrics" field.
   //
-  // If none of the specified metrics are present in the load report, then
-  // 'cpu_utilization' is used instead.
+  // By default, utilization is computed by taking the max of the values of the
+  // metrics specified here. If none of the specified metrics are present in the
+  // load report (or if this field is empty, or all values are less than or
+  // equal to 0), the policy will fall back to using 'application_utilization'
+  // and then 'cpu_utilization'.
   repeated string metric_names_for_computing_utilization = 7;
 }
 ```
@@ -56,8 +53,7 @@ message WeightedRoundRobinLbConfig {
 
 The weight calculation logic in the WRR policy will be updated to determine the `utilization` value as follows from the [`OrcaLoadReport`][OrcaLoadReportProto]
 
-1.  **Check `application_utilization`**: If the backend reports `application_utilization` (value > 0), use it.
-2.  **Check Custom Metrics**: If `application_utilization` is not reported (or is 0), and `metric_names_for_computing_utilization` is configured:
+1.  **Check Custom Metrics**: If `metric_names_for_computing_utilization` is configured:
     - Iterate through the specified metric names.
     - **Resolve Metric Value**:
       - If the name is of the format `field.key` (e.g., `named_metrics.foo`), look up the map field `field` and retrieve the value for `key`.
@@ -69,17 +65,13 @@ The weight calculation logic in the WRR policy will be updated to determine the 
         - `named_metrics.*`
     - **Compute Max**: Track the maximum value among all successfully resolved, positive ( > 0), finite metrics.
     - If a max value is found, use it as the `utilization`.
-3.  **Fallback to `cpu_utilization`**: If neither of the above yields a value, use `cpu_utilization` (utilizing the existing logic).
+2.  **Fallback**: If no custom metric is found (or if `metric_names_for_computing_utilization` is not configured), fall back to the existing WRR utilization behavior defined in [gRFC A58][A58].
 
 #### Pseudocode
 
 ```
 function GetUtilization(report, configured_metrics):
-  # 1. Prefer application_utilization if present
-  if report.application_utilization > 0:
-    return report.application_utilization
-
-  # 2. Check Custom Metrics
+  # 1. Check Custom Metrics
   max_util = null
 
   for metric_name in configured_metrics:
@@ -103,7 +95,9 @@ function GetUtilization(report, configured_metrics):
   if max_util is not null:
     return max_util
 
-  # 3. Fallback
+  # 2. Fallback to existing WRR behavior (A58)
+  if report.application_utilization > 0:
+    return report.application_utilization
   return report.cpu_utilization
 ```
 
@@ -116,7 +110,8 @@ As a consequence, support for any new standard fields added to `OrcaLoadReport` 
 #### Validity and Edge Cases
 
 - **Nan Values**: As shown above, `NaN` values in reports are explicitly ignored to prevent undefined behavior in weight calculations. This is relevant because behavior of `max` on `NaN` in c++ is inconsistent based on order.
-- **Zero and Negative Values**: Any value <= 0.0 is treated as missing and ignored. This is consistent with [gRFC A58][A58] and the [Envoy implementation](https://github.com/envoyproxy/envoy/blob/113f2c2d1015913256a2a8c6f9f97d0622623f45/source/extensions/load_balancing_policies/client_side_weighted_round_robin/client_side_weighted_round_robin_lb.cc#L214-L218).
+- **Zero Values**: Any value equal to `0.0` is treated as missing and ignored. This is consistent with [gRFC A58][A58] and the Envoy implementation, due to the lack of support for optional fields in the load report (where `0` cannot be distinguished from an unset field).
+- **Negative Values**: Any value `< 0.0` is also treated as missing and **ignored silently**. This is consistent with the current [Envoy implementation](https://github.com/envoyproxy/envoy/blob/113f2c2d1015913256a2a8c6f9f97d0622623f45/source/extensions/load_balancing_policies/client_side_weighted_round_robin/client_side_weighted_round_robin_lb.cc#L214-L218).
 - **Bound Checks**: The final selected `utilization` is subject to the standard validation logic from [gRFC A58][A58] (e.g., ensuring the value is positive) before being used to compute weight to avoid undefined behavior in weight calculations.
 - **Normalization**: The WRR policy does not normalize reported metrics; the application is responsible for this.
 
