@@ -34,17 +34,17 @@ We will add a new field `metric_names_for_computing_utilization` to the [`Weight
 message WeightedRoundRobinLbConfig {
   // ... existing fields ...
 
-  // A list of metric names to use for computing utilization.
+  // A list of metrics to be considered for overriding the default utilization
+  // computation behavior.
   //
   // For map fields in the ORCA proto, the string will be of the form
   // "<map_field_name>.<map_key>". For example, the string "named_metrics.foo"
   // will mean to look for the key "foo" in the ORCA "named_metrics" field.
   //
-  // By default, utilization is computed by taking the max of the values of the
-  // metrics specified here. If none of the specified metrics are present in the
-  // load report (or if this field is empty, or all values are less than or
-  // equal to 0), the policy will fall back to using 'application_utilization'
-  // and then 'cpu_utilization'.
+  // Utilization is computed by taking the max of the values of the
+  // metrics specified here. In the absence of this field or absence of
+  // valid values for the specified metrics, the policy will fall back to the
+  // existing default behavior.
   repeated string metric_names_for_computing_utilization = 7;
 }
 ```
@@ -65,7 +65,7 @@ The weight calculation logic in the WRR policy will be updated to determine the 
         - `named_metrics.*`
     - **Compute Max**: Track the maximum value among all successfully resolved, positive ( > 0), finite metrics.
     - If a max value is found, use it as the `utilization`.
-2.  **Fallback**: If no custom metric is found (or if `metric_names_for_computing_utilization` is not configured), fall back to the existing WRR utilization behavior defined in [gRFC A58][A58].
+2.  **Fallback**: If checking custom metrics did not determine a valid utilization value (or if `metric_names_for_computing_utilization` is not configured), fall back to the existing WRR utilization behavior defined in [gRFC A58][A58].
 
 #### Pseudocode
 
