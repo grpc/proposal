@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-02-20
+* Last updated: 2026-03-06
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -165,7 +165,7 @@ will be used:
 #### Payload Handling
 
 The existing ext_proc protocol's handling of request payloads has a
-significant impedence mismatch with gRPC.
+significant impedance mismatch with gRPC.
 
 The ext_proc protocol is designed for HTTP payloads, meaning that the
 ext_proc client sends the raw contents of the HTTP/2 DATA frames to
@@ -207,6 +207,14 @@ It is be desirable for Envoy to implement the same mode, so that users
 can switch back and forth between proxy and proxyless data planes without
 breaking their ext_proc servers.
 
+gRPC implementations should structure their xDS HTTP filter APIs such that
+the filter has access to the serialized bytes of each message rather than
+the deserialized message, to avoid the overhead of repeated
+serialization/deserialization on each message.  In other words, on the
+client side, the filters should run after the message is serialized, and
+on the server side, the filters should run before the message is
+deserialized.
+
 #### Interaction With Compression
 
 There are a couple of unfortunate interactions between ext_proc and
@@ -222,7 +230,7 @@ sender compressed them before sending them to Envoy.  To expose this
 difference to the ext_proc server, we have added a new field called
 `grpc_message_compressed` in both the ext_proc request and response
 message (see https://github.com/envoyproxy/envoy/pull/38753).  Envoy
-will set this bit in the ext_authz request based on the corresponding
+will set this bit in the ext_proc request based on the corresponding
 bit in the gRPC framing header, and it will propagate the bit from the
 ext_proc response back to the gRPC framing header.  In gRPC, if an
 ext_proc response sets this bit, the ext_proc filter will cancel the
@@ -352,7 +360,7 @@ The following fields will be ignored by gRPC:
 - message_timeout and max_message_timeout: Message timeouts do not make
   sense in GRPC body send mode.
 - http_service: It doesn't make sense for gRPC to support non-gRPC
-  mechanisms for contacting the ext_authz server.
+  mechanisms for contacting the ext_proc server.
 - stat_prefix: This does not apply to gRPC.
 - filter_metadata, metadata_options, on_processing_response: gRPC does not
   currently support dynamic metadata.
@@ -532,7 +540,11 @@ as follows:
           The serialized message body.
         - [end_of_stream](https://github.com/envoyproxy/envoy/blob/564612e32eafc10a7a7fd490cdb5cc7149e5802b/api/envoy/service/ext_proc/v3/external_processor.proto#L424C8-L424C21):
           If true, indicates that a half-close should be sent after the
-          message.  Honored only on client-to-server messages.
+          message.  Honored only on client-to-server messages.  If the
+          server sets this but the client has not yet sent a half-close
+          on the data plane RPC, then the ext_proc filter will need to
+          read and discard subsequent messages that the client sends on
+          the stream.
         - end_of_stream_without_message (new field being added in
           https://github.com/envoyproxy/envoy/pull/38753): Will be set to true
           to indicate a half-close with no message to send.
@@ -666,7 +678,7 @@ by subsequent overrides.
 
 ### Metrics
 
-The ext_authz filter will export metrics using the non-per-call metrics
+The ext_proc filter will export metrics using the non-per-call metrics
 architecture defined in [A79].  There will be a separate set of metrics
 on client side and server side, because (a) there are additional labels
 that are relevant on the client but not on the server, and (b) it may be
@@ -679,8 +691,8 @@ The client-side metrics will have the following labels:
 
 | Name        | Disposition | Description |
 | ----------- | ----------- | ----------- |
-| grpc.target | required | The target of the gRPC channel in which ext_authz is used, as the defined in [A66]. |
-| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as defined in [A89].  This will be populated from the xDS cluster name, which will be passed to the ext_authz filter as described in [A60]. |
+| grpc.target | required | The target of the gRPC channel in which ext_proc is used, as the defined in [A66]. |
+| grpc.lb.backend_service | optional | The backend service to which the traffic is being sent, as defined in [A89].  This will be populated from the xDS cluster name, which will be passed to the ext_proc filter as described in [A60]. |
 
 The following client-side metrics will be exported:
 
