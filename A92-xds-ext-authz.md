@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-02-20
+* Last updated: 2026-03-06
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
 
 ## Abstract
@@ -76,15 +76,15 @@ will pass the trace context from the data plane RPC to the ext_authz
 RPC, so that the ext_authz RPC appears as a child span on the data plane
 RPC's trace.
 
-If the RPC to the ext_authz service fails, then if the
-`failure_mode_allow` config field is set to false, the data plane RPC
-will be failed with the status derived from the `status_on_error`
+By default, if the RPC to the ext_authz service fails, the data plane
+RPC will be failed with the status derived from the `status_on_error`
 config field, using the normal [HTTP-to-gRPC status conversion
 rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
-Otherwise, the data plane RPC will be allowed.  If the
+However, if the `failure_mode_allow` config field is set to true, then
+the data plane RPC will be allowed.  In that case, if the
 `failure_mode_allow_header_add` config field is true, then the filter
-will add a `x-envoy-auth-failure-mode-allowed: true` header to the data
-plane RPC.
+will add a `x-envoy-auth-failure-mode-allowed: true` request header to
+the data plane RPC.
 
 #### ExtAuthz Side Channel
 
@@ -229,18 +229,20 @@ sent to the server will be populated as follows:
 - [request](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L200):
   Will always be set.  Inside it:
   - [time](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L95):
-    Will be set to the RPC's start time.
+    Will be set to the RPC's start time.  If the implementation does not
+    already have the start time recorded, it may use the current time
+    when the ext_authz filter sees the request headers.
   - [http](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L98):
     Will always be set.  Inside of it:
     - [method](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L115):
       Will always be "POST".
     - [header_map](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L143):
-      The filter will iterate through each header on the data plane RPC.
-      For each header, if the header is matched by the `disallowed_headers`
-      config field, it will not be added to this map.  Otherwise,
-      if the `allowed_headers` config field is unset or matches the header,
-      the header will be added to this map.  Otherwise, the header will
-      be excluded from this map.
+      The filter will iterate through each request header on the data
+      plane RPC.  For each header, if the header is matched by the
+      `disallowed_headers` config field, it will not be added to this map.
+      Otherwise, if the `allowed_headers` config field is unset or matches
+      the header, the header will be added to this map.  Otherwise, the
+      header will be excluded from this map.
     - [path](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L148):
       Will always be set.
     - [size](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L165):
@@ -256,7 +258,12 @@ sent to the server will be populated as follows:
 We will handle the [`CheckResponse`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L117)
 as follows:
 - [status](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L124):
-  Supported.
+  If this is an OK status, then the data plane RPC will be allowed;
+  otherwise, it will be rejected.  Note that if the RPC is rejected,
+  this field does *not* indicate the status with which to fail the RPC;
+  that comes from the `denied_response.status` field, as described
+  below.  However, implementations should include the text of this
+  status in the RPC failure status message.
 - [denied_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L131):
   Supported.  Inside of it:
   - [status](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L50):
@@ -265,9 +272,9 @@ as follows:
     rules](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md).
   - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L55):
     In gRPC, failing an RPC involves sending a Trailers-Only response,
-    so this field will be used to modify trailers on the data plane RPC
-    rather than response headers.  See [Header Mutations](#header-mutations)
-    below.
+    so this field will be used to modify response trailers on the data
+    plane RPC rather than response headers.  See
+    [Header Mutations](#header-mutations) below.
   - body: Ignored; does not apply to gRPC.
 - [ok_response](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L134):
   - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L75)
@@ -284,8 +291,9 @@ as follows:
 
 ##### Header Mutations
 
-The response from the ext_authz server may indicate header mutations
-(additions, modifications, or removals) to make on the data plane RPC.
+The response from the ext_authz server may indicate mutations (additions,
+modifications, or removals) to make on the data plane RPC's request
+headers, response headers, or response trailers.
 
 When the data plane RPC is allowed, mutations may be made to the data
 plane RPC's request headers or response headers.  Note that response
@@ -294,10 +302,10 @@ Trailers-Only response after the ext_authz filter has received the
 response from the ext_authz server.
 
 When the data plane RPC is denied, the ext_authz filter is generating
-a new set of trailers for a Trailers-Only response, and any header
-mutations specified by the ext_authz server will be applied to that
-initially-empty set of trailers.  In this case, the mutations can
-effectively only specify additions.
+a new set of response trailers for a Trailers-Only response, and any
+header mutations specified by the ext_authz server will be applied
+to that initially-empty set of response trailers.  In this case, the
+mutations can effectively only specify additions.
 
 The `decoder_header_mutation_rules` config field controls which header
 mutations are allowed.  This field is an
@@ -307,14 +315,15 @@ message, which will be used as follows:
   If true, all header mutations are disallowed, regardless of any other
   setting.
 - [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79):
-  Optional.  If a header name matches this regex, then it will be disallowed,
-  regardless of any other setting.  Note that regexes should be checked for
-  validity as part of resource validation.
+  Optional.  If a header name matches this regex, then the mutation will be
+  disallowed, regardless of any other setting.  Note that regexes should be
+  checked for validity as part of resource validation.
 - [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75):
   Optional.  If a header name matches this regex and does not match
-  `disallow_expression`, it will be allowed.  If unset, then all headers
-  not matching `disallow_expression` are allowed.  Note that regexes
-  should be checked for validity as part of resource validation.
+  `disallow_expression`, then the mutation will be allowed.  If unset, then
+  mutations of all headers not matching `disallow_expression` are allowed.
+  Note that regexes should be checked for validity as part of resource
+  validation.
 - [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87):
   If false, a disallowed header mutation will simply be ignored.  If
   true, the data plane RPC will be failed.
@@ -332,7 +341,7 @@ message, which will be used as follows:
   - [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
     The header name.  The entry will be ignored if empty, if not all
     lower-case, if length exceeds 16384, if the key is `host`, or if it
-    starts with `:`.
+    starts with `:` or `grpc-`.
   - [value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L415):
     The header value, used when the header name does not end with `-bin`.
     The entry will be ignored if the length exceeds 16384.
@@ -340,7 +349,11 @@ message, which will be used as follows:
     The header value, used when the header name ends with `-bin`.  The
     entry will be ignored if the length exceeds 16384.
 - [append_action](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L476):
-  We honor the 4 enum values as described in the proto file.
+  We honor the 4 enum values as described in the proto file.  Note that
+  not all gRPC implementations have the equivalent of "predefined inline
+  headers" as described in the proto file for the
+  `APPEND_IF_EXISTS_OR_ADD` enum value; gRPC implementations are free to
+  either use a comma-concatenated approach or add duplicate headers.
 - [keep_empty_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L480):
   By default, any header mutation that results in a header with an
   empty value will cause the header key to be removed.  If this field
