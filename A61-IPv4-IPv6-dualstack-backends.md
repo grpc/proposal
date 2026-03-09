@@ -156,7 +156,7 @@ from another subchannel, but this is a close enough approximation and
 very simple to implement.
 
 Note that every time the LB policy receives a new address list, it will
-start a new first Happy Eyeballs pass over the new list, even if some of
+start a new first pass over the new list using Happy Eyeballs, even if some of
 the subchannels are not actually new due to their addresses having been
 present on both the old and new lists.  This means that on the first
 pass through the address list for a subsequent address list update, when
