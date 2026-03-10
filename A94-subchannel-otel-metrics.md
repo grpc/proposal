@@ -5,7 +5,7 @@
     (@dfawley)
 *   Status: Ready for Implementation
 *   Implemented in:
-*   Last updated: 2025-11-14
+*   Last updated: 2025-12-08
 *   Discussion at: https://groups.google.com/g/grpc-io/c/iMdK7r4E5tU
 
 ## Abstract
@@ -58,9 +58,8 @@ grpc.subchannel.connection_attempts_succeeded (Old - grpc.lb.pick_first.connecti
 grpc.subchannel.connection_attempts_failed (Old - grpc.lb.pick_first.connection_attempts_failed)       | Counter        | {attempt}       | grpc.target, grpc.lb.backend_service (optional), grpc.lb.locality (optional)                                   | Number of failed connection attempts.
 grpc.subchannel.open_connections                                                                       | UpDown Counter | {connection}    | grpc.target, grpc.security_level (optional), grpc.lb.backend_service (optional), grpc.lb.locality (optional)   | Number of open connections.
 
-If we end up discarding connection attempts as we do with the “happy eyeballs”
-algorithm (as per [A61]), we should not record the connection attempt or the
-disconnection.
+If the subchannel is shut down while a connection attempt is in flight, we
+should not record the connection attempt as either succeeded or failed.
 
 Implementations that have already implemented the pick-first metrics should give
 enough time for users to transition to the new metrics. For example,

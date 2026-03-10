@@ -66,7 +66,7 @@ Servers][A36] and [A39: xDS HTTP Filter Support][A39]. Server-side HTTP filters
 are less common than client-side at this point in time, so this may be the first
 usage of `RouteConfiguration` on server-side and so likely involves adding more
 complete support for A39 by creating and executing filters on server-side and
-processing `VirtualHost`s and `RoutMatch`es to determine which configuration
+processing `VirtualHost`s and `RouteMatch`es to determine which configuration
 should be provided to each filter. A39 should be consulted for the expected
 behavior.
 
