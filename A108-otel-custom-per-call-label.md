@@ -92,7 +92,24 @@ and `balancer.Picker`, so no additional plumbing is necessary.
 
 ### C++
 
-gRPC C++ will add an API to ClientContext. Precise details TBD.
+gRPC C++ will add an API to ClientContext.
+
+```cpp
+struct TelemetryLabel {
+  std::string value;
+};
+
+class ClientContext {
+ public:
+  // ...
+
+  // New method to set an arbitrary context element.
+  // Only works for certain allowed context types
+  // (currently, only TelemetryLabel).
+  template <typename T>
+  void SetContext(T element);
+};
+```
 
 ### Metric Stability
 
