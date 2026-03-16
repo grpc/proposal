@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-03-06
+* Last updated: 2026-03-16
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -86,11 +86,12 @@ will rely on the `trused_xds_server` server feature that was added to the
 gRPC xDS bootstrap config in [A81].
 
 When gRPC receives a `GrpcService` proto from an xDS server, it will
-check to see if the `trusted_xds_server` server feature is present in
-the bootstrap config for that xDS server.  If so, then it will trust
-the target name and credentials specified in the `GrpcService` proto.
-If not, then we will provide a mechanism for it to obtain side-channel
-configuration locally from the gRPC xDS bootstrap config.
+check at resource validation time to see if the `trusted_xds_server`
+server feature is present in the bootstrap config for that xDS server.
+If so, then gRPC will trust the target name and credentials specified
+in the `GrpcService` proto.  If not, then we will provide a mechanism
+in the bootstrap config to determine whether the target name is allowed
+and what credentials to use for it.
 
 Specifically, we will add the following new top-level field to the
 bootstrap config:
@@ -246,6 +247,40 @@ The following fields will *not* be used:
   the [service
   config](https://github.com/grpc/grpc/blob/master/doc/service_config.md)
   for the side-channel service, or by using xDS in the side-channel.
+
+### Parsed Form of `GrpcService` Proto
+
+The parsed form of the `GrpcService` proto will contain the following:
+- parameters to use when creating the side channel:
+  - target URI
+  - channel credentials
+  - call credentials
+- parameters to use when creating an RPC on the side channel:
+  - the timeout to use for the RPC deadline
+  - initial metadata to include on the RPC
+
+As an example, in C++, it will look like this:
+
+```c++
+struct XdsGrpcService {
+  // This includes both the target URI and the channel and call credentials,
+  // to be used when creating the side channel.
+  // Note: GrpcXdsServerTarget is a pre-existing type that we use for
+  // specifying the xDS server and the LRS server.
+  std::unique_ptr<GrpcXdsServerTarget> server_target;
+
+  // Deadline and initial metadata, to be used when making RPCs on the
+  // side channel.
+  Duration timeout;
+  std::vector<std::pair<std::string, std::string>> initial_metadata;
+};
+```
+
+Note that the channel and call credentials encoded in this parsed form
+will come from either the `GrpcService` proto or from the
+`allowed_grpc_services` map in the bootstrap config, depending on whether
+the server that sent us the `GrpcService` proto has the
+`trusted_xds_server` server feature in the bootstrap config.
 
 ### Temporary environment variable protection
 
