@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-03-16
+* Last updated: 2026-03-17
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -251,13 +251,11 @@ The following fields will *not* be used:
 ### Parsed Form of `GrpcService` Proto
 
 The parsed form of the `GrpcService` proto will contain the following:
-- parameters to use when creating the side channel:
-  - target URI
-  - channel credentials
-  - call credentials
-- parameters to use when creating an RPC on the side channel:
-  - the timeout to use for the RPC deadline
-  - initial metadata to include on the RPC
+- target URI
+- channel credentials
+- call credentials
+- timeout for RPCs
+- initial metadata for RPCs
 
 As an example, in C++, it will look like this:
 
@@ -281,6 +279,23 @@ will come from either the `GrpcService` proto or from the
 `allowed_grpc_services` map in the bootstrap config, depending on whether
 the server that sent us the `GrpcService` proto has the
 `trusted_xds_server` server feature in the bootstrap config.
+
+The component using the parsed form (e.g., the ext_authz filter) will
+be responsible for creating the side channel with the specified target
+URI and channel credentials, and recreating the channel when those
+parameters change.  It will also be responsible for using the specified
+deadline and initial metadata for each RPC sent on the side channel.
+Implementations may either attach the call credentials to the channel
+credentials when creating the channel (in which case a change to the
+call credentials would require recreating the channel) or they may set
+the call credentials on a per-call basis.
+
+Implementations may optionally choose to create a common library that
+provides this functionality, so that individual components can share
+code for this instead of implementing it themselves.  However, note that
+there may be cases in the future where this code is used outside of xDS
+HTTP filters, so implementations should not assume that such a library
+will be called only from an xDS HTTP filter.
 
 ### Temporary environment variable protection
 
