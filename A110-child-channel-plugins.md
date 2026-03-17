@@ -13,13 +13,11 @@ This proposal introduces a mechanism to configure "child channels", channels cre
 
 ## Background
 
-Complex gRPC ecosystems often require the creation of auxiliary channels that are not directly instantiated by the 
-user application. The primary examples are:
+Complex gRPC ecosystems often require the creation of auxiliary channels that are not directly instantiated by the user application. The primary examples are:
 
 1. xDS (Extensible Discovery Service): When a user creates a channel with an xDS target, the gRPC library internally creates a separate channel to communicate with the xDS control plane.
 2. External Authorization (ext_authz): As described in [gRFC A92](https://github.com/grpc/proposal/pull/481), the gRPC server or client may create an internal channel to contact an external authorization service.
-3. External Processing (ext_proc): As described in [gRFC A93](https://github.com/grpc/proposal/pull/484), filters may 
-   create internal channels to call external processing servers.
+3. External Processing (ext_proc): As described in [gRFC A93](https://github.com/grpc/proposal/pull/484), filters may create internal channels to call external processing servers.
 
 ### Related Proposals
 
@@ -36,7 +34,7 @@ The primary motivation for this feature is the need to configure observability o
 * StatsPlugins & Tracing: Users need to configure metric sinks (as described in gRFC [A66](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md) and [A72](https://github.com/grpc/proposal/blob/master/A72-open-telemetry-tracing.md)) so that telemetry from internal channels is correctly tagged and exported.
 * Interceptors: Users may need to apply specific interceptors (e.g., for logging, or tracing) to internal traffic.
 
-These configurations cannot be set globally because different parts of an application may require different configurations, such as different metric backends or security credentials.
+These configurations cannot be set globally because different parts of an application may require different configurations, such as different metric backends.
 
 ## Proposal
 
@@ -46,6 +44,7 @@ We introduce the concept of **Child Channel Options**. This is a configuration c
 The user API must allow "nesting" of channel options. A user creating a Parent Channel `P` can provide a set of options `O_child`.
 * `O_child` is opaque to `P`. `P` does not apply these options to itself.
 * `O_child` is carried in `P`'s state, available for extraction by internal components.
+* The configuration provided by `O_child` is strictly uniform across all child channels of a particular parent channel.
 
 ### Propagation
 When an internal component (e.g., an xDS client factory or an auth filter) attached to `P` needs to create a Child Channel `C`:
@@ -53,8 +52,8 @@ When an internal component (e.g., an xDS client factory or an auth filter) attac
 2.  It applies `O_child` to the configuration of `C`.
 
 ### Precedence and Merging
-The Child Channel `C` typically requires some internal configuration `O_internal` (e.g., specific target URIs, bootstrap credentials, or internal User-Agent strings).
-* Merge Rule: `O_child` and `O_internal` are merged.
+The Child Channel `C` typically requires some internal configuration `O_internal` (e.g., target URIs, or internal interceptors).
+* Merge Rule: `O_child` and `O_internal` are merged. If the environment supports global channel options, `O_child` options override global channel options.
 * Conflict Resolution: Mandatory internal settings (`O_internal`) generally take precedence over user-provided child options (`O_child`) to ensure correctness.
 
 ### Shared Resources
@@ -72,37 +71,46 @@ In Java, the configuration will be achieved by accepting functions (callbacks). 
 
 * ##### Configuration Interface
 
-  Use the standard `java.util.function.Consumer` and define a new public API interface, `ChildChannelConfigurer`, to encapsulate the configuration logic for auxiliary channels.
+  Define a new public API interface, `ChannelConfigurer`, to encapsulate the configuration logic for channels.
 
   ```java
-  import java.util.function.Consumer;
+
   import io.grpc.ManagedChannelBuilder;
+  import io.grpc.ServerBuilder;
 
   // Captures the intent of the plugin.
-  // Consumes a builder to modify it before the channel is built
+  // Consumes a builder to modify it before further configuring the channel or server
   public interface ChannelConfigurer {
      /**
      * Configures the given channel builder.
      *
      * @param builder the channel builder to configure
      */
-    void configure(ManagedChannelBuilder<?> builder);
+    default void configureChannelBuilder(ManagedChannelBuilder<?> builder) {}
+
+     /**
+     * Configures the given server builder.
+     *
+     * @param builder the server builder to configure
+     */
+    default void configureServerBuilder(ServerBuilder<?> builder) {}
   }
   ``` 
 
 * ##### API Changes
 
-  * ManagedChannelBuilder: Add `ManagedChannelBuilder#childChannelConfigurer(ChannelConfigurer channelConfigurer)` to 
-    allow users to register this configurer.
-  * XdsServerBuilder: Add `XdsServerBuilder#childChannelConfigurer(ChannelConfigurer configurer)` to allow users to 
-    provide configuration for any internal channels created by the server (e.g., connections to external authorization or processing services).
+  * ManagedChannelBuilder: Add `ManagedChannelBuilder#childChannelConfigurer(ChannelConfigurer channelConfigurer)` to allow users to register this configurer.
+  * XdsServerBuilder: Add `XdsServerBuilder#childChannelConfigurer(ChannelConfigurer configurer)` to allow users to provide configuration for any internal channels created by the server (e.g., connections to external authorization or processing services).
 
 * ##### Usage Example
 
   ```java
   // Define the configurer for internal child channels
-  ChannelConfigurer myInternalConfig = (builder) -> {
-      builder.addMetricSink(sink);
+  ChannelConfigurer myInternalConfig = new ChannelConfigurer() {
+      @Override
+      public void configureChannelBuilder(ManagedChannelBuilder<?> builder) {
+          builder.addMetricSink(sink);
+      }
   };
 
   // Apply it to the parent channel
@@ -203,18 +211,21 @@ In gRPC Core, we utilize the existing `ChannelArgs` mechanism recursively to pas
 
 * ##### Usage Example (User-Side Code)
 
-  ```c
-  // TODO(AgraVator): add example for configuring child channel observability
+  ```cpp
+  grpc::ChannelArguments child_channel_args;
+  // E.g., add a custom tracing interceptor specifically for child channels
+  child_args.SetPointer(GRPC_ARG_TRACING_PROVIDER, my_tracing_provider);
+
+  grpc::ChannelArguments parent_args;
+  // Pass the nested args up 
+  parent_args.SetChildChannelArgs(child_channel_args);
+
+  std::shared_ptr<grpc::Channel> channel =
+      grpc::CreateCustomChannel("xds:///my-service", credentials, parent_args);
   ```
 
 ## Rationale
 
 ### Why not Global Configuration?
 
-We reject global configuration (static variables) because it prevents multi-tenant applications from isolating configurations. For example, one client may need to export metrics to Prometheus, while another in the same process exports to Cloud Monitoring.
-
-## Implementation
-
-@AgraVator will be implementing immediately in grpc-java. A draft is available in
-[PR 12578](https://github.com/grpc/grpc-java/pull/12578). Other languages will
-follow, with work starting potentially in a few weeks.
+We reject global configuration (static variables) because it prevents multi-tenant applications from isolating configurations. For example, one client may need to export metrics to Prometheus, while another in the same process exports to Cloud Monitoring. Furthermore, libraries want to configure their channels but cannot do so globally without affecting the host application.
