@@ -1,5 +1,5 @@
-# A110: Child Channel Options
-
+A110: Child Channel Options
+----
 * Author(s): [Abhishek Agrawal](mailto:agrawalabhi@google.com)
 * Approver: a11r
 * Status: In Review
@@ -9,15 +9,29 @@
 
 ## Abstract
 
-This proposal introduces a mechanism to configure "child channels", channels created internally by gRPC components (such as xDS control plane channel). Currently, these channels are often opaque to the user, making it difficult to inject necessary configurations for metrics, tracing etc from the user application. This design proposes an approach for users to pass configuration options to these internal channels.
+This proposal introduces a mechanism to configure "child channels", channels
+created internally by gRPC components (such as xDS control
+user, making it difficult to inject necessary configurations for
+metrics, tracing etc from the user application. This design proposes
+an approach for users to pass configuration options to these
+internal channels.
+gRPC willl support the xDS Extension Config Discovery Service (ECDS),
 
 ## Background
 
-Complex gRPC ecosystems often require the creation of auxiliary channels that are not directly instantiated by the user application. The primary examples are:
+Complex gRPC ecosystems often require the creation of auxiliary channels that
+are not directly instantiated by the user application. The primary examples are:
 
-1. xDS (Extensible Discovery Service): When a user creates a channel with an xDS target, the gRPC library internally creates a separate channel to communicate with the xDS control plane.
-2. External Authorization (ext_authz): As described in [gRFC A92](https://github.com/grpc/proposal/pull/481), the gRPC server or client may create an internal channel to contact an external authorization service.
-3. External Processing (ext_proc): As described in [gRFC A93](https://github.com/grpc/proposal/pull/484), filters may create internal channels to call external processing servers.
+1. xDS (Extensible Discovery Service): When a user creates a channel with an xDS
+   target, the gRPC library internally creates a separate channel to communicate
+   with the xDS control plane.
+2. External Authorization (ext_authz): As described
+   in [gRFC A92](https://github.com/grpc/proposal/pull/481), the gRPC server or
+   client may create an internal channel to contact an external authorization
+   service.
+3. External Processing (ext_proc): As described
+   in [gRFC A93](https://github.com/grpc/proposal/pull/484), filters may create
+   internal channels to call external processing servers.
 
 ### Related Proposals
 
@@ -29,49 +43,85 @@ Complex gRPC ecosystems often require the creation of auxiliary channels that ar
 
 ### The Problem
 
-The primary motivation for this feature is the need to configure observability on a per-child-channel basis.
+The primary motivation for this feature is the need to configure observability
+on a per-child-channel basis.
 
-* StatsPlugins & Tracing: Users need to configure metric sinks (as described in gRFC [A66](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md) and [A72](https://github.com/grpc/proposal/blob/master/A72-open-telemetry-tracing.md)) so that telemetry from internal channels is correctly tagged and exported.
-* Interceptors: Users may need to apply specific interceptors (e.g., for logging, or tracing) to internal traffic.
+* StatsPlugins & Tracing: Users need to configure metric sinks (as described in
+  gRFC [A66](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md)
+  and [A72](https://github.com/grpc/proposal/blob/master/A72-open-telemetry-tracing.md))
+  so that telemetry from internal channels is correctly tagged and exported.
+* Interceptors: Users may need to apply specific interceptors (e.g., for
+  logging, or tracing) to internal traffic.
 
-These configurations cannot be set globally because different parts of an application may require different configurations, such as different metric backends.
+These configurations cannot be set globally because different parts of an
+application may require different configurations, such as different metric
+backends.
 
 ## Proposal
 
-We introduce the concept of **Child Channel Options**. This is a configuration container attached to a parent channel that is strictly designated for use by its children. 
+We introduce the concept of **Child Channel Options**. This is a configuration
+container attached to a parent channel that is strictly designated for use by
+its children.
 
 ### Encapsulation
-The user API must allow "nesting" of channel options. A user creating a Parent Channel `P` can provide a set of options `O_child`.
+
+The user API must allow "nesting" of channel options. A user creating a Parent
+Channel `P` can provide a set of options `O_child`.
+
 * `O_child` is opaque to `P`. `P` does not apply these options to itself.
-* `O_child` is carried in `P`'s state, available for extraction by internal components.
-* The configuration provided by `O_child` is strictly uniform across all child channels of a particular parent channel.
+* `O_child` is carried in `P`'s state, available for extraction by internal
+  components.
+* The configuration provided by `O_child` is strictly uniform across all child
+  channels of a particular parent channel.
 
 ### Propagation
-When an internal component (e.g., an xDS client factory or an auth filter) attached to `P` needs to create a Child Channel `C`:
-1.  It retrieves `O_child` from `P`.
-2.  It applies `O_child` to the configuration of `C`.
+
+When an internal component (e.g., an xDS client factory or an auth filter)
+attached to `P` needs to create a Child Channel `C`:
+
+1. It retrieves `O_child` from `P`.
+2. It applies `O_child` to the configuration of `C`.
 
 ### Precedence and Merging
-The Child Channel `C` typically requires some internal configuration `O_internal` (e.g., target URIs, or internal interceptors).
-* Merge Rule: `O_child` and `O_internal` are merged. If the environment supports global channel options, `O_child` options override global channel options.
-* Conflict Resolution: Mandatory internal settings (`O_internal`) generally take precedence over user-provided child options (`O_child`) to ensure correctness.
+
+The Child Channel `C` typically requires some internal
+configuration `O_internal` (e.g., target URIs, or internal interceptors).
+
+* Merge Rule: `O_child` and `O_internal` are merged. If the environment supports
+  global channel options, `O_child` options override global channel options.
+* Conflict Resolution: Mandatory internal settings (`O_internal`) generally take
+  precedence over user-provided child options (`O_child`) to ensure correctness.
 
 ### Shared Resources
-Certain internal channels, specifically the **xDS Control Plane Client**, are often pooled and shared across multiple parent channels within a process based on the target URI (see [gRFC A27](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)).
 
-If multiple Parent Channels (`P1`, `P2`) point to the same xDS target but provide *different* Child Channel Options (`O_child1`, `O_child2`):
-* Behavior: The shared client is created using the options from the first parent channel that triggers its creation (e.g., `O_child1`).
-* Subsequent Usage: When `P2` requests the client, it receives the existing shared client. `O_child2` is effectively ignored for that specific shared resource.
+Certain internal channels, specifically the **xDS Control Plane Client**, are
+often pooled and shared across multiple parent channels within a process based
+on the target URI (
+see [gRFC A27](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)).
+
+If multiple Parent Channels (`P1`, `P2`) point to the same xDS target but
+provide *different* Child Channel Options (`O_child1`, `O_child2`):
+
+* Behavior: The shared client is created using the options from the first parent
+  channel that triggers its creation (e.g., `O_child1`).
+* Subsequent Usage: When `P2` requests the client, it receives the existing
+  shared client. `O_child2` is effectively ignored for that specific shared
+  resource.
 
 ### Language Implementations
 
 #### Java
 
-In Java, the configuration will be achieved by accepting functions (callbacks). The API allows users to pass a `Consumer<ManagedChannelBuilder<?>>` (or a similar functional interface). When an internal library (e.g., xDS, gRPCLB) creates a child channel, it applies this user-provided function to the builder before further configuring the channel.
+In Java, the configuration will be achieved by accepting functions (callbacks).
+The API allows users to pass a `Consumer<ManagedChannelBuilder<?>>` (or a
+similar functional interface). When an internal library (e.g., xDS, gRPCLB)
+creates a child channel, it applies this user-provided function to the builder
+before further configuring the channel.
 
 * ##### Configuration Interface
 
-  Define a new public API interface, `ChannelConfigurer`, to encapsulate the configuration logic for channels.
+  Define a new public API interface, `ChannelConfigurer`, to encapsulate the
+  configuration logic for channels.
 
   ```java
 
@@ -99,8 +149,14 @@ In Java, the configuration will be achieved by accepting functions (callbacks). 
 
 * ##### API Changes
 
-  * ManagedChannelBuilder: Add `ManagedChannelBuilder#childChannelConfigurer(ChannelConfigurer channelConfigurer)` to allow users to register this configurer.
-  * XdsServerBuilder: Add `XdsServerBuilder#childChannelConfigurer(ChannelConfigurer configurer)` to allow users to provide configuration for any internal channels created by the server (e.g., connections to external authorization or processing services).
+    * ManagedChannelBuilder:
+      Add `ManagedChannelBuilder#childChannelConfigurer(ChannelConfigurer channelConfigurer)`
+      to allow users to register this configurer.
+    * XdsServerBuilder:
+      Add `XdsServerBuilder#childChannelConfigurer(ChannelConfigurer configurer)`
+      to allow users to provide configuration for any internal channels created
+      by the server (e.g., connections to external authorization or processing
+      services).
 
 * ##### Usage Example
 
@@ -121,13 +177,15 @@ In Java, the configuration will be achieved by accepting functions (callbacks). 
 
 #### Go
 
-In Go, both the Client (`grpc.NewClient`) and the Server (`NewGRPCServer`) create internal child channels. We introduce mechanisms to pass `DialOption`s into these internal channels from both entry points.
+In Go, both the Client (`grpc.NewClient`) and the Server (`NewGRPCServer`)
+create internal child channels. We introduce mechanisms to pass `DialOption`s
+into these internal channels from both entry points.
 
 * ##### New API for Child Channel Options
 
 * Client-Side: `WithChildChannelOptions`
 
-    For standard clients, we introduce a `DialOption` wrapper.
+  For standard clients, we introduce a `DialOption` wrapper.
 
     ```go
     // WithChildChannelOptions returns a DialOption that specifies a list of 
@@ -141,7 +199,10 @@ In Go, both the Client (`grpc.NewClient`) and the Server (`NewGRPCServer`) creat
 
 * Server-Side: `WithChildDialOptions`
 
-    For xDS-enabled servers, we introduce a `ServerOption` wrapper. Since `xds.NewGRPCServer` creates an internal xDS client to fetch listener configurations, it requires a way to apply `DialOptions` (such as **Socket Options** or **Stats Handlers**) to that internal connection.
+  For xDS-enabled servers, we introduce a `ServerOption` wrapper.
+  Since `xds.NewGRPCServer` creates an internal xDS client to fetch listener
+  configurations, it requires a way to apply `DialOptions` (such as **Socket
+  Options** or **Stats Handlers**) to that internal connection.
 
     ```go
     // WithChildDialOptions returns a ServerOption that specifies a list of 
@@ -156,7 +217,11 @@ In Go, both the Client (`grpc.NewClient`) and the Server (`NewGRPCServer`) creat
 
 * ##### Usage Example (User-Side Code)
 
-  This design provides users with the flexibility to define independent configurations for parent and child channels within a single NewClient call. For example, a parent channel can be configured with transport security (mTLS) while the internal child channels (such as the xDS control plane connection) are configured with specific interceptors or a custom authority.
+  This design provides users with the flexibility to define independent
+  configurations for parent and child channels within a single NewClient call.
+  For example, a parent channel can be configured with transport security (mTLS)
+  while the internal child channels (such as the xDS control plane connection)
+  are configured with specific interceptors or a custom authority.
 
   ```go
   func main() {
@@ -188,11 +253,17 @@ In Go, both the Client (`grpc.NewClient`) and the Server (`NewGRPCServer`) creat
 
 ##### Core (C/C++)
 
-In gRPC Core, we utilize the existing `ChannelArgs` mechanism recursively to pass configuration to internal channels. We define a standard argument key whose value is a pointer to another `grpc_channel_args` structure. This "Nested Arguments" pattern allows the parent channel to carry a specific subset of arguments intended solely for its children.
+In gRPC Core, we utilize the existing `ChannelArgs` mechanism recursively to
+pass configuration to internal channels. We define a standard argument key whose
+value is a pointer to another `grpc_channel_args` structure. This "Nested
+Arguments" pattern allows the parent channel to carry a specific subset of
+arguments intended solely for its children.
 
 * ##### Configuration Mechanism
 
-  We define a new channel argument key. The value associated with this key is a pointer to a `grpc_channel_args` struct, managed via a pointer vtable to ensure correct ownership and copying.
+  We define a new channel argument key. The value associated with this key is a
+  pointer to a `grpc_channel_args` struct, managed via a pointer vtable to
+  ensure correct ownership and copying.
 
   ```c
   // A pointer argument key. The value is a pointer to a grpc_channel_args 
@@ -202,7 +273,8 @@ In gRPC Core, we utilize the existing `ChannelArgs` mechanism recursively to pas
 
 * **API Changes**
 
-  We add a helper method to the C++ `ChannelArguments` class to simplify packing the nested arguments safely.
+  We add a helper method to the C++ `ChannelArguments` class to simplify packing
+  the nested arguments safely.
 
   ```cpp
     // Sets the channel arguments to be used for child channels.
@@ -228,4 +300,8 @@ In gRPC Core, we utilize the existing `ChannelArgs` mechanism recursively to pas
 
 ### Why not Global Configuration?
 
-We reject global configuration (static variables) because it prevents multi-tenant applications from isolating configurations. For example, one client may need to export metrics to Prometheus, while another in the same process exports to Cloud Monitoring. Furthermore, libraries want to configure their channels but cannot do so globally without affecting the host application.
+We reject global configuration (static variables) because it prevents
+multi-tenant applications from isolating configurations. For example, one client
+may need to export metrics to Prometheus, while another in the same process
+exports to Cloud Monitoring. Furthermore, libraries want to configure their
+channels but cannot do so globally without affecting the host application.
