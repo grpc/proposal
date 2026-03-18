@@ -5,7 +5,9 @@ A107 - TLS Private Key Offloading
 * Status: C++ implemented
 * Implemented in: C++, Go
 * Last updated: 2026-03-18
-* Discussion at: https://groups.google.com/g/grpc-io/c/N02jVxPd_4Y/m/n34PWOyKBgAJ?e=48417069## Abstract
+* Discussion at: https://groups.google.com/g/grpc-io/c/N02jVxPd_4Y/m/n34PWOyKBgAJ?e=48417069
+
+## Abstract
 
 This document outlines gRPC's plan to support TLS private key offloading,
 allowing a separate module (e.g., hardware) to handle private key signing during
@@ -31,6 +33,11 @@ This feature will have the following requirements/assumptions:
 
 
 ### Related Proposals: 
+* [A66]
+* [A79]
+
+[A66]: A66-otel-stats.md
+[A79]: A79-non-per-call-metrics-architecture.md
 
 ## Proposal
 
@@ -54,102 +61,114 @@ struct ssl_private_key_method_st {
 
 ```
 
-For TLS\>=1.2 with ECDHE, the `decrypt` method is not needed. We will provide an
-interface through which users can provide a signing function, with the base
-functionality being a function that takes in unsigned bytes and a signature
-algorithm and returns signed bytes. The `complete` function is an implementation
-detail for gRPC to handle.
+For TLS\>=1.2 with ECDHE, a requirement for this feature, the `decrypt` method is not needed. We will provide an
+interface through which users can provide a custom private key signer, with the
+higher-level functionality being a function that takes in unsigned bytes and a
+signature algorithm and returns signed bytes.
 
 ```
 string signed_bytes sign(string algorithm, string unsigned_bytes)
 ```
 
- 
-
-
-### Temporary environment variable protection
-
-This feature will be explicitly configured by users, thus no environment
-variable protection is needed. If a user does not configure TLS Private Key
-Offloading, it will not happen.
-
-## Rationale
-
-
-Private key offloading is designed to support signing outside of the existing
-process, for example in a hardware module or via an RPC \- thus this API should
-support asynchronous operations in languages where that is possible (Golang's
-crypto/tls does **not** support asynchronous private key signing). 
-
-We are largely restricted by the underlying security libraries in each language.
-In the following sections, each language's API will be discussed as they are
-dependent upon the SSL library interfaces. Further, each language has different
-expectations for the sign functions on whether raw bytes or a digest is
-expected.
-
-
-## Implementation
-
 ### C-Core
 
-#### *APIs*
+#### InMemory Certificate Provider
+We will create an `InMemoryCertificateProvider` that takes a set of root certs
+and a list of `PemKeyCertPair`. Further, these values can be manually updated by
+the user. This provides a strict super-set of functionality of the current
+`StaticDataCertificateProvider` - calling `UpdateRoot` and `UpdateIdentity` on
+an `InMemoryCertificateProvider` at setup is the same as a
+`StaticDataCertificateProvider`.
+
+The updates will return an `absl::Status` to the caller, and further a
+`ValidateCredentials` API is provided.
+
+```c
+// Implements a provider that uses in-memory data that can be modified in a thread-safe manner.
+class InMemoryCertificateProvider : grpc_tls_certificate_provider {
+ public:
+  InMemoryCertificateProvider(std::string root_certificates, PemKeyCertPairList pem_key_cert_pairs);
+  
+  // Thread safe updates
+  absl::Status UpdateRoot(std::string root_certificates);
+  absl::Status UpdateIdentityKeyCertPair(
+      const std::vector<IdentityKeyCertPair>& identity_key_cert_pairs);
+
+  // Returns an OK status if the following conditions hold:
+  // - the root certificates consist of one or more valid PEM blocks, and
+  // - every identity key-cert pair has a certificate chain that consists of
+  //   chain that consists of valid PEM blocks and has a private key is a valid
+  //   PEM block.
+  absl::Status ValidateCredentials() const;
+}
+```
+
+#### Splitting Certificate Providers into Identity and Root Providers
+We will also decouple the root provider and the identity provider in [the
+tls\_credentials\_options](http://google3/third_party/grpc/src/core/credentials/transport/tls/grpc_tls_credentials_options.h;l=77;rcl=731487339)
+and through the stack.  Users should be able to specify, for example, an
+`InMemoryCertificateProvider` that implements private key offloading and a
+`FileWatcherCertificateProvider` for the root certificates. We will mark the
+[coupled
+API](http://google3/third_party/grpc/include/grpcpp/security/tls_credentials_options.h;l=55-56;rcl=682352913)
+as deprecated.  This is required for this effort, as specifying a private key
+signer must be done for the identity, but is unrelated to how the root is
+provided. Currently, identity (private key and certificate chain) presentation
+to gRPC is coupled with the roots presentation to gRPC.
+
+```c++
+class TlsCredentialsOptions {
+ public:
+  [[deprecated(
+      "Use set_root_certificate_provider() or "
+      "set_identity_certificate_provider() instead.")]]
+  void set_certificate_provider(
+      std::shared_ptr<CertificateProviderInterface> certificate_provider);
+  void set_root_certificate_provider(
+      std::shared_ptr<CertificateProviderInterface> certificate_provider);
+  void set_identity_certificate_provider(
+      std::shared_ptr<CertificateProviderInterface> certificate_provider);
+```
+
+#### Private Key Signing
 
 BoringSSL provides an asynchronous API for private key signing, so we will
 provide an asynchronous, cancellable API using callbacks. The C-Core APIs used
 to configure this feature will rely on a new certificate provider
 implementation.
 
-We will create an `InMemoryCertificateProvider` that takes a set of root certs
-and a list of `PemKeyCertPair`. Further, these values can be manually updated by
-the user.  We will also decouple the root provider and the identity provider in
-[the
-tls\_credentials\_options](http://google3/third_party/grpc/src/core/credentials/transport/tls/grpc_tls_credentials_options.h;l=77;rcl=731487339).
-Users should be able to specify, for example, an `InMemoryCertificateProvider`
-that implements private key offloading and a `FileWatcherCertificateProvider`
-for the root certificates. We will mark the [coupled
-API](http://google3/third_party/grpc/include/grpcpp/security/tls_credentials_options.h;l=55-56;rcl=682352913)
-as deprecated.
+The implementation of `PrivateKeySigner::Sign` can be sync or async. In the sync
+case, the implementer must return a signature or a non-ok status.  In the async
+case, the implementer must kick off their async operations then return a
+`PrivateKeySigner::AsyncSigningHandle`. The async operation must call the
+provided `on_sign_complete` function with the signing result when the operation
+is complete. The implementer must also implement `PrivateKeySigner::Cancel`.
+`Cancel` will be called by gRPC in the case that an in-flight operation must be
+shutdown, and the implementer should use this function to ensure any resources
+being used for an asynchronous signing operation are properly shut down and
+released.
 
-```c
+
+```c++
 using PrivateKey = std::variant<absl::string_view, CustomPrivateKeySign>
 
-class PemKeyCertPair {
- public:
-  PemKeyCertPair(PrivateKey private_key, absl::string_view cert_chain);
-}
+// This already exists - it will be deprecated and replaced with `IdentityKeyOrSignerCertPair` where necessary.
+struct [[deprecated("Use IdentityKeyOrSignerCertPair instead")]] GRPCXX_DLL
+    IdentityKeyCertPair {
+  std::string private_key;
+  std::string certificate_chain;
+};
 
-// Implements a provider that uses in-memory data that can be modified in a thread-safe manner.
-class InMemoryCertificateProvider : grpc_tls_certificate_provider {
- public:
-  InMemoryCertificateProvider(std::string root_certificates, PemKeyCertPairList pem_key_cert_pairs);
-  
-  // thread safe updates
-  UpdateRoot(std::string root_certificates);
-  UpdateIdentity(PemKeyCertPairList pem_key_cert_pairs); 
-}
+// A struct that stores the credential data presented to the peer in handshake
+// to show local identity. The private_key and certificate_chain should always
+// match. The private_key can be either a PEM string or a PrivateKeySigner.
+// The PrivateKeySigner will only work with gRPC binaries compiled with
+// BoringSSL.
+struct GRPCXX_DLL IdentityKeyOrSignerCertPair {
+  std::variant<std::string, std::shared_ptr<PrivateKeySigner>> private_key;
+  std::string certificate_chain;
+};
 
-struct grpc_tls_credentials_options {
-  // Deprecated. Use `set_root_certificate_provider` and 
-  // `set_identity_certificate_provider` instead. 
-  void set_certificate_provider(grpc_core::RefCountedPtr<grpc_tls_certificate_provider>   certificate_provider);
-}
-
-// Sets the `grpc_tls_certificate_provider` to provide identity data.
-void set_identity_certificate_provider(grpc_core::RefCountedPtr<grpc_tls_certificate_provider> certificate_provider);
-
-// Sets the `grpc_tls_certificate_provider` to provide root data.
-void set_root_certificate_provider(grpc_core::RefCountedPtr<grpc_tls_certificate_provider> certificate_provider);
-```
-
-#### *Internals*
-
-We detail the async flow below. In the sync case, a signature is simply returned when it is asked for.
-
-1. User configures gRPC credentials with a PemKeyCertPair providing the private key signer.
-
-   [`PemKeyCertPair` already exists](http://google3/third_party/grpc/src/core/credentials/transport/tls/ssl_utils.h;l=153-167;rcl=786762336) but only accepts a `string` private key.  We will modify this to optionally accept a private key signer.
-
-```c
 // Implementations of this class must be thread-safe.
 class PrivateKeySigner {
  public:
@@ -207,115 +226,6 @@ class PrivateKeySigner {
 };
 
 ```
-
-2. gRPC's TLS stack configures the SSL\_CTX with the custom SSL\_PRIVATE\_KEY\_METHOD.
-
-   We will add a type, `TlsPrivateKeyOffloadContext` to manage the state of this operation and store it on the `handshaker`.
-
-```c
-
-// State associated with an SSL object for async private key operations.
-struct TlsPrivateKeyOffloadContext {
-  CustomPrivateKeySign private_key_sign;
-  absl::StatusOr<std::string> signed_bytes;
-
-  // TSI handshake state needed to resume.
-  tsi_handshaker* handshaker;
-  tsi_handshaker_on_next_done_cb notify_cb;
-}
-
-
-
-// Callback function to be invoked when the user's async sign operation is complete.
-// This function is curried with 'ctx' using absl::bind_front.
-static void TlsOffloadSignDoneCallback(TlsPrivateKeyOffloadContext* ctx,
-                                         absl::StatusOr<std::string> signed_data) {
-
-  if (signed_data.ok()) {
-    ctx->signed_data = std::move(signed_data);
-  }
-  //... handle other cases
-
-  // Notify the TSI layer to re-enter the handshake.
-  // This call is thread-safe as per TSI requirements for the callback.
-  if (ctx->notify_cb) {
-    ctx->notify_cb(ctx->handshaker, ctx->notify_user_data, TSI_OK);
-  }
-}
-
-```
-
- 
-
-We then will implement [BoringSSL's ssl\_private\_key\_method\_st](http://google3/third_party/openssl/boringssl/src/include/openssl/ssl.h;l=1352-1356;rcl=814357088) with the user's signing function.
-
-```c
-
-static enum ssl_private_key_result_t TlsPrivateKeySignWrapper(
-    SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out,
-    uint16_t signature_algorithm, const uint8_t* in, size_t in_len) {
-  // Get and fill the TlsPrivateKeyOffloadContext.
-  TlsPrivateKeyOffloadContext* ctx = static_cast<TlsPrivateKeyOffloadContext*>(
-      SSL_get_ex_data(...)
-  // Fill important info
-  // ... 
-  // Create the completion callback by binding the current context.
-  auto done_callback =
-      absl::bind_front(TlsOffloadSignDoneCallback, ctx);
-
-  // Call the user's sign function
-  // The contract with the user is that they MUST invoke the callback when complete in their implementation, and their impl MUST not block. 
-  ctx->private_key_signer->sign(data_to_sign, signature_algorithm,
-                       std::move(done_callback));
-
-  return ssl_private_key_retry;
-}
-
-static enum ssl_private_key_result_t TlsPrivateKeyOffloadComplete(
-    SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out) {
-  // Get TlsPrivateKeyOffloadContext.
-  TlsPrivateKeyOffloadContext* ctx = static_cast<TlsPrivateKeyOffloadContext*>(
-      SSL_get_ex_data(...);
-  // Various checks
-  // ...
-  // Important bit is moving the signed data where it needs to go 
-  memcpy(out, ctx->signed_data.data(), ctx->signed_data.length());
-  *out_len = ctx->signed_data.length();
-  // Tell BoringSSL we're done
-  return ssl_private_key_success;
-}
-
-static const SSL_PRIVATE_KEY_METHOD TlsOffloadPrivateKeyMethod = {
-    TlsPrivateKeySignWrapper,
-    nullptr,  // decrypt not implemented for this use case
-    TlsPrivateKeyOffloadComplete};
-
-```
-
-3. When a handshake starts, tsi\_handshaker\_next is called.  
-4. The TSI layer creates and configures an SSL object, attaching the TlsPrivateKeyOffloadContext (including the user's function and TSI callback info) as ex\_data.  
-5. tsi\_handshaker\_next calls SslDoHandshake (in ssl\_util.cc), which calls SSL\_do\_handshake.  
-6. BoringSSL eventually requires the signature, calls our SSL\_PRIVATE\_KEY\_METHOD sign impl.  
-7. TlsPrivateKeySignWrapper invokes the user's private\_key\_sign, providing the `TlsOffloadSignDoneCallback`. It returns ssl\_private\_key\_retry.  
-8. SSL\_do\_handshake returns, SSL\_get\_error is SSL\_ERROR\_WANT\_PRIVATE\_KEY\_OPERATION.  
-9. Seeing SSL\_ERROR\_WANT\_PRIVATE\_KEY\_OPERATION, SslDoHandshake returns TSI\_ASYNC . tsi\_handshaker\_next returns TSI\_ASYNC. [gRPC core yields control.](http://google3/third_party/grpc/src/core/handshaker/security/security_handshaker.cc;l=426-431;rcl=807452496)  
-10. The user's async operation completes, invoking the `TlsOffloadSignDoneCallback`.  
-11. The callback stores the result in TlsPrivateKeyOffloadContext and calls the notify\_cb (which is tsi\_handshaker\_on\_next\_done\_cb).
-
-    This callback is part of TSI and is [provided by the caller](http://google3/third_party/grpc/src/core/handshaker/security/security_handshaker.cc;l=422-425;rcl=807452496) of `tsi_handshaker_next`. In our case in gRPC, this is [the `OnHandshakeNextDoneGrpcWrapper` function](http://google3/third_party/grpc/src/core/handshaker/security/security_handshaker.cc;l=402;rcl=807452496) .
-
-    This returns control to gRPC Core, resuming the handshake.
-
-12. gRPC core calls tsi\_handshaker\_next again.  
-13. This leads to SSL\_do\_handshake being called again.  
-14. BoringSSL, seeing the pending operation, now calls TlsPrivateKeyOffloadComplete.  
-15. TlsPrivateKeyOffloadComplete retrieves the signed\_data from TlsPrivateKeyOffloadContext and provides it to BoringSSL.  
-16. The handshake continues with the signed data.
-
-### C++
-
-For the C++ APIs, we will simply be able to alias the `PrivateKeySigner` class outwards.
-
 ### Python
 
 Python wraps the C-Core implementation. Currently, Python's security
@@ -567,6 +477,39 @@ gRPC-Java. A user can still implement this themselves and use the
 interface. Particularly, a user could create their own signature provider and
 globally register it to be used. gRPC-Java, as a library, will not do global
 registration.
+
+ 
+
+
+### Temporary environment variable protection
+
+This feature will be explicitly configured by users, thus no environment
+variable protection is needed. If a user does not configure TLS Private Key
+Offloading, it will not happen.
+
+## Rationale
+
+
+Private key offloading is designed to support signing outside of the existing
+process, for example in a hardware module or via an RPC \- thus this API should
+support asynchronous operations in languages where that is possible (Golang's
+crypto/tls does **not** support asynchronous private key signing). 
+
+We are largely restricted by the underlying security libraries in each language.
+In the following sections, each language's API will be discussed as they are
+dependent upon the SSL library interfaces. Further, each language has different
+expectations for the sign functions on whether raw bytes or a digest is
+expected.
+
+
+## Implementation
+
+* https://github.com/grpc/grpc/pull/40878 - Migrate Python to TlsCredentials under the hood
+* https://github.com/grpc/grpc/pull/41490 - Separate cert provider into a root and identity provider
+* https://github.com/grpc/grpc/pull/41484 - Create InMemoryCertificateProvider
+* https://github.com/grpc/grpc/pull/41606 - Implement PrivateKeySigner in C-Core and C++
+* https://github.com/grpc/grpc/pull/41701 - Implement in Python and Cython
+
 
 # **Observability**
 
