@@ -44,7 +44,10 @@ Priority LB should disable the child policy retention cache.
 
 ### Temporary environment variable protection
 
-N/A
+Implementations should provide an environment variable to revert
+to the previous behavior (child policy cache enabled with 15-minute timer).
+
+Env var name: `GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE`.
 
 ## Rationale
 
