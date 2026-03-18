@@ -513,21 +513,23 @@ expected.
 
 # **Observability**
 
-The following non-per-call metric and labels will be added. These will allow a
-user insight into the offloaded operations and will be an aid in debugging
-failures.
+The following non-per-call metrics [A79] and labels will be added. These will
+allow a user insight into the offloaded operations and will be an aid in
+debugging failures.
 
-| Name | Disposition | Description |
+| Label Name | Disposition | Description |
 | :---- | :---- | :---- |
 | `grpc.target` | required | Indicates the target of the gRPC channel for which this handshake is occurring |
-| `grpc.security.handshaker.offloaded_private_key_sign.algorithm` | optional | The signature algorithm used to sign |
-| `grpc.security.handshaker.offloaded_private_key_sign.status` | optional | The status code return for the private key sign function |
+| `grpc.tls.private_key_sign_algorithm` | optional | The signature algorithm used to sign |
+| `grpc.status` | optional | The status code return for the private key sign function. From [A66] |
+
+The `grpc.tls.private_key_sign_algorithm` label will contain both a name and key
+length. For example, `RsaPkcs1Sha256`. For more, see the `SignatureAlgorithm`
+enum in the C section above.
 
 | Metric | Type | Unit | Labels | Description |
 | :---- | :---- | :---- | :---- | :---- |
-| `grpc.security.handshaker.offloaded_private_key_sign_duration` | Histogram | float64/double s | `grpc.target, grpc.security.handshaker.offloaded_private_key_sign.algorithm, grpc.security.handshaker.offloaded_private_key_sign.status` | How long the offloaded private key signing took |
+| `grpc.security.handshaker.offloaded_private_key_sign_duration` | Histogram | float64/double s | `grpc.target, grpc.tls.private_key_sign_algorithm, grpc.status` | How long the offloaded private key signing took |
 
 For the latency metric, we will use the buckets as defined in [gRFC
 A66](https://github.com/grpc/proposal/blob/fcabdfdbd50b3c088f5a5c2bf925755781ec076e/A66-otel-stats.md?plain=1#L360-L369).
-
-The `grpc.security.handshaker.offloaded_private_key_sign.algorithm` label will contain both a name and key length.
