@@ -10,10 +10,15 @@ A115: disable Priority LB policy child policy retention cache
 ## Abstract
 
 [A56](https://github.com/grpc/proposal/blob/master/A56-priority-lb-policy.md) describes
-a [caching mechanism](https://github.com/grpc/proposal/blob/master/A56-priority-lb-policy.md#child-lifetime-management) whereby priority LB child policies are kept around for an additional 15 minutes
-before being fully torn down.
+[mechanisms](https://github.com/grpc/proposal/blob/master/A56-priority-lb-policy.md#child-lifetime-management)
+whereby priority LB child policies are cached. There are two cases:
 
-This proposal removes that cache.
+1) When a higher priority child becomes reachable, we deactive
+the lower-priority children, and remove them only after an expiry.
+
+2) When a child is removed from the LB policy config.
+
+This proposal removes the usage of a cache for case 2).
 
 ## Background
 
@@ -26,12 +31,9 @@ sequence of locality updates. On each child name update, previous policies are a
 to the retention cache.
 
 ```
-[[AA,BB],[CC, DD]] => [priority-0-0 priority-0-1]
-[[AA, BB, CC], [DD]] => [priority-0-1 priority-0-2]
-[[AA, BB], [CC, DD]] => [priority-0-1 priority-0-2]
-[[AA, BB, CC], [DD]] => [priority-0-2 priority-0-3]
-[[AA, BB], [CC, DD]] => [priority-0-2 priority-0-3]
-[[AA, BB, CC], [DD]] => [priority-0-3 priority-0-4]
+[[BB, CC], [AA, DD]] => [priority-0-0 priority-0-1]
+[[AA, BB, CC], [DD, EE]] => [priority-0-1 priority-0-2]
+[[BB, CC], [AA, DD]] => [priority-0-2 priority-0-3]
 ```
 
 Additionally, priority LB child names are generated with strictly increasing numbers
