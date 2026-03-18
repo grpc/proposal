@@ -1,6 +1,6 @@
 A115: disable Priority LB policy child policy retention cache
 ----
-* Author(s): @apolcyn
+* Author(s): @apolcyn, @markdroth
 * Approvers: @markdroth, @ejona86, @dfawley, @easwars
 * Status: {Draft}
 * Implemented in: C-core, Java, Go, Node
@@ -53,7 +53,18 @@ Env var name: `GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE`.
 
 ## Rationale
 
-N/A
+- Caching the child when it gets removed from the config does not actually
+  accomplish anything useful in the case of choosing a priority within an
+  xDS cluster (which is the primary case where this policy is used), because
+  the hueristic in the cds policy that assigns the child names will never
+  reuse a child name once it has been removed from the config.
+
+- We have seen cases where retaining the children has used up a lot of memory
+  and file descriptors, which has caused problems for users.
+
+- In the long run, we want a better solution involving a separate layer for
+  caching subchannels rather than LB policies, but that will be a separate
+  project to be undertaken later.
 
 ## Implementation
 
