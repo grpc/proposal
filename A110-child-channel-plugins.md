@@ -1,30 +1,30 @@
 A110: Child Channel Options
 ----
+
 * Author(s): [Abhishek Agrawal](mailto:agrawalabhi@google.com)
-* Approver: a11r
+* Approver: @markdroth, @ejona86, @dfawley
 * Status: In Review
-* Implemented in: Core, Java, Go
-* Last updated: 2025-12-24
+* Implemented in: <language, ...>
+* Last updated: 2026-03-18
 * Discussion at: https://groups.google.com/g/grpc-io/c/EBIp3uud-Bo
 
 ## Abstract
 
-This proposal introduces a mechanism to configure "child channels", channels
-created internally by gRPC components (such as xDS control
-user, making it difficult to inject necessary configurations for
-metrics, tracing etc from the user application. This design proposes
-an approach for users to pass configuration options to these
-internal channels.
-gRPC willl support the xDS Extension Config Discovery Service (ECDS),
+There are several use cases where gRPC internally creates a "child channel".
+Because these channels are created internally rather than being created by the
+application, it is currently difficult to inject necessary configuration for
+these channels, which makes it hard to configure things like metrics or tracing
+from the application. This design proposes a mechanism to allow applications to
+pass configuration options to these child channels.
 
 ## Background
 
 Complex gRPC ecosystems often require the creation of auxiliary channels that
 are not directly instantiated by the user application. The primary examples are:
 
-1. xDS (Extensible Discovery Service): When a user creates a channel with an xDS
-   target, the gRPC library internally creates a separate channel to communicate
-   with the xDS control plane.
+1. xDS: When a user creates a channel with an xDS target, the gRPC library
+   internally creates a separate channel to communicate with the xDS control
+   plane.
 2. External Authorization (ext_authz): As described
    in [gRFC A92](https://github.com/grpc/proposal/pull/481), the gRPC server or
    client may create an internal channel to contact an external authorization
@@ -32,6 +32,20 @@ are not directly instantiated by the user application. The primary examples are:
 3. External Processing (ext_proc): As described
    in [gRFC A93](https://github.com/grpc/proposal/pull/484), filters may create
    internal channels to call external processing servers.
+
+The primary motivation for this feature is the need to configure observability
+on a per-child-channel basis.
+
+* StatsPlugins: Users use these plugins to configure metrics and tracing (as
+  described in
+  gRFC [A66](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md)
+  and [A72](https://github.com/grpc/proposal/blob/master/A72-open-telemetry-tracing.md))
+  so that telemetry from internal channels is correctly tagged and exported.
+* Interceptors: Users may need to apply specific interceptors (e.g., for
+  logging, or tracing) to internal traffic.
+
+Global configuration is not sufficient for these use cases for the reasons
+described in the 'Rationale' section below.
 
 ### Related Proposals
 
@@ -41,48 +55,27 @@ are not directly instantiated by the user application. The primary examples are:
 * [A92: xDS ExtAuthz Support](https://github.com/grpc/proposal/pull/481)
 * [A93: xDS ExtProc Support](https://github.com/grpc/proposal/pull/484)
 
-### The Problem
-
-The primary motivation for this feature is the need to configure observability
-on a per-child-channel basis.
-
-* StatsPlugins & Tracing: Users need to configure metric sinks (as described in
-  gRFC [A66](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md)
-  and [A72](https://github.com/grpc/proposal/blob/master/A72-open-telemetry-tracing.md))
-  so that telemetry from internal channels is correctly tagged and exported.
-* Interceptors: Users may need to apply specific interceptors (e.g., for
-  logging, or tracing) to internal traffic.
-
-These configurations cannot be set globally because different parts of an
-application may require different configurations, such as different metric
-backends.
-
 ## Proposal
 
 We introduce the concept of **Child Channel Options**. This is a configuration
-container attached to a parent channel that is strictly designated for use by
-its children.
-
-### Encapsulation
+container attached to a parent channel/server that is strictly designated for
+use by its children.
 
 The user API must allow "nesting" of channel options. A user creating a Parent
-Channel `P` can provide a set of options `O_child`.
+Channel/Server `P` can provide a set of options `O_child`.
 
 * `O_child` is opaque to `P`. `P` does not apply these options to itself.
 * `O_child` is carried in `P`'s state, available for extraction by internal
   components.
 * The configuration provided by `O_child` is strictly uniform across all child
-  channels of a particular parent channel.
+  channels of a particular parent channel/server.
 
-### Propagation
-
-When an internal component (e.g., an xDS client factory or an auth filter)
-attached to `P` needs to create a Child Channel `C`:
+When an internal component (e.g., an xDS client factory) attached to `P`
+needs to create a Child Channel `C`:
 
 1. It retrieves `O_child` from `P`.
 2. It applies `O_child` to the configuration of `C`.
-
-### Precedence and Merging
+3. It should also configure channel `C` to use `O_child` for its children.
 
 The Child Channel `C` typically requires some internal
 configuration `O_internal` (e.g., target URIs, or internal interceptors).
@@ -92,18 +85,16 @@ configuration `O_internal` (e.g., target URIs, or internal interceptors).
 * Conflict Resolution: Mandatory internal settings (`O_internal`) generally take
   precedence over user-provided child options (`O_child`) to ensure correctness.
 
-### Shared Resources
-
 Certain internal channels, specifically the **xDS Control Plane Client**, are
-often pooled and shared across multiple parent channels within a process based
-on the target URI (
-see [gRFC A27](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)).
+often pooled and shared across multiple parent channels or servers within a
+process based on the target URI (see
+[gRFC A27](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)).
 
-If multiple Parent Channels (`P1`, `P2`) point to the same xDS target but
-provide *different* Child Channel Options (`O_child1`, `O_child2`):
+If multiple Parent Channels/Servers (`P1`, `P2`) point to the same xDS target
+but provide *different* Child Channel Options (`O_child1`, `O_child2`):
 
 * Behavior: The shared client is created using the options from the first parent
-  channel that triggers its creation (e.g., `O_child1`).
+  channel or server that triggers its creation (e.g., `O_child1`).
 * Subsequent Usage: When `P2` requests the client, it receives the existing
   shared client. `O_child2` is effectively ignored for that specific shared
   resource.
@@ -112,11 +103,11 @@ provide *different* Child Channel Options (`O_child1`, `O_child2`):
 
 #### Java
 
-In Java, the configuration will be achieved by accepting functions (callbacks).
-The API allows users to pass a `Consumer<ManagedChannelBuilder<?>>` (or a
-similar functional interface). When an internal library (e.g., xDS, gRPCLB)
-creates a child channel, it applies this user-provided function to the builder
-before further configuring the channel.
+In Java, the configuration will be achieved by accepting functions.
+The API allows users to pass a `ManagedChannelBuilder<?> builder` or
+`ServerBuilder<?> builder` (or a similar functional interface). When an internal
+library (e.g., xDS, gRPCLB) creates a child channel, it applies this
+user-provided function to the builder before further configuring the channel.
 
 * ##### Configuration Interface
 
@@ -251,15 +242,15 @@ into these internal channels from both entry points.
   }
   ```
 
-##### Core (C/C++)
+#### Core (C/C++)
 
 In gRPC Core, we utilize the existing `ChannelArgs` mechanism recursively to
 pass configuration to internal channels. We define a standard argument key whose
 value is a pointer to another `grpc_channel_args` structure. This "Nested
-Arguments" pattern allows the parent channel to carry a specific subset of
-arguments intended solely for its children.
+Arguments" pattern allows the parent channel or server to carry a specific
+subset of arguments intended solely for its children.
 
-* ##### Configuration Mechanism
+* #### Configuration Mechanism
 
   We define a new channel argument key. The value associated with this key is a
   pointer to a `grpc_channel_args` struct, managed via a pointer vtable to
@@ -271,37 +262,77 @@ arguments intended solely for its children.
   #define GRPC_ARG_CHILD_CHANNEL_ARGS "grpc.child_channel.args"
   ```
 
-* **API Changes**
+* #### API Changes
 
-  We add a helper method to the C++ `ChannelArguments` class to simplify packing
-  the nested arguments safely.
+  We add a helper method to the C++ `ChannelArguments` and `ServerBuilder`
+  classes to simplify packing the nested arguments safely.
 
   ```cpp
     // Sets the channel arguments to be used for child channels.
     void SetChildChannelArgs(const ChannelArguments& args);
   ```
 
-* ##### Usage Example (User-Side Code)
+* #### Usage Example (User-Side Code)
+
+  An example of how this will work on the channel side:
 
   ```cpp
-  grpc::ChannelArguments child_channel_args;
-  // E.g., add a custom tracing interceptor specifically for child channels
-  child_args.SetPointer(GRPC_ARG_TRACING_PROVIDER, my_tracing_provider);
-
+  // Create OTel StatsPlugin.
+  grpc::OpenTelemetryPluginBuilder ot_plugin_builder;
+  // ...set options on builder...
+  auto ot_plugin = ot_plugin_builder.Build();
+  assert(ot_plugin.ok());
+  // Add the StatsPlugin to both child args and parent args.
+  grpc::ChannelArguments child_args;
   grpc::ChannelArguments parent_args;
-  // Pass the nested args up 
-  parent_args.SetChildChannelArgs(child_channel_args);
+  ot_plugin->AddToChannelArguments(&child_args);
+  ot_plugin->AddToChannelArguments(&parent_args);
+  // Add child args to parent args.
+  parent_args.SetChildChannelArgs(child_args);
+  // Create channel with parent args.
+  auto channel = grpc::CreateCustomChannel(
+      "xds:///my-service", credentials, parent_args);
+  ```
 
-  std::shared_ptr<grpc::Channel> channel =
-      grpc::CreateCustomChannel("xds:///my-service", credentials, parent_args);
+  An example of how this will work on the server side:
+
+  ```cpp
+  grpc::ServerBuilder server_builder;
+  // Create OTel StatsPlugin.
+  grpc::OpenTelemetryPluginBuilder ot_plugin_builder;
+  // ...set options on builder...
+  auto ot_plugin = ot_plugin_builder.Build();
+  assert(ot_plugin.ok());
+  // Add the StatsPlugin to both child args and the server builder.
+  grpc::ChannelArguments child_args;
+  ot_plugin->AddToChannelArguments(&child_args);
+  ot_plugin->AddToServerBuilder(&server_builder);
+  // Add the child args to the server builder.
+  server_builder.SetChildChannelArgs(child_args);
+  // Start the server.
+  auto server = server_builder.BuildAndStart();
   ```
 
 ## Rationale
 
 ### Why not Global Configuration?
 
-We reject global configuration (static variables) because it prevents
-multi-tenant applications from isolating configurations. For example, one client
-may need to export metrics to Prometheus, while another in the same process
-exports to Cloud Monitoring. Furthermore, libraries want to configure their
-channels but cannot do so globally without affecting the host application.
+The primary use-case we care about is setting a `StatsPlugin` for one particular
+channel, in which case we want that same `StatsPlugin` to also be used for any
+child of that channel.
+
+For example, let's say that we create two channels, one to target A and one to
+target B, both of which create their own child channel to an `ext_authz` server
+target Z. If we create the channel to target A with a specific `StatsPlugin`,
+then we want that `StatsPlugin` to also be used for the child channel to target
+Z created by the channel to target A. We do *not* want it to be used for the
+child channel to target Z created by the channel to target B, because we did not
+configure the `StatsPlugin` for the channel to target B.
+
+We cannot achieve this using the global registry, for a couple of reasons.
+First, the global registry can only select channels based on parameters like the
+target URI. To attach our `StatsPlugin` to the internal target Z, we would have to
+select it based on target Z, which would erroneously attach it to the child
+channels for both A and B. Second, it is hard for the application that registers
+the global `StatsPlugin` to know what target URIs will be used for internal
+child channels.
