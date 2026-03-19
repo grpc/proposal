@@ -90,7 +90,7 @@ channels/servers. For example, the xDS control plane channel is shared across
 multiple channels or servers as described
 in [gRFC A27](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md).
 However, it is possible for each parent channel or server to be created with
-different child options. In such cases, we will do the following:
+different child options.
 
 Consider an example where Parent Channels/Servers (`P1`, `P2`) point to the
 same target but provide *different* Child Channel
