@@ -85,13 +85,16 @@ configuration `O_internal` (e.g., target URIs, or internal interceptors).
 * Conflict Resolution: Mandatory internal settings (`O_internal`) generally take
   precedence over user-provided child options (`O_child`) to ensure correctness.
 
-Certain internal channels, specifically the **xDS Control Plane Client**, are
-often pooled and shared across multiple parent channels or servers within a
-process based on the target URI (see
-[gRFC A27](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md)).
+In some cases, child channels may be shared across multiple parent
+channels/servers. For example, the xDS control plane channel is shared across
+multiple channels or servers as described
+in [gRFC A27](https://github.com/grpc/proposal/blob/master/A27-xds-global-load-balancing.md).
+However, it is possible for each parent channel or server to be created with
+different child options. In such cases, we will do the following:
 
-If multiple Parent Channels/Servers (`P1`, `P2`) point to the same xDS target
-but provide *different* Child Channel Options (`O_child1`, `O_child2`):
+Consider an example where Parent Channels/Servers (`P1`, `P2`) point to the
+same target but provide *different* Child Channel
+Options (`O_child1`, `O_child2`):
 
 * Behavior: The shared client is created using the options from the first parent
   channel or server that triggers its creation (e.g., `O_child1`).
@@ -250,7 +253,7 @@ value is a pointer to another `grpc_channel_args` structure. This "Nested
 Arguments" pattern allows the parent channel or server to carry a specific
 subset of arguments intended solely for its children.
 
-* #### Configuration Mechanism
+* ##### Configuration Mechanism
 
   We define a new channel argument key. The value associated with this key is a
   pointer to a `grpc_channel_args` struct, managed via a pointer vtable to
@@ -262,7 +265,7 @@ subset of arguments intended solely for its children.
   #define GRPC_ARG_CHILD_CHANNEL_ARGS "grpc.child_channel.args"
   ```
 
-* #### API Changes
+* ##### API Changes
 
   We add a helper method to the C++ `ChannelArguments` and `ServerBuilder`
   classes to simplify packing the nested arguments safely.
@@ -272,7 +275,7 @@ subset of arguments intended solely for its children.
     void SetChildChannelArgs(const ChannelArguments& args);
   ```
 
-* #### Usage Example (User-Side Code)
+* ##### Usage Example (User-Side Code)
 
   An example of how this will work on the channel side:
 
