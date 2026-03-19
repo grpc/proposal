@@ -9,8 +9,8 @@ A115: disable Priority LB policy child policy retention cache
 
 ## Abstract
 
-[A56](https://github.com/grpc/proposal/blob/master/A56-priority-lb-policy.md) describes
-[mechanisms](https://github.com/grpc/proposal/blob/master/A56-priority-lb-policy.md#child-lifetime-management)
+[A56](A56-priority-lb-policy.md) describes
+[mechanisms](A56-priority-lb-policy.md#child-lifetime-management)
 whereby priority LB child policies are cached. There are two cases:
 
 1) When a higher priority child becomes reachable, we deactive
@@ -18,7 +18,7 @@ the lower-priority children, and remove them only after an expiry.
 
 2) When a child is removed from the LB policy config.
 
-This proposal removes the usage of a cache for case 2).
+This proposal removes the usage of a cache for case 2.
 
 ## Background
 
@@ -31,9 +31,9 @@ sequence of locality updates. On each child name update, previous policies are a
 to the retention cache.
 
 ```
-[[BB, CC], [AA, DD]] => [priority-0-0 priority-0-1]
-[[AA, BB, CC], [DD, EE]] => [priority-0-1 priority-0-2]
-[[BB, CC], [AA, DD]] => [priority-0-2 priority-0-3]
+[[AA, BB], [CC, DD]] => [priority-0-0 priority-0-1]
+[[CC], [DD, EE]] => [priority-0-1 priority-0-2]
+[[AA, BB], [CC, DD]] => [priority-0-2 priority-0-3]
 ```
 
 Additionally, priority LB child names are generated with strictly increasing numbers
@@ -42,12 +42,21 @@ the cache is not providing us value.
 
 ## Proposal
 
-Priority LB should disable the child policy retention cache.
+Priority LB should disable the child policy retention cache, when a
+child is removed from its config (i.e., case 2 only).
+
+Note this should be done for Java and Go only.
+
+For C-core, we are actually potentially getting benefit from this
+behavior due to subchannel sharing, so we're not planning to drop
+it there until we have the longer-term solution ready.
 
 ### Temporary environment variable protection
 
 Implementations should provide an environment variable to revert
 to the previous behavior (child policy cache enabled with 15-minute timer).
+
+This should be kept around for a few releases, and then removed.
 
 Env var name: `GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE`.
 
