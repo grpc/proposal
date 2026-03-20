@@ -33,7 +33,7 @@ to the retention cache.
 ```
 [[AA, BB], [CC, DD]] => [priority-0-0 priority-0-1]
 [[CC], [DD, EE]] => [priority-0-1 priority-0-2]
-[[AA, BB], [CC, DD]] => [priority-0-2 priority-0-3]
+[[AA, BB], [CC, DD]] => [priority-0-3 priority-0-2]
 ```
 
 Additionally, priority LB child names are generated with strictly increasing numbers
