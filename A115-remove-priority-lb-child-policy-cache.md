@@ -48,7 +48,7 @@ child is removed from its config (i.e., case 2 only).
 Note this should be done for Java and Go only.
 
 For C-core, we are actually potentially getting benefit from this
-behavior due to subchannel sharing, so we're not planning to drop
+behavior due to subchannel pooling, so we're not planning to drop
 it there until we have the longer-term solution ready.
 
 ### Temporary environment variable protection
