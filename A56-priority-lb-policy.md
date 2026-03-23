@@ -6,6 +6,7 @@ A56: `priority_experimental` LB policy
 * Implemented in: C-core, Java, Go, Node
 * Last updated: 2025-08-18
 * Discussion at: <google group thread> (filled after thread exists)
+* Updated by: [gRFC A115][A115])
 
 ## Abstract
 
@@ -76,6 +77,7 @@ today, which has evolved somewhat since it was originally introduced.
 [A28]: A28-xds-traffic-splitting-and-routing.md
 [A37]: A37-xds-aggregate-and-logical-dns-clusters.md
 [A42]: A42-xds-ring-hash-lb-policy.md
+[A115]: A56-update-remove-priority-lb-child-policy-cache.md
 
 ## Proposal
 
