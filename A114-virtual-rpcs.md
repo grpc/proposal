@@ -32,7 +32,6 @@ Table of Contents
 
 Abstract
 --------
-
 gRPC will support multiplexing virtual RPCs over a single common bi-directional stream. By establishing a logical "Session" over a physical stream, clients and servers can eliminate significant one-time setup costs associated with each RPC. This design improves end-to-end latency and CPU performance by caching and re-using heavy per-client application states across all virtual RPCs sent over the session.
 
 Background
