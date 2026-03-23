@@ -17,21 +17,26 @@ Table of Contents
   * [Overview](#overview)
   * [Detailed Design](#detailed-design)
     * [Protobuf API](#protobuf-api)
+    * [Generic API Support](#generic-api-support)
     * [The Session Lifecycle](#the-session-lifecycle)
+      * [Establishment and Barrier Mechanism](#establishment-and-barrier-mechanism)
+      * [Deadlines and Cancellations](#deadlines-and-cancellations)
+      * [Graceful Shutdown](#graceful-shutdown)
     * [Retries](#retries)
     * [Data Flow and Multiplexing (HTTP/2 on HTTP/2)](#data-flow-and-multiplexing)
     * [Alternative Wire Format](#alternative-wire-format)
     * [Why HTTP/2 on HTTP/2 is Better](#why-http2-on-http2-is-better)
     * [Server-Side Architecture: Dual Server Approach](#server-side-architecture)
-  * [User API Support (Short-Term Workaround)](#user-api-support)
   * [C++ User-Facing APIs](#c-user-facing-apis)
     * [Client-Side API](#client-side-api)
     * [Server-Side API & Context Propagation](#server-side-api)
+      * [Context Propagation](#context-propagation)
   * [Java User-Facing APIs](#java-user-facing-apis)
   * [Go User-Facing APIs](#go-user-facing-apis)
 
 Abstract
 --------
+
 gRPC will support multiplexing virtual RPCs over a single common bi-directional stream. By establishing a logical "Session" over a physical stream, clients and servers can eliminate significant one-time setup costs associated with each RPC. This design improves end-to-end latency and CPU performance by caching and re-using heavy per-client application states across all virtual RPCs sent over the session.
 
 Background
@@ -78,50 +83,71 @@ service FooVrpcService {
 }
 ```
 
+*Workaround*: Since the `returns service` syntax will not be available until a future Protobuf edition, the Session RPC can temporarily be modeled as a standard unary RPC that returns an `Empty` response, relying on manual channel configuration to bind the virtual service.
+
+#### Generic API Support
+
+To support proxy use cases where clients might not have compiled proto definitions, gRPC will provide a Generic API to allow clients in all languages to both initiate the session and invoke virtual RPCs without dependency on generated code.
+
 #### The Session Lifecycle
 
-**Establishment and Barrier Mechanism:**
-The session begins when the client initiates a Session RPC. To the client application, this returns a virtual stub immediately. To avoid extra round-trips, the client can start sending virtual RPCs immediately; these are queued internally on the server side until the server application explicitly signals that the session is ready. 
+##### Establishment and Barrier Mechanism
 
-Alternatively, the client can wait for an explicit acknowledgement via the `OnSessionAcknowledged` reactor callback before sending vRPCs.
+The session begins when the client initiates a Session RPC. To the client application, this returns a virtual stub immediately. 
 
-**Deadlines and Cancellations:**
-* **Session Deadline**: Applying a deadline to the Session RPC propagates a timeout to the server. If this expires, the session handler immediately considers all live virtual requests cancelled with the same `DEADLINE_EXCEEDED` status.
-* **Virtual RPC Deadline**: Deadlines on individual vRPCs work natively. When the deadline expires, the vRPC is canceled and the failure is sent as a payload message over the physical stream.
+To avoid extra round-trips, the client can start sending virtual RPCs immediately. However, the server application will provide an explicit signal (a "barrier") telling the session handler that all common application context has been successfully set up. Internally, this signal triggers sending the `server_initial_metadata` from the session request handler. 
 
-**Graceful Shutdown:**
-The server can initiate a graceful shutdown of the session. When this occurs, the client virtual channel enters the `TRANSIENT_FAILURE` state, rejecting new vRPCs with `CANCELLED`, but allows any pending vRPCs to finish.
+Because the client does not need to wait for this signal, all virtual RPCs sent prior to the barrier are queued internally on the server side until this handshake is complete. Doing this queuing on the server side avoids adding an extra round trip before sending virtual requests, reducing latency for short-lived sessions. Alternatively, the client can explicitly wait for `server_initial_metadata` (via the `OnSessionAcknowledged` callback) before sending vRPCs.
+
+##### Deadlines and Cancellations
+
+We must support deadlines and cancellations for both the Session Request and each individual virtual request.
+
+* **Session Deadline**: The session deadline is converted to a `grpc-timeout` header and sent to the server. If this expires, the gRPC client cancels the Session Request with a `DEADLINE_EXCEEDED` status immediately. The session handler then considers all live virtual requests cancelled with the same `DEADLINE_EXCEEDED` status and propagates this cancellation to the server. On the server side, the Session Handler sends a cancellation to each virtual handler before closing the physical stream.
+
+* **Virtual RPC Deadline**: Deadlines on individual vRPCs work natively via the `ClientContext`. When the deadline expires, the event is caught by the session handler and sent as a payload message (encapsulating the timeout/cancellation) over the physical stream.
+
+##### Graceful Shutdown
+
+The server can initiate a graceful shutdown of the session, telling the client to finish all scheduled virtual RPCs but not start new ones. 
+
+* Internally, gRPC accomplishes this by sending an HTTP/2 `GOAWAY` frame on the *virtual* channel.
+* Upon receiving this, the client virtual channel enters the `GRPC_CHANNEL_TRANSIENT_FAILURE` state. New virtual RPCs are immediately rejected with `CANCELLED`.
+* Once all pending virtual RPCs complete, the client sends a half close to the server and waits for trailing metadata before closing the session.
 
 #### Retries
 
-Retries for the session establishment request itself will work identically to regular RPCs. However, for virtual RPC failures, in general it is not advisable to use retries. Retries in general should happen to different backends. Since the session is tied to a single specific backend, retries should ideally be handled by the application across different sessions. That said, configuration options to retry on virtual channels will be provided for those who specifically need it.
+Retries for the session establishment request itself will work exactly the same as regular RPCs, using the same retry configuration. Because `server_initial_metadata` is not sent until successful establishment, all queued virtual RPCs can also be safely retried on the new physical stream. 
+
+For virtual RPC failures, retries on the same session are generally not advisable because retries should typically happen to different backends. Since the session is tied to a single specific backend, retries should typically be handled by the application layer across different sessions. That said, configuration options to retry on virtual channels will be provided for clients who explicitly require it.
 
 #### Data Flow and Multiplexing (HTTP/2 on HTTP/2)
 
-To natively inherit gRPC's rich feature set, we will build the virtual stack as a new HTTP/2 transport stack, over the standard HTTP/2 stack.
+To natively inherit gRPC's rich feature set, we will build the virtual stack as a new HTTP/2 transport stack, running *over* the standard HTTP/2 stack.
 
-1. The client initiates a `SessionRequest`, establishing an outer HTTP/2 stream.
-2. This outer HTTP/2 stream is wrapped in a new `SessionEndpoint` (an `EventEngine::Endpoint`).
-3. An inner HTTP/2 transport is layered on top of this `SessionEndpoint`, establishing a new Virtual Channel.
-4. Virtual RPCs sent on the Virtual Channel are encoded by the inner HTTP/2 transport into raw bytes and written to the `SessionEndpoint`. These raw bytes are transmitted as standard payload messages over the outer physical stream.
+1. The client initiates a `SessionRequest`, establishing an HTTP/2 stream over the primary HTTP/2 transport. The initial metadata and first payload message are sent over this stream.
+2. We wrap this established stream in a new gRPC Endpoint (e.g., an `EventEngine::Endpoint`).
+3. We then create a new inner HTTP/2 transport layered on top of this Endpoint, and return the resulting Virtual Channel to the client application.
+4. Virtual RPCs sent on the Virtual Channel are first sent to the inner HTTP/2 transport. The transport encodes these into raw bytes and writes them to the inner Endpoint. These raw bytes are then transmitted as standard payload messages over the outer stream.
 
-On the server side, receiving a `SessionRequest` similarly spins up an inner HTTP/2 transport that decodes the subsequent payload messages as independent inner streams. 
-
-*(Note: When the server initiates a Graceful Shutdown as described in the Lifecycle section, gRPC will internally accomplish this by sending an HTTP/2 `GOAWAY` frame on the inner virtual HTTP/2 channel.)*
+On the server side, receiving a `SessionRequest` similarly spins up an inner HTTP/2 transport that decodes the subsequent payload messages as independent inner streams.
 
 #### Alternative Wire Format
 
-An alternative design considered was defining a custom frame format over the physical stream where the over the wire payload message will be structured as follows: Metadata Length (4 Bytes), followed by Serialized Metadata (an encapsulated client/server frame), and finally the Zero-Copy Raw Payload. 
+An alternative design considered was defining a custom frame format over the physical stream where the over the wire payload message would be structured as follows: Metadata Length (4 Bytes), followed by Serialized Metadata (an encapsulated `ClientVrpcFrame` or `ServerVrpcFrame`), and finally the Zero-Copy Raw Payload. 
 
 In this alternative format, every vRPC message would explicitly include a `vrpc_id`, and the server session handler would parse the frame to dispatch it to the correct virtual request handler.
 
 #### Why HTTP/2 on HTTP/2 is Better
 
-The big benefit this approach provides is that we do not need to re-invent many gRPC features for virtual RPCs, which are already provided by the HTTP/2 stack.
+The big benefit of the HTTP/2 on HTTP/2 approach is that we do not need to re-invent many gRPC features for virtual RPCs, which are already provided by the HTTP/2 stack.
 
 If we utilized the custom alternative wire format, we would have to manually implement solutions for:
-* **Flow Control:** In HTTP/2-on-HTTP/2, the HTTP/2 stream in the outer transport will proactively write data to the inner endpoint, freeing itself to allow the next messages (corresponding to other virtual RPCs) to go through. A combination of the inner transport's flow control window and max concurrent streams setting intrinsically prevents unbounded queue growth.
+
+* **Flow Control:** gRPC’s standard flow control uses two windows: a connection-level window and a stream-level window, decided based on the Bandwidth Delay Product (BDP). In the HTTP/2-on-HTTP/2 model, the outer HTTP/2 stream proactively writes data to the inner endpoint, freeing itself to allow the next messages (corresponding to other virtual RPCs) to go through. A combination of the inner transport's flow control window and its `max_concurrent_streams` setting intrinsically prevents unbounded queue growth and prevents slow vRPC handlers from stalling the entire physical stream.
+
 * **Fairness:** HTTP/2 implicitly handles chunking and interleaving frames, providing fairness and preventing a single large virtual RPC payload from blocking smaller vRPCs.
+
 * **HPACK Compression:** Many requests have massive method names and small payloads. The inner HTTP/2 transport implicitly provides HPACK compression, caching repeated method names and drastically reducing transferred bytes.
 
 #### Server-Side Architecture: Dual Server Approach
@@ -129,12 +155,6 @@ If we utilized the custom alternative wire format, we would have to manually imp
 Often, gRPC servers are configured with mandatory interceptors or modules (e.g., authentication, authorization) that run on every incoming connection. Because virtual RPCs have already been authorized at the outer session level, re-running these modules on the inner virtual RPCs is unnecessary.
 
 To allow virtual handlers to bypass these mandatory checks, the design uses a dual-server approach. We will create a new gRPC server without any listening port. Having no listeners means that it is not possible for this server to directly receive traffic from the external clients. Virtual service handlers are registered exclusively on this secondary server. When the primary gRPC server receives a Session Request, it bridges the inner HTTP/2 transport to this secondary server, ensuring vRPCs seamlessly bypass the primary server's mandatory connection-level interceptors.
-
-### User API Support (Short-Term Workaround)
-
-Because the `returns service` proto syntax will not be available until a future Protobuf edition, generated code for virtual stubs will not be immediately available. 
-
-To bridge this gap, gRPC will provide a **Generic API** to allow clients in all languages to both initiate the session and invoke virtual RPCs without dependency on generated code.
 
 ### C++ User-Facing APIs
 
@@ -188,7 +208,8 @@ class MyServerSessionReactor : public grpc::ServerSessionReactor {
 };
 ```
 
-**Context Propagation:**
+##### Context Propagation
+
 To share state (e.g., Auth/Security results), the Server application sets context on the parent session's arena. The virtual handler can easily access the application context via the session arena pointer stored in the virtual call arena:
 
 ```cpp
