@@ -352,7 +352,7 @@ HCM itself is removed (e.g., during client or server shutdown).
 ##### Go
 
 In Go, just like in Java, xDS HTTP Filter instances will be responsible for
-retaining their own state and sharing it across interceptors instances created
+retaining their own state and sharing it across interceptor instances created
 for the individual routes.
 
 The internal `httpfilter` package defines a `Builder` interface that contains
@@ -550,6 +550,6 @@ Java implementation:
   - implement the lifecycle of Filter objects (https://github.com/grpc/grpc-java/pull/11936)
 
 Go implementation:
-- filter state retention: (<https://github.com/grpc/grpc-go/pull/8924>)
+- filter state retention: (https://github.com/grpc/grpc-go/pull/8924)
 
 Will be implemented in all other languages, timelines TBD.
