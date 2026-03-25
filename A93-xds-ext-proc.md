@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-03-06
+* Last updated: 2026-03-24
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -30,6 +30,8 @@ the bootstrap config, described in [A102].  It will also make use of the
 * [A81: xDS Authority Rewriting][A81]
 * [A83: xDS GCP Authentication Filter][A83]
 * [A102: xDS GrpcService Support][A102] (pending)
+* [A106: xDS Unified Matcher and CEL Integration][A106] (pending)
+* [A103: xDS Composite Filter][A103]
 * [A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
 * [A79: Non-Per-Call Metrics Architecture][A79]
 * [A66: OpenTelemetry Metrics][A66]
@@ -40,6 +42,8 @@ the bootstrap config, described in [A102].  It will also make use of the
 [A81]: A81-xds-authority-rewriting.md
 [A83]: A83-xds-gcp-authn-filter.md
 [A102]: https://github.com/grpc/proposal/pull/510
+[A106]: https://github.com/grpc/proposal/pull/520
+[A103]: A103-xds-composite-filter.md
 [A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A89]: A89-backend-service-metric-label.md
@@ -488,8 +492,10 @@ The list of attributes to include is specified by the
 [`request_attributes`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L188)
 config field, for client-to-server events, or the
 [`response_attributes`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L195)
-config field, for server-to-client events.  The set of supported attribute
-names is the same as what we support for any CEL expression in xDS.
+config field, for server-to-client events.
+
+The set of supported attribute names is the same as what we support for
+any CEL expression in xDS, as defined in [A106] and [A103].
 
 For example, consider the case where the `request_attributes` config
 field contains the attribute `request.path` and the filter is processing
