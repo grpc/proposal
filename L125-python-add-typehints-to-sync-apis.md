@@ -9,30 +9,28 @@ Add Typing to gRPC Python Sync API
 
 ## Abstract
 
-This proposal aims to add inline Type Annotations (or Type Hints) to untyped gRPC Python API. 
-Inline Type Annotations are added considering [PEP-484](https://peps.python.org/pep-0484/) and [PEP-526](https://peps.python.org/pep-0526/).
-This proposal also add [Pyright](https://github.com/microsoft/pyright) (a static type checker) which will run in CI to check for correctness of the Type Hints
-added in the gRPC Python Source Code.
+This proposal aims to add inline type annotations (or type hints) to the untyped gRPC Python API. 
+These annotations are added in accordance with [PEP-484](https://peps.python.org/pep-0484/) and [PEP-526](https://peps.python.org/pep-0526/).
+The proposal also introduces [Pyright](https://github.com/microsoft/pyright), a static type checker that will run in CI to verify the correctness of the type hints added to the gRPC Python source code.
 
 ## Background
 
-We already have Type Annotations added in gRPC Python Async IO APIs. This proposal is to add Type Hints to the Sync APIs.
-Type Hints would benefit users and developers in following ways
-* Better IDE Support with Intelligent Autocomplete
+Type annotations are already present in the gRPC Python AsyncIO APIs. This proposal extends type hints to the synchronous APIs.
+Type hints benefit users and developers in the following ways:
+* Better IDE support with intelligent autocomplete
 * Catching bugs before they happen
 * Code as documentation
 
-Additionally, this proposal includes addition of `Pyright` which is static type checker for Python.
-This will verify the correctness of Type Hints.
+Additionally, this proposal includes the addition of `Pyright`, a static type checker for Python, to verify the correctness of these hints.
 
 ### Related Proposals:
 * Related to [Sync API Type Hints](https://github.com/grpc/proposal/pull/459)
 
 ## Proposal
 
-* This proposal majorly targets adding inline Type Annotations to file - `src/python/grpcio/grpc/__init__.py`
-* Fixes all the Type Annotations added in folder `src/python/grpcio` using static type checking tool - `Pyright`
-* Adds missing inline Type Annotations in the `.py` files inside `src/python/grpcio/grpc`
+* This proposal primarily targets adding inline type annotations to the file `src/python/grpcio/grpc/__init__.py`.
+* It ensures all type annotations in the folder `src/python/grpcio` pass validation using `Pyright`.
+* It adds missing inline type annotations to `.py` files inside `src/python/grpcio/grpc`.
 
 ## Rationale
 
