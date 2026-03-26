@@ -216,6 +216,8 @@ rejected with `UNAVAILABLE` status.
 
 #### Wire Format: HTTP/2-on-HTTP/2
 
+![State Diagram](A114_graphics/vrpc1.png)
+
 To natively inherit gRPC's rich feature set, we will build the virtual stack as
 a new HTTP/2 transport stack, running *over* the standard HTTP/2 stack.
 
