@@ -351,7 +351,96 @@ HCM itself is removed (e.g., during client or server shutdown).
 
 ##### Go
 
-TODO(dfawley, easwars): Fill this in.
+In Go, just like in Java, xDS HTTP Filter instances will be responsible for
+retaining their own state and sharing it across interceptor instances created
+for the individual routes.
+
+The internal `httpfilter` package defines a `Builder` interface that contains
+stateless Filter methods like the ones for config parsing and the ones to build
+client and server-side Filter instances.
+
+```golang
+// Builder defines the parsing functionality of an HTTP filter.
+//
+// A Builder may optionally implement either ClientFilterBuilder or
+// ServerFilterBuilder or both, indicating it is capable of working on the
+// client side or server side or both, respectively.
+type Builder interface {
+ TypeURLs() []string                                            // List of supported proto message types
+ ParseFilterConfig(proto.Message) (FilterConfig, error)         // Parse filter config
+ ParseFilterConfigOverride(proto.Message) (FilterConfig, error) // Parse filter config override
+ IsTerminal() bool                                              // Whether this filter must be last in the filter chain
+}
+
+// ClientFilterBuilder is an optional interface that a Builder can implement to
+// indicate its capability to build client-side filters.
+type ClientFilterBuilder interface {
+ BuildClientFilter() ClientFilter
+}
+
+// ServerFilterBuilder is an optional interface that a Builder can implement to
+// indicate its capability to build server-side filters.
+type ServerFilterBuilder interface {
+ BuildServerFilter() ServerFilter
+}
+```
+
+The `httpfilter` package also maintains a registry of Filter Builders.
+
+```golang
+// Register registers the HTTP Filter Builder with the registry. 
+// b.TypeURLs() will be used as the types for this filter.
+func Register(b Builder) { ... }
+
+// Get returns the HTTP Filter Builder registered with typeURL.
+func Get(typeURL string) Builder { ... }
+```
+
+The `ClientFilter` and `ServerFilter` interfaces define the core functionality
+of the Filter for the client and server sides respectively. Implementations of
+this interface are responsible for sharing state across the interceptor
+instances that they create.
+
+```golang
+type ClientFilter interface {
+ // BuildClientInterceptor uses the given FilterConfigs to produce an HTTP
+ // filter interceptor for clients. config will always be non-nil, but
+ // override may be nil if no override config exists for the filter.
+ //
+ // It is valid for this method to return a nil Interceptor and a nil error.
+ // In this case, the RPC will not be intercepted by this filter.
+ BuildClientInterceptor(config, override FilterConfig) (iresolver.ClientInterceptor, error)
+
+ // Close is called when the filter is no longer needed.
+ Close()
+}
+
+type ServerFilter interface {
+ // BuildServerInterceptor uses the given FilterConfigs to produce
+ // an HTTP filter interceptor for servers. config will always be non-nil,
+ // but override may be nil if no override config exists for the filter.
+ //
+ // It is valid for this method to return a nil Interceptor and a nil error.
+ // In this case, the RPC will not be intercepted by this filter.
+ BuildServerInterceptor(config, override FilterConfig) (iresolver.ServerInterceptor, error)
+
+ // Close is called when the filter is no longer needed.
+ Close()
+}
+```
+
+The xDS resolver (on the client-side) and the xDS server (on the server-side)
+maintain a map of `Filter` instances keyed by the filter name (specified in the
+Listener resource) and the type_urls supported by the filter. This ensures that
+a `Filter` instance is not recreated as long as the key does not change across
+xDS resource updates. Configuration changes are handled by the `Filter` instance
+by updating whatever internal state it maintains and sharing the updated state
+with new interceptors that it creates.
+
+`Filter` instances need to maintain their own reference counts to ensure that
+when configuration changes result in internal state changes, the previous state
+is not deleted until previously created interceptors are done handling any
+ongoing RPCs.
 
 ### Filter Behavior
 
@@ -459,5 +548,8 @@ Java implementation:
 - filter state retention:
   - make Filter objects stateful (https://github.com/grpc/grpc-java/pull/11883)
   - implement the lifecycle of Filter objects (https://github.com/grpc/grpc-java/pull/11936)
+
+Go implementation:
+- filter state retention: (https://github.com/grpc/grpc-go/pull/8924)
 
 Will be implemented in all other languages, timelines TBD.
