@@ -19,12 +19,12 @@ Table of Contents
   * [The Session Lifecycle](#the-session-lifecycle)
     * [Establishment and Barrier Mechanism](#establishment-and-barrier-mechanism)
     * [Deadlines and Cancellations](#deadlines-and-cancellations)
+    * [Client Retries](#retries)
     * [Graceful Shutdown](#graceful-shutdown)
-    * [Retries](#retries)
   * [Data Flow and Multiplexing](#data-flow-and-multiplexing)
     * [Wire Format: HTTP/2 on HTTP/2](#wire-format)
     * [Alternative Wire Format](#alternative-wire-format)
-    * [Why HTTP/2 on HTTP/2 is Better](#why-http2-on-http2-is-better)
+    * [Why HTTP/2 on HTTP/2 is Chosen](#why-http2-on-http2-is-chosen)
   * [Server-Side Architecture: Dual Server Approach](#server-side-architecture)
 * [C++ User-Facing APIs](#c-user-facing-apis)
   * [Client-Side API](#client-side-api)
@@ -216,7 +216,7 @@ rejected with `UNAVAILABLE` status.
 
 ### Data Flow and Multiplexing
 
-#### Wire Format: HTTP/2-on-HTTP/2
+#### Wire Format: HTTP/2 on HTTP/2
 
 ![HTTP/2 double stack](A114_graphics/vrpc2.png)
 
