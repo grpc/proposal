@@ -244,9 +244,13 @@ independent inner streams.
 An alternative design considered was defining a custom frame format over the
 physical stream where the over the wire payload message would be structured as
 follows:
-1. Metadata Length (4 Bytes)
-2. Serialized Metadata (an encapsulated `ClientVrpcFrame` or `ServerVrpcFrame`)
-3. Optional Raw Payload.
+1. **Metadata Length (4 Bytes)**: An integer denoting the size of the following serialized metadata.
+2. **Serialized Metadata**: An encapsulated frame
+(`ClientVrpcFrame` or `ServerVrpcFrame`) containing the unique virtual RPC ID
+and the frame type (initial metadata, payload, cancellation, or half-close).
+3. **Optional Raw Payload**: The raw binary bytes of the application message
+follow immediately after the serialized proto. This is present only if the
+message is of the payload type.
 
 #### Why HTTP/2 on HTTP/2 is chosen
 
@@ -355,20 +359,24 @@ class MyServerSessionReactor : public grpc::ServerSessionReactor {
 
 #### Context Propagation
 
-Applications need to prepare and share session-level resources among virtual
+Applications need to prepare and share session-level resources (such as
+authentication credentials or cached application states) among multiple virtual
 RPC handlers. To provide easy and implicit lifetime management for these
 session-level resources, this application context will be stored on the Session
-Call's arena.
+Call's **Arena**.
 
 Because gRPC’s Arena is a ref-counted object, when a virtual call is created,
 gRPC can simply store a reference to the parent session call's arena on the new
 virtual call's arena.
 
-This approach allows the virtual handler to safely access the application
-context via the session arena pointer without needing direct access to the
-parent session handler’s `ServerContext`. This safely decouples their lifetimes,
-ensuring the shared context remains valid since it is possible that the virtual
-handlers are running after the session destruction.
+This design ensures that:
+
+* **Decoupled Lifetimes**: Shared context remains valid even if the parent
+session handler completes, as the virtual handlers hold a reference to the same underlying memory.
+* **Implicit Management**: Resources are automatically cleaned up only after
+both the session and all its associated virtual RPCs have finished.
+
+Users can set and retrieve this shared context through the `ServerContext` API:
 
 ```cpp
 // In Session Handler: Set the context on the outer request ServerContext
@@ -385,3 +393,4 @@ TBD
 ### Go User-Facing APIs
 
 TBD
+
