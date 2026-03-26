@@ -111,7 +111,7 @@ invoke sessions dynamically.
 
 ### The Session Lifecycle
 
-![Lifecycle Diagram](A114_graphics/vrpc_flow.png)
+![Lifecycle Diagram](A116_graphics/vrpc_flow.png)
 
 #### Establishment and Barrier Mechanism
 
@@ -220,7 +220,7 @@ rejected with `UNAVAILABLE` status.
 
 #### Wire Format: HTTP/2 on HTTP/2
 
-![HTTP/2 double stack](A114_graphics/vrpc2.png)
+![HTTP/2 double stack](A116_graphics/vrpc2.png)
 
 To natively inherit gRPC's rich feature set, we will build the virtual stack as
 a new HTTP/2 transport stack, running *over* the standard HTTP/2 stack.
