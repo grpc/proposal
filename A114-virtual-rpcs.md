@@ -25,6 +25,7 @@ Table of Contents
     * [Wire Format: HTTP/2 on HTTP/2](#wire-format)
     * [Alternative Wire Format](#alternative-wire-format)
     * [Why HTTP/2 on HTTP/2 is Chosen](#why-http2-on-http2-is-chosen)
+  * [Flow Control](#flow-control)
   * [Server-Side Architecture: Dual Server Approach](#server-side-architecture)
 * [C++ User-Facing APIs](#c-user-facing-apis)
   * [Client-Side API](#client-side-api)
