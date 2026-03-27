@@ -70,7 +70,15 @@ signature algorithm and returns signed bytes.
 string signed_bytes sign(string algorithm, string unsigned_bytes)
 ```
 
-### C-Core
+### C-Core / C++
+
+There are three distinct changes:
+1. Creating an InMemory Certificate Provider
+     * Must be done to cleanly accept the PrivateKeySigner instead of just a static PEM key or a file path.
+2. Splitting Certificate Providers into Root and Identity Providers
+    * Must be done to decouple how identity (certificate and key signing) and roots of trust are defined. Prior to this, roots had to be provided the same way that identities were provided, which wouldn't work for a PrivateKeySigner API.
+3. The PrivateKeySigner API itself.
+
 
 #### InMemory Certificate Provider
 We will create an `InMemoryCertificateProvider` that takes a set of root certs
@@ -78,12 +86,13 @@ and a list of `PemKeyCertPair`. Further, these values can be manually updated by
 the user. This provides a strict super-set of functionality of the current
 `StaticDataCertificateProvider` - calling `UpdateRoot` and `UpdateIdentity` on
 an `InMemoryCertificateProvider` at setup is the same as a
+`StaticDataCertificateProvider`. Further, we will be deprecating
 `StaticDataCertificateProvider`.
 
 The updates will return an `absl::Status` to the caller, and further a
 `ValidateCredentials` API is provided.
 
-```c
+```c++
 // Implements a provider that uses in-memory data that can be modified in a thread-safe manner.
 class InMemoryCertificateProvider : grpc_tls_certificate_provider {
  public:
@@ -105,12 +114,12 @@ class InMemoryCertificateProvider : grpc_tls_certificate_provider {
 
 #### Splitting Certificate Providers into Identity and Root Providers
 We will also decouple the root provider and the identity provider in [the
-tls\_credentials\_options](http://google3/third_party/grpc/src/core/credentials/transport/tls/grpc_tls_credentials_options.h;l=77;rcl=731487339)
+tls\_credentials\_options](https://github.com/grpc/grpc/blob/fa77e332f6a4a88902c012a83703071c251dc4bb/src/core/credentials/transport/tls/grpc_tls_credentials_options.h#L40)
 and through the stack.  Users should be able to specify, for example, an
 `InMemoryCertificateProvider` that implements private key offloading and a
 `FileWatcherCertificateProvider` for the root certificates. We will mark the
 [coupled
-API](http://google3/third_party/grpc/include/grpcpp/security/tls_credentials_options.h;l=55-56;rcl=682352913)
+API](https://github.com/grpc/grpc/blob/fa77e332f6a4a88902c012a83703071c251dc4bb/include/grpcpp/security/tls_credentials_options.h#L58)
 as deprecated.  This is required for this effort, as specifying a private key
 signer must be done for the identity, but is unrelated to how the root is
 provided. Currently, identity (private key and certificate chain) presentation
@@ -119,13 +128,16 @@ to gRPC is coupled with the roots presentation to gRPC.
 ```c++
 class TlsCredentialsOptions {
  public:
+  // The existing method.
   [[deprecated(
       "Use set_root_certificate_provider() or "
       "set_identity_certificate_provider() instead.")]]
   void set_certificate_provider(
       std::shared_ptr<CertificateProviderInterface> certificate_provider);
+  // The new method proposed in this gRFC.
   void set_root_certificate_provider(
       std::shared_ptr<CertificateProviderInterface> certificate_provider);
+  // The new method proposed in this gRFC.
   void set_identity_certificate_provider(
       std::shared_ptr<CertificateProviderInterface> certificate_provider);
 ```
@@ -133,41 +145,19 @@ class TlsCredentialsOptions {
 #### Private Key Signing
 
 BoringSSL provides an asynchronous API for private key signing, so we will
-provide an asynchronous, cancellable API using callbacks. The C-Core APIs used
-to configure this feature will rely on a new certificate provider
-implementation.
+provide an asynchronous, cancellable API using callbacks. Thus, this is only supported in gRPC builds with BoringSSL. If a
+`PrivateKeySigner` is used in a non-BoringSSL build, the user should expect
+failure.
 
-The implementation of `PrivateKeySigner::Sign` can be sync or async. In the sync
-case, the implementer must return a signature or a non-ok status.  In the async
-case, the implementer must kick off their async operations then return a
-`PrivateKeySigner::AsyncSigningHandle`. The async operation must call the
-provided `on_sign_complete` function with the signing result when the operation
-is complete. The implementer must also implement `PrivateKeySigner::Cancel`.
-`Cancel` will be called by gRPC in the case that an in-flight operation must be
-shutdown, and the implementer should use this function to ensure any resources
-being used for an asynchronous signing operation are properly shut down and
-released.
+The implementation of `PrivateKeySigner::Sign` can choose to return
+synchronously or asynchronously via a callback. The implementer must also
+implement cancellation.  `Cancel` will be called by gRPC in the case that an
+in-flight operation must be shutdown, and the implementer should use this
+function to ensure any resources being used for an asynchronous signing
+operation are properly shut down and released.
 
 
 ```c++
-using PrivateKey = std::variant<absl::string_view, CustomPrivateKeySign>
-
-// This already exists - it will be deprecated and replaced with `IdentityKeyOrSignerCertPair` where necessary.
-struct [[deprecated("Use IdentityKeyOrSignerCertPair instead")]] GRPCXX_DLL
-    IdentityKeyCertPair {
-  std::string private_key;
-  std::string certificate_chain;
-};
-
-// A struct that stores the credential data presented to the peer in handshake
-// to show local identity. The private_key and certificate_chain should always
-// match. The private_key can be either a PEM string or a PrivateKeySigner.
-// The PrivateKeySigner will only work with gRPC binaries compiled with
-// BoringSSL.
-struct GRPCXX_DLL IdentityKeyOrSignerCertPair {
-  std::variant<std::string, std::shared_ptr<PrivateKeySigner>> private_key;
-  std::string certificate_chain;
-};
 
 // Implementations of this class must be thread-safe.
 class PrivateKeySigner {
@@ -224,6 +214,34 @@ class PrivateKeySigner {
   // from a previous call to Sign().
   virtual void Cancel(std::shared_ptr<AsyncSigningHandle> handle) = 0;
 };
+```
+
+The C-Core APIs used
+to configure this feature will rely on a new certificate provider
+implementation. 
+
+```c
+// This already exists - it will be deprecated and replaced with `IdentityKeyOrSignerCertPair` where necessary.
+struct [[deprecated("Use IdentityKeyOrSignerCertPair instead")]] GRPCXX_DLL
+    IdentityKeyCertPair {
+  std::string private_key;
+  std::string certificate_chain;
+};
+
+// A struct that stores the credential data presented to the peer in handshake
+// to show local identity. The private_key and certificate_chain should always
+// match. The private_key can be either a PEM string or a PrivateKeySigner.
+// The PrivateKeySigner will only work with gRPC binaries compiled with
+// BoringSSL.
+struct GRPCXX_DLL IdentityKeyOrSignerCertPair {
+  std::variant<std::string, std::shared_ptr<PrivateKeySigner>> private_key;
+  std::string certificate_chain;
+};
+
+// A new overload on the InMemoryCertificateProvider to take this new struct
+absl::Status UpdateIdentityKeyCertPair(
+    std::vector<IdentityKeyOrSignerCertPair>
+        identity_key_or_signer_cert_pairs);
 
 ```
 ### Python
@@ -239,6 +257,8 @@ different root and identity providers.
 The current Python API takes a function rather than attempting to do the
 interface-based approach from C++.  It returns either how to cancel the async
 operation in the async case or a signature in the sync case.
+
+Note: gevent is NOT supported.
 
 ```py
 
@@ -362,7 +382,7 @@ Golang's `crypto/tls` package does not directly support asynchronous operations
 for the `Signer` interface, but this is not a problem due to the structure of
 goroutines. The API will simply look like implementing the `crypto/tls` `Signer`
 API. In this library, the [`Certificate`
-type's](http://google3/third_party/go/gc/src/crypto/tls/common.go;l=1559;rcl=815505302)
+type's](https://pkg.go.dev/crypto/tls#Certificate)
 `PrivateKey` is a [`crypto.PrivateKey`](https://pkg.go.dev/crypto#PrivateKey),
 which is `Any`, but it must implement the [`Signer`
 interface](https://pkg.go.dev/crypto#Signer). Notably, in Golang, the user's
@@ -504,28 +524,32 @@ expected.
 
 ## Implementation
 
-* https://github.com/grpc/grpc/pull/40878 - Migrate Python to TlsCredentials under the hood
-* https://github.com/grpc/grpc/pull/41490 - Separate cert provider into a root and identity provider
-* https://github.com/grpc/grpc/pull/41484 - Create InMemoryCertificateProvider
-* https://github.com/grpc/grpc/pull/41606 - Implement PrivateKeySigner in C-Core and C++
-* https://github.com/grpc/grpc/pull/41701 - Implement in Python and Cython
+* C-Core/C++
+    * https://github.com/grpc/grpc/pull/40878 - Migrate Python to TlsCredentials under the hood
+    * https://github.com/grpc/grpc/pull/41490 - Separate cert provider into a root and identity provider
+    * https://github.com/grpc/grpc/pull/41484 - Create InMemoryCertificateProvider
+    * https://github.com/grpc/grpc/pull/41606 - Implement PrivateKeySigner in C-Core and C++
+
+* Python
+    * https://github.com/grpc/grpc/pull/41701 - Implement in Python and Cython
 
 
 # **Observability**
 
-The following non-per-call metrics [A79] and labels will be added. These will
-allow a user insight into the offloaded operations and will be an aid in
-debugging failures.
+We will add a new metric using the non-per-call metric framework described in
+[A79]. This will will allow a user insight into the offloaded operations and
+will be an aid in debugging failures.
+
+The new metric will use the following labels:
 
 | Label Name | Disposition | Description |
 | :---- | :---- | :---- |
-| `grpc.target` | required | Indicates the target of the gRPC channel for which this handshake is occurring |
-| `grpc.tls.private_key_sign_algorithm` | optional | The signature algorithm used to sign |
+| `grpc.target` | required | Indicates the target of the gRPC channel for which this handshake is occurring. Defined in [A66]. |
+| `grpc.tls.private_key_sign_algorithm` | optional | The signature algorithm used to sign. Contains both a name and key length. For example, `RsaPkcs1Sha256`. This will be a consistent string between languages.  |
 | `grpc.status` | optional | The status code return for the private key sign function. From [A66] |
 
-The `grpc.tls.private_key_sign_algorithm` label will contain both a name and key
-length. For example, `RsaPkcs1Sha256`. For more, see the `SignatureAlgorithm`
-enum in the C section above.
+
+Here is the new metric we will add:
 
 | Metric | Type | Unit | Labels | Description |
 | :---- | :---- | :---- | :---- | :---- |
