@@ -64,7 +64,7 @@ The weight calculation logic in the WRR policy will be updated to determine the 
         - `mem_utilization`
         - `named_metrics.*`
         - `utilization.*`
-    - **Compute Max**: Track the maximum value among all successfully resolved, positive ( > 0), finite metrics.
+    - **Compute Max**: Track the maximum value among all successfully resolved, positive ( > 0), non-nan metrics.
     - If a max value is found, use it as the `utilization`.
 2.  **Fallback**: If checking custom metrics did not determine a valid utilization value (or if `metric_names_for_computing_utilization` is not configured), fall back to the existing WRR utilization behavior defined in [gRFC A58][A58].
 
