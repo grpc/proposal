@@ -77,7 +77,7 @@ Design
 
 ### Protobuf API
 
-We introduce a new proto syntax: `returns service`. The client will send an
+We will use a new protobuf syntax: `returns service`. The client will send an
 initial Session Request to establish the common context to be used for every
 virtual RPC.
 
@@ -126,9 +126,9 @@ metadata / payload reach the server. However, the server application will
 provide an explicit signal (a "barrier") telling the server session handler that
 all common application context has been successfully set up, and the server is
 ready to accept virtual RPC traffic. Internally, this signal triggers sending
-the `server_initial_metadata` from the session request handler to the client.
+the `server_initial_metadata` from the server to the client.
 
-While the client application does not need to wait to explicitly get this
+While the client application does not explicitly need to wait for this
 signal, all virtual RPCs sent prior to the barrier will be queued internally on
 the server side until this handshake is complete. This queuing is desirable on
 the server side instead of the client side, to avoid adding an extra round trip
@@ -160,7 +160,7 @@ void ClientReactor::OnSessionAcknowledged(bool ok) override {
 
 #### Deadlines and Cancellations
 
-We must support deadlines and cancellations for both the Session Request and
+We must support deadlines and cancellations for both the session and
 each individual virtual request.
 
 * **Session Deadline**: The session deadline is converted to a `grpc-timeout`
@@ -170,7 +170,7 @@ When this expires, the gRPC client cancels the Session Request with a
 live virtual requests cancelled. Note that the error status on the virtual RPC
 will not be `DeadlineExceeded`, since the virtual RPC's deadline did not expire.
 Instead, the virtual RPC will fail with `Unavailable` error status, indicating
-an underlying connection failure.
+an underlying connection unavailability.
 
 * **Virtual RPC Deadline**: Deadlines on individual vRPCs work natively, same as
 non-virtual RPCs. The only difference will be that, when the deadline expires,
