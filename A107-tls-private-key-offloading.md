@@ -33,8 +33,8 @@ This feature will have the following requirements/assumptions:
 
 
 ### Related Proposals: 
-* [A66]
-* [A79]
+* [A66: OpenTelemetry Metrics][A66]
+* [A79: Non-per-call Metrics Architecture][A79]
 
 [A66]: A66-otel-stats.md
 [A79]: A79-non-per-call-metrics-architecture.md
@@ -145,9 +145,10 @@ class TlsCredentialsOptions {
 #### Private Key Signing
 
 BoringSSL provides an asynchronous API for private key signing, so we will
-provide an asynchronous, cancellable API using callbacks. Thus, this is only supported in gRPC builds with BoringSSL. If a
-`PrivateKeySigner` is used in a non-BoringSSL build, the user should expect
-failure.
+provide an asynchronous, cancellable API using callbacks. Thus, this is only
+supported in gRPC builds with BoringSSL. If a `PrivateKeySigner` is used in a
+non-BoringSSL build, the user should expect failure when configuring the
+`PrivateKeySigner` in the `InMemoryCertificateProvider`.
 
 The implementation of `PrivateKeySigner::Sign` can choose to return
 synchronously or asynchronously via a callback. The implementer must also
@@ -216,9 +217,8 @@ class PrivateKeySigner {
 };
 ```
 
-The C-Core APIs used
-to configure this feature will rely on a new certificate provider
-implementation. 
+The private key signer can be configured via the `InMemoryCertificateProvider`
+using a new `IdentityKeyOrSignerCertPair` struct, as shown below."
 
 ```c
 // This already exists - it will be deprecated and replaced with `IdentityKeyOrSignerCertPair` where necessary.
@@ -525,12 +525,12 @@ expected.
 ## Implementation
 
 * C-Core/C++
-    * https://github.com/grpc/grpc/pull/40878 - Migrate Python to TlsCredentials under the hood
     * https://github.com/grpc/grpc/pull/41490 - Separate cert provider into a root and identity provider
     * https://github.com/grpc/grpc/pull/41484 - Create InMemoryCertificateProvider
     * https://github.com/grpc/grpc/pull/41606 - Implement PrivateKeySigner in C-Core and C++
 
 * Python
+    * https://github.com/grpc/grpc/pull/40878 - Migrate Python to TlsCredentials under the hood
     * https://github.com/grpc/grpc/pull/41701 - Implement in Python and Cython
 
 
