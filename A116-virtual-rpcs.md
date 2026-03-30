@@ -2,10 +2,10 @@ gRPC Virtual RPCs on Bidi Streams
 ---------------------------------
 
 * Author(s): Siddharth Nohria
-* Approver: ctiller
+* Approver: a11r
 * Status: Draft
 * Implemented in: C++ (Prototype)
-* Last updated: 2026-03-26
+* Last updated: 2026-03-30
 * Discussion at:
 
 Table of Contents
