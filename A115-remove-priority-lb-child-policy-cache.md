@@ -30,11 +30,10 @@ priorities. For example, notice how priority LB child names increase in the foll
 sequence of locality updates. On each child name update, previous policies are added
 to the retention cache.
 
-```
-[[AA, BB], [CC, DD]] => [priority-0-0 priority-0-1]
-[[CC], [DD, EE]] => [priority-0-1 priority-0-2]
-[[AA, BB], [CC, DD]] => [priority-0-3 priority-0-2]
-```
+For example, consider the following sequence of updates:
+1. P0=[AA, BB], P1=[CC, DD]: P0 will be assigned "child0", P1 will be assigned "child1".
+2. P0=[CC], P1=[DD, EE]: P0 will be assigned "child1" (reusing the child name containing "CC" from the previous update), P1 will be assigned "child2" (new child number).
+3. P0=[AA, BB], P1=[CC, DD]: P0 will be assigned "child3" (new child number), P1 will be assigned "child1" (reusing the child name containing "CC" from the previous update).
 
 Additionally, priority LB child names are generated with strictly increasing numbers
 (once a priority LB child name is unconfigured, it will never be configured again). As such,
