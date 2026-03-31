@@ -218,7 +218,7 @@ class PrivateKeySigner {
 ```
 
 The private key signer can be configured via the `InMemoryCertificateProvider`
-using a new `IdentityKeyOrSignerCertPair` struct, as shown below."
+using a new `IdentityKeyOrSignerCertPair` struct, as shown below.
 
 ```c
 // This already exists - it will be deprecated and replaced with `IdentityKeyOrSignerCertPair` where necessary.
@@ -291,6 +291,7 @@ def ssl_channel_credentials_with_custom_signer(
 
     THIS IS AN EXPERIMENTAL API.
     This API will be removed in a future version and combined with `grpc.ssl_channel_credentials`.
+    This API is not compatible with implementations using gevent.
 
     Args:
       private_key_sign_fn: a function with the signature of
@@ -339,41 +340,40 @@ def sync_client_private_key_signer(
         data_to_sign, private_key_bytes, signature_algorithm
     )
     return signature
+```
 
-def async_signer_worker(data_to_sign, signature_algorithm, on_complete):
+Concurrent example:
+
+```
+
+def _do_signing_concurrent(data_to_sign, signature_algorithm, on_complete):
     """
-    Meant to be used as an async function for a thread, for example
+    A theoretical example for `concurrent_client_private_key_signer` to call
     """
-    private_key_bytes = client_private_key()
-    signature = sign_private_key(
-        data_to_sign, private_key_bytes, signature_algorithm
-    )
-    on_complete(signature)
+    cancel = <start some cancellable concurrent operation that calls on_complete with the signature>
+    return cancel
 
 
-def no_op_cancel():
-    pass
-
-
-def async_client_private_key_signer(
+def concurrent_client_private_key_signer(
     data_to_sign, signature_algorithm, on_complete
 ):
     """
-    Takes in data_to_sign and signs it using the test private key
+    Takes in data_to_sign and signs it concurrently.
     """
-    threading.Thread(
-        target=async_signer_worker,
-        args=(data_to_sign, signature_algorithm, on_complete),
-    ).start()
-    return no_op_cancel
+    # _do_signing_concurrent is a function that begins a concurrent operation to sign
+    # and returns how to cancel the operation.
+    cancel = _do_signing_concurrent(data_to_sign, signature_algorithm,
+                                   on_complete)
+    # cancel is a function with no args that cancels the concurrent operation.
+    return cancel
 
 
-
-
-# Now the user is in their application configuring gRPC 
-# Create creds with the custom signer
-creds = ssl_channel_credentials_with_custom_signer(<some_root>, <sync or async example_signer, <some_chain>)
-
+# In the Python code configuring gRPC, create creds with the custom signer
+creds = grpc.experimental.ssl_channel_credentials_with_custom_signer(
+    private_key_sign_fn=your_signer_fn
+    certificate_chain=your_cert_chain,
+    root_certificates=your_root_certs,
+)
 ```
 
 ### Go
