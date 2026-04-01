@@ -265,12 +265,60 @@ Note that in this mode, all messages on the ext_proc stream will have the
 [`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126)
 field set.
 
-One challenge in this mode is flow control: if we are blocked sending
-a message to the ext_proc server by flow control, then we need some
-push-back on the data plane RPC, or else we would have to buffer messages
-to be sent to the ext_proc server, which can cause OOMs.  (Envoy has
-noted this problem in https://github.com/envoyproxy/envoy/issues/33319
-but has not proposed a solution yet.)
+#### Flow Control
+
+Flow control must be handled properly in both normal mode and
+[observability mode](#observability-mode).
+
+In normal mode, flow control must be applied for each stream through the
+ext_proc code.  On the gRPC client side, this means each of the
+following:
+
+- client messages from the client application to the ext_proc server
+- client messages from the ext_proc server to the data plane server
+- server messages from the data plane server to the ext_proc server
+- server messages from the ext_proc server to the client application
+
+Similarly, on the gRPC server side, it applies to each of the following:
+
+- client messages from the data plane client to the ext_proc server
+- client messages from the ext_proc server to the server application
+- server messages from the server application to the ext_proc server
+- server messages from the ext_proc server to the data plane client
+
+Note that each of those streams is completely independent of any other
+and therefore should have its own independent flow control push-back.
+
+In [observability mode](#observability-mode), flow control works a
+little differently, because for each of client messages and server
+messages, there is a single stream being forwarded to two different
+destinations instead of it being split into two separate streams.  For
+example, for client messages on the gRPC client side, instead of one
+stream from the application to the ext_proc server and another stream
+from the ext_proc server to the data plane server, we will have a single
+stream from the application that goes to both the ext_proc server and
+the data plane server.
+
+Specifically, on the gRPC client side, we have the following:
+
+- client messages from the client application to both the ext_proc server
+  and the data plane server
+- server messages from the data plane server to both the ext_proc server
+  and the client application
+
+And on the gRPC server side, we have the following:
+
+- client messages from the data plane client to both the ext_proc server
+  and the server application
+- server messages from the server application to both the ext_proc server
+  and the data plane client
+
+In any of those streams, if we are blocked sending a message to the
+ext_proc server by flow control, then we need some push-back to the
+originator of the stream, or else we would have to buffer messages to
+be sent to the ext_proc server, which can cause OOMs.  (Envoy has noted
+this problem in https://github.com/envoyproxy/envoy/issues/33319 but
+has not proposed a solution yet.)
 
 For gRPC, we will address this problem by requiring the message to the
 ext_proc server to pass flow control before we allow the message to
@@ -349,7 +397,7 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   `immediate_response` field populated, the filter will act as if the
   ext_proc stream terminated with a non-OK status.
 - [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L283):
-  See [Observability Mode](#observability-mode) below.
+  See [Observability Mode](#observability-mode) above.
 - [deferred_close_timeout](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L305):
   In observability mode, the data plane stream may terminate before the
   ext_proc server has finished reading all data off of the ext_proc
