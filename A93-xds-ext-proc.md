@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-03-24
+* Last updated: 2026-04-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -168,7 +168,7 @@ will be used:
 
 #### Payload Handling
 
-The existing ext_proc protocol's handling of request payloads has a
+The existing ext_proc protocol's handling of message payloads has a
 significant impedance mismatch with gRPC.
 
 The ext_proc protocol is designed for HTTP payloads, meaning that the
@@ -645,42 +645,59 @@ If the `allowed_override_modes` config field is non-empty and
 the value of the `mode_override` field does not match any entry in
 `allowed_override_modes`, the mode override will be ignored.  Note that
 this matching will ignore the value of the `request_header_mode` field,
-since that mode cannot be overridden.  (The filter will already have
-sent the request headers to the ext_proc server before the ext_proc
-server can send back a response changing the processing mode.)
+since that mode cannot be overridden.  (The filter will already have sent
+the client headers to the ext_proc server before the ext_proc server can
+send back a response changing the processing mode.)  Otherwise, when the
+filter receives a response from the ext_proc server with `mode_override`
+set, it will comply with the requested change for all subsequent events
+on the data plane RPC.
 
-Otherwise, when the filter receives a response from the ext_proc server
-with `mode_override` set, it will comply with the requested change for
-all subsequent events on the data plane RPC.  However, note that due to
-the streaming nature of the ext_proc communication, there is no
-guarantee that the filter will see the message before it has already
-processed events from the data plane RPC that would have been affected
-by the change.
+Note that due to the streaming nature of the ext_proc communication,
+there is no guarantee that the filter will see the mode override before it
+has already processed events from the data plane RPC that would have been
+affected by the mode override.  For example, if the filter was originally
+configured to not send server headers and the ext_proc server tries
+to enable that in a response to a client message event, it's possible
+that the filter has already allowed server headers to proceed on the
+data plane RPC before it saw that `mode_override`.  Therefore, ext_proc
+servers should be aware that this usage is best-effort and not guaranteed.
 
-A common use-case for this is when the filter is configured to send
-client messages, and in the response to the client headers event, the
-ext_proc server uses `mode_override` to set `request_body_mode` to
-`NONE`.  The filter may have already sent one or more client message
-events by the time it sees this override.  In this case, the ext_proc
-server will ignore those client message events, and the filter should (a)
-stop sending any subsequent client message events and (b) stop waiting
-for responses to any client message events that it has already sent and
-allow those client messages to proceed on the data plane RPC.
+Also, because the `GRPC` body send mode is a streaming mode, the ext_proc
+filter may have already started streaming the messages before it receives
+the mode override, and there is no way to stop streaming the body without
+terminating the entire stream.  Therefore, if the filter is configured
+to use `GRPC` body send mode, it is not supported to override the mode to
+`NONE`.  However, the inverse *is* supported: the filter may be instructed
+to switch from `NONE` to `GRPC` body send mode, although ext_proc server
+implementations need to be aware that the client may have already passed
+some messages onto the data plane server before seeing the mode override,
+in which case the ext_proc server will not have seen all of the messages.
 
-Note that when using `mode_override` to *enable* sending an event that the
-filter was configured to *disable*, the event may have already occurred
-by the time the filter sees the `mode_override`.  For example, if the
-filter was originally configured to not send server headers and the
-ext_proc server tries to enable that in a response to a client message
-event, it's possible that the filter has already allowed server headers
-to proceed on the data plane RPC before it saw that `mode_override`.
-Therefore, ext_proc servers should be aware that this usage is
-best-effort and not guaranteed.
+The following table shows which mode overrides will be supported in the
+ext_proc response for each data plane RPC event:
 
-To implement this, the filter will store the processing mode separately
-for each data plane RPC.  The processing mode for an RPC will be
-initialized based on the filter's config, but it may be modified later
-by subsequent overrides.
+In Response to Data Plane RPC Event | Mode Override | Supported? | May Miss Data?
+----------------------------------- | ------------- | ---------- | --------------
+client headers | client body | `NONE` to `GRPC`, but not the reverse | yes
+client headers | server headers | yes | no
+client headers | server body | yes | no
+client headers | server trailers | yes | no
+client body | server headers | yes | yes
+client body | server body | `NONE` to `GRPC`, but not the reverse | yes
+client body | server trailers | yes | yes
+server headers | client body | `NONE` to `GRPC`, but not the reverse | yes
+server headers | server body | `NONE` to `GRPC`, but not the reverse | yes
+server headers | server trailers | yes | no
+server body | client body | `NONE` to `GRPC`, but not the reverse | yes
+server body | server body | `NONE` to `GRPC`, but not the reverse | yes
+server body | server trailers | yes | yes
+
+Any override not listed in this table will be ignored.
+
+To implement mode overrides, the filter will store the processing mode
+separately for each data plane RPC.  The processing mode for an RPC
+will be initialized based on the filter's config, but it may be modified
+later by subsequent overrides.
 
 ### Metrics
 
