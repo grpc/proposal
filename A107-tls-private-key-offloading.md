@@ -32,13 +32,6 @@ This feature will have the following requirements/assumptions:
   * In non-ephemeral Diffe-Hellman key exchange, the private key could be used for other cryptographic operations (e.g. decryption with an RSA key). These will not be supported.
 
 
-### Related Proposals: 
-* [A66: OpenTelemetry Metrics][A66]
-* [A79: Non-per-call Metrics Architecture][A79]
-
-[A66]: A66-otel-stats.md
-[A79]: A79-non-per-call-metrics-architecture.md
-
 ## Proposal
 
 The crypto libraries that each gRPC implementation uses have support for TLS
@@ -541,28 +534,3 @@ expected.
 * Python
     * https://github.com/grpc/grpc/pull/40878 - Migrate Python to TlsCredentials under the hood
     * https://github.com/grpc/grpc/pull/41701 - Implement in Python and Cython
-
-
-# **Observability**
-
-We will add a new metric using the non-per-call metric framework described in
-[A79]. This will will allow a user insight into the offloaded operations and
-will be an aid in debugging failures.
-
-The new metric will use the following labels:
-
-| Label Name | Disposition | Description |
-| :---- | :---- | :---- |
-| `grpc.target` | required | Indicates the target of the gRPC channel for which this handshake is occurring. Defined in [A66]. |
-| `grpc.tls.private_key_sign_algorithm` | optional | The signature algorithm used to sign. Contains both a name and key length. For example, `RsaPkcs1Sha256`. This will be a consistent string between languages.  |
-| `grpc.status` | optional | The status code return for the private key sign function. From [A66] |
-
-
-Here is the new metric we will add:
-
-| Metric | Type | Unit | Labels | Description |
-| :---- | :---- | :---- | :---- | :---- |
-| `grpc.security.handshaker.offloaded_private_key_sign_duration` | Histogram | float64/double s | `grpc.target, grpc.tls.private_key_sign_algorithm, grpc.status` | How long the offloaded private key signing took |
-
-For the latency metric, we will use the buckets as defined in [gRFC
-A66](https://github.com/grpc/proposal/blob/fcabdfdbd50b3c088f5a5c2bf925755781ec076e/A66-otel-stats.md?plain=1#L360-L369).
