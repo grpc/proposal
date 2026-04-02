@@ -414,8 +414,8 @@ type Signer interface {
 }
 
 cert = tls.Certificate{
-Certificate: derChain, //[][]byte
-PrivateKey:  PrivateKeySigner, //crypto.PrivateKey
+    Certificate: derChain, //[][]byte
+    PrivateKey:  PrivateKeySigner, //crypto.PrivateKey
 }
 ```
 
@@ -478,14 +478,13 @@ tlsCert := &tls.Certificate{
 
 // Create the InMemoryCertProvider and configure gRPC with it
 provider, err := NewInMemoryCertProvider(tlsCert)
-serverOpts := &advancedtls.Options{
+clientOpts := &advancedtls.Options{
 	IdentityOptions: advancedtls.IdentityCertificateOptions{
 		IdentityProvider: provider,
 	},
 }
-
-// Down the line update
-provider.UpdateCertificate(&tls.Certificate(<some updated thing>))
+clientTLSCreds, err := advancedtls.NewClientCreds(options)
+conn, err := grpc.NewClient(fullServerAddr, grpc.WithTransportCredentials(clientTLSCreds))
 
 ```
 
