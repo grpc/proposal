@@ -344,27 +344,36 @@ def sync_client_private_key_signer(
 
 Concurrent example:
 
-```
+```py
+import multiprocessing
 
-def _do_signing_concurrent(data_to_sign, signature_algorithm, on_complete):
-    """
-    A theoretical example for `concurrent_client_private_key_signer` to call
-    """
-    cancel = <start some cancellable concurrent operation that calls on_complete with the signature>
-    return cancel
+def _sign_worker(data_to_sign, signature_algorithm, on_complete):
+    """Worker function to perform signing in a separate process."""
+    try:
+        # In a real use case, this would use a secure method to access the key.
+        signature = sign_private_key(
+            data_to_sign, client_private_key(), signature_algorithm
+        )
+        on_complete(signature)
+    except Exception as e:
+        on_complete(e)
 
 
 def concurrent_client_private_key_signer(
     data_to_sign, signature_algorithm, on_complete
 ):
-    """
-    Takes in data_to_sign and signs it concurrently.
-    """
-    # _do_signing_concurrent is a function that begins a concurrent operation to sign
-    # and returns how to cancel the operation.
-    cancel = _do_signing_concurrent(data_to_sign, signature_algorithm,
-                                   on_complete)
-    # cancel is a function with no args that cancels the concurrent operation.
+    """Takes in data_to_sign and signs it concurrently using multiprocessing."""
+    p = multiprocessing.Process(
+        target=_sign_worker,
+        args=(data_to_sign, signature_algorithm, on_complete),
+    )
+    p.start()
+
+    # Per the Python API, return a callable matching PrivateKeySignCancel
+    def cancel():
+        p.terminate()
+        p.join()
+
     return cancel
 
 
