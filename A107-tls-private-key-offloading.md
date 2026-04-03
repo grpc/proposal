@@ -316,10 +316,19 @@ bridge types between the Python user sign function and the expected
 sign function while managing the GIL and asynchronous nature of the signing.
 This is technically feasible with Cython.
 
+Example Usage:
 
 ```py
-# Example Usage
+# In the Python code configuring gRPC, create creds with the custom signer
+creds = grpc.experimental.ssl_channel_credentials_with_custom_signer(
+    private_key_sign_fn=your_signer_fn
+    certificate_chain=your_cert_chain,
+    root_certificates=your_root_certs,
+)
+```
 
+Synchronous (blocking) implementation example:
+```py
 def sync_client_private_key_signer(
     data_to_sign,
     signature_algorithm,
@@ -362,20 +371,13 @@ def concurrent_client_private_key_signer(
     )
     p.start()
 
-    # Per the Python API, return a callable matching PrivateKeySignCancel
+    # Per the Python API, this will be called when gRPC has a reason to shutdown
+    # or cancel the request and allows the implementer to clean up resources.
     def cancel():
         p.terminate()
         p.join()
 
     return cancel
-
-
-# In the Python code configuring gRPC, create creds with the custom signer
-creds = grpc.experimental.ssl_channel_credentials_with_custom_signer(
-    private_key_sign_fn=your_signer_fn
-    certificate_chain=your_cert_chain,
-    root_certificates=your_root_certs,
-)
 ```
 
 ### Go
