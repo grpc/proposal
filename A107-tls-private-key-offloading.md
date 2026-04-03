@@ -490,7 +490,7 @@ clientOpts := &advancedtls.Options{
 		IdentityProvider: provider,
 	},
 }
-clientTLSCreds, err := advancedtls.NewClientCreds(options)
+clientTLSCreds, err := advancedtls.NewClientCreds(clientOpts)
 conn, err := grpc.NewClient(fullServerAddr, grpc.WithTransportCredentials(clientTLSCreds))
 
 ```
