@@ -2,9 +2,8 @@ A107 - TLS Private Key Offloading
 ----
 * Author: @gtcooke94
 * Approver: ejona86
-* Status: C++ implemented
-* Implemented in: C++, Go
-* Last updated: 2026-03-18
+* Implemented in: C++
+* Last updated: 2026-04-03
 * Discussion at: https://groups.google.com/g/grpc-io/c/N02jVxPd_4Y/m/n34PWOyKBgAJ?e=48417069
 
 ## Abstract
@@ -62,6 +61,12 @@ signature algorithm and returns signed bytes.
 ```
 string signed_bytes sign(string algorithm, string unsigned_bytes)
 ```
+
+We are largely restricted by the underlying security libraries in each language.
+In the following sections, each language's API will be discussed as they are
+dependent upon the SSL library interfaces. Further, each language has different
+expectations for the sign functions on whether raw bytes or a digest is
+expected.
 
 ### C-Core / C++
 
@@ -512,17 +517,11 @@ Offloading, it will not happen.
 
 ## Rationale
 
-
 Private key offloading is designed to support signing outside of the existing
 process, for example in a hardware module or via an RPC \- thus this API should
 support asynchronous operations in languages where that is possible (Golang's
 crypto/tls does **not** support asynchronous private key signing). 
 
-We are largely restricted by the underlying security libraries in each language.
-In the following sections, each language's API will be discussed as they are
-dependent upon the SSL library interfaces. Further, each language has different
-expectations for the sign functions on whether raw bytes or a digest is
-expected.
 
 
 ## Implementation
