@@ -4,7 +4,7 @@ Standalone Node.js gRPC+Protobuf.js Library API
 * Approver: wenbozhu
 * Status: Ready for Implementation
 * Implemented in: Node.js
-* Last updated: 2019-05-15
+* Last updated: 2022-09-21
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/t7XFE7Wevow
 
 ## Abstract
@@ -17,7 +17,7 @@ The Node gRPC library currently depends on Protobuf.js version 5. Since Protobuf
 
 ## Proposal
 
-For the purpose of definiing services in general, the existing gRPC library has defined the types [`MethodDefinition`](https://grpc.io/grpc/node/grpc.html#~MethodDefinition__anchor) and [`ServiceDefinition`](https://grpc.io/grpc/node/grpc.html#~ServiceDefinition__anchor). A `MethodDefinition` is an object with the following properties:
+For the purpose of defining services in general, the existing gRPC library has defined the types [`MethodDefinition`](https://grpc.io/grpc/node/grpc.html#~MethodDefinition__anchor) and [`ServiceDefinition`](https://grpc.io/grpc/node/grpc.html#~ServiceDefinition__anchor). A `MethodDefinition` is an object with the following properties:
 
  - `path`: The URL path for accessing this method
  - `requestStream`: A boolean indicating whether there is a stream of request messages instead of a single message.
@@ -26,6 +26,7 @@ For the purpose of definiing services in general, the existing gRPC library has 
  - `responseSerialize`: A function for serializing a response object to a `Buffer`
  - `requestDeserialize`: A function for deserializing a request object from a `Buffer`
  - `responseDeserialize`: A function for deserializing a response object from a `Buffer`
+ - `options`: Method options object
 
 This information is sufficient to implement a client or service handler for any kind of method. Then a `ServiceDefintion` is just an object that maps method names to `MethodDefinition` objects. When loading a `.proto` file, more than one service may be loaded, so we additionally define a wrapping type `PackageDefinition`, which maps fully qualified service names to `ServiceDefinition` objects. For example, if a `.proto` file defines the package `a.b` with the services `Service1` and `Service2`, the resulting `PackageDefinition` would have the keys `"a.b.Service1"` and `"a.b.Service2"`.
 
