@@ -318,6 +318,12 @@ subset of arguments intended solely for its children.
 
 ## Rationale
 
+The proposed mechanism of Child Channel Options provides a targeted way to
+propagate configuration from a parent channel to its children. This approach is
+chosen because it allows configuration to be scoped to specific parent-child
+hierarchies, which is necessary for accurate telemetry and interceptor
+application without affecting unrelated channels.
+
 ### Why not Global Configuration?
 
 The primary use-case we care about is setting a `StatsPlugin` for one particular
@@ -339,3 +345,15 @@ select it based on target Z, which would erroneously attach it to the child
 channels for both A and B. Second, it is hard for the application that registers
 the global `StatsPlugin` to know what target URIs will be used for internal
 child channels.
+
+## Non-Goals and Future Work
+
+### Differentiating Configuration Per Child Channel
+
+This proposal mandates that the child channel options provided by a parent are
+uniform across all its child channels. We considered allowing different
+configurations for different child channels (e.g., based on the purpose of the
+channel like xDS vs RLS). However, this would require a mechanism to categorize
+or identify the purpose of each child channel, which adds significant
+complexity. Since no strong need for this was identified during initial
+discussions, it is left for future work if and when it becomes necessary.
