@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-04-01
+* Last updated: 2026-04-22
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -78,10 +78,12 @@ The ext_proc filter will create a gRPC channel to the ext_proc server.
 It will use the mechanism described in [A102] to determine the server to
 talk to and the channel credentials to use.
 
-We do not want to recreate this channel on LDS updates, unless the
-target URI or channel credentials changes.  The ext_proc filter will
-use the filter state retention mechanism described in [A83] to retain
-the channel across updates.
+We do not want to recreate this channel on LDS or RDS updates, unless the
+target URI or channel credentials changes.  The ext_proc filter will use
+the filter state retention mechanism described in [A83] to retain the
+channel across updates.  Note that implementations may need additional
+reference counting on the side channel to handle cases where an RPC is
+already in flight when the LDS or RDS resource changes.
 
 TODO: stats plugin propagation?
 
@@ -682,33 +684,41 @@ which will be handled as described in [A92].
 
 The `mode_override` field in the ext_proc response allows the ext_proc
 server to tell the client to change its behavior for the duration of
-the RPC.  For example, the ext_proc server may decide after seeing the
-client headers event that it does not actually need to see the client
-message events.
+the RPC.  The ext_proc server can set this override only in response
+to client headers or server headers.  For example, it may decide after
+seeing the client headers event that it does not actually need to see
+the server headers event.
 
 If the `allow_mode_override` config field is set to false, then the
 `mode_override` field will be ignored.
 
-If the `allowed_override_modes` config field is non-empty and
-the value of the `mode_override` field does not match any entry in
-`allowed_override_modes`, the mode override will be ignored.  Note that
-this matching will ignore the value of the `request_header_mode` field,
-since that mode cannot be overridden.  (The filter will already have sent
-the client headers to the ext_proc server before the ext_proc server can
-send back a response changing the processing mode.)  Otherwise, when the
-filter receives a response from the ext_proc server with `mode_override`
-set, it will comply with the requested change for all subsequent events
-on the data plane RPC.
+If the `allowed_override_modes` config field is non-empty, then the
+ext_proc filter will check to see if the `mode_override` field matches an
+entry in `allowed_override_modes`.  The matching is done by starting with
+the current processing mode and applying changes from `mode_override` for
+any field whose value is not `DEFAULT`.  The resulting new mode is then
+checked against the entries in `allowed_override_modes`.  This matching
+will ignore the value of the `request_header_mode` field, since that
+mode cannot be overridden.  (The filter will already have sent the client
+headers to the ext_proc server before the ext_proc server can send back
+a response changing the processing mode.)  Implementations may represent
+the processing mode as a bitmask for efficiency.  If no match is found,
+then the `mode_override` field will be ignored.
+
+Otherwise, when the filter receives a response from the ext_proc server
+with `mode_override` set, it will comply with the requested change for
+all subsequent events on the data plane RPC.
 
 Note that due to the streaming nature of the ext_proc communication,
 there is no guarantee that the filter will see the mode override before it
 has already processed events from the data plane RPC that would have been
 affected by the mode override.  For example, if the filter was originally
-configured to not send server headers and the ext_proc server tries
-to enable that in a response to a client message event, it's possible
-that the filter has already allowed server headers to proceed on the
-data plane RPC before it saw that `mode_override`.  Therefore, ext_proc
-servers should be aware that this usage is best-effort and not guaranteed.
+configured to not send client messages and the ext_proc server tries to
+enable that in a response to a server headers event, it's possible that
+the filter has already allowed a number of client messages to proceed
+on the data plane RPC before it saw that `mode_override`.  Therefore,
+ext_proc servers should be aware that this usage is best-effort and
+not guaranteed.
 
 Also, because the `GRPC` body send mode is a streaming mode, the ext_proc
 filter may have already started streaming the messages before it receives
@@ -730,15 +740,9 @@ client headers | client body | `NONE` to `GRPC`, but not the reverse | yes
 client headers | server headers | yes | no
 client headers | server body | yes | no
 client headers | server trailers | yes | no
-client body | server headers | yes | yes
-client body | server body | `NONE` to `GRPC`, but not the reverse | yes
-client body | server trailers | yes | yes
 server headers | client body | `NONE` to `GRPC`, but not the reverse | yes
 server headers | server body | `NONE` to `GRPC`, but not the reverse | yes
 server headers | server trailers | yes | no
-server body | client body | `NONE` to `GRPC`, but not the reverse | yes
-server body | server body | `NONE` to `GRPC`, but not the reverse | yes
-server body | server trailers | yes | yes
 
 Any override not listed in this table will be ignored.
 
