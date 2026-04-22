@@ -291,6 +291,13 @@ Similarly, on the gRPC server side, it applies to each of the following:
 Note that each of those streams is completely independent of any other
 and therefore should have its own independent flow control push-back.
 
+TODO: There is a conflict here, because if we get push-back from the
+data plane server, we would propagate that push-back to the ext_proc
+stream, but that would also wind up pushing back messages bound for the
+data plane client.  This could cause a deadlock for applications that do
+a bunch of writes before doing any reads.  Need to figure out how to
+resolve this.
+
 In [observability mode](#observability-mode), flow control works a
 little differently, because for each of client messages and server
 messages, there is a single stream being forwarded to two different
