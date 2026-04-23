@@ -552,7 +552,10 @@ config field, for client-to-server events, or the
 config field, for server-to-client events.
 
 The set of supported attribute names is the same as what we support for
-any CEL expression in xDS, as defined in [A106] and [A103].
+any CEL expression in xDS, as defined in [A106] and [A103].  However,
+note that implementations do not necessarily need to implement this via
+CEL; the only requirement is that each supported attribute is expanded
+to the appropriate corresponding value.
 
 For example, consider the case where the `request_attributes` config
 field contains the attribute `request.path` and the filter is processing
