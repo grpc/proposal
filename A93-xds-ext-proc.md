@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-04-22
+* Last updated: 2026-04-24
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -377,13 +377,6 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
     and `GRPC` (to be added).
   - We ignore the request_trailer_mode field, since gRPC never sends
     request trailers.
-- [allow_mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L249):
-  If true, allows the ext_proc server to dynamically override the
-  processing mode for an individual data plane RPC.
-- [allowed_override_modes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L331):
-  Ignored unless `allow_mode_override` is true.  This list indicates the
-  set of allowed override modes, ignoring the request header mode.  If
-  this list is empty, then any override sent by the server is honored.
 - [request_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L188)
   and
   [response_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L195):
@@ -430,6 +423,9 @@ The following fields will be ignored by gRPC:
   have a use-case for it.
 - send_body_without_waiting_for_header_response: This is relevant only
   in `STREAMED` body send mode, which gRPC does not support.
+- allow_mode_override and allowed_override_modes: The mode-override
+  feature is complex to implement and does not seem very useful, so we
+  are omitting it until and unless we encounter a use-case that needs it.
 
 #### Override Configuration
 
@@ -649,8 +645,6 @@ as follows:
     filter is running in the gRPC client or server.
   - We will ignore the status and body fields, since these don't apply
     to gRPC.
-- [mode_override](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L189C60-L189C73):
-  See [Processing Mode Override](#processing-mode-override) below.
 - request_drain (new field being added in
   https://github.com/envoyproxy/envoy/pull/38753): If true, the filter
   will send a half-close on the ext_proc stream.  It will then continue
@@ -660,6 +654,8 @@ as follows:
 - We will ignore override_message_timeout, since GRPC body send mode
   does not support timeouts.
 - We ignore the dynamic_metadata field, since it is not relevant to gRPC.
+- We ignore the mode_override field, since we are not supporting this
+  feature.
 
 Note that the responses from the ext_proc server must come back in the
 same order that the events were sent by the filter.  For example, if the
@@ -689,77 +685,6 @@ All mutations (additions, modifications, and removals) are subject to the
 rules in the `mutation_rules` field in the filter config.  This field is
 an `envoy.config.common.mutation_rules.v3.HeaderMutationRules` message,
 which will be handled as described in [A92].
-
-#### Processing Mode Override
-
-The `mode_override` field in the ext_proc response allows the ext_proc
-server to tell the client to change its behavior for the duration of
-the RPC.  The ext_proc server can set this override only in response
-to client headers or server headers.  For example, it may decide after
-seeing the client headers event that it does not actually need to see
-the server headers event.
-
-If the `allow_mode_override` config field is set to false, then the
-`mode_override` field will be ignored.
-
-If the `allowed_override_modes` config field is non-empty, then the
-ext_proc filter will check to see if the `mode_override` field matches an
-entry in `allowed_override_modes`.  The matching is done by starting with
-the current processing mode and applying changes from `mode_override` for
-any field whose value is not `DEFAULT`.  The resulting new mode is then
-checked against the entries in `allowed_override_modes`.  This matching
-will ignore the value of the `request_header_mode` field, since that
-mode cannot be overridden.  (The filter will already have sent the client
-headers to the ext_proc server before the ext_proc server can send back
-a response changing the processing mode.)  Implementations may represent
-the processing mode as a bitmask for efficiency.  If no match is found,
-then the `mode_override` field will be ignored.
-
-Otherwise, when the filter receives a response from the ext_proc server
-with `mode_override` set, it will comply with the requested change for
-all subsequent events on the data plane RPC.
-
-Note that due to the streaming nature of the ext_proc communication,
-there is no guarantee that the filter will see the mode override before it
-has already processed events from the data plane RPC that would have been
-affected by the mode override.  For example, if the filter was originally
-configured to not send client messages and the ext_proc server tries to
-enable that in a response to a server headers event, it's possible that
-the filter has already allowed a number of client messages to proceed
-on the data plane RPC before it saw that `mode_override`.  Therefore,
-ext_proc servers should be aware that this usage is best-effort and
-not guaranteed.
-
-Also, because the `GRPC` body send mode is a streaming mode, the ext_proc
-filter may have already started streaming the messages before it receives
-the mode override, and there is no way to stop streaming the body without
-terminating the entire stream.  Therefore, if the filter is configured
-to use `GRPC` body send mode, it is not supported to override the mode to
-`NONE`.  However, the inverse *is* supported: the filter may be instructed
-to switch from `NONE` to `GRPC` body send mode, although ext_proc server
-implementations need to be aware that the client may have already passed
-some messages onto the data plane server before seeing the mode override,
-in which case the ext_proc server will not have seen all of the messages.
-
-The following table shows which mode overrides will be supported in the
-ext_proc response for each data plane RPC event:
-
-In Response to Data Plane RPC Event | Mode Override | Supported? | May Miss Data?
------------------------------------ | ------------- | ---------- | --------------
-client headers | client body | `NONE` to `GRPC`, but not the reverse | yes
-client headers | server headers | yes | no
-client headers | server body | yes | no
-client headers | server trailers | yes | no
-server headers | client body | `NONE` to `GRPC`, but not the reverse | yes
-server headers | server body | `NONE` to `GRPC`, but not the reverse | yes
-server headers | server trailers | yes | no
-
-Any override not listed in this table will be ignored.
-
-To implement mode overrides, the filter will store the processing mode
-separately for each data plane RPC.  The processing mode for an RPC
-will be initialized based on the filter's config, but it may be modified
-later by subsequent overrides.
 
 ### Metrics
 
