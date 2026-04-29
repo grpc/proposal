@@ -34,17 +34,11 @@ We will add a new field `metric_names_for_computing_utilization` to the [`Weight
 message WeightedRoundRobinLbConfig {
   // ... existing fields ...
 
-  // A list of metrics to be considered for overriding the default utilization
-  // computation behavior.
-  //
-  // For map fields in the ORCA proto, the string will be of the form
-  // "<map_field_name>.<map_key>". For example, the string "named_metrics.foo"
-  // will mean to look for the key "foo" in the ORCA "named_metrics" field.
-  //
-  // Utilization is computed by taking the max of the values of the
-  // metrics specified here. In the absence of this field or absence of
-  // valid values for the specified metrics, the policy will fall back to the
-  // existing default behavior.
+  // By default, Endpoint weight is computed by taking the max of the values of the metric names specified here from the `OrcaLoadReport` proto.
+  // For map fields in the ORCA proto, the string will be of the form ``<map_field_name>.<map_key>``. For example, the string ``named_metrics.foo`` will mean to look for the key ``foo`` in the ORCA `named_metrics` field.
+  // The first period separates the map field name from the key name, so ``named_metrics.foo.bar`` references the key ``foo.bar``.
+  // If none of the specified metrics are present in the load report, then utilization will instead be computed based on the `application_utilization` field reported by the endpoint.
+  // If `application_utilization` is not set, then `cpu_utilization` is used instead.
   repeated string metric_names_for_computing_utilization = 7;
 }
 ```
