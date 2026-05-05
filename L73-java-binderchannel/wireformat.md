@@ -54,6 +54,9 @@ it will shutdown the transport gracefully.
 version = int;
 protocol extension flags = int;
 shutdown flags = int;
+shutdown status = string (* The description component of the status. The status
+                            code itself is in shutdown flags. This field is only
+                            included if FLAG_STATUS_DESCRIPTION is set. *);
 num bytes = long;
 ping id = int;
 initial stream receive window size = int; (* The initial receive window size for
@@ -67,7 +70,7 @@ setup transport transaction =
     [protocol extension flags]
     [initial stream receive window size] (* if FLAG_STREAM_FLOW_CONTROL is set *)
     ;
-shutdown transport transaction = [shutdown flags];
+shutdown transport transaction = [shutdown flags], [shutdown status];
 acknowledge bytes transaction = num bytes;
 ping transaction = ping id;
 ping response transaction = ping id;
@@ -87,10 +90,16 @@ Both client and server transport may also include protocol extension flags at
 the end of their setup transport transaction. See the next section for currently
 defined flags. Unrecognized flags must be ignored.
 
-`shutdown flags` is a bit field reserved for future extensions to the shutdown
-transaction. Receivers must ignore flags they do not understand and current
-senders must set this field to zero (since no flags have been defined yet).
+`shutdown flags` is a bit field containing options and status for the shutdown
+transaction. Receivers must ignore flags they do not understand.
 This field is optional. If missing, no flags have been set.
+
+#### Shutdown Flag fields
+
+*   FLAG_STATUS_DESCRIPTION (0x20)- Indicates the status description string is
+    included.
+*   status - If a status is included in the data, the status code will be
+    present in the top 16 bits of the shutdown flags value.
 
 #### Protocol Extension Flags
 
