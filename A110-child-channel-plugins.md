@@ -102,6 +102,16 @@ Options (`O_child1`, `O_child2`):
   shared client. `O_child2` is effectively ignored for that specific shared
   resource.
 
+**LB Policies and Resolvers**
+
+Some LB policies and resolvers may need to create child channels. We use `grpclb` as an example for how this plumbing will be handled in LB policies. Note that this proposal does not mandate any behavior changes for `grpclb` specifically.
+
+To support this, the child channel options must be plumbed down into resolvers and LB policies. Here are examples of how a component like `grpclb` would use this plumbing:
+
+* Java: The `Helper` will provide a function that accepts a `ChannelBuilder` and applies the child channel options to it.
+* Go: A new field will be added to the `BuildOptions` struct (passed when creating a resolver or LB policy) to contain the child channel options.
+* C-core: No special plumbing is needed because the child channel args are simply passed as channel arguments, which are already available to LB policies.
+
 ### Language Implementations
 
 #### Java
