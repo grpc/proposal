@@ -76,7 +76,7 @@ Env var name: `GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE`.
 
 ## Implementation
 
-N/A
+Java implementation: grpc/grpc-java#12806
 
 ## Open issues (if applicable)
 
