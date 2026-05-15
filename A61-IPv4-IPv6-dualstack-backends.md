@@ -6,6 +6,7 @@ A61: IPv4 and IPv6 Dualstack Backend Support
 * Implemented in: C-core
 * Last updated: 2025-03-06
 * Discussion at: https://groups.google.com/g/grpc-io/c/VjORlKP97cE/m/ihqyN32TAQAJ
+* Updated by: [A76: Improvements to the Ring Hash LB Policy](A76-ring-hash-improvements.md) and [A117: Ring Hash Exit Idle Behavior Changes][A117]
 
 ## Abstract
 
@@ -43,7 +44,7 @@ addresses per endpoint in xDS.  We will support the new xDS APIs being
 added for that effort as well.  Note that this change has implications
 for session affinity behavior in xDS.
 
-### Related Proposals: 
+### Related Proposals:
 * [Support for dual stack EDS endpoints in Envoy][envoy-design]
 * [gRFC A17: Client-Side Health Checking][A17]
 * [gRFC A27: xDS-Based Global Load Balancing][A27]
@@ -596,10 +597,13 @@ if the aggregated connectivity state is TRANSIENT_FAILURE or CONNECTING
 and there are no endpoints in CONNECTING state, the ring_hash policy will
 choose one of the endpoints in IDLE state (if any) to trigger a connection
 attempt on.  It does not matter which IDLE endpoint is chosen; that is
-left up to the implementation to determine.  One possible implementation
-of this is shown in the following pseudo-code:
+left up to the implementation to determine.  (Update: gRFC [A117][] now
+specifies a _random_ endpoint should be chosen.)  One possible implementation of
+this is shown in the following pseudo-code:
 
 ```
+# Updated to show a randomized starting location per gRFC A117.
+endpoints = shuffle(endpoints);
 if (aggregated_state_is_connecting_or_transient_failure) {
   first_idle_index = -1;
   for (i = 0; i < endpoints.size(); ++i) {
@@ -961,3 +965,4 @@ N/A
 [RFC-8305]: https://www.rfc-editor.org/rfc/rfc8305
 [A62]: A62-pick-first.md
 [backoff-spec]: https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md
+[A117]: A117-ring-hash-exit-idle.md
