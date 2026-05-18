@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-04-24
+* Last updated: 2026-05-18
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -92,8 +92,9 @@ TODO: stats plugin propagation?
 On the ext_proc stream, the events sent and received must be in the same
 order as on the data plane.  For client-to-server events, the order must
 be headers, followed by zero or more messages, followed by a half-close.
-For server-to-client events, the order must be headers (skipped for
-Trailers-Only), followed by zero or more messages, followed by trailers.
+For server-to-client events, the order must be headers, followed by zero
+or more messages, followed by trailers (skipped for Trailers-Only, which
+is represented on the ext_proc stream as headers with the EOS bit set).
 It is fine to interleave client-to-server events with server-to-client
 events, since the two directions are independent of each other.  It is
 also fine for some of the events to be missing on the ext_proc stream;
@@ -138,18 +139,19 @@ it can send the client message event on the ext_proc stream immediately
 The stream to the ext_proc server may be terminated at any time.
 
 If the stream terminates with a non-OK status, then by default the
-data plane RPC will be failed with UNAVAILABLE status.  However, if the
+data plane RPC will be failed with INTERNAL status.  However, if the
 `failure_mode_allow` config field is set to true, then the data plane
 RPC will instead be allowed to continue, with no further action taken
 by the ext_proc filter.
 
-If the stream terminates with OK status, that indicates to the filter that
-it no longer needs to send any more events to the ext_proc server for that
-data plane RPC; all remaining events may proceed on the data plane RPC
-without any further action taken by the ext_proc filter.  However, in
-streaming RPCs, it may be necessary for the ext_proc server to drain the
-stream before terminating.  This is because the filter may have already sent
-messages on the stream that the server has not yet seen, and if the
+If the stream terminates with OK status, that indicates to the filter
+that it no longer needs to send any more events to the ext_proc server
+for that data plane RPC; all remaining events may proceed on the data
+plane RPC without any further action taken by the ext_proc filter.
+However, if the ext_proc filter is configured to send request or response
+messages to the ext_proc server, the ext_proc server must drain the
+stream before terminating.  This is because the filter may have already
+sent messages on the stream that the server has not yet seen, and if the
 server never echoes them back, then the messages will simply be dropped
 from the stream.  In order to avoid that, the following drain procedure
 will be used:
@@ -359,7 +361,7 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   This field must be present.  It will be validated as described in [A102].
 - [failure_mode_allow](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L177):
   By default, if the RPC to the ext_proc server fails with a non-OK
-  status, the data plane RPC will be failed with status UNAVAILABLE.  If
+  status, the data plane RPC will be failed with status INTERNAL.  If
   this field is set to true, then the data plane RPC will instead be
   allowed to continue, with no further action taken by the ext_proc filter.
 - [processing_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L181):
@@ -374,7 +376,8 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
     [response_body_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L127):
     The only modes we support here are
     [`NONE`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L66)
-    and `GRPC` (to be added).
+    and `GRPC` (to be added).  Note that if response_body_mode is set to
+    `GRPC`, then response_header_mode must be set to `SEND`.
   - We ignore the request_trailer_mode field, since gRPC never sends
     request trailers.
 - [request_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L188)
@@ -383,7 +386,7 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   Attributes to be sent to ext_proc server along with client-to-server
   and server-to-client events, respectively.  The set of supported
   attributes is the same as what we support for any CEL expression in xDS.
-  any unsupported attribute name will be ignored.  See [Attributes Sent to
+  Any unsupported attribute name will be ignored.  See [Attributes Sent to
   ext_proc Server](#attributes-sent-to-the-ext_proc-server) below for details.
 - [mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L225):
   Optional.  See [Header Mutations](#header-mutations) for details.
