@@ -35,8 +35,9 @@ unhealthy server will not receive the traffic it needs to begin connecting.
 
 This proposal makes two behavior changes:
 
-1. Ring Hash should enter the CONNECTING state when the channel requests it to
-   exit idle mode, instead of ignoring the request.
+1. Ring Hash should enter the CONNECTING state if it is currently in the IDLE
+   state and the channel requests it to exit idle mode, instead of ignoring the
+   request.
 
    This will cause the eager-connection logic described in [gRFC A61][A61rh] to
    trigger:
@@ -45,10 +46,10 @@ This proposal makes two behavior changes:
    > CONNECTING, the ring_hash policy proactively triggers connection attempts
    > across all of the subchannels, even without seeing any picks.
 
-2. New connection attempts not triggered by an RPC should begin from a
-   randomized location (behavior change from [gRFC A61][A61rh]'s
-   TRANSIENT_FAILURE / CONNECTING behavior), which currently states the choice
-   of endpoints is up to the implementation:
+2. New connection attempts not triggered by an RPC should begin with a random
+   endpoint, ignoring endpoint weights.  This is a behavior change from [gRFC
+   A61][A61rh]'s TRANSIENT_FAILURE / CONNECTING behavior, which currently states
+   the choice of endpoints is up to the implementation:
 
    > It does not matter which IDLE endpoint is chosen; that is left up to the
    > implementation to determine.
