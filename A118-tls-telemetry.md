@@ -27,8 +27,10 @@ without a structured mechanism for aggregation and analysis.
 
 ### Related Proposals:
 * [A66: OpenTelemetry Metrics/Stats](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md)
+* [A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient](https://github.com/grpc/proposal/blob/master/A78-grpc-metrics-wrr-pf-xds.md)
 * [A79: OpenTelemetry Non-Per-Call Metrics Architecture](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)
-* [A107: TLS Private Key Offloading ](https://github.com/grpc/proposal/blob/master/A107-tls-private-key-offloading.md)
+* [A89: Backend Service Metric Label](https://github.com/grpc/proposal/blob/master/A89-backend-service-metric-label.md)
+* [A107: TLS Private Key Offloading](https://github.com/grpc/proposal/blob/master/A107-tls-private-key-offloading.md)
 
 ## Proposal
 
@@ -101,6 +103,8 @@ from the labels.
 | `grpc.tls.handshake.result` | Required | The `TlsTelemetryResult` enum indicating success or the reason for handshake failure |
 | `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
 | `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum |
+| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in A78). |
+| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in A89). |
 
 * `grpc.server.tls.handshakes`
 
@@ -135,6 +139,8 @@ the concept of other private key operations that gRPC does not support. See
 | `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
 | `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
 | `grpc.tls.private_key.implementation` | Required | A string identifying the private key signer implementation. |
+| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in A78). |
+| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in A89). |
 
 * `grpc.server.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in A66)
 
