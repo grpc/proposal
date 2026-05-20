@@ -33,7 +33,7 @@ without a structured mechanism for aggregation and analysis.
 
 All metrics will be scoped to TLS exclusively.
 
-### TLS Telemetry Status Enum
+### TLS Telemetry Result Enum
 
 The handshaker status will be represented by an enum that indicates success or
 provides information on why the handshake failed. This value must manage a
@@ -45,7 +45,7 @@ granularity in a given implementation and/or language, `UNKNOWN_FAILURE` will be
 the catch-all error code.
 
 ```c++
-enum class TlsTelemetryStatus {
+enum class TlsTelemetryResult {
   UNKNOWN_FAILURE,  
   SUCCESS,
   // Peer certificate verification failures.
@@ -97,7 +97,7 @@ from the labels.
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.tls.handshake.status` | Required | The `TlsTelemetryStatus` enum indicating success or the reason for handshake failure |
+| `grpc.tls.handshake.result` | Required | The `TlsTelemetryResult` enum indicating success or the reason for handshake failure |
 | `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
 | `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum |
 
@@ -105,25 +105,21 @@ from the labels.
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.tls.handshake.status` | Required | The `TlsTelemetryStatus` enum indicating success or the reason for handshake failure |
+| `grpc.tls.handshake.result` | Required | The `TlsTelemetryResult` enum indicating success or the reason for handshake failure |
 | `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum |
 
 ### TLS Offload Specific Metrics
 
 The following metrics are non-per-call bucketed latency metrics that report the duration of offloaded cryptographic operations.
 
-* `grpc.client.tls.offload_certificate_selection_duration` (unit: float64, type: histogram - latency buckets defined in A66)
-
-| Label Name | Required/Optional | Description |
-| :--- | :--- | :--- |
-| `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
-| `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
-
 * `grpc.server.tls.offload_certificate_selection_duration` (unit: float64, type: histogram - latency buckets defined in A66)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
 | `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
+
+Note - there is no associated client certificate selection metric. This is a
+server specific feature.
 
 * `grpc.client.tls.offload_private_key_operation_duration` (unit: float64, type: histogram - latency buckets defined in A66)
 
