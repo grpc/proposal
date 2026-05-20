@@ -48,7 +48,7 @@ granularity in a given implementation and/or language, `UNKNOWN_FAILURE` will be
 the catch-all error code.
 
 ```c++
-enum class TlsTelemetryResult {
+enum class TlsTelemetryHandshakeResult {
   UNKNOWN_FAILURE,  
   SUCCESS,
   // Peer certificate verification failures.
@@ -100,7 +100,7 @@ from the labels.
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.tls.handshake.result` | Required | The `TlsTelemetryResult` enum indicating success or the reason for handshake failure |
+| `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum indicating success or the reason for handshake failure |
 | `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
 | `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum |
 | `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in A78). TODO - is this actually possible to get in every language |
@@ -110,7 +110,7 @@ from the labels.
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.tls.handshake.result` | Required | The `TlsTelemetryResult` enum indicating success or the reason for handshake failure |
+| `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum indicating success or the reason for handshake failure |
 | `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum |
 
 ### TLS Offload Specific Metrics
