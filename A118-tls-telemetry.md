@@ -28,6 +28,7 @@ without a structured mechanism for aggregation and analysis.
 ### Related Proposals:
 * [A66: OpenTelemetry Metrics/Stats](https://github.com/grpc/proposal/blob/master/A66-otel-stats.md)
 * [A79: OpenTelemetry Non-Per-Call Metrics Architecture](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)
+* [A107: TLS Private Key Offloading ](https://github.com/grpc/proposal/blob/master/A107-tls-private-key-offloading.md)
 
 ## Proposal
 
@@ -121,20 +122,27 @@ The following metrics are non-per-call bucketed latency metrics that report the 
 Note - there is no associated client certificate selection metric. This is a
 server specific feature.
 
-* `grpc.client.tls.offload_private_key_operation_duration` (unit: float64, type: histogram - latency buckets defined in A66)
+For the offloaded private key metrics, we specify signing because that is the
+only offloaded private key operation supported by gRPC. Older TLS versions have
+the concept of other private key operations that gRPC does not support. See
+[A107] for more detail on private key signers.
+
+* `grpc.client.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in A66)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
 | `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
 | `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
-| `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key operation was done, e.g. “RsaPkcs1Sha256”. |
+| `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
+| `grpc.tls.private_key.implementation` | Required | A string identifying the private key signer implementation. |
 
-* `grpc.server.tls.offload_private_key_operation_duration` (unit: float64, type: histogram - latency buckets defined in A66)
+* `grpc.server.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in A66)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
 | `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
-| `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key operation was done, e.g. “RsaPkcs1Sha256”. |
+| `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
+| `grpc.tls.private_key.implementation` | Required | A string identifying the private key signer implementation. |
 
 ### Temporary environment variable protection
 
