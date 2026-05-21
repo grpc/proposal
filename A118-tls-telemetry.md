@@ -36,7 +36,7 @@ without a structured mechanism for aggregation and analysis.
 
 All metrics will be scoped to TLS exclusively.
 
-### TLS Telemetry Result Enum
+### TLS Telemetry Handshake Result Enum
 
 The TLS handshake result will be represented by an enum that indicates success or
 provides information on why the handshake failed. This value must manage a
