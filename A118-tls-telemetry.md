@@ -138,22 +138,22 @@ offload using an EC or RSA key). Older TLS versions have the concept of other
 private key operations that gRPC does not support (for example, decryption
 offload using an RSA key). See [A107] for more detail on private key signers.
 
-* `grpc.client.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in A66)
+* `grpc.client.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in [A66])
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
-| `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
+| `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in [A66]). |
+| `grpc.target` | Required | The target string (as defined in [A66]) passed to the channel. |
 | `grpc.tls.private_key.offloader_name` | Required | A string identifying the private key signer implementation, e.g. "HSM" or "private_key_signer_service". This must be low-cardinality |
 | `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
 | `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78]). |
 | `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89]). |
 
-* `grpc.server.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in A66)
+* `grpc.server.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in [A66])
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
+| `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in [A66]). |
 | `grpc.tls.private_key.offloader_name` | Required | A string identifying the private key signer implementation e.g. "HSM" or "private_key_signer_service". This must be low-cardinality. |
 | `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
 
