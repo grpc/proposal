@@ -4,7 +4,7 @@ A118: Authentication Telemetry
 * Approver: @dfawley, @easwars, @ejona86, @matthewstevenson88, @markdroth
 * Status: In Review
 * Implemented in:
-* Last updated: 2026-05-18
+* Last updated: 2026-05-22
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -31,6 +31,12 @@ without a structured mechanism for aggregation and analysis.
 * [A79: OpenTelemetry Non-Per-Call Metrics Architecture](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)
 * [A89: Backend Service Metric Label](https://github.com/grpc/proposal/blob/master/A89-backend-service-metric-label.md)
 * [A107: TLS Private Key Offloading](https://github.com/grpc/proposal/blob/master/A107-tls-private-key-offloading.md)
+
+[A66]: A66-otel-stats.md
+[A78]: A78-grpc-metrics-wrr-pf-xds.md
+[A79]: A79-non-per-call-metrics-architecture.md
+[A89]: A89-backend-service-metric-label.md
+[A107]: A107-tls-private-key-offloading.md
 
 ## Proposal
 
@@ -101,10 +107,10 @@ from the labels.
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
 | `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum indicating success or the reason for handshake failure. |
-| `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
+| `grpc.target` | Required | The target string (as defined in [A66]) passed to the channel. |
 | `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum indicating if and how the handshake was resumed. |
-| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in A78). TODO - is this actually possible to get in every language |
-| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in A89). TODO - is this actually possible to get in every language |
+| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78]). |
+| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89]). |
 
 * `grpc.server.tls.handshakes`
 
@@ -117,11 +123,11 @@ from the labels.
 
 The following metrics are non-per-call bucketed latency metrics that report the duration of offloaded cryptographic operations.
 
-* `grpc.server.tls.offload_certificate_selection_duration` (unit: float64, type: histogram - latency buckets defined in A66)
+* `grpc.server.tls.offload_certificate_selection_duration` (unit: float64, type: histogram - latency buckets defined in [A66])
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
+| `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in [A66]). |
 
 Note - there is no associated client certificate selection metric. This is a
 server specific feature.
@@ -139,9 +145,9 @@ offload using an RSA key). See [A107] for more detail on private key signers.
 | `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
 | `grpc.target` | Required | The target string (as defined in A66) passed to the channel. |
 | `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
-| `grpc.tls.private_key.implementation` | Required | A string identifying the private key signer implementation. |
-| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in A78). TODO - is this actually possible to get in every language |
-| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in A89). TODO - is this actually possible to get in every language |
+| `grpc.tls.private_key.offloader_name` | Required | A string identifying the private key signer implementation, e.g. "HSM" or "private_key_signer_service". This must be low-cardinality |
+| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78]). |
+| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89]). |
 
 * `grpc.server.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in A66)
 
@@ -149,7 +155,7 @@ offload using an RSA key). See [A107] for more detail on private key signers.
 | :--- | :--- | :--- |
 | `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in A66). |
 | `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
-| `grpc.tls.private_key.implementation` | Required | A string identifying the private key signer implementation. |
+| `grpc.tls.private_key.offloader_name` | Required | A string identifying the private key signer implementation e.g. "HSM" or "private_key_signer_service". This must be low-cardinality. |
 
 ### Temporary environment variable protection
 
