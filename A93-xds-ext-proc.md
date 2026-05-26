@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-05-18
+* Last updated: 2026-05-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -22,8 +22,9 @@ filters, described in gRFC [A39].  We will support this filter on both
 the gRPC client and server side.
 
 Note that this filter will make use of the `allowed_grpc_services` map in
-the bootstrap config, described in [A102].  It will also make use of the
-`trusted_xds_server` server feature introduced in [A81].
+the bootstrap config and xDS header types described in [A102].  It will
+also make use of the `trusted_xds_server` server feature introduced in
+[A81].
 
 ### Related Proposals:
 * [A39: xDS HTTP Filter Support][A39]
@@ -389,7 +390,8 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   Any unsupported attribute name will be ignored.  See [Attributes Sent to
   ext_proc Server](#attributes-sent-to-the-ext_proc-server) below for details.
 - [mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L225):
-  Optional.  See [Header Mutations](#header-mutations) for details.
+  Optional.  Validated as described in [A102].  See [Header
+  Mutations](#header-mutations) for details.
 - [forward_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L237):
   Configures which headers from the data plane RPC will be included in
   the message to the ext_proc server.  In this message:
@@ -645,7 +647,8 @@ as follows:
   - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L346):
     Headers to modify.  Use of these header modifications is best effort,
     depending on which event it was sent in response to and whether the
-    filter is running in the gRPC client or server.
+    filter is running in the gRPC client or server.  See [Header
+    Mutations](#header-mutations) below for details.
   - We will ignore the status and body fields, since these don't apply
     to gRPC.
 - request_drain (new field being added in
@@ -670,7 +673,7 @@ ext_proc stream failed with a non-OK status.
 #### Header Mutations
 
 The ext_proc filter will leverage the same header mutation types as
-defined in the ext_authz filter in [A92].
+defined in [A102].
 
 When responding to a client headers, server headers, or server trailers
 event, the ext_proc server can return a
@@ -680,14 +683,19 @@ handled as follows:
 - [set_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L375):
   Headers to add or modify.  This is a repeated
   `envoy.config.core.v3.HeaderValueOption` message, which will be handled
-  as described in [A92].
+  as described in [A102].
 - [remove_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L379):
-  Headers to remove.
+  Headers to remove.  Each entry must be a valid gRPC header name.
+
+If any of the above fields fails validation, the ext_proc filter will
+treat the ext_proc stream as having failed.  The data plane RPC will
+then be handled based on the value of the `failure_mode_allow` config
+field.
 
 All mutations (additions, modifications, and removals) are subject to the
 rules in the `mutation_rules` field in the filter config.  This field is
 an `envoy.config.common.mutation_rules.v3.HeaderMutationRules` message,
-which will be handled as described in [A92].
+which will be handled as described in [A102].
 
 ### Metrics
 
