@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-03-06
+* Last updated: 2026-05-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
 
 ## Abstract
@@ -22,10 +22,11 @@ filters, described in [A39]. We will support this filter on both
 the gRPC client and server side.
 
 Note that this filter will make use of the `allowed_grpc_services` map in
-the bootstrap config, described in [A102].  It will also make use of the
-`trusted_xds_server` server feature introduced in [A81].
+the bootstrap config and xDS header types described in [A102].  It will
+also make use of the `trusted_xds_server` server feature introduced in
+[A81].
 
-### Related Proposals: 
+### Related Proposals:
 * [A39: xDS HTTP Filter Support][A39]
 * [A36: xDS-Enabled Servers][A36]
 * [A81: xDS Authority Rewriting][A81]
@@ -38,7 +39,7 @@ the bootstrap config, described in [A102].  It will also make use of the
 * [A89: Backend Service Metric Label][A89]
 
 [A36]: A36-xds-for-servers.md
-[A39]: A39-xds-http-filters.md 
+[A39]: A39-xds-http-filters.md
 [A81]: A81-xds-authority-rewriting.md
 [A83]: A83-xds-gcp-authn-filter.md
 [A33]: A33-Fault-Injection.md
@@ -136,7 +137,8 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
 - [disallowed_headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L233):
   We will treat an empty list the same as it being unset.
 - [decoder_header_mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L282):
-  Optional.  See [Header Mutations](#header-mutations) below for details.
+  Optional.  Validated as described in [A102].  See [Header
+  Mutations](#header-mutations) below for details.
 - [include_peer_certificate](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L181)
 
 The following fields will be ignored by gRPC:
@@ -242,7 +244,8 @@ sent to the server will be populated as follows:
       `disallowed_headers` config field, it will not be added to this map.
       Otherwise, if the `allowed_headers` config field is unset or matches
       the header, the header will be added to this map.  Otherwise, the
-      header will be excluded from this map.
+      header will be excluded from this map.  The individual
+      `HeaderValue` messages will be populated as described in [A102].
     - [path](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L148):
       Will always be set.
     - [size](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/attribute_context.proto#L165):
@@ -295,78 +298,36 @@ The response from the ext_authz server may indicate mutations (additions,
 modifications, or removals) to make on the data plane RPC's request
 headers, response headers, or response trailers.
 
-When the data plane RPC is allowed, mutations may be made to the data
-plane RPC's request headers or response headers.  Note that response
-header mutations will be ignored if gRPC winds up sending a
-Trailers-Only response after the ext_authz filter has received the
-response from the ext_authz server.
+When the data plane RPC is allowed, mutations
+may be made to the data plane RPC's request headers via the
+[ok_response.headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L75)
+and
+[ok_response.headers_to_remove](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L92)
+fields or to the data plane RPC's response headers via the
+[ok_response.response_headers_to_add](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L104)
+field.  The entries in the `headers_to_remove` field must be valid
+gRPC header names; the other fields must be validated as per [A102].
+Note that response header mutations will be ignored if gRPC winds up
+sending a Trailers-Only response after the ext_authz filter has received
+the response from the ext_authz server.
 
-When the data plane RPC is denied, the ext_authz filter is generating
-a new set of response trailers for a Trailers-Only response, and any
-header mutations specified by the ext_authz server will be applied
-to that initially-empty set of response trailers.  In this case, the
-mutations can effectively only specify additions.
+When the data plane RPC is denied, headers may be specified via the
+[denied_response.headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/auth/v3/external_auth.proto#L55)
+field, which will be validated as per [A102].  Note that in this case,
+the ext_authz filter is generating a new set of response trailers
+for a Trailers-Only response, and any header mutations specified by
+the ext_authz server will be applied to that initially-empty set of
+response trailers.  Therefore, the mutations can effectively only
+specify additions.
 
-The `decoder_header_mutation_rules` config field controls which header
-mutations are allowed.  This field is an
-[`envoy.config.common.mutation_rules.v3.HeaderMutationRules`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L47C9-L47C28)
-message, which will be used as follows:
-- [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70):
-  If true, all header mutations are disallowed, regardless of any other
-  setting.
-- [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79):
-  Optional.  If a header name matches this regex, then the mutation will be
-  disallowed, regardless of any other setting.  Note that regexes should be
-  checked for validity as part of resource validation.
-- [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75):
-  Optional.  If a header name matches this regex and does not match
-  `disallow_expression`, then the mutation will be allowed.  If unset, then
-  mutations of all headers not matching `disallow_expression` are allowed.
-  Note that regexes should be checked for validity as part of resource
-  validation.
-- [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87):
-  If false, a disallowed header mutation will simply be ignored.  If
-  true, the data plane RPC will be failed.
-- allow_all_routing, disallow_system: These fields are ignored.  gRPC
-  will never allow modifications to headers starting with `:` or to the
-  `host` header, regardless of what these fields are set to.
-- allow_envoy: This field will be ignored, since `x-envoy-*` headers are
-  not generally meaningful to gRPC.
+If any of these fields fails validation, the ext_authz filter will
+treat the ext_authz request as having failed.  The behavior of the data
+plane RPC will then be handled based on the `failure_mode_allow` config
+field.
 
-Header additions and modifications are expressed via an
-[`envoy.config.core.v3.HeaderValueOption`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L429)
-message, which will be used as follows:
-- [header](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L458):
-  Required.  Within it:
-  - [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
-    The header name.  The entry will be ignored if empty, if not all
-    lower-case, if length exceeds 16384, if the key is `host`, or if it
-    starts with `:` or `grpc-`.
-  - [value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L415):
-    The header value, used when the header name does not end with `-bin`.
-    The entry will be ignored if the length exceeds 16384.
-  - [raw_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L422):
-    The header value, used when the header name ends with `-bin`.  The
-    entry will be ignored if the length exceeds 16384.
-- [append_action](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L476):
-  We honor the 4 enum values as described in the proto file.  Note that
-  not all gRPC implementations have the equivalent of "predefined inline
-  headers" as described in the proto file for the
-  `APPEND_IF_EXISTS_OR_ADD` enum value; gRPC implementations are free to
-  either use a comma-concatenated approach or add duplicate headers.
-- [keep_empty_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L480):
-  By default, any header mutation that results in a header with an
-  empty value will cause the header key to be removed.  If this field
-  is set to true, then such empty headers will be kept.
-- We do not support the deprecated append field.
-
-Header removals are encoded separately from additions and modifications
-but are still subject to the mutation rules in the filter's config.
-
-Note that use of these xDS messages and the underlying header mutation
-functionality is not specific to the ext_authz filter and will be
-used in other places in the future, so they should be implemented in a
-reusable way.
+All of the above mutations are subject to the rules in the
+[decoder_header_mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto#L282)
+config field, which controls which header mutations are allowed.
 
 ### Metrics
 
