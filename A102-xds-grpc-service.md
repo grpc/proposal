@@ -1,10 +1,10 @@
-A102: xDS `GrpcService` Support
+A102: xDS `GrpcService` Support and Header Representations
 ----
 * Author(s): @markdroth, @sergiitk
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-03-17
+* Last updated: 2026-05-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -15,6 +15,10 @@ ExtAuthz ([A92]), and ExtProc ([A93]).  This design specifies how the
 control plane will configure the communication with these side-channel
 services.  It also addresses the relevant security implications.
 
+Several of these features also use common xDS representations of
+headers, header mutations, and header mutation rules.  This design
+specifies how gRPC will handle those common representations.
+
 ## Background
 
 The control plane configures communication with side-channel services
@@ -23,6 +27,9 @@ proto](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157
 This message tells the data plane how to find the side-channel service
 and what channel credentials and call credentials to use for that
 communication.
+
+Header-related information is encoded via several xDS protos, which are
+described in a later section.
 
 ### Related Proposals: 
 * [gRFC A27: xDS-Based Global Load Balancing][A27]
@@ -49,6 +56,9 @@ message.  In that message, gRPC will support only the
 target specifier, not
 [`EnvoyGrpc`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L33)
 (see "Rationale" section below).
+
+gRPC will also support the various xDS protos for representing
+header-related information, with appropriate validation.
 
 ### Security Considerations
 
@@ -226,20 +236,8 @@ When validating a `GrpcService` proto, the following fields will be used:
   and it must have a positive value.
 - [`initial_metadata`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L315):
   If present, specifies headers to be added to RPCs sent to the side-channel
-  service.  Inside of each entry:
-  - [`key`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/base.proto#L404):
-    Value length must be in the range [1, 16384).  Must be a valid
-    gRPC header name.  Must not start with `:` or `grpc-` and must not be
-    `host`.
-  - [`value`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/base.proto#L415):
-    Specifies the header value.  Must be shorter than 16384 bytes.  Must
-    be a valid gRPC header value.  Not used if `key` ends in `-bin`
-    and `raw_value` is set.
-  - [`raw_value`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/base.proto#L422):
-    Used only if `key` ends in `-bin`.  Must be shorter than 16384 bytes.
-    Will be base64-encoded on the wire, unless the pure binary metadata
-    extension from [gRFC G1: True Binary
-    Metadata](G1-true-binary-metadata.md) is used.
+  service.  See [Header Representation](#header-representation) below
+  for details.
 
 The following fields will *not* be used:
 - `envoy_grpc`: See "Rationale" section below for details.
@@ -296,6 +294,89 @@ code for this instead of implementing it themselves.  However, note that
 there may be cases in the future where this code is used outside of xDS
 HTTP filters, so implementations should not assume that such a library
 will be called only from an xDS HTTP filter.
+
+#### Header Representation
+
+xDS provides common representations for headers, header mutations, and
+header mutation rules.  These xDS representations and their associated
+functionality are used in a variety of places, so they should be
+implemented in a reusable way.
+
+An individual header value is represented as an
+[`envoy.config.core.v3.HeaderValue`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L400)
+message, which will be used as follows:
+- [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
+  The header name.  When reading, the entry will be considered invalid
+  if empty, if not all lower-case, if length exceeds 16384, if the key is
+  `host`, if it starts with `:` or `grpc-`, or if it is not a valid gRPC
+  header name.
+- [raw_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L422):
+  The header value.  When reading, the entry will be considered invalid
+  if the length exceeds 16384 or if it does not contain a valid gRPC
+  header value.  When writing a `HeaderValue` proto for a header whose
+  name ends in `-bin`, the value must be base64-encoded.
+- [value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L415):
+  A legacy field representing the header value.  When reading a
+  `HeaderValue` proto, this field will be used only if the `raw_value`
+  field is unset.  When writing a `HeaderValue` proto, this field will
+  never be used; the `raw_value` field will always be used instead.
+  The entry will be considered invalid if the length exceeds 16384 or if
+  it does not contain a valid gRPC header value.
+
+A
+[`HeaderMap`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L484)
+message represents a list of header files.  Each individual entry will
+be validated as a `HeaderValue` proto, as described above.
+
+Header additions and modifications are represented as an
+[`envoy.config.core.v3.HeaderValueOption`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L429)
+message, which will be used as follows:
+- [header](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L458):
+  A `HeaderValue` proto; see above.
+- [append_action](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L476):
+  We honor the 4 enum values as described in the proto file.  Note that
+  not all gRPC implementations have the equivalent of "predefined inline
+  headers" as described in the proto file for the
+  `APPEND_IF_EXISTS_OR_ADD` enum value; gRPC implementations are free to
+  either use a comma-concatenated approach or add duplicate headers.
+- [keep_empty_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L480):
+  By default, any header mutation that results in a header with an
+  empty value will cause the header key to be removed.  If this field
+  is set to true, then such empty headers will be kept.
+- We do not support the deprecated append field.
+
+Header mutation rules are represented as an
+[`envoy.config.common.mutation_rules.v3.HeaderMutationRules`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L47C9-L47C28)
+message, which will be used as follows:
+- [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70):
+  If true, all header mutations are disallowed, regardless of any other
+  setting.
+- [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79):
+  Optional.  If a header name matches this regex, then the mutation will be
+  disallowed, regardless of any other setting.  Note that regexes should be
+  checked for validity as part of resource validation.
+- [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75):
+  Optional.  If a header name matches this regex and does not match
+  `disallow_expression`, then the mutation will be allowed.  If unset, then
+  mutations of all headers not matching `disallow_expression` are allowed.
+  Note that regexes should be checked for validity as part of resource
+  validation.
+- [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87):
+  If false, a disallowed header mutation will simply be ignored.  If
+  true, the data plane RPC will be failed.
+- allow_all_routing, disallow_system: These fields are ignored.  gRPC
+  will never allow modifications to headers starting with `:` or to the
+  `host` header, regardless of what these fields are set to.
+- allow_envoy: This field will be ignored, since `x-envoy-*` headers are
+  not generally meaningful to gRPC.
+
+When validating any of these messages from within an xDS resource, if
+any field fails validation, then the xDS resource will be considered
+invalid.  If validating any of these messages in a response from a
+side-channel service (e.g., an ext_authz or ext_proc server), the
+side-channel client implementation can decide how to handle the failure;
+in most cases, it would be expected to consider the side-channel RPC to
+have failed.
 
 ### Temporary environment variable protection
 
