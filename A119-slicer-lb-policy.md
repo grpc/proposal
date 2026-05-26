@@ -47,6 +47,7 @@ has applications in various scenarios, such as:
 ### Related Proposals
 
 * [A42: xDS Ring Hash LB Policy][A42]
+* [A52: gRPC xDS Custom Load Balancer Configuration][A52]
 * [A57: XdsClient Failure Mode Behavior][A57]
 * [A62: Pick First][A62]]
 * [A102: xDS GrpcService Support][A102]
@@ -617,15 +618,135 @@ TBD
 
 ### xDS integration
 
-TBD
+In xDS-based deployments, client applications can be configured to use the
+`slicer_experimental` LB policy by leveraging gRPC's support for custom LB
+policies, as described in [gRFC A52][A52]. The xDS management server will set
+the
+[load_balancing_policy](https://github.com/envoyproxy/envoy/blob/d26361ac44e48ad347afbaff141c5c0387d48c40/api/envoy/config/cluster/v3/cluster.proto#L1229)
+field of the
+[Cluster](https://github.com/envoyproxy/envoy/blob/d26361ac44e48ad347afbaff141c5c0387d48c40/api/envoy/config/cluster/v3/cluster.proto#L50)
+resource appropriately.
+
+As mentioned in the [Supported modes of
+operation](#supported-modes-of-operation) section, client applications can be
+configured to use the `slicer_experimental` LB policy for both locality and
+endpoint picking, by setting the `load_balancing_policy` field to an instance of
+the `Slicer` protobuf message described in the next section. To use the
+`slicer_experimental` LB policy *only* for endpoint picking, the
+`load_balancing_policy` field could be set to a locality picking policy like
+[WrrLocality](https://github.com/envoyproxy/envoy/blob/d26361ac44e48ad347afbaff141c5c0387d48c40/api/envoy/extensions/load_balancing_policies/wrr_locality/v3/wrr_locality.proto#L21)
+and setting the `endpoint_picking_policy` field inside it to the `Slicer`
+protobuf message described below.
 
 #### xDS LB policy configuration
 
-TBD
+A new message type that represents the configuration for the
+`slicer_experimental` LB policy will be added to the envoy repository in the
+[api/envoy/extensions/load_balancing_policies](https://github.com/envoyproxy/envoy/tree/main/api/envoy/extensions/load_balancing_policies)
+directory.
 
-#### Changes to xDS LB Registry
+```proto
+import "envoy/config/core/v3/grpc_service.proto";
 
-TBD
+message Slicer {
+ // Configuration for the gRPC service that the LB policy will communicate with
+ // to receive sharding assignments from and to send load reports to.
+ config.core.v3.GrpcService grpc_service = 1
+
+// An identifier sent to the sharding service. Assignments and load reports are
+// scoped to this identifier.
+//
+// Can optionally contain up to two "%s" tokens. The first is replaced with the
+// "Backend Service" and the second with the "Locality" before sending. If a
+// token is present, but the corresponding information is not available to the
+// LB policy, the token will be replaced with an empty string.
+ string slicing_target = 3;
+
+// Name of the request header containing the application-defined key. This key
+// is used to look up the matching key range (slice) assigned by the sharding
+// service.
+ string slice_key_header_name = 4;
+
+ // Mode used to pick an endpoint for a request.
+ enum EndpointPickingMode {
+  RANDOM = 0;
+ }
+
+ // Mode used to pick an endpoint from a matching key range.
+ // If unset, defaults to RANDOM.
+ EndpointPickingMode slice_picking_mode = 5;
+
+ // Mode used to pick an endpoint when using the fallback mechanism.
+ // If unset, defaults to RANDOM.
+ EndpointPickingMode fallback_picking_mode = 6;
+
+ // Names of load metrics to send to the external sharding service.
+ repeated string load_metric_keys = 7;
+}
+```
+
+While most of the fields in the above proto are similar to the fields in the
+[Load Balancing Configuration](#load-balancing-configuration) section, the
+notable difference is the use of the
+[GrpcService](https://github.com/envoyproxy/envoy/blob/d26361ac44e48ad347afbaff141c5c0387d48c40/api/envoy/config/core/v3/grpc_service.proto#L29)
+protobuf message to specify the configuration for the auto-sharding service.
+
+* gRPC only supports the `google_grpc` field inside the `target_specifier`
+  field. If this field is not set, the `Cluster` resource must be NACKed.
+* gRPC ignores the `timeout` field because the RPC to the sharding service uses
+  bidi-streaming.
+* gRPC ignores the `initial_metadata` and `retry_policy` fields because the OSS
+  DynamicSharding gRPC protocol has no current use case for these.
+* The credentials used to communicate with the external auto-sharding service
+  will be the ones specified in the `GrpcService` proto, if the xDS management
+  server is a trusted server. Else, it will be based on the
+  `allowed_grpc_services` field of the bootstrap configuration. See [gRFC
+  A102][A102] for more details.
+
+#### Changes to xDS LB Policy Registry
+
+The xDS LB Policy Registry API described in [gRFC A52][A52] will be enhanced to
+support the two new bits of functionality, as follows:
+
+1. Parsing a `GrpcService` proto embedded within an LB policy's configuration
+   into its internal representation, requires access to the following:
+   * the complete bootstrap configuration to access the `allowed_grpc_services`
+     section of the bootstrap configuration.
+   * configuration of the specific xDS server that delivered this resource, to
+     determine if the server is to be trusted or not.
+1. Returning additional information (like the parsed internal representation of
+   the `GrpcService` proto), other than the currently returned gRPC LB
+   policy configuration (in JSON format), to be forwarded to the LB policies.
+
+In Go, the existing `converter` type will be modified as follows:
+
+```golang
+// ConverterOptions contains options passed to the Converter.
+type ConverterOptions struct {
+ // BootstrapConfig is the complete xDS bootstrap configuration.
+ BootstrapConfig *bootstrap.Config
+ // ServerConfig is the configuration of the xDS server from which the
+ // resource was received.
+ ServerConfig *bootstrap.ServerConfig
+}
+
+// LBPolicyInfo contains information to be passed to the LB policy, outside of
+// its configuration.
+type LBPolicyInfo struct {
+  // GRPCService is the internal parsed representation of a GrpcService proto
+  // that was present in the xDS LB policy configuration.
+  GRPCService InternalGRPCService
+
+}
+
+// Converter converts raw proto bytes into JSON LB policy configuration.
+// 
+// Returns the following:
+// - converted JSON form of the LB policy configuration
+// - Additional information to be passed to the LB policy, and,
+// - Any error encountered during the conversion.
+type Converter func(rawProto []byte, depth int, opts ConverterOptions) (json.RawMessage, LBPolicyInfo, error)
+```
 
 #### Child policy config generation
 
@@ -658,6 +779,7 @@ TBD
 Will be implemented in Go first, closely followed by Java and C++.
 
 [A42]: A42-xds-ring-hash-lb-policy.md
+[A52]: A52-xds-custom-lb-policies.md
 [A57]: A57-xds-client-failure-mode-behavior.md
 [A62]: A62-pick-first.md
 [A102]: (https://github.com/grpc/proposal/pull/510)
