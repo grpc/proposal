@@ -653,19 +653,19 @@ message Slicer {
  // to receive sharding assignments from and to send load reports to.
  config.core.v3.GrpcService grpc_service = 1
 
-// An identifier sent to the sharding service. Assignments and load reports are
-// scoped to this identifier.
-//
-// Can optionally contain up to two "%s" tokens. The first is replaced with the
-// "Backend Service" and the second with the "Locality" before sending. If a
-// token is present, but the corresponding information is not available to the
-// LB policy, the token will be replaced with an empty string.
- string slicing_target = 3;
+ // An identifier sent to the sharding service. Assignments and load reports are
+ // scoped to this identifier.
+ //
+ // Can optionally contain up to two "%s" tokens. The first is replaced with the
+ // "Backend Service" and the second with the "Locality" before sending. If a
+ // token is present, but the corresponding information is not available to the
+ // LB policy, the token will be replaced with an empty string.
+ string slicing_target = 2;
 
-// Name of the request header containing the application-defined key. This key
-// is used to look up the matching key range (slice) assigned by the sharding
-// service.
- string slice_key_header_name = 4;
+ // Name of the request header containing the application-defined key. This key
+ // is used to look up the matching key range (slice) assigned by the sharding
+ // service.
+ string slice_key_header_name = 3;
 
  // Mode used to pick an endpoint for a request.
  enum EndpointPickingMode {
@@ -674,14 +674,14 @@ message Slicer {
 
  // Mode used to pick an endpoint from a matching key range.
  // If unset, defaults to RANDOM.
- EndpointPickingMode slice_picking_mode = 5;
+ EndpointPickingMode slice_picking_mode = 4;
 
  // Mode used to pick an endpoint when using the fallback mechanism.
  // If unset, defaults to RANDOM.
- EndpointPickingMode fallback_picking_mode = 6;
+ EndpointPickingMode fallback_picking_mode = 5;
 
  // Names of load metrics to send to the external sharding service.
- repeated string load_metric_keys = 7;
+ repeated string load_metric_keys = 6;
 }
 ```
 
