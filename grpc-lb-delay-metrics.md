@@ -274,6 +274,29 @@ Built-in pickers (`pick_first`, `round_robin`, `ring_hash`, `priority`, etc.)
 implement `DelayMetricTokener`. Custom LB policies that implement neither
 mechanism report an empty token.
 
+**Tracing Signals** — To support the new child span design in Go without introducing OpenTelemetry dependencies in the core library, we introduce new internal stats signals. These are emitted by the channel infrastructure and handled by the registered stats handler (e.g., the OpenTelemetry plugin):
+
+```go
+// In package stats
+
+// DelayStart indicates that the RPC has entered a delay period.
+// This is a signal to the stats handler to start a new child span.
+type DelayStart struct {
+    // Reason is the bounded token describing the cause of delay.
+    Reason string
+}
+
+func (*DelayStart) IsClient() bool { return true }
+func (*DelayStart) isRPCStats()   {}
+
+// DelayEnd indicates that the current delay period has resolved.
+// This is a signal to the stats handler to end the child span.
+type DelayEnd struct{}
+
+func (*DelayEnd) IsClient() bool { return true }
+func (*DelayEnd) isRPCStats()   {}
+```
+
 **Example — `pick_first` (picker-level):**
 ```go
 type pfPicker struct {
@@ -390,6 +413,30 @@ delegating policies to read the child's token:
 public String getDelayMetricToken() { return ""; }
 ```
 
+**Tracing APIs** — To support the new child span design in Java (and avoiding span events), we add new default methods to `ClientStreamTracer`. These allow the channel to notify the tracer when a delay starts and ends. (Note: `ClientStreamTracer` corresponds to `CallAttemptTracer` in C++. If a separate `CallTracer` is introduced for call-level tracking, it would have similar methods).
+
+```java
+// In package io.grpc
+
+public abstract class ClientStreamTracer extends StreamTracer {
+    // ... existing methods ...
+
+    /**
+     * Called when the RPC enters a delay period (e.g., waiting for a pick).
+     * The implementation should create a new child span for the delay.
+     *
+     * @param reason The bounded token describing the cause of delay.
+     */
+    public void recordDelayStart(String reason) {}
+
+    /**
+     * Called when the current delay period resolves.
+     * The implementation should end the child span.
+     */
+    public void recordDelayEnd() {}
+}
+```
+
 **Example implementation in `PickFirstLeafLoadBalancer`:**
 ```java
 private class Picker extends SubchannelPicker {
@@ -471,6 +518,34 @@ class SubchannelPicker : public DualRefCounted<SubchannelPicker> {
 
     // Returns the bounded delay reason token. Default returns empty.
     virtual absl::string_view GetDelayMetricToken() const { return ""; }
+};
+```
+
+**Tracing APIs** — To support the new child span design in C++ (and avoiding span events), we add new virtual methods to both `ClientCallTracerInterface` and `ClientCallTracerInterface::CallAttemptTracer`. These allow the channel to notify the tracer when a delay starts and ends at both the call and attempt levels:
+
+```cpp
+// In src/core/telemetry/call_tracer.h
+
+class ClientCallTracerInterface : public CallTracerAnnotationInterface {
+ public:
+    // ... existing methods ...
+
+    // Records the start of a delay period at the call level.
+    virtual void RecordDelayStart(absl::string_view reason) = 0;
+
+    // Records the end of the current delay period at the call level.
+    virtual void RecordDelayEnd() = 0;
+
+    class CallAttemptTracer : public CallTracerInterface {
+     public:
+        // ... existing methods ...
+
+        // Records the start of a delay period at the attempt level.
+        virtual void RecordDelayStart(absl::string_view reason) = 0;
+
+        // Records the end of the current delay period at the attempt level.
+        virtual void RecordDelayEnd() = 0;
+    };
 };
 ```
 
@@ -807,23 +882,20 @@ feature is deemed stable.
 
 ### Tracing Enhancement
 
-[A72] defines a "Delayed LB pick complete" span event on the attempt span,
-emitted when an RPC experiences load balancer pick delay. Today, this event
-carries no attributes. This proposal enhances it with the following attributes:
+To provide high-fidelity visibility into delays, this proposal introduces a **generic delay framework** using child spans, rather than just adding events to existing spans. This allows capturing the start, end, and specific reason for any processing delay (not limited to load balancing).
 
-| Attribute Key | Type | Description |
-|---|---|---|
-| `delay_duration` | double | The wait duration in seconds. |
-| `delay_reason` | string | The delay reason token from the picker. |
+When an RPC experiences a delay (such as waiting for a load balancer pick), the channel will create a **new child span** named simply **`"Delay"`**.
 
-The event is emitted at the point where the wait ends (successful pick or
-cancellation), on the attempt span. The attribute values come from the same
-delay start time and token already captured for the metric.
+This child span will have the following attributes:
+*   `delay_type`: Describes the category of delay. For this proposal, it will be `"load_balancing"`.
+*   `delay_reason`: The specific bounded token describing why the delay happened (e.g., `"pick_first:connecting"`, `"rls:lookup_pending"`).
 
-This enhancement is additive to [A72] — the event name remains "Delayed LB pick
-complete" and the event is still emitted only when the RPC experienced delay.
-The only change is the addition of attributes. If tracing is not configured via
-the OpenTelemetry plugin, no span events are emitted and there is no overhead.
+The span is created when the delay condition begins and is ended when the condition resolves or transitions to a new reason (in which case a new segment span is created). This provides a clear, time-accurate visualization of delay segments in the trace.
+
+To support this in each language:
+*   **C++**: New APIs in `ClientCallTracerInterface::CallAttemptTracer` to start and end delay spans.
+*   **Java**: New default methods in `ClientStreamTracer` to start and end delay spans.
+*   **Go**: New internal stats signals (`stats.DelayStart` and `stats.DelayEnd`) to notify the stats handler when to manage the delay span lifecycle.
 
 ## Rationale
 
