@@ -102,28 +102,28 @@ enum class TlsResumptionType {
 The following metrics are count metrics, with the primary information coming
 from the labels.
 
-* `grpc.client.tls.handshakes`
+* `grpc.client.tls.handshakes` (unit: handshakes type: counter. This is experimental.)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum indicating success or the reason for handshake failure. |
+| `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum string indicating success or the reason for handshake failure. |
 | `grpc.target` | Required | The target string (as defined in [A66]) passed to the channel. |
-| `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum indicating if and how the handshake was resumed. |
+| `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum string indicating if and how the handshake was resumed. |
 | `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78]). |
 | `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89]). |
 
-* `grpc.server.tls.handshakes`
+* `grpc.server.tls.handshakes` (unit: handshakes type: counter. This is experimental.)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum indicating success or the reason for handshake failure. |
-| `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum  indicating if and how the handshake was resumed. |
+| `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum string indicating success or the reason for handshake failure. |
+| `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType`  enum string  indicating if and how the handshake was resumed. |
 
 ### TLS Offload Specific Metrics
 
 The following metrics are non-per-call bucketed latency metrics that report the duration of offloaded cryptographic operations.
 
-* `grpc.server.tls.offload_certificate_selection_duration` (unit: float64, type: histogram - latency buckets defined in [A66])
+* `grpc.server.tls.offload_certificate_selection_duration` (unit: float64 seconds, type: histogram - latency buckets defined in [A66]. This is experimental.)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
@@ -138,7 +138,7 @@ offload using an EC or RSA key). Older TLS versions have the concept of other
 private key operations that gRPC does not support (for example, decryption
 offload using an RSA key). See [A107] for more detail on private key signers.
 
-* `grpc.client.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in [A66])
+* `grpc.client.tls.offload_private_key_signing_duration` (unit: float64 seconds, type: histogram - latency buckets defined in [A66]. This is experimental.)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
@@ -149,7 +149,7 @@ offload using an RSA key). See [A107] for more detail on private key signers.
 | `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78]). |
 | `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89]). |
 
-* `grpc.server.tls.offload_private_key_signing_duration` (unit: float64, type: histogram - latency buckets defined in [A66])
+* `grpc.server.tls.offload_private_key_signing_duration` (unit: float64 seconds, type: histogram - latency buckets defined in [A66]. This is experimental.)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
