@@ -220,7 +220,7 @@ connection layer (`internal/transport`). Client handshakes are performed in a
 single place: `internal/transport/http2_client.go` inside `NewHTTP2Client` via
 `transportCreds.ClientHandshake`. Server handshakes are also performed in a
 single place: `internal/transport/http2_server.go` inside `NewServerTransport`
-via `config.Credentials.ServerHandshake`. We can incremement the metrics here
+via `config.Credentials.ServerHandshake`. We can increment the metrics here
 only in the case where TLS is the protocol being used.
 
 ```diff
