@@ -4,8 +4,8 @@ A118: Authentication Telemetry
 * Approver: @dfawley, @easwars, @ejona86, @matthewstevenson88, @markdroth
 * Status: In Review
 * Implemented in:
-* Last updated: 2026-05-22
-* Discussion at: <google group thread> (filled after thread exists)
+* Last updated: 2026-06-03
+* Discussion at: https://groups.google.com/g/grpc-io/c/hwK5GWDvL20?e=48417069
 
 ## Abstract
 
@@ -30,12 +30,14 @@ without a structured mechanism for aggregation and analysis.
 * [A78: gRPC OTel Metrics for WRR, Pick First, and XdsClient](https://github.com/grpc/proposal/blob/master/A78-grpc-metrics-wrr-pf-xds.md)
 * [A79: OpenTelemetry Non-Per-Call Metrics Architecture](https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md)
 * [A89: Backend Service Metric Label](https://github.com/grpc/proposal/blob/master/A89-backend-service-metric-label.md)
+* [A94: OTel metrics for Subchannels](https://github.com/grpc/proposal/blob/master/A94-subchannel-otel-metrics.md)
 * [A107: TLS Private Key Offloading](https://github.com/grpc/proposal/blob/master/A107-tls-private-key-offloading.md)
 
 [A66]: A66-otel-stats.md
 [A78]: A78-grpc-metrics-wrr-pf-xds.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A89]: A89-backend-service-metric-label.md
+[A94]: A94-subchannel-otel-metrics.md
 [A107]: A107-tls-private-key-offloading.md
 
 ## Proposal
@@ -44,41 +46,39 @@ All metrics will be scoped to TLS exclusively.
 
 ### TLS Telemetry Handshake Result Enum
 
-The TLS handshake result will be represented by an enum that indicates success or
-provides information on why the handshake failed. This value must manage a
+The TLS handshake result will be represented by an enum that indicates success
+or provides information on why the handshake failed. This value must manage a
 balance of low-cardinality while being fine-grained enough to be useful;
-therefore, an enum containing subdomains of authentication errors will be
-created. This is presented as a C++ enum below, but will be identical in all
-languages. In cases where we cannot categorize an error or cannot get enough
-granularity in a given implementation and/or language, `UNKNOWN_FAILURE` will be
-the catch-all error code.
+therefore, a set consisting of subdomains of authentication errors will be
+created. These are strings that will be a label value in the handshake metrics.
+These strings will be identical in all languages. In cases where we cannot
+categorize an error or cannot get enough granularity in a given implementation
+and/or language, `UNKNOWN_FAILURE` will be the catch-all error code.
 
-```c++
-enum class TlsTelemetryHandshakeResult {
-  UNKNOWN_FAILURE,  
-  SUCCESS,
-  // Peer certificate verification failures.
-  CERTIFICATE_VERIFICATION_FAILED,
-  CERTIFICATE_REVOKED,
-  CERTIFICATE_EXPIRED,
-  CERTIFICATE_NOT_YET_VALID,
-  CERTIFICATE_AUTHORITY_INVALID,
-  // TLS negotiation mismatch failures
-  CERTIFICATE_HOSTNAME_MISMATCH,
-  CERTIFICATE_MALFORMED,
-  CIPHER_SUITE_MISMATCH,
-  PROTOCOL_VERSION_UNSUPPORTED,
-  INAPPROPRIATE_FALLBACK,
-  NO_APPLICATION_PROTOCOL,
-  // Cryptographic failures
-  SIGNATURE_VERIFICATION_FAILED,
-  DECRYPTION_FAILED,
-  KEY_EXCHANGE_FAILURE,
-  // Other failures
-  UNEXPECTED_MESSAGE,
-  HANDSHAKE_TIMEOUT,
-  PEER_CONNECTION_CLOSED
-};
+```
+"UNKNOWN_FAILURE",
+"SUCCESS",
+// Peer certificate verification failures.
+"CERTIFICATE_VERIFICATION_FAILED",
+"CERTIFICATE_REVOKED",
+"CERTIFICATE_EXPIRED",
+"CERTIFICATE_NOT_YET_VALID",
+"CERTIFICATE_AUTHORITY_INVALID",
+// TLS negotiation mismatch failures
+"CERTIFICATE_HOSTNAME_MISMATCH",
+"CERTIFICATE_MALFORMED",
+"CIPHER_SUITE_MISMATCH",
+"PROTOCOL_VERSION_UNSUPPORTED",
+"INAPPROPRIATE_FALLBACK",
+"NO_APPLICATION_PROTOCOL",
+// Cryptographic failures
+"SIGNATURE_VERIFICATION_FAILED",
+"DECRYPTION_FAILED",
+"KEY_EXCHANGE_FAILURE",
+// Other failures
+"UNEXPECTED_MESSAGE",
+"HANDSHAKE_TIMEOUT",
+"PEER_CONNECTION_CLOSED"
 ```
 
 ### TLS Resumption Type Enum
@@ -109,8 +109,8 @@ from the labels.
 | `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum string indicating success or the reason for handshake failure. |
 | `grpc.target` | Required | The target string (as defined in [A66]) passed to the channel. |
 | `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum string indicating if and how the handshake was resumed. |
-| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78]). |
-| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89]). |
+| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78], [A94]). |
+| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89], [A94]). |
 
 * `grpc.server.tls.handshakes` (unit: handshakes type: counter. This is experimental.)
 
@@ -146,8 +146,8 @@ offload using an RSA key). See [A107] for more detail on private key signers.
 | `grpc.target` | Required | The target string (as defined in [A66]) passed to the channel. |
 | `grpc.tls.private_key.offloader_name` | Required | A string identifying the private key signer implementation, e.g. "HSM" or "private_key_signer_service". This must be low-cardinality |
 | `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
-| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78]). |
-| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89]). |
+| `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78], [A94]). |
+| `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89], [A94]). |
 
 * `grpc.server.tls.offload_private_key_signing_duration` (unit: float64 seconds, type: histogram - latency buckets defined in [A66]. This is experimental.)
 
@@ -184,6 +184,7 @@ accept this coupling. Thus, the TSI code can contain gRPC monitoring specifics.
 In the few use-cases where TSI is not called via gRPC, we will ensure that
 metric incrementation is not performed.
 
+// TODO: Update this comment to be more accurate based on the impl PR
 We will add the Channel's `StatsPluginGroup` as an optional argument to the SSL
 TSI handshaker creation functions. This ensures that we don't break any existing
 users of TSI and that we never increment metrics when TSI is used outside of
