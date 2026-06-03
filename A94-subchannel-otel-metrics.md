@@ -30,6 +30,7 @@ to client-side per-attempt metrics. This label has xds cluster information.
 *   [A61]: IPv4 and IPv6 Dualstack Backend Support
 *   [A66]: OpenTelemetry Metrics
 *   [A74]: xDS Config Tears
+*   [A75]: xDS Aggregate Cluster Behavior Fixes
 *   [A78]: gRPC OTel Metrics for WRR, Pick First, and XdsClient
 *   [A79]: Non-per-call Metrics Architecture
 *   [A89]: Backend Service Metric Label
@@ -40,6 +41,7 @@ to client-side per-attempt metrics. This label has xds cluster information.
 [A61]: A61-IPv4-IPv6-dualstack-backends.md
 [A66]: A66-otel-stats.md
 [A74]: A74-xds-config-tears.md
+[A75]: A75-xds-aggregate-cluster-behavior-fixes.md
 [A78]: A78-grpc-metrics-wrr-pf-xds.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A89]: A89-backend-service-metric-label.md
