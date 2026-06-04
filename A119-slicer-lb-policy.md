@@ -706,7 +706,7 @@ protobuf message to specify the configuration for the auto-sharding service.
 #### Changes to xDS LB Policy Registry
 
 The xDS LB Policy Registry API described in [gRFC A52][A52] will be enhanced to
-support the two new bits of functionality, as follows:
+support two new bits of functionality, as follows:
 
 1. Parsing a `GrpcService` proto embedded within an LB policy's configuration
    into its internal representation, requires access to the following:
@@ -718,7 +718,7 @@ support the two new bits of functionality, as follows:
    the `GrpcService` proto), other than the currently returned gRPC LB
    policy configuration (in JSON format), to be forwarded to the LB policies.
 
-In Go, the existing `converter` type will be modified as follows:
+In Go, the existing `Converter` type will be modified as follows:
 
 ```golang
 // ConverterOptions contains options passed to the Converter.
@@ -750,11 +750,75 @@ type Converter func(rawProto []byte, depth int, opts ConverterOptions) (json.Raw
 
 #### Child policy config generation
 
-TBD
+The `ClusterUpdate` struct is gRPC's internal representation of the xDS cluster
+resource. A new field `LBPolicyInfo` will be added to this struct to carry
+additional information to be conveyed to the LB policy, in additional to the
+existing field `LBPolicy` that carries the LB policy configuration.
+
+```golang
+package xdsresource
+
+type ClusterUpdate struct {
+  // Existing fields redacted
+
+  // LBPolicyInfo contains additional information to be passed to the LB policy,
+  // outside of its configuration.
+  LBPolicyInfo LBPolicyInfo
+
+  // LBPolicy represents the locality and endpoint picking policy in JSON,
+  // which will be the child policy of xds_cluster_impl.
+  LBPolicy json.RawMessage
+}
+```
+
+The existing logic to parse the xDS cluster resource will remain mostly
+untouched apart from populating the above mentioned new field when returned by
+the xDS LB Policy Registry.
 
 #### Changes to XdsClient
 
-TBD
+The `XdsClient` fundamentally operates as two distinct components:
+
+* **The Transport Layer**: Responsible for maintaining the ADS (Aggregated
+  Discovery Service) stream to the management server, requesting resources,
+  handling ACKs/NACKs etc.
+* **Resource-Specific Logic**: Handles parsing incoming resources and converting
+  them into internal representations for use by the rest of the gRPC stack.
+
+While the `GrpcService` protobuf message is part of the `slicer_experimental` LB
+policy configuration, its parsing logic should not reside within
+`ClusterResourceType`, which contains functionality to parse incoming `Cluster`
+resources. This protobuf message can also be embedded in HTTP filter
+configurations within `Listener` and `RouteConfiguration` resources (as detailed
+in gRFCs A92[A92] and A93[A93]). Decoupling the parsing logic ensures it remains
+reusable across all these contexts.
+
+In Go, a new function will be added to the `xdsresource` package that can be
+shared by all the resource-type implementations to parse `GrpcService` protobuf
+messages into their internal representation.
+
+```golang
+package xdsresource
+
+import (
+  v3corepb "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+  google.golang.org/grpc/internal/xds/bootstrap
+)
+
+// ParseGRPCService converts a GrpcService proto into its internal
+// representation.
+func ParseGRPCService(*v3corepb.GrpcService, *bootstrap.Config, *bootstrap.ServerConfig) (*InternalGRPCService, error) {
+  // Determine channel and call credentials to use:
+  // - If `trusted_xds_server` bit is set in `ServerConfig`, use credentials
+  //   from the GrpcService proto
+  // - Else, consult the `allowed_grpc_services` map in `Config` to determine if
+  //   the `GrpcService` is in the allowed list of services.
+  //   - If allowed, use credentials specified in the bootstrap config
+  //   - Else, return error
+
+  // Parse other fields and convert to internal representation.
+}
+```
 
 #### Changes to CDS LB policy
 
@@ -782,4 +846,6 @@ Will be implemented in Go first, closely followed by Java and C++.
 [A52]: A52-xds-custom-lb-policies.md
 [A57]: A57-xds-client-failure-mode-behavior.md
 [A62]: A62-pick-first.md
-[A102]: (https://github.com/grpc/proposal/pull/510)
+[A92]: https://github.com/grpc/proposal/pull/481
+[A93]: https://github.com/grpc/proposal/pull/484
+[A102]: https://github.com/grpc/proposal/pull/510
