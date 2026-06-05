@@ -96,7 +96,7 @@ func defaultCurvePreferences() []CurveID {
 | 1.24 <= Go < 1.26 | `{X25519MLKEM768, X25519, CurveP256, CurveP384, CurveP521}` |
 | Go >= 1.26 | `{X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024, X25519, CurveP256, CurveP384, CurveP521}` |
 
-We will add a passthrough setting in `advancedtls` for the user to explicitly configure `CurvePreferences`. It will be `advancedtls.Options.CurvePreferences` and will be a simple pass through to the `tls.Config`.
+We will add a passthrough setting in `advancedtls` for the user to explicitly configure `CurvePreferences`. It will be `advancedtls.Options.CurvePreferences` and will be a simple pass through to the `tls.Config.CurvePreferences`.
 
 #### Performance Comparison
 
@@ -154,11 +154,5 @@ No temporary environment variable protection is required. This change prefers X2
 ## Rationale
 
 Prioritizing rapid PQC readiness is critical as SNDL attacks present an immediate threat. Preferring X25519-MLKEM768 provides hybrid post-quantum confidentiality while preserving decades of classical security guarantees and allowing graceful fallback for legacy interop.
-
-## Implementation
-
-* C++: Keep P-256 default for OpenSSL < 3.5; prefer X25519-MLKEM768 by default for BoringSSL and OpenSSL 3.5+.
-* Go: Add `advancedtls.Options.CurvePreferences` passthrough to `tls.Config`.
-* Java: Update gRPC-Java to use netty-tcnative 4.2 (w/ BoringSSL) and ensure `SSLParameters.setNamedGroups` APIs exist for user configuration where supported.
 
 
