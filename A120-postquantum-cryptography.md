@@ -40,7 +40,7 @@ In OpenSSL < 3 (and thus BoringSSL), if no key exchange groups are set gRPC curr
 | 3 <= OpenSSL < 3.5 | {x25519, P-256, x448, ... many more ...} | [OpenSSL Default](https://github.com/openssl/openssl/blob/89cd17a031e022211684eb7eb41190cf1910f9fa/ssl/t1_lib.c#L195-L213) |
 | OpenSSL >= 3.5 | {X25519MLKEM768, X25519, P-256, X448, P-384, P-521, ffdhe2048, ffdhe3072} | [OpenSSL Default](https://github.com/openssl/openssl/blob/286ddeaac037533bbdce65b3c689e3f7ffebf0f6/ssl/t1_lib.c#L204) |
 
-The following table describes what the default behavior should be for each version. MLKEM768 is only supported in BoringSSL and OpenSSL3.5+. Thus, for all OpenSSL < 3.5, we will keep the P-256 default.
+The following table describes what the default behavior should be for each version. MLKEM768 is only supported in BoringSSL and OpenSSL3.5+.
 
 | BoringSSL (1.1.1) | {X25519MLKEM768, X25519, P-256, P-384, P-521} with SSL_CTX_set1_groups_list (Until the better defaults in BoringSSL) |
 | :---- | :---- |
@@ -49,7 +49,9 @@ The following table describes what the default behavior should be for each versi
 
 ### Go
 
-In Golang, this is configured via [tls.Config.CurvePreferences](https://pkg.go.dev/crypto/tls#Config). However, `advancedtls` **does not** currently support the user passing through `CurvePreferences`.
+In Golang, the crypto/tls library is part of the core language, and as of Go 1.24 the X25519-MLKEM768 hybrid cipher is already the default. As of the writing of this document, gRPC-Go support Go 1.25+, so preferring the PQC hybrid cipher by default is a no-op.
+
+Users can configure their own preference via [tls.Config.CurvePreferences](https://pkg.go.dev/crypto/tls#Config). However, `advancedtls` **does not** currently support the user passing through `CurvePreferences`.
 
 This means grpc-go with `advancedtls` is fully dependent on the [Golang defaults](https://github.com/golang/go/blob/d90b98e65320778f3b1f99a6951ab20f04d218b3/src/crypto/tls/defaults.go#L19-L35). Otherwise, users have direct access to the `tls.Config` and can set the `CurvePreference`.
 
@@ -73,6 +75,8 @@ Similar to Go, gRPC-Java does not currently make opinionated preferences on the 
 * Conscrypt does not support X25519MLKEM768 (no recent build with newer BoringSSL)
 
 In Java 21+, `SSLParameters.setNamedGroups` option will allow gRPC to create a passthrouh API that allows a user to configure their algorithms directly.
+
+A field will be added to the `TlsChannelCredentials`, and a new `TlsChannelCredentials.Feature will be defined to support setting the key exchange groups. This will passthrough to `SSLParameters.setNamedGroups`.
 
 ```java
 // Get current SSLParameters
