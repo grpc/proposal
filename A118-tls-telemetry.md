@@ -185,7 +185,7 @@ In the few use-cases where TSI is not called via gRPC, we will ensure that
 metric incrementation is not performed.
 
 // TODO: Update this comment to be more accurate based on the impl PR
-We will add the Channel's `StatsPluginGroup` as an optional argument to the SSL
+We will add the Channel's `CollectionScope` as an optional argument to the SSL
 TSI handshaker creation functions. This ensures that we don't break any existing
 users of TSI and that we never increment metrics when TSI is used outside of
 gRPC. When TSI is called from gRPC, we will pass this argument. This will be
@@ -198,7 +198,7 @@ from the handshaker to increment metrics.
      const char* server_name_indication, size_t network_bio_buf_size,
      size_t ssl_bio_buf_size,
      std::optional<std::string> alpn_preferred_protocol_list,
-+    std::shared_ptr<grpc_core::GlobalStatsPluginRegistry::StatsPluginGroup> stats_plugin_group,
++    grpc_core::RefCountedPtr<grpc_core::CollectionScope> collection_scope,
      tsi_handshaker** handshaker);
 
 ```
@@ -208,7 +208,7 @@ from the handshaker to increment metrics.
      tsi_ssl_server_handshaker_factory* factory, size_t network_bio_buf_size,
 -    size_t ssl_bio_buf_size, tsi_handshaker** handshaker);
 +    size_t ssl_bio_buf_size, 
-+    std::shared_ptr<grpc_core::GlobalStatsPluginRegistry::StatsPluginGroup> stats_plugin_group,
++    grpc_core::RefCountedPtr<grpc_core::CollectionScope> collection_scope,
 +    tsi_handshaker** handshaker);
 ```
 ### Golang
