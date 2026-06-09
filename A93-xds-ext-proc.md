@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-05-26
+* Last updated: 2026-06-09
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -141,9 +141,11 @@ The stream to the ext_proc server may be terminated at any time.
 
 If the stream terminates with a non-OK status, then by default the
 data plane RPC will be failed with INTERNAL status.  However, if the
-`failure_mode_allow` config field is set to true, then the data plane
-RPC will instead be allowed to continue, with no further action taken
-by the ext_proc filter.
+`failure_mode_allow` config field is set to true and the filter has not
+yet started sending client or server messages to the ext_proc stream
+(which will be the case if the body send mode is NONE), then the data
+plane RPC will instead be allowed to continue, with no further action
+taken by the ext_proc filter.
 
 If the stream terminates with OK status, that indicates to the filter
 that it no longer needs to send any more events to the ext_proc server
@@ -363,8 +365,10 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
 - [failure_mode_allow](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L177):
   By default, if the RPC to the ext_proc server fails with a non-OK
   status, the data plane RPC will be failed with status INTERNAL.  If
-  this field is set to true, then the data plane RPC will instead be
-  allowed to continue, with no further action taken by the ext_proc filter.
+  this field is set to true, then the data plane RPC may instead be
+  allowed to continue with no further action taken by the ext_proc filter.
+  See [Early Termination of ext_proc
+  Stream](#early-termination-of-ext_proc-stream) for details.
 - [processing_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L181):
   Required.  Inside of it:
   - [request_header_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L118),
@@ -690,7 +694,8 @@ handled as follows:
 If any of the above fields fails validation, the ext_proc filter will
 treat the ext_proc stream as having failed.  The data plane RPC will
 then be handled based on the value of the `failure_mode_allow` config
-field.
+field.  See [Early Termination of ext_proc
+Stream](#early-termination-of-ext_proc-stream) for details.
 
 All mutations (additions, modifications, and removals) are subject to the
 rules in the `mutation_rules` field in the filter config.  This field is
