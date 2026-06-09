@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support and Header Representations
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-05-26
+* Last updated: 2026-06-09
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -339,11 +339,10 @@ message, which will be used as follows:
   headers" as described in the proto file for the
   `APPEND_IF_EXISTS_OR_ADD` enum value; gRPC implementations are free to
   either use a comma-concatenated approach or add duplicate headers.
-- [keep_empty_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L480):
-  By default, any header mutation that results in a header with an
-  empty value will cause the header key to be removed.  If this field
-  is set to true, then such empty headers will be kept.
-- We do not support the deprecated append field.
+- We do not support the `keep_empty_value` field.  Any header mutation that
+  results in a header with an empty value will cause the header key to be
+  removed, regardless of the value of this field.
+- We do not support the deprecated `append` field.
 
 Header mutation rules are represented as an
 [`envoy.config.common.mutation_rules.v3.HeaderMutationRules`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L47C9-L47C28)
