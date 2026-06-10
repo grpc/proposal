@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support and Header Representations
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-06-09
+* Last updated: 2026-06-10
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -339,9 +339,9 @@ message, which will be used as follows:
   headers" as described in the proto file for the
   `APPEND_IF_EXISTS_OR_ADD` enum value; gRPC implementations are free to
   either use a comma-concatenated approach or add duplicate headers.
-- We do not support the `keep_empty_value` field.  Any header mutation that
-  results in a header with an empty value will cause the header key to be
-  removed, regardless of the value of this field.
+- We do not support the `keep_empty_value` field.  gRPC will keep
+  headers even if the mutations result in an empty value, regardless of
+  the value of this field.
 - We do not support the deprecated `append` field.
 
 Header mutation rules are represented as an
