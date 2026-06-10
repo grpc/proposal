@@ -184,7 +184,6 @@ accept this coupling. Thus, the TSI code can contain gRPC monitoring specifics.
 In the few use-cases where TSI is not called via gRPC, we will ensure that
 metric incrementation is not performed.
 
-// TODO: Update this comment to be more accurate based on the impl PR
 We will add the Channel's `CollectionScope` as an optional argument to the SSL
 TSI handshaker creation functions. This ensures that we don't break any existing
 users of TSI and that we never increment metrics when TSI is used outside of
@@ -228,12 +227,11 @@ only in the case where TLS is the protocol being used.
 +++ b/internal/transport/http2_client.go
 @@ -294,7 +294,23 @@
  	if transportCreds != nil {
-+		isTLS := transportCreds.Info().SecurityProtocol == "tls"
+ 		isTLS := transportCreds.Info().SecurityProtocol == "tls"
  		conn, authInfo, err = transportCreds.ClientHandshake(connectCtx, addr.ServerName, conn)
 +		if isTLS {
-+     <increment client/server handshakes metric>
++			<increment client/server handshakes metric>
 +		}
-+
  		if err != nil {
  			return nil, connectionErrorf(isTemporary(err), err, "transport: authentication handshake failed: %v", err)
  		}
