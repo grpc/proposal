@@ -277,41 +277,106 @@ field set.
 Flow control must be handled properly in both normal mode and
 [observability mode](#observability-mode).
 
-In normal mode, flow control must be applied for each stream through the
-ext_proc code.  On the gRPC client side, this means each of the
-following:
+In normal mode, flow control must be applied for each of the following
+paths through the ext_proc code:
 
-- client messages from the client application to the ext_proc server
-- client messages from the ext_proc server to the data plane server
-- server messages from the data plane server to the ext_proc server
-- server messages from the ext_proc server to the client application
+1. client messages from downstream to the ext_proc sidestream
+2. client messages from the ext_proc sidestream to upstream
+3. server messages from upstream to the ext_proc sidestream
+4. server messages from the ext_proc sidestream to downstream
 
-Similarly, on the gRPC server side, it applies to each of the following:
+(Note that on the gRPC client side, "downstream" indicates the client
+application and "upstream" indicates the transport, whereas on the
+gRPC server side, "downstream" indicates the transport and "upstream"
+indicates the server application.  The exact mechanisms for flow control
+are different in the application APIs than in the transport, but in both
+cases, there is some push-back signal to tell the sender to stop writing
+when the receiver's buffer is full.)
 
-- client messages from the data plane client to the ext_proc server
-- client messages from the ext_proc server to the server application
-- server messages from the server application to the ext_proc server
-- server messages from the ext_proc server to the data plane client
+Note that each of those paths is completely independent of any other and
+therefore needs its own independent flow control push-back.  One challenge
+here is that paths (2) and (4) are both pushing back to the same sender,
+which is the ext_proc sidestream.  This imposes the possibility of a
+deadlock.  For example, consider the following case:
+- Downstream application needs to complete a bunch of writes before doing
+  a read.
+- Upstream application has done a whole bunch of writes, but since the
+  downstream application hasn't yet done any reads, we need to apply
+  push-back to the ext_proc stream.  But that would also apply push-back
+  for the downstream-to-upstream messages.
+- Because we have applied push-back to the downstream-to-upstream messages,
+  the downstream application cannot finish its writes -- but because it is
+  designed not to do any reads until it finishes its writes, it will never
+  actually do any reads. Thus, it is deadlocked.
 
-Note that each of those streams is completely independent of any other
-and therefore should have its own independent flow control push-back.
+To avoid this kind of deadlock, we are introducing flow control in the
+ext_proc protocol to allow pushing back on each path independently
+in https://github.com/envoyproxy/envoy/pull/45509.  The mechanism is
+modeled after [HTTP/2 flow
+control](https://datatracker.ietf.org/doc/html/rfc9113#name-flow-control),
+but we have taken some trade-offs to simplify implementations for
+ext_proc servers in exchange for slightly less control over the exact
+amount of bytes a sender may send.  The mechanism works as follows.
 
-TODO: There is a conflict here, because if we get push-back from the
-data plane server, we would propagate that push-back to the ext_proc
-stream, but that would also wind up pushing back messages bound for the
-data plane client.  This could cause a deadlock for applications that do
-a bunch of writes before doing any reads.  Need to figure out how to
-resolve this.
+The sender for each of the four paths above will track the amount of
+flow control window it has available.  Whenever it sends body data,
+it must decrement its flow control window by the number of bytes that
+it has sent.  When its flow control window is less than or equal to the
+amount of body data it wishes to send, it may not send until it receives
+a window update causing its flow control window to be large enough.
+
+However, in GRPC body send mode, whenever the flow control window is
+greater than zero, a sender may send a single message, even if the size of
+that message exceeds the available flow control window.  At that point,
+the flow control window will be negative and the sender must not send
+the next message until it becomes positive.  This means that the
+receiver can't completely cap the amount of bytes it will receive, but
+it is necessary to deal with the fact that GRPC body send mode requires
+sending complete messages at a time, rather than splitting them up into
+DATA frames as HTTP/2 does, which would allow making incremental
+progress.
+
+The initial window sizes for all four paths are set by the filter in
+its initial message on the ext_proc sidestream.  Note that the initial
+size for the to-sidestream windows are set by the sender, not the
+receiver. This is because each sidestream may be routed to a different
+ext_proc server instance, but there is no connection-level handshake to
+set a default for that server instance, so the only alternative here would
+be to have the ext_proc server instance set this on a per-stream basis,
+which would require an additional round-trip and therefore hurt latency.
+This unfortunately means that the ext_proc server instance has a bit less
+control: as soon as it receives these initial values, it can immediately
+send a window update that reduces the window, but it must be prepared
+to handle any data that the sender has already sent.
+
+As the receiver reads data, it must send back a window update telling
+the sender that it can send more data.  The window update can be
+positive or negative.  The sender must immediately add this value to
+its available flow control window for sending.
+
+The ext_proc filter will use this mechanism to handle push-back on each
+path by not considering reads complete (and therefore releasing the flow
+control back to the sender) until its corresponding write has passed
+flow control.  For example, for path (1) above, when reading client
+messages from downstream, the filter will not release flow control back
+to the downstream until its write to the ext_proc sidestream has cleared
+flow control.
 
 In [observability mode](#observability-mode), flow control works a
-little differently, because for each of client messages and server
-messages, there is a single stream being forwarded to two different
-destinations instead of it being split into two separate streams.  For
-example, for client messages on the gRPC client side, instead of one
-stream from the application to the ext_proc server and another stream
-from the ext_proc server to the data plane server, we will have a single
-stream from the application that goes to both the ext_proc server and
-the data plane server.
+little differently, because it does not read from the ext_proc
+sidestream and therefore does not suffer from the deadlock problem
+described above.  As a result, there is no need to support
+ext_proc-level flow control in observability mode; we rely solely on the
+normal HTTP/2-level flow control on the ext_proc sidestream.
+
+However, there is a different wrinkle here.  For each of client messages
+and server messages, there is a single stream being forwarded to two
+different destinations instead of it being split into two separate
+streams.  For example, for client messages on the gRPC client side,
+instead of one stream from the application to the ext_proc server and
+another stream from the ext_proc server to the data plane server, we
+will have a single stream from the application that goes to both the
+ext_proc server and the data plane server.
 
 Specifically, on the gRPC client side, we have the following:
 
@@ -330,9 +395,7 @@ And on the gRPC server side, we have the following:
 In any of those streams, if we are blocked sending a message to the
 ext_proc server by flow control, then we need some push-back to the
 originator of the stream, or else we would have to buffer messages to
-be sent to the ext_proc server, which can cause OOMs.  (Envoy has noted
-this problem in https://github.com/envoyproxy/envoy/issues/33319 but
-has not proposed a solution yet.)
+be sent to the ext_proc server, which can cause OOMs.
 
 For gRPC, we will address this problem by requiring the message to the
 ext_proc server to pass flow control before we allow the message to
@@ -535,6 +598,25 @@ sent to the server will be populated as follows:
     Populated from the filter config's processing mode.
   - The send_body_without_waiting_for_header_response field will never
     be set, since that applies only in STREAMED body send mode.
+- `flow_control_init` (new field being added in
+  https://github.com/envoyproxy/envoy/pull/45509): Will be populated on
+  the first message sent on the ext_proc stream when not in
+  observability mode.  All four initial window size fields must be set.
+  A good default initial value is 65536, but implementations can raise
+  or lower that based on their own memory management requirements.
+- `client_window_update` (new field being added in
+  https://github.com/envoyproxy/envoy/pull/45509): Normally, whenever the
+  filter reads a request body chunk from the ext_proc side-stream, it will
+  send a window update setting the
+  `window_increment_sidesteram_to_upstream` field to the number of bytes
+  it just read.  Similarly, whenever the filter reads a response body
+  chunk from the ext_proc side-stream, it will send a window update
+  setting the `window_increment_sidestream_to_downstream` field to the
+  number of bytes it just read.  Implementations may modify the number
+  of window bytes they return as needed based on their own memory
+  management requirements.  Note that the `client_window_update` may be
+  sent in a message by itself or along with another message that the
+  filter was going to send anyway.
 - Note: We will not populate request_trailers, because gRPC never sends
   request trailers.
 - Note: We will not populate metadata_context, because gRPC does not
@@ -661,6 +743,14 @@ as follows:
   sending message bodies received from the ext_proc server until the
   ext_proc stream terminates with OK status.  After that, any subsequent
   message on the stream will be passed through as-is.
+- `server_window_update` (new field being added in
+  https://github.com/envoyproxy/envoy/pull/45509): Whenever the filter
+  receives a message with this field set, it will increment its
+  available flow control window for request messages by the amount in
+  `window_increment_downstream_to_sidestream` and its available flow
+  control window for response messages by the amount in
+  `window_increment_upstream_to_sidestream`.  Note that the amount of
+  available flow control window may go negative.
 - We will ignore override_message_timeout, since GRPC body send mode
   does not support timeouts.
 - We ignore the dynamic_metadata field, since it is not relevant to gRPC.
