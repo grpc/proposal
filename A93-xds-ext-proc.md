@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-06-09
+* Last updated: 2026-06-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -357,10 +357,12 @@ its available flow control window for sending.
 The ext_proc filter will use this mechanism to handle push-back on each
 path by not considering reads complete (and therefore releasing the flow
 control back to the sender) until its corresponding write has passed
-flow control.  For example, for path (1) above, when reading client
-messages from downstream, the filter will not release flow control back
-to the downstream until its write to the ext_proc sidestream has cleared
-flow control.
+flow control at both the ext_proc and HTTP/2 layers.  For example, for
+path (1) above, when reading client messages from downstream, the filter
+will first wait until it has allocated enough ext_proc flow control to
+send the message on the sidestream and then wait for the write to the
+sidestream to clear flow control at the HTTP/2 layer for the sidestream,
+and only then will it release flow control back to the downstream.
 
 In [observability mode](#observability-mode), flow control works a
 little differently, because it does not read from the ext_proc
@@ -445,16 +447,18 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
     The only modes we support here are
     [`NONE`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L66)
     and `GRPC` (to be added).  Note that if response_body_mode is set to
-    `GRPC`, then response_header_mode must be set to `SEND`.
+    `GRPC`, then response_trailer_mode must be set to `SEND`.
   - We ignore the request_trailer_mode field, since gRPC never sends
     request trailers.
 - [request_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L188)
   and
   [response_attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L195):
   Attributes to be sent to ext_proc server along with client-to-server
-  and server-to-client events, respectively.  The set of supported
-  attributes is the same as what we support for any CEL expression in xDS.
-  Any unsupported attribute name will be ignored.  See [Attributes Sent to
+  and server-to-client events, respectively.  Populated only on the
+  first client-to-server and first server-to-client event, respectively.
+  The set of supported attributes is the same as what we support for any
+  CEL expression in xDS.  Any unsupported attribute name will be ignored.
+  See [Attributes Sent to
   ext_proc Server](#attributes-sent-to-the-ext_proc-server) below for details.
 - [mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L225):
   Optional.  Validated as described in [A102].  See [Header
