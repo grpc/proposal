@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support and Header Representations
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-06-10
+* Last updated: 2026-06-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -368,6 +368,13 @@ message, which will be used as follows:
   `host` header, regardless of what these fields are set to.
 - allow_envoy: This field will be ignored, since `x-envoy-*` headers are
   not generally meaningful to gRPC.
+
+Note that if a header mutation is disallowed, then it will be considered
+a rule violation even if the mutation would have been a no-op.  For
+example, if the modification is a `HeaderValueOption` with action
+`ADD_IF_ABSENT` and the header already exists, the modification would
+have been a no-op, but if the header name is not allowed, then it will
+still be considered a rule violation.
 
 When validating any of these messages from within an xDS resource, if
 any field fails validation, then the xDS resource will be considered
