@@ -117,7 +117,7 @@ from the labels.
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
 | `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum string indicating success or the reason for handshake failure. |
-| `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum string  indicating if and how the handshake was resumed. |
+| `grpc.tls.handshake.resumed` | Optional | The `TlsResumptionType` enum string indicating if and how the handshake was resumed. |
 
 ### TLS Offload Specific Metrics
 
