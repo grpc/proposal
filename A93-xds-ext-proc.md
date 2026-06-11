@@ -141,20 +141,21 @@ The stream to the ext_proc server may be terminated at any time.
 
 If the stream terminates with a non-OK status, then by default the
 data plane RPC will be failed with INTERNAL status.  However, if the
-`failure_mode_allow` config field is set to true and the filter has not
-yet started sending client or server messages to the ext_proc stream
-(which will be the case if the body send mode is NONE), then the data
-plane RPC will instead be allowed to continue, with no further action
-taken by the ext_proc filter.
+`failure_mode_allow` config field is set to true and the filter is in
+[observability mode](#observability-mode) or has not yet started sending
+client or server messages to the ext_proc stream (which will be the case
+if the body send mode is NONE), then the data plane RPC will instead be
+allowed to continue, with no further action taken by the ext_proc filter.
 
 If the stream terminates with OK status, that indicates to the filter
 that it no longer needs to send any more events to the ext_proc server
 for that data plane RPC; all remaining events may proceed on the data
 plane RPC without any further action taken by the ext_proc filter.
-However, if the ext_proc filter is configured to send request or response
-messages to the ext_proc server, the ext_proc server must drain the
-stream before terminating.  This is because the filter may have already
-sent messages on the stream that the server has not yet seen, and if the
+However, when not in [observability mode](#observability-mode), if the
+ext_proc filter is configured to send request or response messages
+to the ext_proc server, the ext_proc server must drain the stream
+before terminating.  This is because the filter may have already sent
+messages on the stream that the server has not yet seen, and if the
 server never echoes them back, then the messages will simply be dropped
 from the stream.  In order to avoid that, the following drain procedure
 will be used:
