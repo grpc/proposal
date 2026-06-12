@@ -61,7 +61,7 @@ We introduce the concept of **Child Channel Options**. This is a configuration
 container attached to a parent channel/server that is strictly designated for
 use by its children.
 
-The user API must allow "nesting" of channel options. A user creating a Parent
+The user API must allow "nesting" of channel options (specifying child channel options within parent channel options). A user creating a Parent
 Channel/Server `P` can provide a set of options `O_child`.
 
 * `O_child` is opaque to `P`. `P` does not apply these options to itself.
@@ -76,6 +76,8 @@ needs to create a Child Channel `C`:
 1. It retrieves `O_child` from `P`.
 2. It applies `O_child` to the configuration of `C`.
 3. It should also configure channel `C` to use `O_child` for its children.
+
+* **Multi-level Propagation**: The child options `O_child` apply recursively to all child channels, no matter how deeply nested. For example, if a parent channel `P` creates a child channel `C` (e.g., to an `ext_authz` server), and `C` itself is configured to use `xds:///` (which requires creating an xDS client control plane channel), `C` will pass `O_child` to its own child channels.
 
 The Child Channel `C` typically requires some internal
 configuration `O_internal` (e.g., target URIs, or internal interceptors).
@@ -116,48 +118,40 @@ To support this, the child channel options must be plumbed down into resolvers a
 
 #### Java
 
-In Java, the configuration will be achieved by accepting functions.
-The API allows users to pass a `ManagedChannelBuilder<?> builder` or
-`ServerBuilder<?> builder` (or a similar functional interface). When an internal
-library (e.g., xDS, gRPCLB) creates a child channel, it applies this
-user-provided function to the builder before further configuring the channel.
+In Java, the configuration will be achieved by accepting functional interfaces.
+The API allows users to register a configurer on a `ManagedChannelBuilder<?>` or
+`ServerBuilder<?>`. When an internal library (e.g., xDS, gRPCLB) creates a child
+channel, it applies this user-provided configurer to the child's channel builder
+before building the channel.
 
 * ##### Configuration Interface
 
-  Define a new public API interface, `ChannelConfigurer`, to encapsulate the
+  Define a new public API interface, `ChannelConfigurator`, to encapsulate the
   configuration logic for channels.
 
   ```java
 
   import io.grpc.ManagedChannelBuilder;
-  import io.grpc.ServerBuilder;
 
   // Captures the intent of the plugin.
-  // Consumes a builder to modify it before further configuring the channel or server
-  public interface ChannelConfigurer {
+  // Consumes a builder to modify it before further configuring the channel
+  public interface ChannelConfigurator {
      /**
      * Configures the given channel builder.
      *
      * @param builder the channel builder to configure
      */
-    default void configureChannelBuilder(ManagedChannelBuilder<?> builder) {}
-
-     /**
-     * Configures the given server builder.
-     *
-     * @param builder the server builder to configure
-     */
-    default void configureServerBuilder(ServerBuilder<?> builder) {}
+    void configureChannelBuilder(ManagedChannelBuilder<?> builder);
   }
   ``` 
 
 * ##### API Changes
 
     * ManagedChannelBuilder:
-      Add `ManagedChannelBuilder#childChannelConfigurer(ChannelConfigurer channelConfigurer)`
-      to allow users to register this configurer.
+      Add `ManagedChannelBuilder#childChannelConfigurator(ChannelConfigurator channelConfigurator)`
+      to allow users to register this configurator.
     * XdsServerBuilder:
-      Add `XdsServerBuilder#childChannelConfigurer(ChannelConfigurer configurer)`
+      Add `XdsServerBuilder#childChannelConfigurator(ChannelConfigurator configurator)`
       to allow users to provide configuration for any internal channels created
       by the server (e.g., connections to external authorization or processing
       services).
@@ -165,17 +159,17 @@ user-provided function to the builder before further configuring the channel.
 * ##### Usage Example
 
   ```java
-  // Define the configurer for internal child channels
-  ChannelConfigurer myInternalConfig = new ChannelConfigurer() {
+  // Define the configurator for internal child channels
+  ChannelConfigurator myInternalConfig = new ChannelConfigurator() {
       @Override
       public void configureChannelBuilder(ManagedChannelBuilder<?> builder) {
-          builder.addMetricSink(sink);
+          builder.maxInboundMessageSize(4 * 1024 * 1024);
       }
   };
 
   // Apply it to the parent channel
   ManagedChannel channel = ManagedChannelBuilder.forTarget("xds:///my-service")
-      .childChannelConfigurer(myInternalConfig) // <--- Configuration injected here
+      .childChannelConfigurator(myInternalConfig) // <--- Configuration injected here
       .build();    
   ```
 
@@ -201,7 +195,7 @@ into these internal channels from both entry points.
     }
     ```
 
-* Server-Side: `WithChildDialOptions`
+* Server-Side: `ChildChannelOptions`
 
   For xDS-enabled servers, we introduce a `ServerOption` wrapper.
   Since `xds.NewGRPCServer` creates an internal xDS client to fetch listener
@@ -209,10 +203,10 @@ into these internal channels from both entry points.
   Options** or **Stats Handlers**) to that internal connection.
 
     ```go
-    // WithChildDialOptions returns a ServerOption that specifies a list of 
+    // ChildChannelOptions returns a ServerOption that specifies a list of 
     // DialOptions to be applied to the server's internal child channels 
     // (e.g., the xDS control plane connection).
-    func WithChildDialOptions(opts ...DialOption) ServerOption {
+    func ChildChannelOptions(opts ...DialOption) ServerOption {
         return newFuncServerOption(func(o *serverOptions) {
             o.childDialOptions = opts
         })
