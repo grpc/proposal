@@ -102,8 +102,7 @@ enum class TlsResumptionType {
 The following metrics are count metrics, with the primary information coming
 from the labels.
 
-* `grpc.client.tls.handshakes` (unit: {handshake} type: int64 counter. This is experimental.)
-
+* `grpc.client.tls.handshakes` (unit: {handshake} type: int64 counter. description: EXPERIMENTAL: The number of handshakes performed on the client side. The primary useful information comes from the the labels, in particular the result label contains information on why a handshake failed if it did not succeed.)
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
 | `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum string indicating success or the reason for handshake failure. |
@@ -112,7 +111,7 @@ from the labels.
 | `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78], [A94]). |
 | `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89], [A94]). |
 
-* `grpc.server.tls.handshakes` (unit: {handshake} type: int64 counter. This is experimental.)
+* `grpc.server.tls.handshakes` (unit: {handshake} type: int64 counter. description: EXPERIMENTAL: The number of handshakes performed on the server side. The primary useful information comes from the the labels, in particular the result label contains information on why a handshake failed if it did not succeed.))
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
@@ -123,7 +122,7 @@ from the labels.
 
 The following metrics are non-per-call bucketed latency metrics that report the duration of offloaded cryptographic operations.
 
-* `grpc.server.tls.offload_certificate_selection_duration` (unit: s, type:  float64 histogram - latency buckets defined in [A66]. This is experimental.)
+* `grpc.server.tls.offload_certificate_selection_duration` (unit: s, type:  float64 histogram - latency buckets defined in [A66]. description: EXPERIMENTAL: Measures the duration of the offloaded certificate selection operation.)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
@@ -138,7 +137,7 @@ offload using an EC or RSA key). Older TLS versions have the concept of other
 private key operations that gRPC does not support (for example, decryption
 offload using an RSA key). See [A107] for more detail on private key signers.
 
-* `grpc.client.tls.offload_private_key_signing_duration` (unit: s, type: float64 histogram - latency buckets defined in [A66]. This is experimental.)
+* `grpc.client.tls.offload_private_key_signing_duration` (unit: s, type: float64 histogram - latency buckets defined in [A66]. description: EXPERIMENTAL: Measures the duration of the offloaded private key signing operation.)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
@@ -149,11 +148,11 @@ offload using an RSA key). See [A107] for more detail on private key signers.
 | `grpc.lb.locality` | Optional | The locality to which the traffic is being sent (as defined in [A78], [A94]). |
 | `grpc.lb.backend_service` | Optional | The backend service to which the traffic is being sent (as defined in [A89], [A94]). |
 
-* `grpc.server.tls.offload_private_key_signing_duration` (unit: s, type: float64 histogram - latency buckets defined in [A66]. This is experimental.)
+* `grpc.server.tls.offload_private_key_signing_duration` (unit: s, type: float64 histogram - latency buckets defined in [A66]. description: EXPERIMENTAL: Measures the duration of the offloaded private key signing operation.)
 
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
-| `grpc.status` | Required | Result of the certificate selection offloading, in the format of a gRPC status code (as defined in [A66]). |
+| `grpc.status` | Required | Result of the private key signing offloading, in the format of a gRPC status code (as defined in [A66]). |
 | `grpc.tls.private_key.offloader_name` | Required | A string identifying the private key signer implementation e.g. "HSM" or "private_key_signer_service". This must be low-cardinality. |
 | `grpc.tls.private_key_algorithm` | Optional | An algorithm enum indicating how the offloaded private key signing was done, e.g. “RsaPkcs1Sha256”. |
 
