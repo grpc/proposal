@@ -119,9 +119,9 @@ To support this, the child channel options must be plumbed down into resolvers a
 #### Java
 
 In Java, the configuration will be achieved by accepting functional interfaces.
-The API allows users to register a configurer on a `ManagedChannelBuilder<?>` or
+The API allows users to register a configurator on a `ManagedChannelBuilder<?>` or
 `ServerBuilder<?>`. When an internal library (e.g., xDS, gRPCLB) creates a child
-channel, it applies this user-provided configurer to the child's channel builder
+channel, it applies this user-provided configurator to the child's channel builder
 before building the channel.
 
 * ##### Configuration Interface
