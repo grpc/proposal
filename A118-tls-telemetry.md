@@ -1,8 +1,8 @@
-A118: Authentication Telemetry
+A118: TLS Telemetry
 ----
 * Author(s): @gtcooke94
 * Approver: @dfawley, @easwars, @ejona86, @matthewstevenson88, @markdroth
-* Status: In Review
+* Status: Approved
 * Implemented in:
 * Last updated: 2026-06-03
 * Discussion at: https://groups.google.com/g/grpc-io/c/hwK5GWDvL20?e=48417069
