@@ -1,10 +1,9 @@
-A120 - Post-Quantum Cryptography
-----
+# A120 - Post-Quantum Cryptography
 * Author(s): @gtcooke94
 * Approver: markdroth, ejona86, easwars, matthewstevenson88, dfawley
 * Implemented in: C++, Go, Java
 * Last updated: 2026-06-05
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: `<google group thread>` (filled after thread exists)
 
 ## Abstract
 
@@ -17,9 +16,9 @@ Maintainers of the individual pieces of the general TLS ecosystem are in consens
 
 Performance concerns are the primary source of anticipated pushback. However, we align with the broader ecosystem: prioritizing rapid PQC readiness is critical. Performance-sensitive users that cannot take this approach can choose to opt-out by configuring their ciphers. In addition, gRPC SSL/TLS users are not historically sensitive to ~600 μs handshake latency delta. For example, gRPC-C++ does not enable TLS resumption by default, which would save much more than that.
 
-Post-quantum authenticity is not susceptible to store-now-decypt-later attacks so is out-of-scope for the sudden urgency.
+Post-quantum authenticity is not susceptible to store-now-decrypt-later attacks so is out-of-scope for the sudden urgency.
 
-Not all of gRPC’s TLS stack enables users to configure their own key exchange groups. This is a loose prerequisite to changing the default behavior for gRPC, as we want users to be able to opt-out of post-quantum confidentiality if they desire.
+Not all of gRPC's TLS stack enables users to configure their own key exchange groups. This is a loose prerequisite to changing the default behavior for gRPC, as we want users to be able to opt-out of post-quantum confidentiality if they desire.
 
 
 ## Proposal
@@ -28,34 +27,36 @@ The gRPC TLS stacks must prefer the X25519-MLKEM768 key exchange group over non-
 
 In the case where the security library is already preferring PQC, we will not take over the defaults. In the case that the underlying security libraries are not already preferring PQC, gRPC will take an opinionated default of {X25519-MLKEM768, X25519, P-256, P-384, P-521}. MLKEM1024 will be added to this list when widely supported.
 
-Further, each gRPC language implementation will have way to set key exchange groups.
+Further, each gRPC language implementation will have a way to set key exchange groups.
 
 ### C++
 
-In OpenSSL < 3 (and thus BoringSSL), if no key exchange groups are set gRPC currently defaults as follows:
+In OpenSSL < 3 (and thus BoringSSL), if no key exchange groups are set, gRPC currently defaults as follows:
 
+| Library / Version | Key Exchange Groups | Source / Notes |
+| :--- | :--- | :--- |
 | BoringSSL (1.1.1) | P-256 | gRPC Default |
-| :---- | :---- | :---- |
 | OpenSSL < 3 | P-256 | gRPC Default |
 | 3 <= OpenSSL < 3.5 | {X25519, P-256, X448, ... many more ...} | [OpenSSL Default](https://github.com/openssl/openssl/blob/89cd17a031e022211684eb7eb41190cf1910f9fa/ssl/t1_lib.c#L195-L213) |
 | OpenSSL >= 3.5 | {X25519-MLKEM768, X25519, P-256, X448, P-384, P-521, ffdhe2048, ffdhe3072} | [OpenSSL Default](https://github.com/openssl/openssl/blob/286ddeaac037533bbdce65b3c689e3f7ffebf0f6/ssl/t1_lib.c#L204) |
 
-The following table describes what the default behavior should be for each version. X25519-MLKEM768 is only supported in BoringSSL and OpenSSL3.5+.
+The following table describes what the default behavior should be for each version. X25519-MLKEM768 is only supported in BoringSSL and OpenSSL 3.5+.
 
-| BoringSSL (1.1.1) | {X25519-MLKEM768, X25519, P-256, P-384, P-521} with SSL_CTX_set1_groups_list (Until the better defaults in BoringSSL) |
-| :---- | :---- |
-| OpenSSL < 3 | {X25519, P-256, P-384, P-521} with SSL_CTX_set1_groups/SSL_CTX_set1_curves |
+| Library / Version | Recommended Configuration / Behavior |
+| :--- | :--- |
+| BoringSSL (1.1.1) | {X25519-MLKEM768, X25519, P-256, P-384, P-521} with `SSL_CTX_set1_groups_list` (Until the better defaults in BoringSSL) |
+| OpenSSL < 3 | {X25519, P-256, P-384, P-521} with `SSL_CTX_set1_groups`/`SSL_CTX_set1_curves` |
 | OpenSSL 3+ | (Use OpenSSL defaults):<br> < 3.5 {X25519, P-256, P-384, P-521},<br> 3.5+ {X25519-MLKEM768, …} |
 
 ### Go
 
-In Golang, the crypto/tls library is part of the core language, and as of Go 1.24 the X25519-MLKEM768 hybrid cipher is already the default. As of the writing of this document, gRPC-Go support Go 1.25+, so preferring the PQC hybrid cipher by default is a no-op.
+In Golang, the `crypto/tls` library is part of the core language, and as of Go 1.24 the X25519-MLKEM768 hybrid cipher is already the default. As of the writing of this document, gRPC-Go supports Go 1.25+, so preferring the PQC hybrid cipher by default is a no-op.
 
 Users can configure their own preference via [tls.Config.CurvePreferences](https://pkg.go.dev/crypto/tls#Config). However, `advancedtls` **does not** currently support the user passing through `CurvePreferences`.
 
-This means grpc-go with `advancedtls` is fully dependent on the [Golang defaults](https://github.com/golang/go/blob/d90b98e65320778f3b1f99a6951ab20f04d218b3/src/crypto/tls/defaults.go#L19-L35). Otherwise, users have direct access to the `tls.Config` and can set the `CurvePreference`.
+This means gRPC-Go with `advancedtls` is fully dependent on the [Golang defaults](https://github.com/golang/go/blob/d90b98e65320778f3b1f99a6951ab20f04d218b3/src/crypto/tls/defaults.go#L19-L35). Otherwise, users have direct access to the `tls.Config` and can set the `CurvePreference`.
 
-We will add a passthrough setting in `advancedtls` for the user to explicitly configure `CurvePreferences`. It will be `advancedtls.Options.CurvePreferences` and will be a simple pass through to the `tls.Config.CurvePreferences`.
+We will add a passthrough setting in `advancedtls` for the user to explicitly configure `CurvePreferences`. It will be `advancedtls.Options.CurvePreferences` and will be a simple passthrough to the `tls.Config.CurvePreferences`.
 
 
 | Go version | Defaults |
@@ -66,17 +67,17 @@ We will add a passthrough setting in `advancedtls` for the user to explicitly co
 
 ### Java
 
-Similar to Go, gRPC-Java does not currently make opinionated preferences on the key exchange algorithm, and the defaults are dependent upon the security provider used. The providers have significant differences and this creates confusion for users. Further, X25519-MLKEM768 is not supported in all java versions, nor in all security providers. We propose that we update gRPC-Java to use netty-tcnative 4.2 (which uses BoringSSL) to cover most important use cases. Otherwise, OpenJDK 27 is the first version in which X25519-MLKEM768 is supported, so we are constrained by the language.
+Similar to Go, gRPC-Java does not currently make opinionated preferences on the key exchange algorithm, and the defaults are dependent upon the security provider used. The providers have significant differences and this creates confusion for users. Further, X25519-MLKEM768 is not supported in all Java versions, nor in all security providers. We propose that we update gRPC-Java to use `netty-tcnative` 4.2 (which uses BoringSSL) to cover the most important use cases. Otherwise, OpenJDK 27 is the first version in which X25519-MLKEM768 is supported, so we are constrained by the language.
 
-* netty-tcnative 4.1 (w/ BoringSSL) - {X25519, P-256, P-384, P-521}
-* netty-tcnative 4.2 (w/ BoringSSL) - {X25519-MLKEM768, X25519, P-256, P-384, P-521}
+* `netty-tcnative` 4.1 (w/ BoringSSL) - {X25519, P-256, P-384, P-521}
+* `netty-tcnative` 4.2 (w/ BoringSSL) - {X25519-MLKEM768, X25519, P-256, P-384, P-521}
 * OpenJDK 27+ post-quantum is supported by default - the exact list is {X25519-MLKEM768, X25519, P-256, P-384, P-521, X448, ffdhe2048, ffdhe3072, ffdhe4096, ffdhe6144, ffdhe8192}
   * See [JEP 527](https://openjdk.org/jeps/527) for more detail.
 * Conscrypt does not support X25519-MLKEM768 (no recent build with newer BoringSSL)
 
-In Java 21+, `SSLParameters.setNamedGroups` option will allow gRPC to create a passthrouh API that allows a user to configure their algorithms directly.
+In Java 21+, the `SSLParameters.setNamedGroups` method will allow gRPC to create a passthrough API that allows a user to configure their algorithms directly.
 
-A field will be added to the `TlsChannelCredentials`, and a new `TlsChannelCredentials.Feature will be defined to support setting the key exchange groups. This will passthrough to `SSLParameters.setNamedGroups`.
+A field will be added to `TlsChannelCredentials`, and a new `TlsChannelCredentials.Feature` will be defined to support setting the key exchange groups. This will pass through to `SSLParameters.setNamedGroups`.
 
 ### Temporary environment variable protection
 
