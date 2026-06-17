@@ -78,22 +78,6 @@ In Java 21+, `SSLParameters.setNamedGroups` option will allow gRPC to create a p
 
 A field will be added to the `TlsChannelCredentials`, and a new `TlsChannelCredentials.Feature will be defined to support setting the key exchange groups. This will passthrough to `SSLParameters.setNamedGroups`.
 
-```java
-// Get current SSLParameters
-SSLParameters params = socket.getSSLParameters();
-
-// Set the prioritized named groups, including the hybrid PQ-scheme
-params.setNamedGroups(new String[] { 
-    "X25519-MLKEM768", // Post-quantum hybrid (preferred)
-    "X25519",         // Classical fallback
-    "P-256" 
-});
-
-// Update the socket with the new parameters
-socket.setSSLParameters(params);
-```
-
-
 ### Temporary environment variable protection
 
 No temporary environment variable protection is required. This change prefers X25519-MLKEM768 by default but allows graceful fallback, and users can opt-out entirely by configuring their ciphersuites or curve preferences.
