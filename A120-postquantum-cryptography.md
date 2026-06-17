@@ -66,7 +66,7 @@ We will add a passthrough setting in `advancedtls` for the user to explicitly co
 
 ### Java
 
-Similar to Go, gRPC-Java does not currently make opinionated preferences on the key exchange algorithm, and the defaults are dependent upon the security provider used. The providers have significant differences and this creates confusion for users. Further, X25519-MLKEM768 is not supported in all java versions, nor in all security providers. We propose that we update gRPC-Java to use netty-tcnative 4.2 (w/ BoringSSL) to cover most important use cases. Otherwise, OpenJDK 27 is the first version in which X25519-MLKEM768 is supported, so we are constrained by the language.
+Similar to Go, gRPC-Java does not currently make opinionated preferences on the key exchange algorithm, and the defaults are dependent upon the security provider used. The providers have significant differences and this creates confusion for users. Further, X25519-MLKEM768 is not supported in all java versions, nor in all security providers. We propose that we update gRPC-Java to use netty-tcnative 4.2 (which uses BoringSSL) to cover most important use cases. Otherwise, OpenJDK 27 is the first version in which X25519-MLKEM768 is supported, so we are constrained by the language.
 
 * netty-tcnative 4.1 (w/ BoringSSL) - {X25519, P-256, P-384, P-521}
 * netty-tcnative 4.2 (w/ BoringSSL) - {X25519-MLKEM768, X25519, P-256, P-384, P-521}
@@ -106,7 +106,7 @@ Prioritizing rapid PQC readiness is critical as SNDL attacks present an immediat
 
 X25519-MLKEM768 is a hybrid algorithm. Specifically, it combines the classical X25519 cipher and the post-quantum MLKEM768 cipher. Think of the two ciphers as two separate "locks" on the data - an adversary has to break both locks individually to capture the data. We have decades of confidence in classical cryptography protecting against normal computing, so we keep that and add post-quantum protections on top. In this way, gRPC traffic is still protected against potentially unknown classical attacks against the post-quantum MLKEM768 cipher. This choice is consistent with what the rest of the industry is doing (e.g. across the broader TLS ecosystem and the Web).
 
-As to why we select the X25519-MLKEM768 combination specifically, simply put, it is ready, whereas the CNSA 2.0 recommendation (X25519-MLKEM1024) is not available in any TLS libraries at present. We plan to add support for X25519-MLKEM1024 when it is available.
+As to why we select the X25519-MLKEM768 combination specifically, simply put, it is ready, whereas alternatives (like X25519-MLKEM1024 or MLKEM1024) are not yet widely available in TLS libraries at present. We plan to add support for these as they become available, and in many cases they will become the new defaults of the crypto libraries.
 
 ### C++ Performance Comparison
 
