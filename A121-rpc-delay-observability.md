@@ -1,4 +1,4 @@
-# A121: Client-Side RPC Delay Observability
+# A121: RPC Delay Observability
 ----
 * Author(s): Madhav Bissa (@mbissa)
 * Approver: @markdroth, @ejona86, @dfawley, @easwars
