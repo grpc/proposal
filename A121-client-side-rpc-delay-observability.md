@@ -1,7 +1,7 @@
-# RPC Delay Observability
+# A121: Client-Side RPC Delay Observability
 ----
-* Author(s): Madhav Bissa (@madhavbissa)
-* Approver: markdroth
+* Author(s): Madhav Bissa (@mbissa)
+* Approver: @markdroth, @ejona86, @dfawley, @easwars
 * Implemented in: Go, Java, C++
 * Last updated: 2026-06-19
 * Discussion at: <google group thread> (filled after thread exists)
@@ -100,7 +100,7 @@ The following metrics are registered as client-side per-call metrics, extending 
 | **Bucket Boundaries** | Same as A66 latency buckets: 0, 0.00001, 0.00005, 0.0001, 0.0003, 0.0006, 0.0008, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.008, 0.01, 0.013, 0.016, 0.02, 0.025, 0.03, 0.04, 0.05, 0.065, 0.08, 0.1, 0.13, 0.16, 0.2, 0.25, 0.3, 0.4, 0.5, 0.65, 0.8, 1, 2, 5, 10, 20, 50, 100 |
 | **Default Enabled** | `false` (experimental, opt-in) |
 
-### 2. Telemetry Value Taxonomy
+### 2. Delay Types & Reasons
 
 To ensure consistency across implementations, we define the taxonomy of metric and tracing labels. 
 
@@ -177,7 +177,7 @@ Policies like `xds_cluster_manager`, `weighted_target`, and `rls` do not modify 
 However, to provide visibility in tracing, the parent container policy's structural details (such as the target cluster name, RLS route shard, or weight group) are recorded inside the trace event's free-form description or as span attributes (e.g., `"waiting for child cluster 'cluster-abc' to connect"`).
 
 
-### 3. Tracer API Changes
+### 3. Telemetry API
 
 #### Lifecycle & State Machine
 
@@ -186,7 +186,7 @@ The client channel, load balancer, and telemetry tracer coordinate synchronously
 ##### 1. Timer Orchestration
 *   **Resolver / Control-Plane (Call-Level Delay)**: When the client channel is initialized or name resolution is re-triggered, the channel starts a logical timer and invokes `recordCallDelayStart("resolving", reason)` to create the `"Call Delay"` child span carrying the `grpc.delay_type = "resolving"` attribute. When the resolver successfully applies the first valid service config and endpoints, the channel stops the logical timer and invokes `recordCallDelayEnd()`.
 *   **LB Picker (Attempt-Level Delay)**: When an RPC attempt is initiated, the picker executes. If the picker defers the pick (e.g. returning `ErrNoSubConnAvailable`), it returns a pending result containing the metric delay type (e.g., `"connecting"`) and the free-form debug reason. The channel's attempt-routing wrapper starts a logical timer and invokes `recordAttemptDelayStart(type, reason)` to create the `"Attempt Delay"` child span. As the attempt remains buffered, subsequent picker evaluations may return different reasons, which the channel updates using `recordAttemptDelayReasonChanged(reason)` to append span events. When a picker evaluation successfully assigns a subchannel, the channel stops the logical timer and invokes `recordAttemptDelayEnd()`.
-*   **Scope Resolution**: The decision of whether a delay segment is Call-Level (recorded to `grpc.client.call.delay.duration`) or Attempt-Level (recorded to `grpc.client.attempt.delay.duration`) is determined entirely by the scope of the tracer object on which the callbacks are invoked. Call-level delays (such as `"resolving"`) are invoked strictly on the call-scoped tracer (e.g. `ClientCallTracer` in Go, `ClientStreamTracer.Factory` in Java, or `ClientCallTracerInterface` in C++). Attempt-level delays (such as `"connecting"`) are invoked strictly on the attempt-scoped tracer (e.g. `ClientCallAttemptTracer` in Go, `ClientStreamTracer` in Java, or `CallAttemptTracer` in C++).
+*   **Scope Resolution**: The decision of whether a delay segment is Call-Level (recorded to `grpc.client.call.delay.duration`) or Attempt-Level (recorded to `grpc.client.attempt.delay.duration`) is determined entirely by the scope of the tracer object on which the callbacks are invoked. Call-level delays (such as `"resolving"`) are invoked strictly on the call-scoped tracer object, while attempt-level delays (such as `"connecting"`) are invoked strictly on the attempt-scoped tracer object. This mapping is enforced statically by the respective language API signatures.
 
 ##### 2. Emission
 Both metric duration recording and trace span management are fully delegated to the registered telemetry plugin (e.g., OpenTelemetry) via the tracer API:
