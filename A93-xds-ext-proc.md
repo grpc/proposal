@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-06-11
+* Last updated: 2026-06-23
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -173,6 +173,10 @@ will be used:
 3. When the filter sees the ext_proc stream terminate with OK status, it
    will resume reading messages from the data plane stream, and all such
    messages will proceed on the data plane stream without modification.
+
+If the ext_proc stream is terminated with an OK status without ever
+having initiated the above drain procedure, then the filter will treat
+it as if the ext_proc stream terminated with a non-OK status.
 
 #### Payload Handling
 
