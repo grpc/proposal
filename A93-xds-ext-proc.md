@@ -369,6 +369,11 @@ send the message on the sidestream and then wait for the write to the
 sidestream to clear flow control at the HTTP/2 layer for the sidestream,
 and only then will it release flow control back to the downstream.
 
+If the ext_proc filter receives more data than allowed by flow control
+(i.e., if it receives more data once the available flow control window
+is less than or equal to 0), it will cancel the ext_proc stream and
+treat it as having failed with a non-OK status.
+
 In [observability mode](#observability-mode), flow control works a
 little differently, because it does not read from the ext_proc
 sidestream and therefore does not suffer from the deadlock problem
