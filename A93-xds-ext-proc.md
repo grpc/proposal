@@ -711,10 +711,13 @@ as follows:
           server sets this but the client has not yet sent a half-close
           on the data plane RPC, then the ext_proc filter will need to
           read and discard subsequent messages that the client sends on
-          the stream.
+          the stream.  If this field is true in the response_body field,
+          the filter will cancel the ext_proc stream and treat it as if
+          it failed with a non-OK status (see above for details).
         - end_of_stream_without_message (new field being added in
           https://github.com/envoyproxy/envoy/pull/38753): Will be set to true
-          to indicate a half-close with no message to send.
+          to indicate a half-close with no message to send.  Ignored if
+          end_of_stream is false.
         - grpc_message_compressed (new field being added in
           https://github.com/envoyproxy/envoy/pull/38753): If set to
           true, the filter will cancel the ext_proc stream and treat it
