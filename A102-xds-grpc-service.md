@@ -1,0 +1,443 @@
+A102: xDS `GrpcService` Support and Header Representations
+----
+* Author(s): @markdroth, @sergiitk
+* Approver: @ejona86, @dfawley
+* Status: {Draft, In Review, Ready for Implementation, Implemented}
+* Implemented in: <language, ...>
+* Last updated: 2026-06-11
+* Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
+
+## Abstract
+
+There are several features that require the xDS control plane to configure
+gRPC to talk to a side-channel service, such as rate limiting ([A77]),
+ExtAuthz ([A92]), and ExtProc ([A93]).  This design specifies how the
+control plane will configure the communication with these side-channel
+services.  It also addresses the relevant security implications.
+
+Several of these features also use common xDS representations of
+headers, header mutations, and header mutation rules.  This design
+specifies how gRPC will handle those common representations.
+
+## Background
+
+The control plane configures communication with side-channel services
+via the xDS [`GrpcService`
+proto](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L29).
+This message tells the data plane how to find the side-channel service
+and what channel credentials and call credentials to use for that
+communication.
+
+Header-related information is encoded via several xDS protos, which are
+described in a later section.
+
+### Related Proposals: 
+* [gRFC A27: xDS-Based Global Load Balancing][A27]
+* [gRFC A29: xDS-Based mTLS Security for gRPC Clients and Servers][A29]
+* [gRFC A77: xDS Server-Side Rate Limiting][A77] (WIP)
+* [gRFC A81: xDS Authority Rewriting][A81]
+* [gRFC A92: xDS ExtAuthz Support][A92] (WIP)
+* [gRFC A93: xDS ExtProc Support][A93] (WIP)
+* [A97: xDS JWT Call Credentials][A97]
+
+[A27]: A27-xds-global-load-balancing.md
+[A29]: A29-xds-tls-security.md
+[A77]: https://github.com/grpc/proposal/pull/414
+[A81]: A81-xds-authority-rewriting.md
+[A92]: https://github.com/grpc/proposal/pull/481
+[A93]: https://github.com/grpc/proposal/pull/484
+[A97]: A97-xds-jwt-call-creds.md
+
+## Proposal
+
+gRPC will support the `GrpcService`
+message.  In that message, gRPC will support only the
+[`GoogleGrpc`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L68)
+target specifier, not
+[`EnvoyGrpc`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L33)
+(see "Rationale" section below).
+
+gRPC will also support the various xDS protos for representing
+header-related information, with appropriate validation.
+
+### Security Considerations
+
+The control plane specifying the side-channel target and credentials
+introduces a number of potential privilege-escalation attacks from a
+compromised control plane.  Here are some examples of such attacks:
+
+- Because the side-channel target name comes from the control plane
+  rather than being configured locally on the client, a compromised
+  control plane can tell the client to talk to an attacker-controlled
+  side-channel service.  When used for functionality like ExtProc, this
+  would allow the control plane to get access to the contents of data
+  plane RPCs.
+
+  - Note: Even if the client could enforce the use of a channel credential
+    type like TLS that verifies that the server's identity matches the
+    target name, that would not ameliorate this attack, because the
+    target name itself is coming from the control plane.
+
+  - Note: Even if the client locally configured the target name of
+    the side-channel service but trusted the control plane to specify
+    the credential type, the control plane could specify
+    `InsecureCredentials`, and then it would just need to control the
+    client's name resolution in order to send the client to an
+    attacker-controlled side-channel service.
+
+- A compromised control plane could instruct gRPC to contact an
+  attacker-controlled side-channel service using a call credential that
+  sends an access token, which would leak that access token.
+
+There will be cases where it is acceptable to trust the control plane
+to have that kind of privilege-escalation capability, and there will be
+other cases where it is not.  To differentiate between these two cases, we
+will rely on the `trused_xds_server` server feature that was added to the
+gRPC xDS bootstrap config in [A81].
+
+When gRPC receives a `GrpcService` proto from an xDS server, it will
+check at resource validation time to see if the `trusted_xds_server`
+server feature is present in the bootstrap config for that xDS server.
+If so, then gRPC will trust the target name and credentials specified
+in the `GrpcService` proto.  If not, then we will provide a mechanism
+in the bootstrap config to determine whether the target name is allowed
+and what credentials to use for it.
+
+Specifically, we will add the following new top-level field to the
+bootstrap config:
+
+```json5
+// The list of side-channel services allowed to be configured via xDS.
+"allowed_grpc_services": {
+  // The key is fully-qualified target URI.
+  "dns:///ratelimit.example.org:443": {
+    // List of channel creds.  Client will stop at the first type it
+    // supports.  This field is required and must contain at least one
+    // channel creds type that the client supports.
+    "channel_creds": [
+      {
+        "type": <string containing channel cred type>,
+        // The "config" field is optional; it may be missing if the
+        // credential type does not require config parameters.
+        "config": <JSON object containing config for the type>
+      }
+    ]
+    // List of call creds.  Optional.  Client will apply all call creds
+    // types that it supports but will ignore any types that it does not
+    // support.
+    "call_creds": [
+      {
+        "type": <string containing call cred type>,
+        // The "config" field is optional; it may be missing if the
+        // credential type does not require config parameters.
+        "config": <JSON object containing config for the type>
+      }
+    ]
+  }
+}
+```
+
+Note that the `channel_creds` and `call_creds` fields follow the same
+format as the top-level `xds_servers` field.  See [A27] and [A97] for
+details.
+
+When gRPC receives a `GrpcService` proto from an untrusted control
+plane, it will look up the target URI from the `GrpcService` proto in
+the `allowed_grpc_services` map.  If the specified target URI is not
+present in the map, then the `GrpcService` proto will be considered
+invalid, resulting in gRPC NACKing the xDS resource.  If the specified
+target URI *is* present in the map, then the `GrpcService` proto will be
+considered valid, but gRPC will ignore the credential information from
+the `GrpcService` proto; instead, it will use the channel credentials
+and call credentials specified in the map.
+
+### Credential Configuration in `GrpcService` Proto
+
+In order to make channel and call credentials more pluggable, we are
+introducing new extension points in `GrpcService`, as shown in
+https://github.com/envoyproxy/envoy/pull/40823.  Specifically, this
+introduces the following new fields:
+
+- `channel_credentials_plugin`: This provides an extension point to
+  specify channel credentials.  Just like in the gRPC xDS bootstrap
+  format, in order to faciliate easier introduction of new credential
+  types, this field is structured as a list, and the client will iterate
+  over the list and stop at the first credential type that it supports.
+  If it does not find any supported credential type in the list, that is
+  a validation error, and the xDS resource will be NACKed.  If it finds
+  a supported credential type but the config is invalid, then the xDS
+  resource will also be NACKed.  The following extensions will be supported
+  in this field:
+
+  - `envoy.extensions.grpc_service.channel_credentials.google_default.v3.GoogleDefaultCredentials`
+  - `envoy.extensions.grpc_service.channel_credentials.insecure.v3.InsecureCredentials`
+  - `envoy.extensions.grpc_service.channel_credentials.tls.v3.TlsCredentials`:
+    In this message:
+    - `root_certificate_provider`: Required.  References certificate
+      provider instances configured at the top level of the bootstrap
+      config.  Validated the same way as in `CommonTlsContext` (see [A29]).
+    - `identity_certificate_provider`: Optional.  References certificate
+      provider instances configured at the top level of the bootstrap
+      config.  Validated the same way as in `CommonTlsContext` (see [A29]).
+  - `envoy.extensions.grpc_service.channel_credentials.xds.v3.XdsCredentials`:
+    In this message:
+    - `fallback_credentials`: Required. Specifies a channel credential
+      plugin to be used as fallback credentials.
+
+- `call_credentials_plugin`: This provides an extension point to specify
+  call credentials.  Just like in the gRPC xDS bootstrap config format,
+  in order to faciliate easier introduction of new credential types,
+  this field is structured as a list, and the client will iterate over
+  the list adding all credential types that it supports, ignoring any
+  type that it does not support.  Note that unlike channel credentials,
+  call credentials are optional, and there can be more than one, so the
+  client will need to iterate over the entire list, but it's valid if
+  none of the specified types are supported.  If the client finds a
+  supported credential type but the config is invalid, then the xDS
+  resource will be NACKed.  The following extensions will be supported
+  in this field:
+
+  - `envoy.extensions.grpc_service.call_credentials.access_token.v3.AccessTokenCredentials`:
+    In this message:
+    - `token`: Required.  The access token.  The token will be added as
+      an `authorization` header with value `Bearer ` (note trailing
+      space) followed by the value of this field.  Note that the
+      token will not be sent on the wire unless the connection has
+      security level PRIVACY_AND_INTEGRITY.
+
+Note that this will require extending the channel credentials and call
+credentials registries to support configuration via these protos, in
+addition to the JSON formats that they already support for the gRPC
+xDS bootstrap config.
+
+### `GrpcService` Proto Validation
+
+When validating a `GrpcService` proto, the following fields will be used:
+- [`google_grpc`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L303):
+  This field must be set.  Inside of it:
+  - [`target_uri`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L254):
+    Must be set to a valid gRPC target URI.  The target URI must be
+    checked against the resolver registry during xDS resource
+    validation.
+  - `channel_credentials_plugin`: See above.
+  - `call_credentials_plugin`: See above.
+  - `channel_credentials`, `call_credentials`,
+    `credentials_factory_name`, and `config`: Ignored; we will use the
+    new credential plugin fields above instead.
+  - `stat_prefix`: Ignored; not relevant to gRPC.
+  - `per_stream_buffer_limit_bytes`: Ignored.  We don't have a use-case
+    for this right now but could add it later if needed.
+  - `channel_args`: Ignored.  Not supportable across languages in gRPC.
+- [`timeout`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L308):
+  If set, this will be used to set the deadline on RPCs sent to the
+  side-channel service.  The value must obey the restrictions specified in
+  the [`google.protobuf.Duration`
+  documentation](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Duration),
+  and it must have a positive value.
+- [`initial_metadata`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L315):
+  If present, specifies headers to be added to RPCs sent to the side-channel
+  service.  See [Header Representation](#header-representation) below
+  for details.
+
+The following fields will *not* be used:
+- `envoy_grpc`: See "Rationale" section below for details.
+- `retry_policy`: If retries are needed, they should be configured in
+  the [service
+  config](https://github.com/grpc/grpc/blob/master/doc/service_config.md)
+  for the side-channel service, or by using xDS in the side-channel.
+
+### Parsed Form of `GrpcService` Proto
+
+The parsed form of the `GrpcService` proto will contain the following:
+- target URI
+- channel credentials
+- call credentials
+- timeout for RPCs
+- initial metadata for RPCs
+
+As an example, in C++, it will look like this:
+
+```c++
+struct XdsGrpcService {
+  // This includes both the target URI and the channel and call credentials,
+  // to be used when creating the side channel.
+  // Note: GrpcXdsServerTarget is a pre-existing type that we use for
+  // specifying the xDS server and the LRS server.
+  std::unique_ptr<GrpcXdsServerTarget> server_target;
+
+  // Deadline and initial metadata, to be used when making RPCs on the
+  // side channel.
+  Duration timeout;
+  std::vector<std::pair<std::string, std::string>> initial_metadata;
+};
+```
+
+Note that the channel and call credentials encoded in this parsed form
+will come from either the `GrpcService` proto or from the
+`allowed_grpc_services` map in the bootstrap config, depending on whether
+the server that sent us the `GrpcService` proto has the
+`trusted_xds_server` server feature in the bootstrap config.
+
+The component using the parsed form (e.g., the ext_authz filter) will
+be responsible for creating the side channel with the specified target
+URI and channel credentials, and recreating the channel when those
+parameters change.  It will also be responsible for using the specified
+deadline and initial metadata for each RPC sent on the side channel.
+Implementations may either attach the call credentials to the channel
+credentials when creating the channel (in which case a change to the
+call credentials would require recreating the channel) or they may set
+the call credentials on a per-call basis.
+
+Implementations may optionally choose to create a common library that
+provides this functionality, so that individual components can share
+code for this instead of implementing it themselves.  However, note that
+there may be cases in the future where this code is used outside of xDS
+HTTP filters, so implementations should not assume that such a library
+will be called only from an xDS HTTP filter.
+
+#### Header Representation
+
+xDS provides common representations for headers, header mutations, and
+header mutation rules.  These xDS representations and their associated
+functionality are used in a variety of places, so they should be
+implemented in a reusable way.
+
+An individual header value is represented as an
+[`envoy.config.core.v3.HeaderValue`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L400)
+message, which will be used as follows:
+- [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
+  The header name.  When reading, the entry will be considered invalid
+  if empty, if not all lower-case, if length exceeds 16384, if the key is
+  `host`, if it starts with `:` or `grpc-`, or if it is not a valid gRPC
+  header name.
+- [raw_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L422):
+  The header value.  When reading, the entry will be considered invalid
+  if the length exceeds 16384 or if it does not contain a valid gRPC
+  header value.  When writing a `HeaderValue` proto for a header whose
+  name ends in `-bin`, the value must be base64-encoded.
+- [value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L415):
+  A legacy field representing the header value.  When reading a
+  `HeaderValue` proto, this field will be used only if the `raw_value`
+  field is unset.  When writing a `HeaderValue` proto, this field will
+  never be used; the `raw_value` field will always be used instead.
+  The entry will be considered invalid if the length exceeds 16384 or if
+  it does not contain a valid gRPC header value.
+
+A
+[`HeaderMap`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L484)
+message represents a list of header files.  Each individual entry will
+be validated as a `HeaderValue` proto, as described above.
+
+Header additions and modifications are represented as an
+[`envoy.config.core.v3.HeaderValueOption`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L429)
+message, which will be used as follows:
+- [header](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L458):
+  A `HeaderValue` proto; see above.
+- [append_action](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L476):
+  We honor the 4 enum values as described in the proto file.  Note that
+  not all gRPC implementations have the equivalent of "predefined inline
+  headers" as described in the proto file for the
+  `APPEND_IF_EXISTS_OR_ADD` enum value; gRPC implementations are free to
+  either use a comma-concatenated approach or add duplicate headers.
+- We do not support the `keep_empty_value` field.  gRPC will keep
+  headers even if the mutations result in an empty value, regardless of
+  the value of this field.
+- We do not support the deprecated `append` field.
+
+Header mutation rules are represented as an
+[`envoy.config.common.mutation_rules.v3.HeaderMutationRules`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L47C9-L47C28)
+message, which will be used as follows:
+- [disallow_all](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L70):
+  If true, all header mutations are disallowed, regardless of any other
+  setting.
+- [disallow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L79):
+  Optional.  If a header name matches this regex, then the mutation will be
+  disallowed, regardless of any other setting.  Note that regexes should be
+  checked for validity as part of resource validation.
+- [allow_expression](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L75):
+  Optional.  If a header name matches this regex and does not match
+  `disallow_expression`, then the mutation will be allowed.  If unset, then
+  mutations of all headers not matching `disallow_expression` are allowed.
+  Note that regexes should be checked for validity as part of resource
+  validation.
+- [disallow_is_error](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/common/mutation_rules/v3/mutation_rules.proto#L87):
+  If false, a disallowed header mutation will simply be ignored.  If
+  true, the data plane RPC will be failed.
+- allow_all_routing, disallow_system: These fields are ignored.  gRPC
+  will never allow modifications to headers starting with `:` or to the
+  `host` header, regardless of what these fields are set to.
+- allow_envoy: This field will be ignored, since `x-envoy-*` headers are
+  not generally meaningful to gRPC.
+
+Note that if a header mutation is disallowed, then it will be considered
+a rule violation even if the mutation would have been a no-op.  For
+example, if the modification is a `HeaderValueOption` with action
+`ADD_IF_ABSENT` and the header already exists, the modification would
+have been a no-op, but if the header name is not allowed, then it will
+still be considered a rule violation.
+
+When validating any of these messages from within an xDS resource, if
+any field fails validation, then the xDS resource will be considered
+invalid.  If validating any of these messages in a response from a
+side-channel service (e.g., an ext_authz or ext_proc server), the
+side-channel client implementation can decide how to handle the failure;
+in most cases, it would be expected to consider the side-channel RPC to
+have failed.
+
+### Temporary environment variable protection
+
+This gRFC does not describe a discrete feature; the functionality it
+describes will be used only in the context of other features, which
+will each have their own environment variable protection.  Therefore,
+no additional environment variable protection is needed here.
+
+Note that when implementing one of those other features, it will be
+important for the appropriate environment variable guard to cover
+reading the `allowed_grpc_services` field in the bootstrap config.
+
+## Rationale
+
+### `GoogleGrpc` vs. `EnvoyGrpc`
+
+Envoy supports both `GoogleGrpc` and `EnvoyGrpc` target specifiers.
+The latter uses Envoy's own gRPC implementation, which is essentially
+a small wrapper on top of its existing HTTP/2 functionality.  Rather
+than configuring the side-channel using a gRPC target URI, it specifies
+the side-channel using the name of an xDS cluster, which must already be
+part of the data plane's configuration.  That approach does not make
+sense in gRPC, for two reasons.
+
+First, even in Envoy, `EnvoyGrpc` makes sense only in cases where
+the data plane's xDS configuration already includes a cluster for the
+side-channel service; in any other case, `GoogleGrpc` would be used
+instead.  But unlike Envoy, gRPC is not a general-purpose proxy that
+handles routing requests for multiple services in a single instance;
+instead, each gRPC channel is created for one specific target (i.e.,
+one particular service) and generally contains only the configuration
+for that service, which means that in practice its xDS configuration
+never includes the xDS cluster for the side-channel service.
+
+Second, even if gRPC's xDS configuration did include the cluster for
+the side-channel service, gRPC's architecture does not support sending
+traffic to a specific cluster.  Unlike Envoy, gRPC does not have a
+distinct Cluster Manager that can be used to select a cluster to send
+requests to, which means that it fundamentally doesn't make sense to
+use an xDS cluster name to contact the side-channel service.
+
+### Security Concerns
+
+A more comprehensive approach to the security concerns would be to
+provide a mechanism to cryptographically sign the xDS resources and have
+the client verify the signature.  This would ensure that a compromised
+control plane would not be able to send arbitrary resources to clients;
+instead, the attack would have to happen where the xDS resources are
+constructed and signed, which could in principle be better protected.
+
+We are in favor of this approach, but it will require a lot more work,
+so we are leaving it as a future improvement.
+
+## Implementation
+
+Will be implemented in C-core, Java, Go, and Node as part of either RLQS
+([A77]), ExtAuthz ([A92]), or ExtProc ([A93]), whichever happens to be
+implemented first in any given language.
