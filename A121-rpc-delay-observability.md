@@ -125,8 +125,6 @@ Recorded on the `grpc.client.attempt.delay.duration` histogram. These represent 
 Structural container policies prepend their logical prefixes to the base attempt-level types using a colon separator:
 *   **Priority Policy**: Prepends the active priority tier index, resulting in composed types like:
     *   `p0:connecting`
-    *   `p1:subchannel_state_mismatch`
-    *   `p0:picker_failing_with_wait_for_ready`
 *   **Pass-Through Container Policies**: Policies like `xds_cluster_manager`, `weighted_target`, and `rls` **do not prepend any prefix or wrap the delay type**. They bubble up the child's `grpc.delay_type` (e.g., `"connecting"`) as-is.
 
 Because only the priority policy contributes a prefix and it contributes exactly one (its active tier index), the resulting `grpc.delay_type` cardinality stays bounded; prefixes do not stack across nested pass-through containers. Implementations should keep the prefix a small bounded token (the tier index) so metric cardinality remains low; detailed per-container structure belongs in the `grpc.delay_reason` span event, not the metric label.
@@ -183,7 +181,7 @@ However, to provide visibility in tracing, the parent container policy's structu
 
 #### Lifecycle & State Machine
 
-The client channel, load balancer, and telemetry tracer coordinate synchronously to record delays without dynamic memory allocation during routing.
+The client channel, load balancer, and telemetry tracer coordinate synchronously to record delays during routing.
 
 ##### 1. Timer Orchestration
 The channel owns the **lifecycle** of a delay segment (deciding when it starts, transitions, and ends) while the telemetry plugin owns the **timing** of that segment (it timestamps the start on `recordDelayStart`, computes the elapsed duration on `recordDelayEnd`, and emits the histogram). The channel therefore does not maintain a separate duration clock; "logical timer" below refers to this plugin-side measurement, delimited by the channel's start/end signals.
@@ -253,7 +251,7 @@ The **scope of the receiving tracer object** (call-scoped vs attempt-scoped) sta
 ###### Per-runtime binding
 The binding *mechanism* is asymmetric because each runtime's current telemetry API differs; only the six logical operations and their two scopes are common. This asymmetry is inherent to the existing APIs, not a difference in the delay design itself:
 *   **Go**: introduces a **new** call-scoped and attempt-scoped tracer API (gRPC-Go's V2 stats handler). A new API is required because the V1 `stats.Handler` is attempt-scoped only and cannot host a call-level hook. The broader V2 API is out of scope here beyond the delay hooks it must expose.
-*   **Java**: **reuses the existing tracer types** but adds new no-op-default methods to them — attempt hooks on `ClientStreamTracer`, call hooks on `ClientStreamTracer.Factory` — and reuses the existing name-resolution-delay plumbing (`ClientStreamTracer.NAME_RESOLUTION_DELAYED` and the `createPendingStream()` callback) for the `"resolving"` segment. Because no attempt-level `ClientStreamTracer` instance exists while an RPC is buffered waiting on a pick, a buffered-pick (`"connecting"`) delay is anchored on the call-scoped `Factory` until the stream is created.
+*   **Java**: **reuses the existing tracer types** but adds new no-op-default methods to them — attempt hooks on `ClientStreamTracer`, call hooks on `ClientStreamTracer.Factory` — and reuses the existing name-resolution-delay plumbing (`ClientStreamTracer.NAME_RESOLUTION_DELAYED` and the `createPendingStream()` callback) for the `"resolving"` segment. The attempt-level `"connecting"` delay is recorded directly on the attempt-scoped `ClientStreamTracer` instance.
 *   **C++ (Core)**: **reuses the existing annotation framework**, adding only a new `DelayAnnotation` subtype that replaces the current free-form `"Delayed name resolution complete."` / `"Delayed LB pick complete."` string annotations.
 
 In short: C++ reuses its mechanism wholesale (one new subtype), Java reuses its tracer types but extends them with new methods, and Go introduces new tracer types outright.
