@@ -133,7 +133,7 @@ Because only the priority policy contributes a prefix and it contributes exactly
 
 ##### Metadata Propagation & Composition
 The prepending and wrapping logic is handled entirely inside the Balancer Picker tree hierarchy, keeping the channel's attempt-routing wrapper and tracer plugins completely decoupled and simple:
-1.  **Leaf Pickers** (such as `pick_first` or `round_robin`): Generate the base leaf types (e.g., `delay_type = "connecting"`) and the initial, descriptive `delay_reason` (e.g., `"subchannel connecting: TCP handshake in progress"`).
+1.  **Leaf Pickers** (such as `pick_first` or `round_robin`): Generate the base delay types (e.g., `delay_type = "connecting"`) and the initial, descriptive `delay_reason` (e.g., `"subchannel connecting: TCP handshake in progress"`).
 2.  **Container Pickers**: Intercept the child's deferred pick result as it bubbles up the picker tree. The `priority` picker prepends its active tier index to the type (e.g., producing `"p0:connecting"`). A pass-through picker (such as `xds_cluster_manager`) forwards the child's `delay_type` unmodified, but can enrich the `delay_reason` with its own structural details.
 3.  **The Channel Wrapper**: Receives the final, fully-composed `delay_type` and `delay_reason` strings from the root picker and passes them directly to the tracer (`recordAttemptDelayStart`). The channel wrapper is also responsible for intercepting specific channel-level states (e.g., generating `"picker_failing_with_wait_for_ready"` when a picker returns an error for a `wait_for_ready` RPC, or `"subchannel_state_mismatch"` when a transport disconnects before the picker is updated).
 
