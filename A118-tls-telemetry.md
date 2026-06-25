@@ -103,6 +103,7 @@ The following metrics are count metrics, with the primary information coming
 from the labels.
 
 * `grpc.client.tls.handshakes` (unit: {handshake} type: int64 counter. description: EXPERIMENTAL: The number of handshakes performed on the client side. The primary useful information comes from the the labels, in particular the result label contains information on why a handshake failed if it did not succeed.)
+
 | Label Name | Required/Optional | Description |
 | :--- | :--- | :--- |
 | `grpc.tls.handshake.result` | Required | The `TlsTelemetryHandshakeResult` enum string indicating success or the reason for handshake failure. |
