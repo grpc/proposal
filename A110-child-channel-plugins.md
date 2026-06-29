@@ -24,7 +24,9 @@ are not directly instantiated by the user application. The primary examples are:
 
 1. xDS: When a user creates a channel with an xDS target, the gRPC library
    internally creates a separate channel to communicate with the xDS control
-   plane. (Note: Child channel options are passed to the `XdsClient` when the `XdsClient` is created, and that `XdsClient` instance will use those same child channel options for any child channel it creates over its lifetime.)
+   plane. (Note: Child channel options are passed to the `XdsClient` when the
+   `XdsClient` is created, and that `XdsClient` instance will use those same
+   child channel options for any child channel it creates over its lifetime.)
 2. External Authorization (ext_authz): As described
    in [gRFC A92](https://github.com/grpc/proposal/pull/481), the gRPC server or
    client may create an internal channel to contact an external authorization
@@ -61,7 +63,8 @@ We introduce the concept of **Child Channel Options**. This is a configuration
 container attached to a parent channel/server that is strictly designated for
 use by its children.
 
-The user API must allow "nesting" of channel options (specifying child channel options within parent channel options). A user creating a Parent
+The user API must allow "nesting" of channel options (specifying child channel
+options within parent channel options). A user creating a Parent
 Channel/Server `P` can provide a set of options `O_child`.
 
 * `O_child` is opaque to `P`. `P` does not apply these options to itself.
@@ -77,7 +80,12 @@ needs to create a Child Channel `C`:
 2. It applies `O_child` to the configuration of `C`.
 3. It should also configure channel `C` to use `O_child` for its children.
 
-* **Multi-level Propagation**: The child options `O_child` apply recursively to all child channels, no matter how deeply nested. For example, if a parent channel `P` creates a child channel `C` (e.g., to an `ext_authz` server), and `C` itself is configured to use `xds:///` (which requires creating an xDS client control plane channel), `C` will pass `O_child` to its own child channels.
+* **Multi-level Propagation**: The child options `O_child` apply recursively to
+  all child channels, no matter how deeply nested. For example, if a parent
+  channel `P` creates a child channel `C` (e.g., to an `ext_authz` server), and
+  `C` itself is configured to use `xds:///` (which requires creating an xDS
+  client control plane channel), `C` will pass `O_child` to its own child
+  channels.
 
 The Child Channel `C` typically requires some internal
 configuration `O_internal` (e.g., target URIs, or internal interceptors).
@@ -106,23 +114,35 @@ Options (`O_child1`, `O_child2`):
 
 **LB Policies and Resolvers**
 
-Some LB policies and resolvers may need to create child channels. We use `grpclb` as an example for how this plumbing will be handled in LB policies. Note that this proposal does not mandate any behavior changes for `grpclb` specifically.
+Some LB policies and resolvers may need to create child channels. We use
+`grpclb` as an example for how this plumbing will be handled in LB policies.
+Note that this proposal does not mandate any behavior changes for `grpclb`
+specifically.
 
-To support this, the child channel options must be plumbed down into resolvers and LB policies. Here are examples of how a component like `grpclb` would use this plumbing:
+To support this, the child channel options must be plumbed down into resolvers
+and LB policies. Here are examples of how a component like `grpclb` would use
+this plumbing:
 
-* Java: The `Helper` will provide a function that accepts a `ChannelBuilder` and applies the child channel options to it.
-* Go: A new field will be added to the `BuildOptions` struct (passed when creating a resolver or LB policy) to contain the child channel options.
-* C-core: No special plumbing is needed because the child channel args are simply passed as channel arguments, which are already available to LB policies. However, when an LB policy creates a child channel, it must propagate both the individual child channel args and the `GRPC_ARG_CHILD_CHANNEL_ARGS` argument containing the child channel args to the child channel.
+* Java: The `Helper` will provide a function that accepts a `ChannelBuilder` and
+  applies the child channel options to it.
+* Go: A new field will be added to the `BuildOptions` struct (passed when
+  creating a resolver or LB policy) to contain the child channel options.
+* C-core: No special plumbing is needed because the child channel args are
+  simply passed as channel arguments, which are already available to LB
+  policies. However, when an LB policy creates a child channel, it must
+  propagate both the individual child channel args and the
+  `GRPC_ARG_CHILD_CHANNEL_ARGS` argument containing the child channel args to
+  the child channel.
 
 ### Language Implementations
 
 #### Java
 
 In Java, the configuration will be achieved by accepting functional interfaces.
-The API allows users to register a configurator on a `ManagedChannelBuilder<?>` or
-`ServerBuilder<?>`. When an internal library (e.g., xDS, gRPCLB) creates a child
-channel, it applies this user-provided configurator to the child's channel builder
-before building the channel.
+The API allows users to register a configurator on a `ManagedChannelBuilder<?>`
+or `ServerBuilder<?>`. When an internal library (e.g., xDS, gRPCLB) creates a
+child channel, it applies this user-provided configurator to the child's channel
+builder before building the channel.
 
 * ##### Configuration Interface
 
@@ -344,8 +364,8 @@ configure the `StatsPlugin` for the channel to target B.
 
 We cannot achieve this using the global registry, for a couple of reasons.
 First, the global registry can only select channels based on parameters like the
-target URI. To attach our `StatsPlugin` to the internal target Z, we would have to
-select it based on target Z, which would erroneously attach it to the child
+target URI. To attach our `StatsPlugin` to the internal target Z, we would have
+to select it based on target Z, which would erroneously attach it to the child
 channels for both A and B. Second, it is hard for the application that registers
 the global `StatsPlugin` to know what target URIs will be used for internal
 child channels.
