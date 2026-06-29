@@ -24,7 +24,7 @@ are not directly instantiated by the user application. The primary examples are:
 
 1. xDS: When a user creates a channel with an xDS target, the gRPC library
    internally creates a separate channel to communicate with the xDS control
-   plane.
+   plane. (Note: Child channel options are passed to the `XdsClient` when the `XdsClient` is created, and that `XdsClient` instance will use those same child channel options for any child channel it creates over its lifetime.)
 2. External Authorization (ext_authz): As described
    in [gRFC A92](https://github.com/grpc/proposal/pull/481), the gRPC server or
    client may create an internal channel to contact an external authorization
@@ -112,7 +112,7 @@ To support this, the child channel options must be plumbed down into resolvers a
 
 * Java: The `Helper` will provide a function that accepts a `ChannelBuilder` and applies the child channel options to it.
 * Go: A new field will be added to the `BuildOptions` struct (passed when creating a resolver or LB policy) to contain the child channel options.
-* C-core: No special plumbing is needed because the child channel args are simply passed as channel arguments, which are already available to LB policies.
+* C-core: No special plumbing is needed because the child channel args are simply passed as channel arguments, which are already available to LB policies. However, when an LB policy creates a child channel, it must propagate both the individual child channel args and the `GRPC_ARG_CHILD_CHANNEL_ARGS` argument containing the child channel args to the child channel.
 
 ### Language Implementations
 
