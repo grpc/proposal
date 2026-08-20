@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support and Header Representations
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-06-11
+* Last updated: 2026-08-20
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -201,9 +201,9 @@ introduces the following new fields:
     In this message:
     - `token`: Required.  The access token.  The token will be added as
       an `authorization` header with value `Bearer ` (note trailing
-      space) followed by the value of this field.  Note that the
-      token will not be sent on the wire unless the connection has
-      security level PRIVACY_AND_INTEGRITY.
+      space) followed by the value of this field.  Note that if the
+      connection has a security level lower than PRIVACY_AND_INTEGRITY,
+      the RPC will fail.
 
 Note that this will require extending the channel credentials and call
 credentials registries to support configuration via these protos, in
