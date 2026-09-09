@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support and Header Representations
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-08-20
+* Last updated: 2026-09-09
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -62,9 +62,10 @@ header-related information, with appropriate validation.
 
 ### Security Considerations
 
-The control plane specifying the side-channel target and credentials
-introduces a number of potential privilege-escalation attacks from a
-compromised control plane.  Here are some examples of such attacks:
+The control plane specifying the side-channel target, credentials, and
+initial metadata introduces a number of potential privilege-escalation
+attacks from a compromised control plane.  Here are some examples of
+such attacks:
 
 - Because the side-channel target name comes from the control plane
   rather than being configured locally on the client, a compromised
@@ -89,6 +90,12 @@ compromised control plane.  Here are some examples of such attacks:
   attacker-controlled side-channel service using a call credential that
   sends an access token, which would leak that access token.
 
+- If the control plane specifies initial metadata and the side-channel
+  service uses that initial metadata to determine its behavior, this
+  effectively gives the control plane the ability to determine behavior
+  that affects data plane RPCs.  For example, an ext_authz call-out
+  might perform different policy checks based on the initial metadata.
+
 There will be cases where it is acceptable to trust the control plane
 to have that kind of privilege-escalation capability, and there will be
 other cases where it is not.  To differentiate between these two cases, we
@@ -98,10 +105,13 @@ gRPC xDS bootstrap config in [A81].
 When gRPC receives a `GrpcService` proto from an xDS server, it will
 check at resource validation time to see if the `trusted_xds_server`
 server feature is present in the bootstrap config for that xDS server.
-If so, then gRPC will trust the target name and credentials specified
-in the `GrpcService` proto.  If not, then we will provide a mechanism
-in the bootstrap config to determine whether the target name is allowed
-and what credentials to use for it.
+If so, then gRPC will trust the target name, credentials, and initial
+metadata specified in the `GrpcService` proto.  If not, then we will
+provide a mechanism in the bootstrap config to determine whether the
+target name is allowed and what credentials to use for it.  For now,
+there will be no way to specify initial metadata in the bootstrap
+config, but that is something we could consider adding in the future if
+there is a need for it.
 
 Specifically, we will add the following new top-level field to the
 bootstrap config:
@@ -237,7 +247,7 @@ When validating a `GrpcService` proto, the following fields will be used:
 - [`initial_metadata`](https://github.com/envoyproxy/envoy/blob/7ebdf6da0a49240778fd6fed42670157fde371db/api/envoy/config/core/v3/grpc_service.proto#L315):
   If present, specifies headers to be added to RPCs sent to the side-channel
   service.  See [Header Representation](#header-representation) below
-  for details.
+  for details.  Ignored from untrusted xDS servers.
 
 The following fields will *not* be used:
 - `envoy_grpc`: See "Rationale" section below for details.
