@@ -353,6 +353,13 @@ subset of arguments intended solely for its children.
     void SetChildChannelArgs(const ChannelArguments& args);
   ```
 
+  We add an extension to the C-core API for creating the vtable.
+
+  ```c
+    /** Returns a vtable for storing grpc_channel_args in a channel arg. */
+    GRPCAPI const grpc_arg_pointer_vtable* grpc_channel_args_arg_vtable(void);
+  ```
+
 * ##### Usage Example (User-Side Code)
 
   An example of how this will work on the channel side:
