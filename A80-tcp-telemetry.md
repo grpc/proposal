@@ -88,10 +88,12 @@ This document proposes exporting the following TCP metrics from gRPC to improve 
 | :---- | :---- | :---- |
 | \[0, 1KiB) | Whole buffer | 1024 |
 | \[1KiB, 8KiB) | First 1KiB | 1024 |
-| \[8KiB, 64KiB) | First 8KiB | 8196 |
+| \[8KiB, 64KiB) | First 8KiB | 8192 |
 | \[64KiB, 256KiB) | First 64KiB | 65536 |
 | \[256KiB, 2MiB) | First 256KiB | 262144 |
-| \[2MiB, \+inf) | First 2MiB | 2097152 |
+| \[2MiB, 8Mib) | First 2MiB | 2097152 |
+| \[8Mib, \+inf) | First 8MiB | 8388608 |
+
 
 Writes smaller than 1024 Bytes are labelled with `size=1024` to reduce cardinality. Further, their size does not have a big impact on transfer latency since they are able to fit inside a single TCP packet.
 
