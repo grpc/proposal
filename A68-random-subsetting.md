@@ -9,7 +9,7 @@ A68: Random subsetting with rendezvous hashing LB policy.
 
 ## Abstract
 
-Add support for the `random_subsetting` load balancing policy.
+Add support for the `random_subsetting_experimental` load balancing policy.
 
 ## Background
 
@@ -21,18 +21,18 @@ Currently, gRPC is lacking a way to select a subset of endpoints available from 
 
 ## Proposal
 
-Introduce a new LB policy, `random_subsetting`. This policy selects a subset of endpoints and passes them to the child LB policy. It maintains 2 important properties:
+Introduce a new LB policy, `random_subsetting_experimental`. This policy selects a subset of endpoints and passes them to the child LB policy. It maintains 2 important properties:
 * The policy tries to distribute connections among servers as equally as possible. The higher `(N_clients*subset_size)/N_servers` ratio is, the closer the resulting server connection distribution is to uniform.
 * The policy minimizes the amount of connection churn generated during server scale-ups by using [rendezvous hashing](https://en.wikipedia.org/wiki/Rendezvous_hashing)
 
 ### LB Policy Config and Parameters
 
-The `random_subsetting` LB policy config will be as follows.
+The `random_subsetting_experimental` LB policy config will be as follows.
 
 ```proto
 message LoadBalancingConfig {
     oneof policy {
-        RandomSubsettingLbConfig random_subsetting = 21 [json_name = "random_subsetting"];
+        RandomSubsettingLbConfig random_subsetting_experimental = 21 [json_name = "random_subsetting_experimental"];
     }
 }
 message RandomSubsettingLbConfig {

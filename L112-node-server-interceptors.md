@@ -18,6 +18,7 @@ Server interceptors are one of the longest-standing feature requests in the Node
 
 ### Related Proposals:
 * [L5: NodeJS Client Interceptors][L5]
+* [L35: Exposing the per-call authentication context data in Node][L35]
 * [A41: xDS RBAC Support][A41]
 
 ## Proposal
@@ -48,6 +49,17 @@ export interface ServerMethodDefinition<RequestType, ResponseType> {
   responseSerialize: Serialize<ResponseType>;
   requestDeserialize: Deserialize<RequestType>;
   originalName?: string;
+}
+```
+
+A `ConnectionInfo` object describes the connection that was used to make the call, and it is defined as follows:
+
+```ts
+export interface ConnectionInfo {
+  localAddress?: string | undefined;
+  localPort?: number | undefined;
+  remoteAddress?: string | undefined;
+  remotePort?: number | undefined
 }
 ```
 
@@ -87,6 +99,14 @@ class ServerInterceptingCall {
    * Return the host requested by the client in the ":authority" header.
    */
   getHost(): string;
+  /**
+   * Return information about the connection used to make the call.
+   */
+  getConnectionInfo(): string;
+  /**
+   * Get the auth context for the call.
+   */
+  getAuthContext(): AuthContext;
 }
 ```
 
@@ -276,9 +296,14 @@ For consistency with the client interceptors design, interceptors will see un-se
 
 The client interceptor design has interceptor lists and interceptor provider lists, and interceptors specified at client construction vs interceptors specified for individual call invocations. In contrast, this design only specifies that an interceptor list can be provided at server construction. Per-call interceptors simply don't make sense on the server side, because there is no reasonable point at which to inject them that wouldn't just act as a regular interceptor. Interceptor providers on the other hand could work on the server, but they are not necessary for basic interceptor functionality. The primary purpose of this design is to solidify the interceptor part of the design. Additional injection points for interceptors could be specified in the future, and the way they interact with each other can be decided at that time.
 
+### Optional fields in `ConnectionInfo`
+
+The type information for Node indicates that the corresponding fields on the `Socket` class are not guaranteed to be populated, so we cannot guarantee that we can populate them here.
+
 ## Implementation
 
 I (murgatroid99) will implement this immediately.
 
 [L5]: https://github.com/grpc/proposal/blob/master/L5-node-client-interceptors.md
 [A41]: https://github.com/grpc/proposal/blob/master/A41-xds-rbac.md
+[L35]: https://github.com/grpc/proposal/blob/master/L35-node-getAuthContext.md
