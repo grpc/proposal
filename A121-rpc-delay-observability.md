@@ -110,11 +110,11 @@ The channel records delays by calling three new methods on the call tracer. The 
 
 | Method | Called when |
 |---|---|
-| `RecordDelayStart(delay_type, reason)` | a delay begins, or the `delay_type` changes (after calling `RecordDelayEnd(delay_type)` for the previous delay type) |
+| `RecordDelayStart(delay_type, reason)` | a delay begins |
 | `RecordDelayReasonChanged(delay_type, reason)` | the reason changes within the same `delay_type` |
-| `RecordDelayEnd(delay_type)` | the delay resolves or the `delay_type` changes (followed by RecordDelayStart) |
+| `RecordDelayEnd(delay_type)` | a delay ends |
 
-**Caller (channel) responsibilities.** The channel is the single owner of the current `delay_type`: it stores it, chooses the `delay_type` and `delay_reason`, and passes the `delay_type` on every call so the call tracer never has to store it. It calls `RecordDelayStart` when a `delay_type` first appears or changes (in which case the channel ends the previous delay first with a call to `RecordDelayEnd`), `RecordDelayReasonChanged` when only the reason changes, and `RecordDelayEnd` when the delay resolves. The scope — and therefore which histogram the delay is recorded to (see [Metric Schema](#metric-schema)) — is chosen by whether the channel calls the method on the call-scoped or the attempt-scoped tracer.
+**Caller (channel) responsibilities.** The channel is the single owner of the current `delay_type`: it stores it, chooses the `delay_type` and `delay_reason`, and passes the `delay_type` on every call so the call tracer never has to store it. It must call `RecordDelayStart` with the appropriate `delay_type` when a delay starts and `RecordDelayEnd` with the same `delay_type` when the delay ends. If the `delay_type` changes, that indicates that the original delay has ended and a new delay has started, so the channel must first call `RecordDelayEnd` with the old `delay_type` and then `RecordDelayStart` with the new `delay_type`. The channel must call `RecordDelayReasonChanged` when the `delay_type` does not change but the `delay_reason` does. The scope — and therefore which histogram the delay is recorded to (see [Metric Schema](#metric-schema)) — is chosen by whether the channel calls the method on the call-scoped or the attempt-scoped tracer.
 
 **Call tracer (telemetry plugin) responsibilities.** On `RecordDelayStart`, the plugin opens the `Delay` span (see [Tracing Schema](#tracing-schema)) and records the delay type and start time of the delay. Further, it also records the initial reason with a `Delay triggered` event. On `RecordDelayReasonChanged`, it adds another `Delay triggered` event with the new reason. On `RecordDelayEnd`, it closes the span and records the elapsed duration to the histogram identified by the supplied `delay_type`. Because `delay_type` is supplied on every call, the plugin does not need to store it, and the plugin owns timing (the methods carry no duration argument).
 
