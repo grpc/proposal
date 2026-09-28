@@ -452,8 +452,8 @@ option.
 
 #### Go
 
-The “Channel Factory” or provider is defined as a function type that accepts the
-a string, and returns a gRPC channel. The existing `grpc.ClientConnInterface`
+The “Channel Factory” or provider is defined as a function type that accepts a
+string key, and returns a gRPC channel. The existing `grpc.ClientConnInterface`
 interface, instead of the concrete `*grpc.ClientConn` type,  is used to
 represent a gRPC channel, to allow for wrapping. The LB policy can create a
 client stub to the sharding service by passing this interface to the protobuf
