@@ -190,7 +190,7 @@ These pass-through container policies do not modify the metric `delay_type`; the
 
 #### Channel Behavior for LB Pick Delays
 
-For picker-generated delays, the channel reads the queued pick's `delay_type` and `delay_reason` and drives the call tracer per the [Call Tracer API](#call-tracer-api-changes): it calls `RecordDelayStart` when a pick is first queued, `RecordDelayReasonChanged` when a subsequent queued pick reports the same `delay_type` with a different `delay_reason`, and `RecordDelayEnd` when a pick assigns a ready subchannel.
+For picker-generated delays, the channel reads the queued pick's `delay_type` and `delay_reason` and drives the call tracer per the [Call Tracer API](#call-tracer-api-changes): it calls `RecordDelayStart` when a pick is first queued with a given `delay_type`, `RecordDelayReasonChanged` when a subsequent queued pick reports the same `delay_type` with a different `delay_reason`, and `RecordDelayEnd` when a pick either assigns a ready subchannel or returns a different `delay_type` than the last pick for that call.
 
 The channel additionally synthesizes two attempt-level delay types itself, keeping pickers ignorant of `wait_for_ready` semantics and transport-level races:
 
