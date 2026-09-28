@@ -3,7 +3,7 @@ A121: RPC Delay Observability
 * Author(s): Madhav Bissa (@mbissa)
 * Approver: @markdroth, @ejona86, @dfawley, @easwars
 * Implemented in: Go, Java, C++
-* Last updated: 2026-09-22
+* Last updated: 2026-09-28
 * Discussion at: https://groups.google.com/g/grpc-io/c/NsxXJ2MxXM4
 
 ## Abstract
@@ -147,7 +147,7 @@ When a picker cannot return a ready connection, the pick is **queued**. Two stri
 
 The channel reads these where it already handles a queued pick; no new return channel and no pick-loop restructuring are introduced. The fields live on:
 
-*   **Go**: `balancer.PickResult` (queued pick = the `ErrNoSubConnAvailable` return).
+*   **Go**: an enriched `balancer.ErrNoSubConnAvailable`, the error returned alongside `balancer.PickResult` to signal a queued pick.
 *   **Java**: `PickResult` (queued pick = `PickResult.withNoResult()`).
 *   **C++ (Core)**: the `PickResult::Queue` variant.
 
@@ -190,7 +190,7 @@ These pass-through container policies do not modify the metric `delay_type`; the
 
 #### Channel Behavior for LB Pick Delays
 
-For picker-generated delays, the channel reads the queued pick's `delay_type` and `delay_reason` and drives the call tracer per the [Call Tracer API](#call-tracer-api-changes): `RecordDelayStart` when the `delay_type` first appears or changes (in which case the channel ends the previous delay first with a call to `RecordDelayEnd`), `RecordDelayReasonChanged` when only the reason changes, and `RecordDelayEnd` when a pick assigns a ready subchannel.
+For picker-generated delays, the channel reads the queued pick's `delay_type` and `delay_reason` and drives the call tracer per the [Call Tracer API](#call-tracer-api-changes): it calls `RecordDelayStart` when a pick is first queued, `RecordDelayReasonChanged` when a subsequent queued pick reports the same `delay_type` with a different `delay_reason`, and `RecordDelayEnd` when a pick assigns a ready subchannel.
 
 The channel additionally synthesizes two attempt-level delay types itself, keeping pickers ignorant of `wait_for_ready` semantics and transport-level races:
 
