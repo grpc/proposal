@@ -107,12 +107,12 @@ class EndpointState:
 
   # Called to request a connection.
   # Lazily creates the LB policy as needed.
-  def RequestConnection(self):
+  def request_connection(self):
     if self.child_lb is None:
       # ...create child policy...
-    self.child_lb.ExitIdle()
+    self.child_lb.exit_idle()
 
-# Map from endpoint hostname to endpoiont state
+# Map from endpoint hostname to endpoint state
 class EndpointMap:
   m: dict[str, EndpointState]
 ```
@@ -233,7 +233,7 @@ Because assignments are pre-validated to have no gaps and cover the full key
 range, and since `SliceMap.slices` is sorted by `start_key`, the implementation
 of `SliceMap.lookup` boils down to a binary search to find the smallest index
 `i` where `SliceMap.slices[i].start_key > key`. Once we have `i`, index `i - 1`
-is what we are actually looking for. Here is a psuedo-code for it:
+is what we are actually looking for. Here is a pseudo-code for it:
 
 ```python
 # Returns an index into SliceMap.slices
@@ -318,13 +318,13 @@ is no longer valid. Continuing to use them may cause the `AutoshardingClient` to
 not accept updates from the sharding server for a long time. Creating a new
 `AutoshardingClient` in these cases gracefully handles these issues.
 
-At creation time, the `AutoshardinClient` is passed the following:
+At creation time, the `AutoshardingClient` is passed the following:
 
 * A gRPC channel to the autosharding service.
 * A string that uniquely identifies an assignment in the autosharding service.
   This string is derived from the `autosharding_target` field of the LB policy
   configuration. If a `%s` token was present in configuration field, the LB
-  policy must replace it with the “Locality” value  passed to it as a resolver
+  policy must replace it with the “Locality” value passed to it as a resolver
   state attribute (similar to how the “Channel Factory” is passed).
   * In xDS use-cases, the “Locality” value is currently populated by the
     `weighted_target_experimental` LB policy as a resolver state attribute, and
@@ -342,10 +342,10 @@ At creation time, the `AutoshardinClient` is passed the following:
     user to ensure that this attribute is populated by the Name Resolver. If
     this attribute is not available, the LB policy will replace the `%s` token
     with an empty string.
-* A UUID created by the LB policy time at build time. The `AutoshardingClient`
-  must reuse this value across stream restarts.
-* A timeout that determines how long to should wait for the initial assignment
-  from the sharding service. The LB policy passes the value of the
+* A UUID created by the LB policy at build time. The `AutoshardingClient` must
+  reuse this value across stream restarts.
+* A timeout that determines how long to wait for the initial assignment from the
+  sharding service. The LB policy passes the value of the
   `initial_assignment_timeout` field from the LB policy configuration here.
 
 #### Contract of the AutoshardingClient
@@ -405,12 +405,8 @@ queued RPCs. The behavior will be as follows (first match wins):
 
 * If the result was a valid assignment, the LB policy will build a `SliceMap`
   and construct a picker that uses that new `SliceMap`.
-* If the result was an error and fallback is enabled, then the LB policy will
-  construct a picker that uses fallback for all RPCs. See [Fallback at
-  AutoShardingClient Startup](#fallback-at-autoshardingclient-startup) below.
-* Otherwise (result was an error and fallback is not enabled), then the LB
-  policy will construct a picker that fails all picks with `UNAVAILABLE` status
-  and an appropriate error message.
+* If the result was an error, the behavior is described in the [Fallback
+  Mechanism](#fallback-mechanism) section below.
 
 #### Sending the first message
 
@@ -419,7 +415,6 @@ kick things off. This message currently contains three fields:
 
 * `target`: The autosharding target string passed to it at creation time.
 * `client_uuid`: The UUID string passed to it at creation time.
-  the same value across stream restarts.
 * `latest_generation`: The generation number of the most recent valid assignment
   received by this `AutoshardingClient` or `0` if it is yet to receive any valid
   assignment.
@@ -429,7 +424,7 @@ kick things off. This message currently contains three fields:
 #### Handling responses from the Autosharding server
 
 Responses received from the sharding server in a
-`WatchShardingAssignmentResponse` message can one of the following:
+`WatchShardingAssignmentResponse` message can be one of the following:
 
 * `AssignmentChunk`: This contains one chunk of a logical assignment from the
   sharding server. The `AutoshardingClient` must cache chunks until it receives
@@ -531,9 +526,17 @@ provided by the Name Resolver. There are two types of fallback:
   and assignments, but all endpoints in the matching `SliceEntry` for an RPC are
   in `TRANSIENT_FAILURE`.
 * Fallback at `AutoshardingClient` startup: This happens when the
-  `AutoshardingClient` returns an error. See
+  `AutoshardingClient` returns an error before returning a valid assignment. See
   [AutoshardingClient](#contract-of-the-autoshardingclient) for more details on
   when it returns an error.
+  * By default, when the `AutoshardingClient` returns an error, the LB policy
+    will construct a picker that fails all picks with `UNAVAILABLE` status and
+    an appropriate error message.
+  * However, if fallback is enabled, then the LB policy will instead construct a
+    picker that will use fallback for all RPCs, regardless of key.
+  * Note that the error cases above can implemented by building a `SliceMap`
+    with an empty `Assignment` and using the picker [described
+    here](#the-picker) or by using a dedicated fallback/erroring picker.
 
 Key considerations here:
 
@@ -541,13 +544,6 @@ Key considerations here:
   policy configuration.
 * The LB policy must consider all available endpoints during fallback and must
   not employ any sort of subsetting.
-
-#### Fallback at AutoshardingClient Startup
-
-By default, when the AutoshardingClient returns an error, the LB policy will
-construct a picker that fails all picks. However, if fallback is enabled, then
-the LB policy will instead construct a picker that will use fallback for all
-RPCs, regardless of key.
 
 ### Supported modes of operation
 
@@ -658,7 +654,8 @@ def handle_name_resolver_update(
     new_grpc_channel_created = True
 
   # If autosharding_target in config has changed, ensure a new
-  # AutoshardingClient is created.
+  # AutoshardingClient is created. Ensure %s string substitution for "Locality"
+  # is taken into account.
   if (
       self.config is None
       or config.autosharding_target != self.config.autosharding_target
@@ -710,7 +707,8 @@ policy must perform the following:
   * Since the order or number of endpoints did not change as part of this
     update, the `Picker` will be able to build a new `list[PickerEndpoint]` and
     use it with the existing `SliceMap`.
-* Compute the aggregated connectivity state of the gRPC channel.
+* Compute the aggregated connectivity state of the gRPC channel as described in
+  [Aggregated Connectivity State](#aggregated-connectivity-state).
 * Update the gRPC channel with the new connectivity state and `Picker`.
 
 ### Creating a gRPC Channel to the Autosharding Service
@@ -783,7 +781,7 @@ func SetClientConnProvider(s resolver.State, p ClientConnProvider) resolver.Stat
 
 TBD
 
-#### JAVA
+#### Java
 
 TBD
 
@@ -795,7 +793,7 @@ Resolver or new assignments from the sharding service. The LB policy must create
 a new `Picker` when it receives a state update from one of its child policies as
 well, but in this case, the existing `SliceMap` can be reused.
 
-Here is the pseudo-code for the `Picker` method of the picker:
+Here is the pseudo-code for the picker:
 
 ```python
 class Picker:
@@ -887,7 +885,7 @@ class Picker:
 
       # If IDLE, trigger connection on the child LB (at most one per pick)
       if not requested_connection and endpoint.state == IDLE:
-        endpoint.RequestConnection()
+        endpoint.request_connection()
         requested_connection = True
 
     # If no READY endpoint was found, but we requested a connection or found a
@@ -904,7 +902,7 @@ class Picker:
 ### Interactions with `pick_first`
 
 The LB policy will not proactively connect to endpoints given to it by the Name
-Resolver. Instead, connections are triggerred from the picker as described above
+Resolver. Instead, connections are triggered from the picker as described above
 in the picker pseudo-code. `autosharding_experimental` must create a
 `pick_first` child for every endpoint given to it by the Name Resolver.
 `pick_first` starts connecting as soon as it is given its endpoint. So,
@@ -939,11 +937,11 @@ Unlike most other LB policies, which start off in `CONNECTING`, this policy
 starts off in `IDLE` because it establishes connections lazily in response to
 RPCs. It uses a heuristic and reports `TRANSIENT_FAILURE` when at least two
 subchannels are in `TRANSIENT_FAILURE` and none of the subchannels are `READY`.
-This heuristic is an attempt to to balance the need to allow the `priority`
-policy (which would be an ancestor to this LB policy in the tree of LB policies
-used in xDS use-cases) to quickly failover to the next priority and the desire
-to avoid reporting the entire policy as having failed when the problem is just
-one individual subchannel that happens to be unreachable.
+This heuristic is an attempt to balance the need to allow the `priority` policy
+(which would be an ancestor to this LB policy in the tree of LB policies used in
+xDS use-cases) to quickly failover to the next priority and the desire to avoid
+reporting the entire policy as having failed when the problem is just one
+individual subchannel that happens to be unreachable.
 
 The specific behavior that will enable this LB policy to stop reporting
 `TRANSIENT_FAILURE` even when it is not receiving picks will be that whenever
@@ -1093,7 +1091,7 @@ We need a map of GrpcServices to be passed from the xDS LB Registry to the
   [Cluster](https://github.com/envoyproxy/envoy/blob/d26361ac44e48ad347afbaff141c5c0387d48c40/api/envoy/config/cluster/v3/cluster.proto#L50)
   resource. This means that we could have multiple LB policies that contain a
   GrpcService proto in their configuration.
-* The key for this map needs to be uniquely identify the contents of the
+* The key for this map needs to uniquely identify the contents of the
   `GrpcService` proto and not just the target URI field inside of it, because we
   could have more than one LB policy that wishes to communicate with the same
   external server, but use different credentials.
@@ -1107,7 +1105,7 @@ GrpcServices.
 
 The `ClusterUpdate` struct is gRPC's internal representation of the xDS cluster
 resource. A new field `LBPolicyInfo` will be added to this struct to carry
-additional information to be conveyed to the LB policy, in additional to the
+additional information to be conveyed to the LB policy, in addition to the
 existing field `LBPolicy` that carries the LB policy configuration.
 
 ```golang
@@ -1193,7 +1191,7 @@ identified use-case requiring it.
 Without the "Channel Factory" taking care of handling the credentials required
 to talk to the external sharding service, we would have had to somehow plumb
 these credentials into the LB policy. Passing credentials through the LB policy
-configuration, which can be aquired through DNS, is a serious security risk.
+configuration, which can be acquired through DNS, is a serious security risk.
 Other options like using the parent channel credentials are equally less
 appealing as well.
 
@@ -1208,7 +1206,7 @@ The LB policy could be used by applications in two widely differing scenarios:
   traffic is expected to hit very few key-ranges, or just a single key-range.
 
 While connecting to backends eagerly like `pick_first` or `round_robin` would
-work for the first case, it would be extermely wasteful in the second case. Most
+work for the first case, it would be extremely wasteful in the second case. Most
 of our known use-cases fall into the second bucket and optimizing for that seems
 prudent. Connecting to backends lazily will work fine for the reverse-proxy case
 as well, as it will quickly wind up establishing connections to all endpoints.
