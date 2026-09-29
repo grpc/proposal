@@ -382,37 +382,80 @@ the "Channel Factory".
 
 ### Handling updates from the Name Resolver
 
-When the LB policy receives a configuration update, it must do the following:
+The logic for handling updates from the Name Resolver is described in this
+pseudo-code:
 
-* If the `channel_factory_key` field has changed (or if this is the
-  first configuration update):
-  * Use the “Channel Factory” to [create a new gRPC channel using this
-    key](#creating-a-grpc-channel-to-the-autosharding-service).
-  * If gRPC channel creation succeeds, create a new `AutoshardingClient`.
-  * Else, handle the failure in the same way an error from the
-    `AutoshardingClient` is handled, i.e., entering fallback mode if fallback is
-    enabled or failing RPCs if fallback is not enabled.
-  * Close the previously created `AutoshardingClient` and gRPC channel to the
-    sharding service, if any.
-* Else if the `autosharding_target` field has changed, close the previously
-  created `AutoshardingClient` and create a new `AutoshardingClient`.
+```python
+def handle_name_resolver_update(
+    self, state: ResolverState, config: LbConfig
+) -> Status:
+  if not state.endpoints:
+    # Set channel's connectivity state to TRANSIENT_FAILURE and provide an
+    # erroring picker.
+    self.update_channel_state(TRANSIENT_FAILURE, ErrorPicker(bad_resolver_state))
+    return bad_resolver_state
 
-When the LB policy receives endpoints from the Name Resolver, it must do the
-following:
+  channel_factory = get_channel_factory_from_resolver_state(state)
+  if channel_factory is None:
+    # Set channel's connectivity state to TRANSIENT_FAILURE and provide an
+    # erroring picker.
+    self.update_channel_state(TRANSIENT_FAILURE, ErrorPicker(bad_resolver_state))
+    return bad_resolver_state
 
-* Create a `pick_first` child, lazily, for every endpoint. The latter will create
-  subchannels for the addresses within the endpoints. See [this
-  section](#interactions-with-pick_first) for more details.
-* Update the `EndpointMap` accordingly.
-* Build a new `SliceMap` unless it is yet to receive an assignment from the
-  `AutoshardingClient`. See section [Building the
-  SliceMap](#building-the-slicemap) for more information.
-  * Build a new `Picker` that uses the above `SliceMap`.
+  # Reuse the existing gRPC channel unless channel_factory_key has changed.
+  channel = self.grpc_channel
+  create_new_autosharding_client = False
+  new_grpc_channel_created = False
 
-If the LB policy receives an empty set of endpoints from the Name Resolver, it
-must set the connectivity state of the gRPC channel to `TRANSIENT_FAILURE` and
-fail all subsequent RPCs until an update with a non-empty set of endpoints is
-received.
+  if (
+      self.config is None
+      or config.channel_factory_key != self.config.channel_factory_key
+  ):
+    channel = channel_factory(config.channel_factory_key)
+    if channel is None:
+      # Set channel's connectivity state to TRANSIENT_FAILURE and provide an
+      # erroring picker.
+      self.update_channel_state(
+          TRANSIENT_FAILURE, ErrorPicker(channel_creation_error)
+      )
+      return channel_creation_error
+    create_new_autosharding_client = True
+    new_grpc_channel_created = True
+
+  # If autosharding_target in config has changed, ensure a new
+  # AutoshardingClient is created.
+  if (
+      self.config is None
+      or config.autosharding_target != self.config.autosharding_target
+  ):
+    create_new_autosharding_client = True
+
+  # Create the new AutoshardingClient first, then close the previous client,
+  # and only then close the previous gRPC channel so no active client ever
+  # references a closed channel.
+  if create_new_autosharding_client:
+    new_client = self.create_new_autosharding_client(channel, config, state)
+    self.close_previous_autosharding_client()
+    self.autosharding_client = new_client
+
+  if new_grpc_channel_created:
+    self.close_previous_grpc_channel()
+    self.grpc_channel = channel
+
+  # Update cached copy of the configuration before building the new Picker.
+  self.config = config
+
+  # Update the EndpointMap with the new set of endpoints and lazily create a
+  # `pick_first` child policy for each endpoint.
+  self.update_endpoint_map(state.endpoints)
+  self.create_child_policies()
+
+  # Rebuild the SliceMap using the latest EndpointMap and current Assignment
+  # (if any), then update the channel's connectivity state and Picker.
+  self.slice_map = build_slice_map(self.endpoint_map, self.assignment)
+  self.update_state_and_picker()
+  return OK
+```
 
 ### Handling updates from child policies
 
