@@ -117,7 +117,7 @@ class EndpointMap:
   m: dict[str, EndpointState]
 ```
 
-The LB policy must create or updates its `EndpointMap` whenever it receives
+The LB policy must create or update its `EndpointMap` whenever it receives
 endpoints from the Name Resolver. If multiple endpoints share the same hostname,
 implementations may arbitrarily pick one and drop the others.
 
@@ -155,10 +155,10 @@ def update_endpoint_map(self, resolved_endpoints: list[Endpoint]):
   self.endpoint_map = new_map
 ```
 
-The pseudo-code above handles closing of child policies accosiated with removed
+The pseudo-code above handles closing of child policies associated with removed
 endpoints. Implementations could delegate that responsibility to a utility (for
 example, in Go, this will be handled by the `endpointsharding` LB policy which
-will configured as the child of `autosharding_experimental`).
+will be configured as the child of `autosharding_experimental`).
 
 The LB policy must update the existing `EndpointMap` when it receives an
 update from the child policy. This means that the `EndpointMap` cannot be shared
@@ -687,7 +687,7 @@ def handle_name_resolver_update(
 
   # If the LB policy is yet to receive an assignment or error from the
   # AutoshardingClient, RPCs must be queued.
-  if self.assignment is None && self.assignment_error is None:
+  if self.assignment is None and self.assignment_error is None:
     self.update_channel_state(IDLE, QueuePicker())
     return OK
 
