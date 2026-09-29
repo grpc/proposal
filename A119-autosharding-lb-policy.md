@@ -117,23 +117,50 @@ class EndpointMap:
   m: dict[str, EndpointState]
 ```
 
-The LB policy must create a new `EndpointMap` whenever it receives endpoints
-from the Name Resolver. If multiple endpoints share the same hostname,
+The LB policy must create or updates its `EndpointMap` whenever it receives
+endpoints from the Name Resolver. If multiple endpoints share the same hostname,
 implementations may arbitrarily pick one and drop the others.
 
 ```python
-def build_endpoint_map(resolved_endpoints: list[Endpoint]) -> EndpointMap:
-  endpoint_map = EndpointMap(m={})
+def update_endpoint_map(self, resolved_endpoints: list[Endpoint]):
+  old_map = self.endpoint_map.m if self.endpoint_map is not None else {}
+  new_map = EndpointMap(m={})
+
   for endpoint in resolved_endpoints:
-    if endpoint.hostname not in endpoint_map.m:
-      endpoint_map.m[endpoint.hostname] = EndpointState(
-          index    = len(endpoint_map.m),
+    # De-duplicate endpoints sharing the same hostname within this update.
+    if endpoint.hostname in new_map.m:
+      continue
+
+    if endpoint.hostname in old_map:
+      # Retain existing child LB state for endpoints still present.
+      prev = old_map[endpoint.hostname]
+      new_map.m[endpoint.hostname] = EndpointState(
+          index    = len(new_map.m),
+          endpoint = endpoint,
+          child_lb = prev.child_lb,
+          state    = prev.state,
+          picker   = prev.picker,
+      )
+    else:
+      new_map.m[endpoint.hostname] = EndpointState(
+          index    = len(new_map.m),
           endpoint = endpoint,
       )
-  return endpoint_map
+
+  # Shut down child policies for endpoints removed in this update.
+  for hostname, es in old_map.items():
+    if hostname not in new_map.m and es.child_lb is not None:
+      es.child_lb.close()
+
+  self.endpoint_map = new_map
 ```
 
-The LB policy should update the existing `EndpointMap` when it receives an
+The pseudo-code above handles closing of child policies accosiated with removed
+endpoints. Implementations could delegate that responsibility to a utility (for
+example, in Go, this will be handled by the `endpointsharding` LB policy which
+will configured as the child of `autosharding_experimental`).
+
+The LB policy must update the existing `EndpointMap` when it receives an
 update from the child policy. This means that the `EndpointMap` cannot be shared
 with the picker without synchronizing access to it. Instead, we propose creating
 a new data structure that contains only the fields from `EndpointState` that the
