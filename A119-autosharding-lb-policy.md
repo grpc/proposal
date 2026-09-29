@@ -658,6 +658,12 @@ def handle_name_resolver_update(
   self.update_endpoint_map(state.endpoints)
   self.create_child_policies()
 
+  # If the LB policy is yet to receive an assignment or error from the
+  # AutoshardingClient, RPCs must be queued.
+  if self.assignment is None && self.assignment_error is None:
+    self.update_channel_state(IDLE, QueuePicker())
+    return OK
+
   # Rebuild the SliceMap using the latest EndpointMap and current Assignment
   # (if any), then update the channel's connectivity state and Picker.
   self.slice_map = build_slice_map(self.endpoint_map, self.assignment)
