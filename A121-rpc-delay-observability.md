@@ -3,7 +3,7 @@ A121: RPC Delay Observability
 * Author(s): Madhav Bissa (@mbissa)
 * Approver: @markdroth, @ejona86, @dfawley, @easwars
 * Implemented in: Go, Java, C++
-* Last updated: 2026-09-28
+* Last updated: 2026-10-01
 * Discussion at: https://groups.google.com/g/grpc-io/c/NsxXJ2MxXM4
 
 ## Abstract
@@ -16,7 +16,7 @@ Existing gRPC core telemetry, as defined in [gRPC A66 (OpenTelemetry Metrics)][A
 
 When a gRPC channel is first created, it is in IDLE state, meaning that it has not done name resolution or attempted to connect to any endpoints. When the application sends an RPC on the channel, the channel will leave IDLE state and attempt to connect. Any RPCs sent on the channel while it is attempting to connect will be queued until the channel becomes connected, which results in increased latency for these RPCs. However, because current telemetry lacks visibility into these connecting delays, developers cannot distinguish between a slow network, a slow backend, or a channel initialization delay.
 
-While there are other sources of client-side delay that involve network I/O (such as credential fetching or retry delays), this proposal focuses on the two most common: **name resolution** and **load balancing pick** delays. The framework is extensible to other client-side delays in the future.
+While there are other sources of client-side delay that involve network I/O (such as credential fetching, retry delays, or waiting on the server's max concurrent streams limit), this proposal focuses on the two most common: **name resolution** and **load balancing pick** delays. The framework is extensible to other client-side delays in the future.
 
 ### Related Proposals:
 * **[gRPC A66: OpenTelemetry Metrics][A66]**: Establishes base OpenTelemetry metrics.
@@ -53,7 +53,7 @@ The base `grpc.delay_type` values are summarized below for reference; each is de
 
 The `priority` policy prepends the numeric priority to the delay type returned by the child policy (e.g. `"0:connecting"`); these prefixes stack when priority policies are nested (e.g. `"0:1:connecting"`), so the composed set is not statically enumerable.
 
-A delay begins when the channel starts waiting and ends when the wait resolves, when the `grpc.delay_type` changes (which ends the current delay and starts a new one), or when the RPC is cancelled or reaches its deadline.
+A delay begins when the channel starts waiting and ends when the wait resolves, when the `grpc.delay_type` changes (which ends the current delay and starts a new one), or when the call or attempt ends for any other reason (e.g. failure, cancellation, or deadline).
 
 ### Metric Schema
 
@@ -104,6 +104,8 @@ Each value of `grpc.delay_reason` (the initial reason when the span opens, and e
 }
 ```
 
+**Relationship to existing [gRFC A72][A72] events.** The A72 events `"Delayed name resolution complete"` and `"Delayed LB pick complete"` are unchanged and continue to be emitted, now driven by the new delay mechanism: the telemetry plugin adds `"Delayed name resolution complete"` when the call-level `resolving` delay ends, and `"Delayed LB pick complete"` at stream creation if the attempt had any delay. Existing public signals used to produce these events today remain in place for current consumers.
+
 ### Call Tracer API Changes
 
 The channel records delays by calling three new methods on the call tracer. The same three methods exist on both the call-scoped and the attempt-scoped tracer; the tracer on which they are called determines which histogram the delay is recorded to (and therefore whether it is a call-level or attempt-level delay):
@@ -111,14 +113,14 @@ The channel records delays by calling three new methods on the call tracer. The 
 | Method | Called when |
 |---|---|
 | `RecordDelayStart(delay_type, reason)` | a delay begins |
-| `RecordDelayReasonChanged(delay_type, reason)` | the reason changes within the same `delay_type` |
-| `RecordDelayEnd(delay_type)` | a delay ends |
+| `RecordDelayReasonChanged(reason)` | the reason changes within the same `delay_type` |
+| `RecordDelayEnd()` | a delay ends |
 
-**Caller (channel) responsibilities.** The channel is the single owner of the current `delay_type`: it stores it, chooses the `delay_type` and `delay_reason`, and passes the `delay_type` on every call so the call tracer never has to store it. It must call `RecordDelayStart` with the appropriate `delay_type` when a delay starts and `RecordDelayEnd` with the same `delay_type` when the delay ends. If the `delay_type` changes, that indicates that the original delay has ended and a new delay has started, so the channel must first call `RecordDelayEnd` with the old `delay_type` and then `RecordDelayStart` with the new `delay_type`. The channel must call `RecordDelayReasonChanged` when the `delay_type` does not change but the `delay_reason` does. The scope — and therefore which histogram the delay is recorded to (see [Metric Schema](#metric-schema)) — is chosen by whether the channel calls the method on the call-scoped or the attempt-scoped tracer.
+**Caller (channel) responsibilities.** The channel owns the current `delay_type`: it tracks it to decide transitions and chooses the `delay_type` and `delay_reason`. It must call `RecordDelayStart` when a delay starts and `RecordDelayEnd` when the delay ends. If the `delay_type` changes, that indicates that the original delay has ended and a new delay has started, so the channel must first call `RecordDelayEnd` and then `RecordDelayStart` with the new `delay_type`. The channel must call `RecordDelayReasonChanged` when the `delay_type` does not change but the `delay_reason` does. The channel guarantees a well-formed sequence on each tracer: `RecordDelayStart`, zero or more `RecordDelayReasonChanged`, then `RecordDelayEnd` (or the end of the call or attempt), with at most one delay open at a time. The scope — and therefore which histogram the delay is recorded to (see [Metric Schema](#metric-schema)) — is chosen by whether the channel calls the method on the call-scoped or the attempt-scoped tracer.
 
-**Call tracer (telemetry plugin) responsibilities.** On `RecordDelayStart`, the plugin opens the `Delay` span (see [Tracing Schema](#tracing-schema)) and records the delay type and start time of the delay. Further, it also records the initial reason with a `Delay triggered` event. On `RecordDelayReasonChanged`, it adds another `Delay triggered` event with the new reason. On `RecordDelayEnd`, it closes the span and records the elapsed duration to the histogram identified by the supplied `delay_type`. Because `delay_type` is supplied on every call, the plugin does not need to store it, and the plugin owns timing (the methods carry no duration argument).
+**Call tracer (telemetry plugin) responsibilities.** On `RecordDelayStart`, the plugin opens the `Delay` span (see [Tracing Schema](#tracing-schema)) and stores the delay type and start time alongside it. Further, it also records the initial reason with a `Delay triggered` event. On `RecordDelayReasonChanged`, it adds another `Delay triggered` event with the new reason. On `RecordDelayEnd`, it closes the span and records the elapsed duration to the histogram using the stored delay type. The plugin owns timing (the methods carry no duration argument).
 
-**Cancellation and deadlines.** The channel must end any open delay when the RPC stops waiting, not only when the wait resolves successfully. This includes the RPC being cancelled or reaching its deadline. The channel calls `RecordDelayEnd(delay_type)` for the delay that is currently open, on the tracer that delay was started on; if no delay is open, no call is made. The duration recorded in these cases is the partial duration up to that point.
+**Calls that end while delayed.** If the call or attempt ends while a delay is open — for any reason, such as a picker error that ends the RPC, a drop, cancellation, or deadline — the call tracer closes the open delay when it is notified that the call or attempt has ended, recording the partial duration up to that point. The channel does not need to call `RecordDelayEnd` on these paths, but may do so. A call tracer treats `RecordDelayEnd` with no open delay as a no-op.
 
 **Per-language binding.** These methods bind onto each runtime's existing telemetry types:
 
@@ -128,15 +130,18 @@ The channel records delays by calling three new methods on the call tracer. The 
 
 ### Resolver Delays
 
-The channel records a call-level delay of type **`resolving`** while an RPC is blocked waiting for name resolution. When an RPC is sent while the channel has not yet received its first resolver result, the channel calls `RecordDelayStart("resolving", reason)` on the call tracer; when the resolver delivers its first result and the RPC can proceed, the channel calls `RecordDelayEnd("resolving")`. If resolution has already completed by the time the RPC is sent, no delay is recorded.
+The channel records a call-level delay of type **`resolving`** while an RPC is blocked waiting for name resolution. When an RPC is sent while the channel has not yet received its first resolver result, the channel calls `RecordDelayStart("resolving", reason)` on the call tracer; when the resolver delivers its first result and the RPC can proceed, the channel calls `RecordDelayEnd()`. If resolution has already completed by the time the RPC is sent, no delay is recorded.
 
-If the resolver reports a *failure* rather than a result, only `wait_for_ready` RPCs are blocked (other RPCs fail fast). In that case the failure is reported as the delay reason, and if the resolver reports a subsequent failure the channel calls `RecordDelayReasonChanged("resolving", reason)` with the new failure.
+If the resolver reports a *failure* rather than a result, only `wait_for_ready` RPCs keep waiting (other RPCs fail fast). This gRFC does not change channel behavior, and implementations differ here, so each records the delay where it already blocks:
+
+*   **Go and Java**: the first resolver event, result or error, releases all queued RPCs, so the `resolving` delay ends with the error as its final reason. A `wait_for_ready` RPC then waits on the picker as `picker_failing_with_wait_for_ready`, with the picker's error as the reason.
+*   **C++**: `wait_for_ready` RPCs stay queued at the resolver, so the `resolving` delay continues; each subsequent failure is reported via `RecordDelayReasonChanged(reason)`, and the delay ends when a resolver result arrives.
 
 Example reasons: waiting on the initial DNS query (e.g. `"waiting for DNS query to complete for target example.com"`), or a resolver failure (e.g. `"name resolution failed: NXDOMAIN for example.com"`).
 
 ### LB Pick Delays
 
-Attempt-level delays occur while an attempt waits for a load balancing pick to select a ready connection. Most delay types and reasons are generated by the LB policies themselves; two are synthesized by the channel.
+LB pick delays are attempt-level delays that occur while an attempt waits for a load balancing pick to select a ready connection. Most delay types and reasons are generated by the LB policies themselves; two are synthesized by the channel.
 
 #### LB Picker API Changes
 
@@ -147,26 +152,26 @@ When a picker cannot return a ready connection, the pick is **queued**. Two stri
 
 The channel reads these where it already handles a queued pick; no new return channel and no pick-loop restructuring are introduced. The fields live on:
 
-*   **Go**: an enriched `balancer.ErrNoSubConnAvailable`, the error returned alongside `balancer.PickResult` to signal a queued pick.
+*   **Go**: a new `balancer.QueuedPickError` carrying `DelayType` and `DelayReason`, which wraps `balancer.ErrNoSubConnAvailable` so `errors.Is` still identifies a queued pick. Returning the plain `ErrNoSubConnAvailable` remains valid and is recorded as `connecting` with a generic reason. Code that compares against `ErrNoSubConnAvailable` with `==` must switch to `errors.Is`.
 *   **Java**: `PickResult` (queued pick = `PickResult.withNoResult()`).
 *   **C++ (Core)**: the `PickResult::Queue` variant.
 
-The delay types and example reasons generated by each LB policy follow. These examples are non-exhaustive; implementations are encouraged to append additional debug details to the reason.
+The delay types and example reasons generated by each LB policy follow. These examples are non-exhaustive; implementations are encouraged to append additional debug details to the reason. Reasons should start with the name of the LB policy that generated them (e.g. `"round_robin: ..."`); a parent policy that adds its own details prepends its name the same way.
 
 ##### `pick_first`
 
-Generates `delay_type = "connecting"` while waiting for the selected subchannel to connect. Example reasons:
+Generates `delay_type = "connecting"` while waiting for any subchannel to connect. Example reasons:
 
-*   `"waiting for subchannel to connect to 192.168.1.50:8080"`.
-*   `"transport connected, waiting for initial health check to report SERVING"`.
+*   `"pick_first: waiting for any subchannel to connect"`.
+*   `"pick_first: transport connected, waiting for initial health check to report SERVING"`.
 
 ##### Petiole policies (`round_robin`, `weighted_round_robin`, `ring_hash`, `least_request`)
 
 These policies (including `least_request`, defined in [gRFC A48][A48]) manage a collection of endpoints—each through a child `pick_first` policy—and behave identically for delay reporting. They generate `delay_type = "connecting"` while waiting for one or more endpoints to become ready. The `delay_reason` captures the aggregate connection state across the endpoints being attempted. Example reasons:
 
-*   `"waiting for any endpoint to connect (attempting 192.168.1.50:8080, 192.168.1.51:8080)"`.
-*   `"waiting for ring hash nodes to connect to 192.168.1.50:8080"`.
-*   `"waiting for subchannels to connect and report initial load"`.
+*   `"round_robin: waiting for any endpoint to connect"`.
+*   `"ring_hash: waiting for endpoint 192.168.1.50:8080 to connect"`.
+*   `"weighted_round_robin: waiting for any endpoint to connect"`.
 
 ##### `xds_override_host`
 
@@ -174,15 +179,15 @@ Generates `delay_type = "connecting"`; attempting to connect to a specific overr
 
 ##### `priority`
 
-Prepends its **numeric priority** to the delay type returned by the child policy, producing composed values such as `"0:connecting"`. Priority policies can be nested (a priority policy's child is itself a priority policy), in which case each level prepends its own numeric priority and the prefixes stack — e.g. `"0:1:connecting"`. On failover — e.g. priority `0` enters `TRANSIENT_FAILURE` and the policy moves to priority `1` — the `delay_type` changes (`"0:connecting"` → `"1:connecting"`), which ends the current delay and starts a new one; the reason records the failover (which can include the child policy name and the failure cause, e.g. `"failing over to priority 1 (child 'tier-1-backup'); priority 0 failed: connection timeout"`). See [gRFC A56][A56].
+Prepends its **numeric priority** to the delay type returned by the child policy, producing composed values such as `"0:connecting"`. Priority policies can be nested (a priority policy's child is itself a priority policy), in which case each level prepends its own numeric priority and the prefixes stack — e.g. `"0:1:connecting"`. On failover — e.g. priority `0` enters `TRANSIENT_FAILURE` and the policy moves to priority `1` — the `delay_type` changes (`"0:connecting"` → `"1:connecting"`), which ends the current delay and starts a new one; the reason records the failover (which can include the child policy name and the failure cause, e.g. `"priority: failing over to priority 1 (child 'tier-1-backup'); priority 0 failed: connection timeout"`). See [gRFC A56][A56].
 
 ##### `rls`
 
-Generates `delay_type = "rls_lookup_pending"` while an RPC is blocked on a control-plane lookup (a cache miss). The reason can include the RLS server target or cache keys (e.g. `"Route Lookup Service query pending on rls-server:8080"`). For picks that are not blocked on a lookup, it forwards the child's `delay_type` unmodified. *(The RLS LB policy is not a public API and is not covered by any gRFC.)*
+Generates `delay_type = "rls_lookup_pending"` while an RPC is blocked on a control-plane lookup (a cache miss). The reason can include the RLS server target or cache keys (e.g. `"rls: Route Lookup Service query pending on rls-server:8080"`). For picks that are not blocked on a lookup, it forwards the child's `delay_type` unmodified. *(The RLS LB policy is not a public API and is not covered by any gRFC.)*
 
 ##### `cds`
 
-Generates `delay_type = "cds_dynamic_discovery"` while waiting for a dynamic CDS cluster resource definition (see [gRFC A74][A74]). The reason can include the targeted cluster name (e.g. `"waiting for CDS resource definition for cluster cluster_abc"`).
+Generates `delay_type = "cds_dynamic_discovery"` while waiting for a dynamic CDS cluster resource definition (see [gRFC A74][A74]). The reason can include the targeted cluster name (e.g. `"cds: waiting for CDS resource definition for cluster cluster_abc"`).
 
 ##### `xds_cluster_manager` and `weighted_target`
 
@@ -190,7 +195,7 @@ These pass-through container policies do not modify the metric `delay_type`; the
 
 #### Channel Behavior for LB Pick Delays
 
-For picker-generated delays, the channel reads the queued pick's `delay_type` and `delay_reason` and drives the call tracer per the [Call Tracer API](#call-tracer-api-changes): it calls `RecordDelayStart` when a pick is first queued with a given `delay_type`, `RecordDelayReasonChanged` when a subsequent queued pick reports the same `delay_type` with a different `delay_reason`, and `RecordDelayEnd` when a pick either assigns a ready subchannel or returns a different `delay_type` than the last pick for that call.
+For picker-generated delays, the channel reads the queued pick's `delay_type` and `delay_reason` and drives the call tracer per the [Call Tracer API](#call-tracer-api-changes): it calls `RecordDelayStart` when a pick is first queued with a given `delay_type`, `RecordDelayReasonChanged` when a subsequent queued pick reports the same `delay_type` with a different `delay_reason`, and `RecordDelayEnd` when a pick either assigns a ready subchannel or returns a different `delay_type` than the last pick for that call. If the RPC fails or is cancelled while a pick delay is open, the delay is closed as described in [Calls that end while delayed](#call-tracer-api-changes).
 
 The channel additionally synthesizes two attempt-level delay types itself, keeping pickers ignorant of `wait_for_ready` semantics and transport-level races:
 
