@@ -4,7 +4,7 @@ A93: xDS ExtProc Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-09-09
+* Last updated: 2026-10-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
 
 ## Abstract
@@ -35,7 +35,6 @@ also make use of the `trusted_xds_server` server feature introduced in
 * [A103: xDS Composite Filter][A103]
 * [A79: Non-Per-Call Metrics Architecture][A79]
 * [A66: OpenTelemetry Metrics][A66]
-* [A89: Backend Service Metric Label][A89]
 * [A110: Child Channel Options][A110]
 
 [A39]: A39-xds-http-filters.md
@@ -45,7 +44,6 @@ also make use of the `trusted_xds_server` server feature introduced in
 [A106]: https://github.com/grpc/proposal/pull/520
 [A103]: A103-xds-composite-filter.md
 [A79]: A79-non-per-call-metrics-architecture.md
-[A89]: A89-backend-service-metric-label.md
 [A66]: A66-otel-stats.md
 [A110]: A110-child-channel-plugins.md
 
@@ -78,7 +76,7 @@ It will use the mechanism described in [A102] to determine the server to
 talk to and the channel credentials to use.
 
 We do not want to recreate this channel on LDS or RDS updates, unless the
-target URI or channel credentials changes.  The ext_proc filter will use
+target URI or channel credentials change.  The ext_proc filter will use
 the filter state retention mechanism described in [A83] to retain the
 channel across updates.  Note that implementations may need additional
 reference counting on the side channel to handle cases where an RPC is
@@ -134,7 +132,12 @@ waiting for a response for client headers, if it sees a client message,
 it can send the client message event on the ext_proc stream immediately
 (assuming it is configured to send client messages).
 
-#### Early Termination of ext_proc Stream
+When the data plane stream ends or is cancelled, the ext_proc
+side-stream will be closed.  However, note that closing the side-stream
+may be delayed in [observability mode](#observability-mode), as
+described below.
+
+#### Early Termination of the ext_proc Stream
 
 The stream to the ext_proc server may be terminated at any time.
 
@@ -162,7 +165,7 @@ changes in https://github.com/envoyproxy/envoy/pull/45901:
 
 1. The ext_proc server will send an ext_proc response with the
    `request_drain_requests` or `request_drain_responses` fields
-   set to true.  The filter will react by sending `request_body` or
+   set to true.  The filter will react by sending a `request_body` or
    `response_body` message with the `drain_complete` field set to true
    on the ext_proc stream.  Note that at this point, the filter must stop
    reading messages from the data plane stream, so that flow control
@@ -177,11 +180,10 @@ changes in https://github.com/envoyproxy/envoy/pull/45901:
    stream, and all such messages will proceed on the data plane stream
    without modification.
 
-If the filter is not in observability mode, has started sending request
-or response messages to the ext_proc server, and the ext_proc server has
+If the filter is not in observability mode, the ext_proc server has
 not used the above procedure to drain the request or response messages,
-then if the ext_proc stream is terminated with an OK status, the filter
-will treat it as if the ext_proc stream terminated with a non-OK status.
+and the ext_proc stream is terminated with an OK status, the filter will
+treat it as if the ext_proc stream terminated with a non-OK status.
 
 #### Payload Handling
 
@@ -224,9 +226,12 @@ messages, so each body chunk sent to or from the ext_proc server will
 be a complete, deframed gRPC message.
 
 The new `GRPC` mode will be the only processing mode supported in gRPC.
-It is be desirable for Envoy to implement the same mode, so that users
-can switch back and forth between proxy and proxyless data planes without
+It is desirable for Envoy to implement the same mode, so that users can
+switch back and forth between proxy and proxyless data planes without
 breaking their ext_proc servers.
+
+Note that the new `GRPC` mode requires [flow control](#flow-control), as
+described below.
 
 gRPC implementations should structure their xDS HTTP filter APIs such that
 the filter has access to the serialized bytes of each message rather than
@@ -282,6 +287,14 @@ Note that in this mode, all messages on the ext_proc stream will have the
 [`observability_mode`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126)
 field set.
 
+In this mode, the filter will read messages from the ext_proc stream but
+will immediately discard them without evaluating them.
+
+In this mode, at the end of the data plane stream, the filter will wait
+up to `deferred_close_timeout` for the ext_proc stream to close before
+terminating it.  This gives a chance for the ext_proc server to finish
+processing any in-flight events before the stream is cancelled.
+
 #### Flow Control
 
 Flow control must be handled properly in both normal mode and
@@ -331,9 +344,9 @@ amount of bytes a sender may send.  The mechanism works as follows.
 The sender for each of the four paths above will track the amount of
 flow control window it has available.  Whenever it sends body data,
 it must decrement its flow control window by the number of bytes that
-it has sent.  When its flow control window is less than or equal to the
-amount of body data it wishes to send, it may not send until it receives
-a window update causing its flow control window to be large enough.
+it has sent.  When its flow control window is less than the amount of
+body data it wishes to send, it may not send until it receives a window
+update causing its flow control window to be large enough.
 
 However, in GRPC body send mode, whenever the flow control window is
 greater than zero, a sender may send a single message, even if the size of
@@ -346,9 +359,16 @@ sending complete messages at a time, rather than splitting them up into
 DATA frames as HTTP/2 does, which would allow making incremental
 progress.
 
+Note that a `request_body` message containing no gRPC message but
+setting the `end_of_stream` field to true (which would also set the
+`end_of_stream_without_message` field to true) may be sent without any
+available flow control window.  This is consistent with the fact that
+the flow control window applies only to the message contents, which in
+this case have zero length.
+
 The initial window sizes for all four paths are set by the filter in
 its initial message on the ext_proc sidestream.  Note that the initial
-size for the to-sidestream windows are set by the sender, not the
+sizes for the to-sidestream windows are set by the sender, not the
 receiver. This is because each sidestream may be routed to a different
 ext_proc server instance, but there is no connection-level handshake to
 set a default for that server instance, so the only alternative here would
@@ -362,17 +382,20 @@ to handle any data that the sender has already sent.
 As the receiver finishes processing data, it must send back a window
 update telling the sender that it can send more data.  The window update
 can be positive or negative.  The sender must immediately add this value
-to its available flow control window for sending.
+to its available flow control window for sending.  Note that the
+available window is represented as a signed 64-bit integer;
+implementations must cap at the limit of that type to avoid overflow.
 
 The ext_proc filter will use this mechanism to handle push-back on each
 path by not considering reads complete (and therefore releasing the flow
-control back to the sender) until its corresponding write has passed
-flow control at both the ext_proc and HTTP/2 layers.  For example, for
-path (1) above, when reading client messages from downstream, the filter
-will first wait until it has allocated enough ext_proc flow control to
-send the message on the sidestream and then wait for the write to the
-sidestream to clear flow control at the HTTP/2 layer for the sidestream,
-and only then will it release flow control back to the downstream.
+control back to the sender) until its corresponding write has passed flow
+control at both the ext_proc and HTTP/2 layers.  For example, for path
+(1) above, when reading client messages from downstream, the filter will
+first wait until it has allocated enough ext_proc flow control (i.e.,
+greater than zero) to send the message on the sidestream and then wait
+for the write to the sidestream to clear flow control at the HTTP/2
+layer for the sidestream, and only then will it release flow control
+back to the downstream.
 
 Filter implementations may determine the number of window bytes they
 return as needed based on their own memory management requirements.
@@ -457,8 +480,8 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   status, the data plane RPC will be failed with status INTERNAL.  If
   this field is set to true, then the data plane RPC may instead be
   allowed to continue with no further action taken by the ext_proc filter.
-  See [Early Termination of ext_proc
-  Stream](#early-termination-of-ext_proc-stream) for details.
+  See [Early Termination of the ext_proc
+  Stream](#early-termination-of-the-ext_proc-stream) for details.
 - [processing_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L181):
   Required.  Inside of it:
   - [request_header_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto#L118),
@@ -483,7 +506,7 @@ proto](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4f
   first client-to-server and first server-to-client event, respectively.
   The set of supported attributes is the same as what we support for any
   CEL expression in xDS.  Any unsupported attribute name will be ignored.
-  See [Attributes Sent to
+  See [Attributes Sent to the
   ext_proc Server](#attributes-sent-to-the-ext_proc-server) below for details.
 - [mutation_rules](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L225):
   Optional.  Validated as described in [A102].  See [Header
@@ -528,14 +551,19 @@ The following fields will be ignored by gRPC:
   feature is complex to implement and does not seem very useful, so we
   are omitting it until and unless we encounter a use-case that needs it.
 
+Any field not meeting the requirements above will cause the xDS resource
+to be considered invalid and NACKed.
+
 #### Override Configuration
 
 We will support `typed_per_filter_config` config overrides for this
 filter, as described in [A39].
 
-We will support the following fields in the
+The override config is represented as a
 [`ExtProcPerRoute`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L395)
-proto:
+proto.  Any field specified in this proto overrides the corresponding
+field in the top-level config.  We will support the following fields in
+this proto:
 - [overrides](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L406):
   Optional.  Inside of it:
   - [processing_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L414):
@@ -550,6 +578,9 @@ proto:
   - We will ignore the grpc_initial_metadata field.  Initial metadata
     can be set inside of the grpc_service field, so there's no need to
     support a separate way of setting it.
+
+Any field not meeting the requirements above will cause the xDS resource
+to be considered invalid and NACKed.
 
 Note that we will not use the [`disabled`
 field](https://github.com/envoyproxy/envoy/blob/72833beab4fdc87f7fc53ec31ab70fd734581720/api/envoy/extensions/filters/http/ext_proc/v3/ext_proc.proto#L420)
@@ -620,7 +651,7 @@ sent to the server will be populated as follows:
   - [trailers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L247):
     Contains the trailers.
 - [attributes](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L113):
-  See [Attributes Sent to ext_proc
+  See [Attributes Sent to the ext_proc
   Server](#attributes-sent-to-the-ext_proc-server) below.
 - [observability_mode](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L126):
   Will be set to the value of the `observability_mode` config field.
@@ -643,7 +674,7 @@ sent to the server will be populated as follows:
   https://github.com/envoyproxy/envoy/pull/45509): The filter will set
   this field to provide flow control window back to the ext_proc server,
   as described in [Flow Control](#flow-control) above.  The
-  `window_increment_sidesteram_to_upstream` field provides more window
+  `window_increment_sidestream_to_upstream` field provides more window
   for client-to-server messages, whereas the
   `window_increment_sidestream_to_downstream` field provides more window
   for server-to-client messages.  Note that the `client_window_update`
@@ -654,7 +685,7 @@ sent to the server will be populated as follows:
 - Note: We will not populate metadata_context, because gRPC does not
   support dynamic metadata.
 
-#### Attributes Sent to ext_proc Server
+#### Attributes Sent to the ext_proc Server
 
 The
 [`attributes`](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L113)
@@ -767,7 +798,8 @@ as follows:
   immediately send trailers with the specified status.  The filter may
   cancel the ext_proc stream after seeing this.  Inside this message:
   - [grpc_status](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L353):
-    The status code to send on the data plane RPC.
+    The status code to send on the data plane RPC.  If unset, we will
+    use UNKNOWN.
   - [details](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L358):
     The status message to send on the data plane RPC.
   - [headers](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/service/ext_proc/v3/external_processor.proto#L346):
@@ -795,12 +827,27 @@ as follows:
 - We ignore the mode_override field, since we are not supporting this
   feature.
 
-Note that the responses from the ext_proc server must come back in the
-same order that the events were sent by the filter.  For example, if the
-client sends a client headers event and a client message event and the
-ext_proc server responds to the client message event first, that is
-considered a protocol error.  The filter will treat that as if the
-ext_proc stream failed with a non-OK status.
+As mentioned above, note that the events sent back from the server must
+be legal for the underlying data plane stream.  In the client-to-server
+direction, headers must come before body, and nothing must come after
+end-of-stream.  In the server-to-client direction, headers must come
+before body, trailers must come after body, and nothing must come after
+end-of-stream.  So, for example, if the client sends a client headers event
+and a client message event and the ext_proc server responds to the client
+message event first, that is considered a protocol error.  The filter
+will treat that as if the ext_proc stream failed with a non-OK status.
+
+It is also a protocol error if the ext_proc server sends an event that
+the filter is not configured to send.  For example, if the filter is
+configured to not send client headers, then it will be considered a
+protocol error if the ext_proc server sends a response for client
+headers.
+
+Note that if the filter is configured to send client or server messages,
+it is valid for the ext_proc server to send client or server messages
+before the filter has sent any such messages to the ext_proc server.
+This would happen in a case where the ext_proc server wishes to insert
+messages at the start of the stream.
 
 #### Header Mutations
 
@@ -822,8 +869,8 @@ handled as follows:
 If any of the above fields fails validation, the ext_proc filter will
 treat the ext_proc stream as having failed.  The data plane RPC will
 then be handled based on the value of the `failure_mode_allow` config
-field.  See [Early Termination of ext_proc
-Stream](#early-termination-of-ext_proc-stream) for details.
+field.  See [Early Termination of the ext_proc
+Stream](#early-termination-of-the-ext_proc-stream) for details.
 
 All mutations (additions, modifications, and removals) are subject to the
 rules in the `mutation_rules` field in the filter config.  This field is
@@ -836,8 +883,13 @@ The ext_proc filter will export metrics using the non-per-call metrics
 architecture defined in [A79].  There will be a separate set of metrics
 on client side and server side, because (a) there are additional labels
 that are relevant on the client but not on the server, and (b) it may be
-useful to differentiate between authorization behavior on the client vs.
-the server.
+useful to differentiate between ext_proc behavior on the client vs. the
+server.
+
+All metrics added in this proposal will start as experimental and
+therefore off by default.  The long term goal will be to
+de-experimentalize them and have them be on by default, but the exact
+criteria for that change are TBD.
 
 #### Client-Side Metrics
 
@@ -845,7 +897,7 @@ The client-side metrics will have the following labels:
 
 | Name        | Disposition | Description |
 | ----------- | ----------- | ----------- |
-| grpc.target | required | The target of the gRPC channel in which ext_proc is used, as the defined in [A66]. |
+| grpc.target | required | The target of the gRPC channel in which ext_proc is used, as defined in [A66]. |
 
 The following client-side metrics will be exported:
 
@@ -906,10 +958,9 @@ have needed to wait a full RTT with the ext_proc server between each
 message on the stream.  We also considered a more pipelined approach
 where the data plane would have queued the messages and the ext_proc
 server would have been required to send back a response for each message
-indicating an optional replacement, but that approach would have (a)
+indicating an optional replacement, but that approach would have
 not allowed the ext_proc server to modify the number of messages on
-the stream and (b) would have required implementing some form of flow
-control to impose push-back upon hitting some maximum buffer size.
+the stream.
 
 ## Implementation
 
