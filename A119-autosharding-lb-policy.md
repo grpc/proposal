@@ -3,7 +3,7 @@ A119: Auto-Sharding LB Policy
 * Author: easwars
 * Approver: markdroth
 * Implemented in: TBD
-* Last updated: 2026-09-21
+* Last updated: 2026-10-05
 * Discussion at: <https://groups.google.com/g/grpc-io/c/BXcwH6ytqRs>
 
 ## Abstract
@@ -620,18 +620,27 @@ pseudo-code:
 def handle_name_resolver_update(
     self, state: ResolverState, config: LbConfig
 ) -> Status:
-  if not state.endpoints:
-    # Set channel's connectivity state to TRANSIENT_FAILURE and provide an
-    # erroring picker.
-    self.update_channel_state(TRANSIENT_FAILURE, ErrorPicker(bad_resolver_state))
-    return bad_resolver_state
+  # Update the EndpointMap with the new set of filtered endpoints and lazily
+  # create/remove `pick_first` child policies for each endpoint.
+  order_or_count_changed = self.update_endpoint_map(state.endpoints)
+  if order_or_count_changed:
+    self.regenerate_slice_map = True
+  self.update_child_policies()
 
+  # Fail if there are no valid endpoints.
+  if not self.endpoint_map:
+    self.update_channel_state(
+        TRANSIENT_FAILURE, ErrorPicker("no endpoints from resolver")
+    )
+    return BAD_RESOLVER_STATE
+
+  # Fail if no channel factory in resolver state attributes.
   channel_factory = get_channel_factory_from_resolver_state(state)
   if channel_factory is None:
-    # Set channel's connectivity state to TRANSIENT_FAILURE and provide an
-    # erroring picker.
-    self.update_channel_state(TRANSIENT_FAILURE, ErrorPicker(bad_resolver_state))
-    return bad_resolver_state
+    self.update_channel_state(
+        TRANSIENT_FAILURE, ErrorPicker("no channel factory in resolver state")
+    )
+    return BAD_RESOLVER_STATE
 
   # Reuse the existing gRPC channel unless channel_factory_key has changed.
   channel = self.grpc_channel
@@ -639,36 +648,33 @@ def handle_name_resolver_update(
   new_grpc_channel_created = False
 
   if (
-      self.config is None
+      self.autosharding_client is None
       or config.channel_factory_key != self.config.channel_factory_key
   ):
     channel = channel_factory(config.channel_factory_key)
     if channel is None:
-      # Set channel's connectivity state to TRANSIENT_FAILURE and provide an
-      # erroring picker.
       self.update_channel_state(
           TRANSIENT_FAILURE, ErrorPicker(channel_creation_error)
       )
-      return channel_creation_error
+      return BAD_RESOLVER_STATE
     create_new_autosharding_client = True
     new_grpc_channel_created = True
 
-  # If autosharding_target in config has changed, ensure a new
-  # AutoshardingClient is created. Ensure %s string substitution for "Locality"
-  # is taken into account.
-  if (
-      self.config is None
-      or config.autosharding_target != self.config.autosharding_target
-  ):
+  # If autosharding_target in config has changed (taking "%s" Locality
+  # substitution into account), ensure a new AutoshardingClient is created.
+  locality = get_locality_from_resolver_state(state)
+  new_target = config.autosharding_target.replace("%s", locality, 1)
+  if self.autosharding_client is None or new_target != self.autosharding_target:
     create_new_autosharding_client = True
 
   # Create the new AutoshardingClient first, then close the previous client,
   # and only then close the previous gRPC channel so no active client ever
   # references a closed channel.
   if create_new_autosharding_client:
-    new_client = self.create_new_autosharding_client(channel, config, state)
+    new_client = self.create_new_autosharding_client(channel, new_target, config)
     self.close_previous_autosharding_client()
     self.autosharding_client = new_client
+    self.autosharding_target = new_target
 
   if new_grpc_channel_created:
     self.close_previous_grpc_channel()
@@ -677,21 +683,41 @@ def handle_name_resolver_update(
   # Update cached copy of the configuration before building the new Picker.
   self.config = config
 
-  # Update the EndpointMap with the new set of endpoints and lazily create a
-  # `pick_first` child policy for each endpoint.
-  self.update_endpoint_map(state.endpoints)
-  self.create_child_policies()
-
   # If the LB policy is yet to receive an assignment or error from the
   # AutoshardingClient, RPCs must be queued.
   if self.assignment is None and self.assignment_error is None:
     self.update_channel_state(IDLE, QueuePicker())
     return OK
 
-  # Rebuild the SliceMap using the latest EndpointMap and current Assignment
-  # (if any), then update the channel's connectivity state and Picker.
-  self.slice_map = build_slice_map(self.endpoint_map, self.assignment)
-  self.update_state_and_picker()
+  # If the LB policy received an error from the AutoshardingClient and
+  # fallback is disabled, RPCs must be failed.
+  if self.assignment_error is not None and not config.enable_fallback:
+    self.update_channel_state(
+        TRANSIENT_FAILURE, ErrorPicker(self.assignment_error)
+    )
+    return OK
+
+  # Rebuild the SliceMap only when required.
+  if self.regenerate_slice_map:
+    self.slice_map = build_slice_map(self.endpoint_map, self.assignment)
+    self.regenerate_slice_map = False
+
+  # Compute the channel's aggregated connectivity state.
+  agg_state = self.compute_aggregated_connectivity_state()
+
+  # If aggregated state is TRANSIENT_FAILURE or CONNECTING and there are no
+  # endpoints in CONNECTING, request a connection on an IDLE endpoint (if any).
+  if (
+      agg_state in (TRANSIENT_FAILURE, CONNECTING)
+      and not self.has_connecting_endpoint()
+  ):
+    idle_endpoint = self.first_idle_endpoint()
+    if idle_endpoint is not None:
+      idle_endpoint.request_connection()
+
+  # Build new picker and update the channel.
+  picker = self.build_picker()
+  self.update_channel_state(agg_state, picker)
   return OK
 ```
 
