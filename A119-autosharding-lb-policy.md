@@ -3,7 +3,7 @@ A119: Auto-Sharding LB Policy
 * Author: easwars
 * Approver: markdroth
 * Implemented in: TBD
-* Last updated: 2026-10-05
+* Last updated: 2026-10-06
 * Discussion at: <https://groups.google.com/g/grpc-io/c/BXcwH6ytqRs>
 
 ## Abstract
@@ -499,9 +499,10 @@ received `generation`) and notifies the LB policy according to the outcome:
 | Outcome | `accepted` | `error_message` | Action on LB Policy |
 | :--- | :--- | :--- | :--- |
 | **Stale generation** | `false` | Set | None (assignment dropped) |
-| **No usable `Slice`s remain** | `false` | Set | Report error to LB policy |
-| **Some `Slice`s invalid, $\ge 1$ usable** | `true` | Set | Pass gap-filled, sorted `Assignment` |
-| **All `Slice`s valid** | `true` | Empty | Pass gap-filled, sorted `Assignment` |
+| **No usable `Slices` remain** | `false` | Set | Report error to LB policy |
+| **Some gaps in `Slices`** | `true` | Set | Pass gap-filled, sorted `Assignment` |
+| **Some `Slices` invalid, $\ge 1$ usable** | `true` | Set | Pass gap-filled, sorted `Assignment` |
+| **All `Slices` valid** | `true` | Empty | Pass gap-filled, sorted `Assignment` |
 
 Note that an error is reported **only** if a valid assignment was not reported
 previously, as mentioned [previously here](#contract-of-the-autoshardingclient).
@@ -512,10 +513,34 @@ and the LB policy builds a new `SliceMap` and `Picker` to update the channel.
 
 #### Handling gaps in the assignment
 
-Gaps in the key-ranges represented by the `Slice`s within an assignment are
-allowed. In this case, the `AutoshardingClient` must fill these gaps with
-`Slice`s that contain no endpoints. This will cause requests that match these
-`Slice`s to fallback (if enabled) or fail.
+Gaps in the key-ranges represented by the `Slices` within an assignment are
+allowed, but are not common. In this case, the `AutoshardingClient` must fill
+these gaps with `Slices` that contain no endpoints and accept the assignment as
+valid. It will also include an error message in the `AssignmentAck` indicating
+the gap. Requests that match these gaps will use the fallback pool (if enabled)
+or fail.
+
+#### Handling Slices with no endpoints
+
+The sharding server could return an assignment that contains some `Slices` that
+have no endpoints assinged to them. For example, in a multi-tenant sharding
+scenario, we could have a case where every key has a tenant ID as prefix and
+thus every client will use only part of the key space that starts with its
+tenant ID.  In this case, the first and last `Slice` in the assignment will
+contain no endpoints, while middle slices will cover single tenant keys. And in
+this case, we want to disable fallback for the `Slices` that don't have any
+endpoints, even if fallback is enabled in the LB policy configuration.
+
+gRPC needs specialized handling for these `Slices` to ensure that fallback is
+disabled for them. This could be handled as follows:
+
+* A new field, `fallback_disabled`, will be added to the `Slice` data structure
+  stored within an `Assignment` (see [Assignment](#assignment) for details).
+* The `AutoshardingClient` will set the `fallback_disabled` field to true for
+  `Slices` where the sharding server specified no endpoints.
+* This boolean will also be propagated to slices stored in the `SliceMap`.
+* At pick time, if the `Picker` ends up selecting a `Slice` where
+  `fallback_disabled` is set to `true`, it will unconditionally fail the pick.
 
 ### Fallback Mechanism
 
