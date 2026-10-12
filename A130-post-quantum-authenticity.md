@@ -1,4 +1,4 @@
-A1XX - Post-Quantum Cryptography: Authenticity (Signature Algorithms)
+A130 - Post-Quantum Cryptography: Authenticity (Signature Algorithms)
 ----
 * Author(s): @gtcooke94
 * Approver: markdroth, ejona86, easwars, matthewstevenson88, dfawley
@@ -19,8 +19,9 @@ cryptography (PQC) transition is ensuring post-quantum **authenticity** in its
 SSL/TLS stacks.  Once a CRQC is available, an active adversary will be able to
 forge classical digital signatures (RSA, ECDSA, Ed25519) in real time and
 impersonate TLS endpoints. gRPC must support post-quantum TLS 1.3 signature
-algorithms—specifically NIST FIPS 204 `ML-DSA-65` and `ML-DSA-87`—and expose
-public APIs across C++, Go, and Java to configure TLS signature algorithms.
+algorithms—specifically NIST FIPS 204 `ML-DSA-44`, `ML-DSA-65`, and `ML-DSA-87`
+- and expose public APIs across C++, Go, and Java to configure TLS signature
+algorithms.
 
 
 
@@ -34,43 +35,42 @@ forge certificates themselves to successfully execute impersonation attacks
 Because this is a live-attack, it lacks the immediate urgency of the
 post-quantum confidentiality transition.  However, migrating PKIs across
 production use-cases of gRPC could take significant wall-time, so there is value
-in giving the users the tools to do that for gRPC deployments as soon as
-possible.
+in giving the users the tools to enable post-quantum authenticity for their gRPC
+deployments as soon as possible.
 
 In TLS 1.3 ([RFC 8446 Section 4.2.3](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3)),
 signature algorithms are negotiated via the `signature_algorithms` extension in
 the `ClientHello` (for server authentication) and `CertificateRequest` (for
 mTLS client authentication). A peer may only authenticate using a certificate
 and `CertificateVerify` signature whose `SignatureScheme` was advertised by the
-verifying peer.
+verifying peer. ** ML-DSA leaf certificates are only supported using TLS1.3 **.
 
 In addition, there is another TLS extension named `signature_algorithms_cert`.
 If unset, the `signature_algorithms` value is used. If set, this separately
 represents a list of algorithms for which we can **verify** certificates (and
 `signature_algorithms` represents algorithms we can **sign** with). An example:
 we only hold classical private keys and certificates and can only produce RSA
-signatures. However, our BoringSSL version does have support for MLDSA87, so we
-can verify MLDSA87 signatures. We can separately advertise to a peer that we can
-verify their MLDSA87 certificates (`signature_algorithms_cert`), while also
-advertising that we cannot produce an MLDSA87 signature ourselves
+signatures. However, our BoringSSL version does have support for ML-DSA-87, so we
+can verify ML-DSA-87 signatures. We can separately advertise to a peer that we can
+verify their ML-DSA-87 certificates (`signature_algorithms_cert`), while also
+advertising that we cannot produce an ML-DSA-87 signature ourselves
 (`signature_algorithms`). In gRPC use-cases, we don't actively see a strong
 reason to prioritize `siganture_algorithms_cert` support at this time, and
-instead will focus soley on implementing support for MLDSA and
+instead will focus soley on implementing support for ML-DSA and
 `signature_algorithms` as soon as possible.
 
 Currently, support for ML-DSA in the default TLS `signature_algorithms` list
 varies across underlying cryptographic libraries. Most notably, BoringSSL
 supports signing with `ML-DSA`, but does **not** include `ML-DSA` in its default
 verification list (`kVerifySignatureAlgorithms`); negotiating an ML-DSA
-certificate in BoringSSL requires explicitly configuring the signature
+signature algorithm in BoringSSL requires explicitly configuring the signature
 algorithms list via `SSL_CTX_set1_sigalgs_list`.
 
 Furthermore, not all of gRPC's TLS stacks enable users to configure their own
 signature algorithms. Exposing a signature algorithms API is both a direct
 requirement for enabling ML-DSA today and a prerequisite for allowing users to
-enforce PQC-only authentication policies or opt out of post-quantum signature
-schemes if desired.
-
+enforce quantum secure authentication or opt out of post-quantum signature
+schemes (not recommended) if desired.
 
 ### Related Proposals
 
@@ -81,13 +81,35 @@ schemes if desired.
 
 ## Proposal
 
-Each gRPC language implementation (C++, Go, and Java) will provide an API to
-configure the ordered preference list of TLS signature algorithms (signature
-schemes), including the NIST FIPS 204 Module-Lattice-Based Digital Signature
-Standard algorithms standardized for TLS 1.3 in
+Largely this proposal consists of two items:
+
+1. Supporting ML-DSA in general.
+2. Supporting Signature Algorithm Negotiation.
+
+Supporting ML-DSA does not require public API changes - rather, gRPC's internals
+must ensure that we handle being passed certificates and private keys utilizing
+ML-DSA through the existing APIs for configuring identity data.
+
+Supporting signature algorithm negotiation, on the other hand, will require
+public API additions detailed below.
+
+### Supporting ML-DSA
+
+Each gRPC language implementation (C++, Go, and Java) will ensure that the
+existing configuration APIs for certificates and private keys properly supports
+the signatures in
 [`draft-ietf-tls-mldsa`](https://datatracker.ietf.org/doc/html/draft-ietf-tls-mldsa)
-(`ML-DSA-65` and `ML-DSA-87`, as well as `ML-DSA-44` where supported by the
-underlying runtime) alongside standard classical algorithms.
+(namely `ML-DSA-65` and `ML-DSA-87`, and `ML-DSA-44`) where supported by the
+underlying runtime alongside standard classical algorithms.
+
+
+### Supporting Signature Algorithm Negotiation
+
+In order for a peer to accept both classical and post-quantum signatures, we
+must support negotiation of signature algorithms. While the end-goal for
+post-quantum secure systems is strictly post-quantum signatures, we expect many
+gRPC deployments will have extended migrations in which both classical and
+post-quantum signature algorithms are supported.
 
 In the TLS 1.3 handshake, signature algorithms are negotiated as follows, per
 [RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3): the
@@ -97,6 +119,9 @@ supported verification schemes in `CertificateRequest.signature_algorithms`),
 and the authenticating peer selects a certificate and signs `CertificateVerify`
 using a mutually supported algorithm.
 
+Each gRPC language implementation (C++, Go, and Java) will provide an API to
+configure the ordered preference list of TLS signature algorithms.
+
 When a user configures a list of signature algorithms on the gRPC TLS
 credentials options, gRPC will pass that ordered list through to the underlying
 SSL/TLS library. When no signature algorithms are explicitly configured by the
@@ -104,12 +129,11 @@ user, gRPC will preserve the underlying security library's default signature
 algorithms.
 
 Of note, much of the challenging work of migrating a production gRPC setup lies
-in migrating from classical to MLDSA signatures. This migration is NOT within
+in migrating from classical to ML-DSA signatures. This migration is NOT within
 gRPC's scope as we cannot know user's PKI details. We will ensure that gRPC
 contains the tools for users to implement their own migration strategy - namely
 two items:
 
-1. Supporting MLDSA in general
 1. Adding APIs to configure the `signature_algorithms` TLS1.3 extension.
 1. Ensuring the CertificateProvider interface abstractions work for
 multi-certificate setups with mixed signatures and negotiation via configuring
@@ -179,7 +203,7 @@ class TlsCredentialsOptions {
 
 In Golang, the `crypto/tls` library is part of the core language. Starting in Go
 1.27, `crypto/mldsa`, `crypto/x509`, and `crypto/tls` natively support
-`tls.MLDSA44`, `tls.MLDSA65`, and `tls.MLDSA87`, and include them at the front
+`tls.ML-DSA44`, `tls.MLDSA-65`, and `tls.MLDSA-87`, and include them at the front
 of the default TLS 1.3 signature algorithms list
 (`defaultSupportedSignatureAlgorithms`).
 
@@ -220,7 +244,7 @@ type Options struct {
 | Go version | Defaults (`defaultSupportedSignatureAlgorithms` in TLS 1.3) |
 | :---- | :---- |
 | Go < 1.27 | `{PSSWithSHA256, ECDSAWithP256AndSHA256, Ed25519, PSSWithSHA384, PSSWithSHA512, ECDSAWithP384AndSHA384, ECDSAWithP521AndSHA512}` |
-| Go >= 1.27 | `{MLDSA44, MLDSA65, MLDSA87, PSSWithSHA256, ECDSAWithP256AndSHA256, Ed25519, PSSWithSHA384, PSSWithSHA512, ECDSAWithP384AndSHA384, ECDSAWithP521AndSHA512}` |
+| Go >= 1.27 | `{ML-DSA44, MLDSA-65, MLDSA-87, PSSWithSHA256, ECDSAWithP256AndSHA256, Ed25519, PSSWithSHA384, PSSWithSHA512, ECDSAWithP384AndSHA384, ECDSAWithP521AndSHA512}` |
 
 ### Java
 
@@ -339,7 +363,7 @@ additional signature schemes as they are standardized.
 
 ## Performance Analysis
 
-MLDSA keys and signatures are significantly larger than classical signatures. This means certificates will increase in size.
+ML-DSA keys and signatures are significantly larger than classical signatures. This means certificates will increase in size.
 
 | Algorithm / Parameter Set | Security Profile | Public Key Size | Signature Size | Total Overhead (Key + Sig) | Size Increase vs. ECDSA P-256 |
 | :--- | :--- | :---: | :---: | :---: | :---: |
@@ -350,16 +374,16 @@ MLDSA keys and signatures are significantly larger than classical signatures. Th
 | **ML-DSA-65** | NIST Level 3 (192-bit) | 1,952 B | 3,309 B | 5,261 B | ~41× larger |
 | **ML-DSA-87** | NIST Level 5 (256-bit) | 2,592 B | 4,627 B | 7,219 B | ~56× larger |
 
-MLDSA signatures are also more costly to compute. The below performance benchmarks will be added as support is added in gRPC.
+ML-DSA signatures are also more costly to compute. The below performance benchmarks will be added as support is added in gRPC.
 
 ### C++ Performance Comparison
 
 | Benchmark | Real Time / Op | CPU Time / Op | Instructions / Op | Peak Mem (Bytes) | Allocs / Op |
 | :---- | :---: | :---: | :---: | :---: | :---: |
 | BM_TlsConnection (Default ECDSA P-256) | TBD | TBD | TBD | TBD | TBD |
-| BM_TlsConnection_MLDSA65 | TBD | TBD | TBD | TBD | TBD |
-| BM_TlsConnection_MLDSA87 | TBD | TBD | TBD | TBD | TBD |
+| BM_TlsConnection_ML-DSA-65 | TBD | TBD | TBD | TBD | TBD |
+| BM_TlsConnection_ML-DSA-87 | TBD | TBD | TBD | TBD | TBD |
 | | | | | | |
 | BM_MtlsConnection (Default ECDSA P-256) | TBD | TBD | TBD | TBD | TBD |
-| BM_MtlsConnection_MLDSA65 | TBD | TBD | TBD | TBD | TBD |
-| BM_MtlsConnection_MLDSA87 | TBD | TBD | TBD | TBD | TBD |
+| BM_MtlsConnection_ML-DSA-65 | TBD | TBD | TBD | TBD | TBD |
+| BM_MtlsConnection_ML-DSA-87 | TBD | TBD | TBD | TBD | TBD |
