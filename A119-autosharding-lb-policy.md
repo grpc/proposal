@@ -540,7 +540,8 @@ disabled for them. This could be handled as follows:
   `Slices` where the sharding server specified no endpoints.
 * This boolean will also be propagated to slices stored in the `SliceMap`.
 * At pick time, if the `Picker` ends up selecting a `Slice` where
-  `fallback_disabled` is set to `true`, it will unconditionally fail the pick.
+  `fallback_disabled` is set to `true`, it will drop the pick. This ensures all
+  RPCs (including `wait_for_ready` ones) fail immediately without retries.
 
 ### Fallback Mechanism
 
