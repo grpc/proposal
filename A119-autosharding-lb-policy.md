@@ -3,7 +3,7 @@ A119: Auto-Sharding LB Policy
 * Author: easwars
 * Approver: markdroth
 * Implemented in: TBD
-* Last updated: 2026-10-06
+* Last updated: 2026-10-14
 * Discussion at: <https://groups.google.com/g/grpc-io/c/BXcwH6ytqRs>
 
 ## Abstract
@@ -626,6 +626,10 @@ message AutoshardingLbConfig {
  google.protobuf.Duration initial_assignment_timeout = 5;
 }
 ```
+
+When parsing the JSON LB configuration, the LB policy must ensure that the
+`key_header_name` field contains a valid gRPC header name. If not, the
+configuration must be rejected.
 
 Key considerations regarding the LB policy configuration that must be handled by
 the "Channel Factory".
