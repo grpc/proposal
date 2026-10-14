@@ -162,10 +162,12 @@ to exit `IDLE` state, and that a request missing the header does not incur extra
 latency in the common case where there is already at least one endpoint in
 `READY` state. It converges to picking a random endpoint if the header is not
 set, since each request may cause one or two random endpoints to go from `IDLE`
-to `READY`: - a first connection attempt if it randomly picks an `IDLE` endpoint
-and no endpoint is currently `CONNECTING` - a second connection attempt if the
-pick was queued and an endpoint transitioned from `CONNECTING` to `READY`, but
-no other endpoint is currently `CONNECTING`.
+to `READY`:
+- A first connection attempt if it randomly picks an `IDLE` endpoint and no
+  endpoint is currently `CONNECTING`.
+- A second connection attempt if the pick was queued and an endpoint
+  transitioned from `CONNECTING` to `READY`, but no other endpoint is
+  currently `CONNECTING`.
 
 Because pickers generated with `picker_has_endpoint_in_connecting_state` set to
 false may be used by multiple requests until an endpoint transitions to
