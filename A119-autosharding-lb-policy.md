@@ -74,6 +74,29 @@ following functionality:
 Crucially, the LB policy receives its configuration and endpoint data from the
 Name Resolver and not from the sharding service.
 
+### Supported modes of operation
+
+The LB policy must support two primary modes of operation:
+
+* An LB policy that performs both locality and endpoint picking:
+  * In xDS use-cases, such an LB policy receives endpoints across all
+    localities and shards requests accordingly. This is similar to how the
+    `ring_hash` LB policy, specified in [gRFC A42][A42], works.
+  * In non-xDS use-cases, such an LB policy will be configured as the top-level
+    LB policy, sharding requests across a flat list of endpoints provided by the
+    Name Resolver.
+* An LB policy that only performs endpoint picking:
+  * In xDS use-cases, such an LB policy will be configured under a policy like
+    `weighted_target_experimental` that handles locality picking, while each
+    `autosharding_experimental` child policy instance only handles endpoint
+    picking within its specific locality.
+
+The LB policy must maintain consistent behavior across both modes and must not
+require explicit knowledge of its operational context. Notably, we do not
+support using this LB policy solely for locality picking with delegation to a
+separate endpoint-picking policy. This configuration lacks identified use cases
+and introduces significant implementation complexity.
+
 ### LB Policy Architecture
 
 ![LB Policy Architecture](A119_graphics/Auto-Sharding-LB-Policy-Architecture.png)
@@ -122,15 +145,20 @@ endpoints from the Name Resolver. If multiple endpoints share the same hostname,
 implementations may arbitrarily pick one and drop the others.
 
 ```python
-def update_endpoint_map(self, resolved_endpoints: list[Endpoint]):
+# Builds an endpointMap with the new set of resolver endpoints and returns a
+# boolean indicating if the order or count of endpoints changed. This is used to
+# determine if a new SliceMap needs to be built.
+def update_endpoint_map(self, resolved_endpoints: list[Endpoint]) -> bool:
   old_map = self.endpoint_map.m if self.endpoint_map is not None else {}
   new_map = EndpointMap(m={})
+  order_or_count_changed = False
 
   for endpoint in resolved_endpoints:
     # De-duplicate endpoints sharing the same hostname within this update.
     if endpoint.hostname in new_map.m:
       continue
 
+    idx = len(new_map.m)
     if endpoint.hostname in old_map:
       # Retain existing child LB state for endpoints still present.
       prev = old_map[endpoint.hostname]
@@ -141,11 +169,17 @@ def update_endpoint_map(self, resolved_endpoints: list[Endpoint]):
           state    = prev.state,
           picker   = prev.picker,
       )
+      if prev.index != idx:
+        order_or_count_changed = True
     else:
       new_map.m[endpoint.hostname] = EndpointState(
           index    = len(new_map.m),
           endpoint = endpoint,
       )
+      order_or_count_changed = True
+
+  if len(new_map.m) != len(old_map):
+    order_or_count_changed = True
 
   # Shut down child policies for endpoints removed in this update.
   for hostname, es in old_map.items():
@@ -153,6 +187,7 @@ def update_endpoint_map(self, resolved_endpoints: list[Endpoint]):
       es.child_lb.close()
 
   self.endpoint_map = new_map
+  return order_or_count_changed
 ```
 
 The pseudo-code above handles closing of child policies associated with removed
@@ -557,12 +592,11 @@ provided by the Name Resolver. There are two types of fallback:
   when it returns an error.
   * By default, when the `AutoshardingClient` returns an error, the LB policy
     will construct a picker that fails all picks with `UNAVAILABLE` status and
-    an appropriate error message.
+    an appropriate error message. Note that this can be implemented by building
+    a `SliceMap` with an empty `Assignment` and using the picker [described
+    here](#the-picker) or by using a dedicated fallback/erroring picker.
   * However, if fallback is enabled, then the LB policy will instead construct a
     picker that will use fallback for all RPCs, regardless of key.
-  * Note that the error cases above can implemented by building a `SliceMap`
-    with an empty `Assignment` and using the picker [described
-    here](#the-picker) or by using a dedicated fallback/erroring picker.
 
 Key considerations here:
 
@@ -570,29 +604,6 @@ Key considerations here:
   policy configuration.
 * The LB policy must consider all available endpoints during fallback and must
   not employ any sort of subsetting.
-
-### Supported modes of operation
-
-The LB policy must support two primary modes of operation:
-
-* An LB policy that performs both locality and endpoint picking:
-  * In xDS use-cases, such an LB policy receives endpoints across all
-    localities and shards requests accordingly. This is similar to how the
-    `ring_hash` LB policy, specified in [gRFC A42][A42], works.
-  * In non-xDS use-cases, such an LB policy will be configured as the top-level
-    LB policy, sharding requests across a flat list of endpoints provided by the
-    Name Resolver.
-* An LB policy that only performs endpoint picking:
-  * In xDS use-cases, such an LB policy will be configured under a policy like
-    `weighted_target_experimental` that handles locality picking, while each
-    `autosharding_experimental` child policy instance only handles endpoint
-    picking within its specific locality.
-
-The LB policy must maintain consistent behavior across both modes and must not
-require explicit knowledge of its operational context. Notably, we do not
-support using this LB policy solely for locality picking with delegation to a
-separate endpoint-picking policy. This configuration lacks identified use cases
-and introduces significant implementation complexity.
 
 ### Load Balancing Configuration
 
@@ -681,12 +692,12 @@ def handle_name_resolver_update(
       self.autosharding_client is None
       or config.channel_factory_key != self.config.channel_factory_key
   ):
-    channel = channel_factory(config.channel_factory_key)
-    if channel is None:
-      self.update_channel_state(
-          TRANSIENT_FAILURE, ErrorPicker(channel_creation_error)
-      )
-      return BAD_RESOLVER_STATE
+    # Depending on the language, channel_factory may either return a LameChannel
+    # directly on failure (e.g., C++) or return an error that the LB policy
+    # wraps in a LameChannel (e.g., Go).
+    channel, err = channel_factory(config.channel_factory_key)
+    if err is not None:
+      channel = LameChannel(err)
     create_new_autosharding_client = True
     new_grpc_channel_created = True
 
