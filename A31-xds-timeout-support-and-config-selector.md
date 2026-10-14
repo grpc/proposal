@@ -4,7 +4,7 @@ A31: gRPC xDS Timeout Support and Config Selector Design
 * Approver: markdroth, ejona86
 * Status: Final
 * Implemented in:
-* Last updated: 2020-09-29
+* Last updated: 2026-10-14
 * Discussion at: https://groups.google.com/g/grpc-io/c/iujkovEFSJU
 
 ## Abstract
@@ -134,11 +134,12 @@ Config Selector has a reference to the deleted cluster, then when there are no
 more references to the config selector, the final reference to the cluster will
 be removed, triggering the Service Config update.
 
-Note that when a cluster is deleted in xDS, if the xds_cluster_manager Load
-Balancing Policy were to queue RPCs in this scenario, wait-for-ready RPCs would
-be stuck indefinitely referencing the cluster, and it could never be removed.
-Deleted clusters need to drop the RPC and return an INTERNAL status. Note that
-in pickers, a deleted cluster is indistinguishable from an unknown one (below).
+Note that when a cluster's CDS resource does not exist (e.g., it was deleted by
+the xDS server), the cluster remains a child of the xds_cluster_manager Load
+Balancing Policy, which delegates picks for it to that cluster's cds policy.
+If the cds policy were to queue RPCs in this scenario, wait-for-ready RPCs
+would be stuck indefinitely referencing the cluster, and it could never be
+removed.  The cds policy must drop the RPC with an UNAVAILABLE status.
 
 When new clusters are added to xDS, they will be added to both the Config
 Selector and Service Config simultaneously.  Here, precautions must be taken to
