@@ -2,7 +2,6 @@ A92: xDS ExtAuthz Support
 ----
 * Author(s): @markdroth
 * Approver: @ejona86, @dfawley
-* Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2026-10-15
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
