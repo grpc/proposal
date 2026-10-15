@@ -4,7 +4,7 @@ A83: xDS GCP Authentication Filter
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2024-12-04
+* Last updated: 2025-09-19
 * Discussion at: https://groups.google.com/g/grpc-io/c/76a0zWJChX4
 
 ## Abstract
@@ -265,9 +265,24 @@ filter stack (i.e., upon receiving an LDS or RDS update), each filter
 has access to both the previous blackboard (if any) and to a new
 blackboard, which starts empty.  As each filter is initialized, it can
 look for entries in the old blackboard to reuse, and any such entry is
-added to the new blackboard.  The channel then destroys the old
-blackboard and replaces it with the new one, which it will retain until
-the next time it creates a new filter stack.
+added to the new blackboard.  We then destroy the old blackboard and
+replace it with the new one, which we will retain until the next time
+we create a new filter stack.
+
+On the client side, there will be exactly one HTTP connection manager
+config and therefore exactly one list of xDS HTTP filters, so the
+channel will have a single blackboard instance to track the filter
+state across updates.
+
+On the server side, we will initially have a separate blackboard instance
+for each xDS Listener.  Note that a single Listener can contain multiple
+L4 filter chains, each of which will have its own HTTP connection
+manager and therefore its own HTTP filter stack, so it is possible to
+share state across multiple HTTP filter stacks in the same xDS Listener.
+However, implementations should not rely on having separate state for
+each Listener, because we may in the future switch to having a separate
+blackboard for the entire server instance, thus combining state for
+multiple xDS Listeners.
 
 The GCP Authentication filter will use this mechanism for the call
 credentials cache.  The blackboard key string will be the filter's
@@ -283,9 +298,149 @@ a cache size change will wind up affecting the old filter instance,
 which in principle it shouldn't, but that is considered acceptable for
 this type of change.
 
-##### Java and Go
+##### Java
 
-TODO(sergiitk, ejona86, dfawley): Fill this in.
+In Java, xDS HTTP Filter objects will be responsible for retaining their own
+state.
+
+The GCP Authentication filter will store the call credentials cache as a regular
+field on a `GcpAuthenticationFilter` object. No in-filter logic will be needed
+to separate caches per filter instance name, as Java's implementation
+will produce distinct `GcpAuthenticationFilter` instances, and therefore,
+different caches.
+
+To achieve this, we need to make several key changes to the class design.
+
+In Java, each xDS HTTP Filter has a corresponding concrete implementation of the
+`io.grpc.xds.Filter` interface. We will refer these classes as "Filters" from
+here.
+
+Currently, Filter classes are stateless singletons, registered by type URL in a
+global `FilterRegistry`. We will make Filter classes stateful and use the
+concrete instances to retain data across LDS / RDS updates as necessary.
+
+We will introduce a new interface `Filter.Provider` with a `newInstance`
+method to instantiate Filter classes. All stateless `Filter` methods, such as
+config parsing, will be moved to `Filter.Provider`.
+
+We will implement `Filter.Provider` in each existing Filter class (as an
+inner static class). Filters that do not need to retain filter state
+may implement `newInstance` to keep returning a singleton instance of self.
+
+We will update `FilterRegistry` to register `Filter.Provider` instances instead
+of `Filter` instances.
+
+Next, we will implement the lifecycle of Filter objects, which differs between
+client-side and server-side Filters. This will be implemented separately in
+`XdsNameResolver` and `XdsServerWrapper` respectively, due to the structural
+differences in their configurations.
+
+The filter state is scoped to `HttpConnectionManager` (HCM) instance.
+
+On the client-side, each `XdsNameResolver` has a single HCM, which contains a
+single list of L7 filters.
+
+Server-side, however, may have multiple `FilterChain` instances (from the
+`filter_chains` repeated field and an optional `default_filter_chain`), each
+with its own HCM and L7 filters. To keep track of individual L4 filter chains
+across LDS updates, we'll use their unique names. The state will not be retained
+for any unnamed L4 filter chain.
+
+Filter instances are shut down when they are removed from their HCM, or when the
+HCM itself is removed (e.g., during client or server shutdown).
+
+##### Go
+
+In Go, just like in Java, xDS HTTP Filter instances will be responsible for
+retaining their own state and sharing it across interceptor instances created
+for the individual routes.
+
+The internal `httpfilter` package defines a `Builder` interface that contains
+stateless Filter methods like the ones for config parsing and the ones to build
+client and server-side Filter instances.
+
+```golang
+// Builder defines the parsing functionality of an HTTP filter.
+//
+// A Builder may optionally implement either ClientFilterBuilder or
+// ServerFilterBuilder or both, indicating it is capable of working on the
+// client side or server side or both, respectively.
+type Builder interface {
+ TypeURLs() []string                                            // List of supported proto message types
+ ParseFilterConfig(proto.Message) (FilterConfig, error)         // Parse filter config
+ ParseFilterConfigOverride(proto.Message) (FilterConfig, error) // Parse filter config override
+ IsTerminal() bool                                              // Whether this filter must be last in the filter chain
+}
+
+// ClientFilterBuilder is an optional interface that a Builder can implement to
+// indicate its capability to build client-side filters.
+type ClientFilterBuilder interface {
+ BuildClientFilter() ClientFilter
+}
+
+// ServerFilterBuilder is an optional interface that a Builder can implement to
+// indicate its capability to build server-side filters.
+type ServerFilterBuilder interface {
+ BuildServerFilter() ServerFilter
+}
+```
+
+The `httpfilter` package also maintains a registry of Filter Builders.
+
+```golang
+// Register registers the HTTP Filter Builder with the registry. 
+// b.TypeURLs() will be used as the types for this filter.
+func Register(b Builder) { ... }
+
+// Get returns the HTTP Filter Builder registered with typeURL.
+func Get(typeURL string) Builder { ... }
+```
+
+The `ClientFilter` and `ServerFilter` interfaces define the core functionality
+of the Filter for the client and server sides respectively. Implementations of
+this interface are responsible for sharing state across the interceptor
+instances that they create.
+
+```golang
+type ClientFilter interface {
+ // BuildClientInterceptor uses the given FilterConfigs to produce an HTTP
+ // filter interceptor for clients. config will always be non-nil, but
+ // override may be nil if no override config exists for the filter.
+ //
+ // It is valid for this method to return a nil Interceptor and a nil error.
+ // In this case, the RPC will not be intercepted by this filter.
+ BuildClientInterceptor(config, override FilterConfig) (iresolver.ClientInterceptor, error)
+
+ // Close is called when the filter is no longer needed.
+ Close()
+}
+
+type ServerFilter interface {
+ // BuildServerInterceptor uses the given FilterConfigs to produce
+ // an HTTP filter interceptor for servers. config will always be non-nil,
+ // but override may be nil if no override config exists for the filter.
+ //
+ // It is valid for this method to return a nil Interceptor and a nil error.
+ // In this case, the RPC will not be intercepted by this filter.
+ BuildServerInterceptor(config, override FilterConfig) (iresolver.ServerInterceptor, error)
+
+ // Close is called when the filter is no longer needed.
+ Close()
+}
+```
+
+The xDS resolver (on the client-side) and the xDS server (on the server-side)
+maintain a map of `Filter` instances keyed by the filter name (specified in the
+Listener resource) and the type_urls supported by the filter. This ensures that
+a `Filter` instance is not recreated as long as the key does not change across
+xDS resource updates. Configuration changes are handled by the `Filter` instance
+by updating whatever internal state it maintains and sharing the updated state
+with new interceptors that it creates.
+
+`Filter` instances need to maintain their own reference counts to ensure that
+when configuration changes result in internal state changes, the previous state
+is not deleted until previously created interceptors are done handling any
+ongoing RPCs.
 
 ### Filter Behavior
 
@@ -382,6 +537,19 @@ C-core implementation:
 - validate Audience cluster metadata (https://github.com/grpc/grpc/pull/37566)
 - implement GCP auth filter (https://github.com/grpc/grpc/pull/37550)
 - mechanism for retaining cache across xDS updates
-  (https://github.com/grpc/grpc/pull/37646)
+  (https://github.com/grpc/grpc/pull/37646,
+  https://github.com/grpc/grpc/pull/39964, and
+  https://github.com/grpc/grpc/pull/39983)
+  
+Java implementation:
+- implement GCP auth filter (https://github.com/grpc/grpc-java/pull/11638)
+- xDS cluster metadata parsing (https://github.com/grpc/grpc-java/pull/11741)
+- propagate audience from cluster resource in gcp auth filter (https://github.com/grpc/grpc-java/pull/11972)
+- filter state retention:
+  - make Filter objects stateful (https://github.com/grpc/grpc-java/pull/11883)
+  - implement the lifecycle of Filter objects (https://github.com/grpc/grpc-java/pull/11936)
+
+Go implementation:
+- filter state retention: (https://github.com/grpc/grpc-go/pull/8924)
 
 Will be implemented in all other languages, timelines TBD.

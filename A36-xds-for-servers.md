@@ -153,9 +153,10 @@ the template or its replacement is performed. For example, with an address of
 resource name would be `grpc/server?xds.resource.listening_address=[::]:80`.
 
 To be useful, the xDS-returned Listener must have an
-[`address`][Listener.address] that matches the listening address provided. The
-Listener's `address` would be a TCP `SocketAddress` with matching `address` and
-`port_value`. The XdsServer must be "not serving" if the address does not match.
+[`address`][Listener.address] that matches the listening address
+provided. The Listener's `address` would be a TCP `SocketAddress` with
+matching `address` and `port_value`. We accept a port of 0 as matching any
+port. The XdsServer must be "not serving" if the address does not match.
 
 The xDS client must NACK the Listener resource if `Listener.listener_filters` is
 non-empty. It must also NACK the Listener resource if

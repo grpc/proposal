@@ -1,10 +1,10 @@
 Exposing the per-call authentication context data in Node
 ----
-* Author(s): Nicolas Noble
+* Author(s): Nicolas Noble, murgatroid99
 * Approver: murgatroid99
 * Status: Draft
 * Implemented in: Node
-* Last updated: August 21, 2018
+* Last updated: 2025-03-06
 * Discussion at: https://groups.google.com/forum/#!topic/grpc-io/yVnvHDGxTME
 
 ## Abstract
@@ -23,14 +23,14 @@ Therefore, this proposal offers to only cover two fields at the beginning:
  - `transport_security_type`, transformed into a singleton string `transportSecurityType`
  - `x509_pem_cert`, transformed into the object: `sslPeerCertificate: { raw: certificateBuffer }`
 
-### Related Proposals: 
+### Related Proposals:
 N/A
 
 ## Proposal
 
 This proposal suggests that all we expose in the Node gRPC API are the raw DER bytes of the certificate for the `x509_pem_cert` field if present, and the singleton element `transport_security_type`. This would be presented in the `raw` key of an object. To illustrate, this would look like:
 
-```
+```js
 const authContext = call.getAuthContext()
 /*
 authContext = {
@@ -42,14 +42,25 @@ authContext = {
 */
 ```
 
+If the connection is not secure, neither field will be set. If the call is not associated with a connection at all, `getAuthContext` will return `null`.
+
+### Expanded contents in `@grpc/grpc-js`
+
+In the `@grpc/grpc-js` library, the `sslPeerCertificate` field will contain the full contents of the `getPeerCertificate` result.
+
 ## Rationale
 The lowest common denominator between the fully-parsed certificate made available in Node's getPeerCertificate method and the certificate stored in the auth_context by grpc-core is the raw certificate (in DER and PEM formats respectively). For this reason, we are suggesting only exposing the raw certificate and leaving it up to consumers of this callback to parse the certificate as desired.
 
 The avoids needing to parse out off the fields of a certificate and trying to match the full format exposed in Node's getPeerCertificate method. However, by choosing to place the the raw DER bytes in a Buffer in the `raw` field, this matches Node's behavior with respect to this field and it thus leaves open the option of parsing additional fields to better match Node's implementation in the future.
 
+
+### Expanded contents in `@grpc/grpc-js`
+
+The `grpc` library was deprecated in 2021. As a result, supporting the ability to migrate from `@grpc/grpc-js` to `grpc` is no longer a significant concern, so we can add a non-forward-compatible API.
+
 ## Implementation
 
-[Nicolas Noble](https://github.com/nicolasnoble) will be implementing this proposal.
+murgatroid99 will be implementing this proposal.
 
 ## Open issues (if applicable)
 

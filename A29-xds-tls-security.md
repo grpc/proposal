@@ -6,6 +6,7 @@ A29: xDS-Based Security for gRPC Clients and Servers
 * Implemented in: C-core, Java, and Go
 * Last updated: 2021-08-30
 * Discussion at: https://groups.google.com/g/grpc-io/c/4IwVLPeTAe4/m/ng9w3D0XBgAJ
+* Updated by: [A101: xDS-Based setting SNI and server certificate SAN validation](A101-SNI-setting-and-SNI-SAN-validation.md)
 
 ## Abstract
 

@@ -119,4 +119,6 @@ plane starts sending CDS resources containing this transport socket.
 
 C-core implementation: grpc/grpc#37800
 
-Will also be implemented in Java and Go.
+Java implementation: https://github.com/grpc/grpc-java/pull/11861
+
+Will also be implemented in Go.
