@@ -2,7 +2,6 @@ A93: xDS ExtProc Support
 ----
 * Author(s): @markdroth
 * Approver: @ejona86, @dfawley
-* Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
 * Last updated: 2026-10-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/AqqG4kkUc08
