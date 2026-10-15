@@ -4,7 +4,7 @@ A92: xDS ExtAuthz Support
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-08-24
+* Last updated: 2026-10-15
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
 
 ## Abstract
@@ -32,20 +32,22 @@ also make use of the `trusted_xds_server` server feature introduced in
 * [A81: xDS Authority Rewriting][A81]
 * [A83: xDS GCP Authentication Filter][A83]
 * [A33: xDS Fault Injection][A33]
-* [A102: xDS GrpcService Support][A102] (pending)
+* [A102: xDS GrpcService Support][A102]
 * [A60: xDS-Based Stateful Session Affinity for Weighted Clusters][A60]
 * [A79: Non-Per-Call Metrics Architecture][A79]
 * [A66: OpenTelemetry Metrics][A66]
+* [A110: Child Channel Options][A110]
 
 [A36]: A36-xds-for-servers.md
 [A39]: A39-xds-http-filters.md
 [A81]: A81-xds-authority-rewriting.md
 [A83]: A83-xds-gcp-authn-filter.md
 [A33]: A33-Fault-Injection.md
-[A102]: https://github.com/grpc/proposal/pull/510
+[A102]: A102-xds-grpc-service.md
 [A60]: A60-xds-stateful-session-affinity-weighted-clusters.md
 [A79]: A79-non-per-call-metrics-architecture.md
 [A66]: A66-otel-stats.md
+[A110]: A110-child-channel-plugins.md
 
 ## Proposal
 
@@ -96,7 +98,8 @@ target URI or channel credentials changes.  The ext_authz filter will
 use the filter state retention mechanism described in [A83] to retain
 the channel across updates.
 
-TODO: stats plugin propagation?
+Implementations will use the mechanism described in [A110] to set options
+for the side channel.
 
 ### Filter Configuration
 
