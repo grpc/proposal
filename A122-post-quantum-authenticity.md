@@ -1,4 +1,4 @@
-A130 - Post-Quantum Cryptography: Authenticity (Signature Algorithms)
+A122 - Post-Quantum Cryptography: Authenticity (Signature Algorithms)
 ----
 * Author(s): @gtcooke94
 * Approver: markdroth, ejona86, easwars, matthewstevenson88, dfawley
