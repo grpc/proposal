@@ -31,12 +31,14 @@ In [A120], post-quantum authenticity was scoped out of the initial high-priority
 push because digital signatures are not vulnerable to passive
 store-now-decrypt-later (SNDL) attacks; rather, an attacker must forge a
 handshake signature live during connection establishment. An attacker could also
-forge certificates themselves to successfully execute impersonation attacks
+forge certificates themselves to successfully execute impersonation attacks.
 Because this is a live-attack, it lacks the immediate urgency of the
 post-quantum confidentiality transition.  However, migrating PKIs across
 production use-cases of gRPC could take significant wall-time, so there is value
 in giving the users the tools to enable post-quantum authenticity for their gRPC
-deployments as soon as possible.
+deployments as soon as possible. To enable users to safely conduct this
+migration, gRPC needs to enable its users to customize a TLS extension, which is
+described below.
 
 In TLS 1.3 ([RFC 8446 Section 4.2.3](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3)),
 signature algorithms are negotiated via the `signature_algorithms` extension in
@@ -44,20 +46,20 @@ the `ClientHello` (for server authentication) and `CertificateRequest` (for
 mTLS client authentication). A peer may only authenticate using a certificate
 and `CertificateVerify` signature whose `SignatureScheme` was advertised by the
 verifying peer. ** ML-DSA leaf certificates are only supported using TLS1.3 **.
+One can think of the `signature_algorithms` as advertising to your peer what
+capabilities you have to verify your peer's signatures.
 
 In addition, there is another TLS extension named `signature_algorithms_cert`.
-If unset, the `signature_algorithms` value is used. If set, this separately
-represents a list of algorithms for which we can **verify** certificates (and
-`signature_algorithms` represents algorithms we can **sign** with). An example:
-we only hold classical private keys and certificates and can only produce RSA
-signatures. However, our BoringSSL version does have support for ML-DSA-87, so we
-can verify ML-DSA-87 signatures. We can separately advertise to a peer that we can
-verify their ML-DSA-87 certificates (`signature_algorithms_cert`), while also
-advertising that we cannot produce an ML-DSA-87 signature ourselves
-(`signature_algorithms`). In gRPC use-cases, we don't actively see a strong
-reason to prioritize `siganture_algorithms_cert` support at this time, and
-instead will focus soley on implementing support for ML-DSA and
-`signature_algorithms` as soon as possible.
+We do not plan to support setting this extension at this time. In fact, in
+Golang for example it is simply not supported. It is detailed below for
+completeness. If unset, the `signature_algorithms` value described above is
+used. If set, this separately represents a list of algorithms for which we can
+verify *static* certificate signatures, while `signature_algorithms` represents
+algorithms for which we can verify *handshake transcript signatures*. This was
+introduced for legacy systems who can take the compute burden of static
+verification of certificate signatures (which can be done off of the hot path of
+the handshake), but not the burden of hot-path signature verification of the
+handshake transcript.
 
 Currently, support for ML-DSA in the default TLS `signature_algorithms` list
 varies across underlying cryptographic libraries. Most notably, BoringSSL
@@ -87,8 +89,8 @@ Largely this proposal consists of two items:
 2. Supporting Signature Algorithm Negotiation.
 
 Supporting ML-DSA does not require public API changes - rather, gRPC's internals
-must ensure that we handle being passed certificates and private keys utilizing
-ML-DSA through the existing APIs for configuring identity data.
+must ensure that they can handle being passed certificates and private keys
+utilizing ML-DSA through the existing APIs for configuring identity data.
 
 Supporting signature algorithm negotiation, on the other hand, will require
 public API additions detailed below.
@@ -148,8 +150,14 @@ the `signature_algorithms` extension.
 | OpenSSL >= 3.5 | `{mldsa65, mldsa87, mldsa44, ecdsa_secp256r1_sha256, ecdsa_secp384r1_sha384, ecdsa_secp521r1_sha512, ed25519, ed448, ...}` | OpenSSL Default [`tls12_sigalgs`](https://github.com/openssl/openssl/blob/286ddeaac037533bbdce65b3c689e3f7ffebf0f6/ssl/t1_lib.c#L1930-L1974) |
 
 The following table describes how gRPC C++ will configure signature algorithms
-across SSL libraries. `ML-DSA-65` and `ML-DSA-87` are supported in BoringSSL and
+across SSL libraries. `ML-DSA` algorithms are supported in BoringSSL and
 OpenSSL 3.5+.
+Notably, BoringSSL is the case where we will take an opinionated default, as
+BoringSSL has not yet added default support for MLDSA. Eventually, when
+BoringSSL updates it's defaults, our opinionated default will be removed in
+favor of the security library default. This is consistent with the design in
+[A120] - we will take opinionated defaults only when the security library has
+not yet taken post-quantum defaults.
 
 | Library / Version | Configuration / Behavior |
 | :--- | :--- |
