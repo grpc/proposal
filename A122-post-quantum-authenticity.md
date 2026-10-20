@@ -27,8 +27,12 @@ algorithms.
 
 ## Background
 
-In [A120], post-quantum authenticity was scoped out of the initial high-priority
-push because digital signatures are not vulnerable to passive
+Broadly, post-quantum authenticity covers the area of proving identity - in TLS
+this is performed via analyzing signatures, thus certificates and handshake data
+must be signed via post-quantum signature algorithms. This protects against
+impersonation attacks - e.g. forging certificates and man-in-the-middle (MitM)
+attacks. In [A120], post-quantum authenticity was scoped out of the initial
+high-priority push because digital signatures are not vulnerable to passive
 store-now-decrypt-later (SNDL) attacks; rather, an attacker must forge a
 handshake signature live during connection establishment. An attacker could also
 forge certificates themselves to successfully execute impersonation attacks.
@@ -40,14 +44,17 @@ deployments as soon as possible. To enable users to safely conduct this
 migration, gRPC needs to enable its users to customize a TLS extension, which is
 described below.
 
-In TLS 1.3 ([RFC 8446 Section 4.2.3](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3)),
+To achieve post-quantum authenticity, applications must use ML-DSA digital
+signatures during a TLS handshake, which is only supported in TLS 1.3 and
+requires having credentials with ML-DSA keys. To facilitate the
+migration to ML-DSA-based credentials, gRPC must allow applications to negotiate
+their use in a TLS handshake. To that end, in TLS 1.3 ([RFC 8446 Section
+4.2.3](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3)), digital
 signature algorithms are negotiated via the `signature_algorithms` extension in
-the `ClientHello` (for server authentication) and `CertificateRequest` (for
-mTLS client authentication). A peer may only authenticate using a certificate
-and `CertificateVerify` signature whose `SignatureScheme` was advertised by the
-verifying peer. ** ML-DSA leaf certificates are only supported using TLS1.3 **.
-One can think of the `signature_algorithms` as advertising to your peer what
-capabilities you have to verify your peer's signatures.
+the `ClientHello` handshake message (for server authentication) and in the
+`CertificateRequest` handshake message (for mTLS client authentication). A peer
+may only authenticate using a certificate and `CertificateVerify` digital
+signature whose `SignatureScheme` was advertised by the verifying peer.
 
 In addition, there is another TLS extension named `signature_algorithms_cert`.
 We do not plan to support setting this extension at this time. In fact, in
@@ -83,14 +90,18 @@ schemes (not recommended) if desired.
 
 ## Proposal
 
-Largely this proposal consists of two items:
+To enable post-quantum authenticity in gRPC, we must achieve the following 2 goals:
 
-1. Supporting ML-DSA in general.
-2. Supporting Signature Algorithm Negotiation.
+1. Enable gRPC applications to establish TLS connections using ML-DSA
+credentials.
+1. Enable gRPC applications to configure the signature algorithms negotiated
+during the TLS handshake. This necessary for requiring (instead of just
+preferring) ML-DSA, and will be useful during migration.
 
-Supporting ML-DSA does not require public API changes - rather, gRPC's internals
-must ensure that they can handle being passed certificates and private keys
-utilizing ML-DSA through the existing APIs for configuring identity data.
+Enabling gRPC application to establish TLS connections using ML-DSA credentials
+does not require public API changes - rather, gRPC's internals must ensure that
+they can handle being passed certificates and private keys utilizing ML-DSA
+through the existing APIs for configuring identity data.
 
 Supporting signature algorithm negotiation, on the other hand, will require
 public API additions detailed below.
@@ -99,16 +110,17 @@ public API additions detailed below.
 
 Each gRPC language implementation (C++, Go, and Java) will ensure that the
 existing configuration APIs for certificates and private keys properly supports
-the signatures in
+the ML-DSA digitial signature algorithms in
 [`draft-ietf-tls-mldsa`](https://datatracker.ietf.org/doc/html/draft-ietf-tls-mldsa)
-(namely `ML-DSA-65` and `ML-DSA-87`, and `ML-DSA-44`) where supported by the
-underlying runtime alongside standard classical algorithms.
-
+(namely `ML-DSA-65` and `ML-DSA-87`, and `ML-DSA-44`) whenever the underlying
+crypto library supports the ML-DSA algorithms. Support for classical digital
+signature algorithms (e.g. ECDSA, RSA) will not be removed at this time.
 
 ### Supporting Signature Algorithm Negotiation
 
-In order for a peer to accept both classical and post-quantum signatures, we
-must support negotiation of signature algorithms. While the end-goal for
+In order for a gRPC application to interoperate with peers that may or may not
+support post-quantum digital signatures, gRPC must support negotiation of
+digital signature algorithms during the TLS handshake. While the end-goal for
 post-quantum secure systems is strictly post-quantum signatures, we expect many
 gRPC deployments will have extended migrations in which both classical and
 post-quantum signature algorithms are supported.
@@ -140,6 +152,13 @@ two items:
 1. Ensuring the CertificateProvider interface abstractions work for
 multi-certificate setups with mixed signatures and negotiation via configuring
 the `signature_algorithms` extension.
+
+#### Becoming Post-Quantum Secure
+
+To be considered post-quantum secure, there must be no classical fallback. To do
+this, the gRPC user must configure the `signature_algorithms` such that only
+ML-DSA algorithms are supported, disallowing the negotiation of classical
+algorithms.
 
 ### C++
 
@@ -345,7 +364,7 @@ providing a consistent cross-language configuration API allows gRPC users to
 begin deploying and testing post-quantum PKI hierarchies well ahead of the
 Eo2028 CRQC horizon, without disrupting existing classical deployments.
 
-### Why ML-DSA-65 and ML-DSA-87?
+### Why ML-DSA
 
 `ML-DSA` (Module-Lattice-Based Digital Signature Standard, standardized by NIST
 in [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final) from CRYSTALS-Dilithium)
