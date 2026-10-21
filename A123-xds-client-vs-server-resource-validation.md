@@ -4,7 +4,7 @@ A123: xDS Client vs. Server Resource Validation
 * Approver: @ejona, @dfawley
 * Implemented in: <language, ...>
 * Last updated: 2026-10-21
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/cMpxYlKadv0
 
 ## Abstract
 
