@@ -3,7 +3,7 @@ A123: xDS Client vs. Server Resource Validation
 * Author(s): @markdroth
 * Approver: @ejona, @dfawley
 * Implemented in: <language, ...>
-* Last updated: 2026-10-15
+* Last updated: 2026-10-21
 * Discussion at: <google group thread> (filled after thread exists)
 
 ## Abstract
@@ -43,7 +43,7 @@ a model where we now have multiple XdsClient instances per process,
 and any given XdsClient instance will never be used by both channels
 and servers.  Therefore, it is now possible for each XdsClient instance
 to know which side it's being used on and use that information when
-validation xDS resources.  This means that when an XdsClient instance
+validating xDS resources.  This means that when an XdsClient instance
 for the client side sees a resource that is valid only on the server side
 (or vice-versa), we will be able to reject the resource and stick with
 the previous valid version (subject to the bootstrap settings introduced
@@ -103,8 +103,12 @@ On the server side, gRPC will reject resources in the following cases:
 
 ### Temporary environment variable protection
 
-This proposal does not include any features enabled via external I/O,
-so it does not need environment variable protection.
+Implementations may choose to guard this behavior by the environment
+variable `GRPC_EXPERIMENTAL_XDS_CLIENT_VS_SERVER_VALIDATION`.  However,
+we do not plan any interop tests for this feature (implementations
+should provide their own tests), so implementations should enable the
+feature by default when it is implemented, and they may choose not to
+provide the env var guard at all.
 
 ## Rationale
 
