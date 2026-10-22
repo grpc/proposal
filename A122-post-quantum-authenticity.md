@@ -27,17 +27,19 @@ algorithms.
 
 ## Background
 
-Broadly, post-quantum authenticity covers the area of proving identity - in TLS
-this is performed via analyzing signatures, thus certificates and handshake data
-must be signed via post-quantum signature algorithms. This protects against
-impersonation attacks - e.g. forging certificates and man-in-the-middle (MitM)
-attacks. In [A120], post-quantum authenticity was scoped out of the initial
-high-priority push because digital signatures are not vulnerable to passive
-store-now-decrypt-later (SNDL) attacks; rather, an attacker must forge a
-handshake signature live during connection establishment. An attacker could also
-forge certificates themselves to successfully execute impersonation attacks.
-Because this is a live-attack, it lacks the immediate urgency of the
-post-quantum confidentiality transition.  However, migrating PKIs across
+
+
+Post-quantum authenticity ensures that proof of identity during the TLS
+handshake is resistant to attacks by quantum computers. Since proof of identity
+during a TLS handshake is done through digital signatures, post-quantum
+authenticity requires using post-quantum signature algorithms. This protects
+against impersonation attacks - e.g. forging certificates and man-in-the-middle
+(MitM) attacks. In [A120], post-quantum authenticity was scoped out of the
+initial high-priority push because digital signatures are not vulnerable to
+passive store-now-decrypt-later (SNDL) attacks; rather, an attacker must forge
+certificates pre-handshake or force a handshake signature live during connection
+establishment.  Because this is a live attack, it lacks the immediate urgency of
+the post-quantum confidentiality transition.  However, migrating PKIs across
 production use-cases of gRPC could take significant wall-time, so there is value
 in giving the users the tools to enable post-quantum authenticity for their gRPC
 deployments as soon as possible. To enable users to safely conduct this
@@ -46,22 +48,25 @@ described below.
 
 To achieve post-quantum authenticity, applications must use ML-DSA digital
 signatures during a TLS handshake, which is only supported in TLS 1.3 and
-requires having credentials with ML-DSA keys. To facilitate the
-migration to ML-DSA-based credentials, gRPC must allow applications to negotiate
-their use in a TLS handshake. To that end, in TLS 1.3 ([RFC 8446 Section
-4.2.3](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3)), digital
-signature algorithms are negotiated via the `signature_algorithms` extension in
-the `ClientHello` handshake message (for server authentication) and in the
-`CertificateRequest` handshake message (for mTLS client authentication). A peer
-may only authenticate using a certificate and `CertificateVerify` digital
-signature whose `SignatureScheme` was advertised by the verifying peer.
+requires having credentials with ML-DSA keys. In addition, all credential in the
+chain from leaf to root-of-trust must be signed with ML-DSA keys. To facilitate
+the migration to ML-DSA-based credentials, gRPC must allow applications to
+negotiate their use in a TLS handshake. To that end, in TLS 1.3 ([RFC 8446
+Section 4.2.3](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3)),
+digital signature algorithms are negotiated via the `signature_algorithms`
+extension in the `ClientHello` handshake message (for server authentication) and
+in the `CertificateRequest` handshake message (for mTLS client authentication).
+A peer may only authenticate using a certificate chain that is both signed by an
+algorithm advertised by the verifying peer and can sign the handshake transcript
+utilizing an algorithm advertised by the verifying peer.
 
-In addition, there is another TLS extension named `signature_algorithms_cert`.
-We do not plan to support setting this extension at this time. In fact, in
-Golang for example it is simply not supported. It is detailed below for
-completeness. If unset, the `signature_algorithms` value described above is
-used. If set, this separately represents a list of algorithms for which we can
-verify *static* certificate signatures, while `signature_algorithms` represents
+In addition, there is another TLS extension named `signature_algorithms_cert`
+that allow further customization beyond the `signature_algorithms` extension. If
+unset, the value of `signature_algorithms` is used. We do not plan to support
+setting this extension separately at this time. In fact, in Golang for example
+it is simply not supported. It is detailed below for completeness. This
+extension separately represents a list of algorithms for which we can verify
+*static* certificate signatures, while `signature_algorithms` represents
 algorithms for which we can verify *handshake transcript signatures*. This was
 introduced for legacy systems who can take the compute burden of static
 verification of certificate signatures (which can be done off of the hot path of
@@ -69,11 +74,7 @@ the handshake), but not the burden of hot-path signature verification of the
 handshake transcript.
 
 Currently, support for ML-DSA in the default TLS `signature_algorithms` list
-varies across underlying cryptographic libraries. Most notably, BoringSSL
-supports signing with `ML-DSA`, but does **not** include `ML-DSA` in its default
-verification list (`kVerifySignatureAlgorithms`); negotiating an ML-DSA
-signature algorithm in BoringSSL requires explicitly configuring the signature
-algorithms list via `SSL_CTX_set1_sigalgs_list`.
+varies across underlying cryptographic libraries. 
 
 Furthermore, not all of gRPC's TLS stacks enable users to configure their own
 signature algorithms. Exposing a signature algorithms API is both a direct
@@ -121,9 +122,9 @@ signature algorithms (e.g. ECDSA, RSA) will not be removed at this time.
 In order for a gRPC application to interoperate with peers that may or may not
 support post-quantum digital signatures, gRPC must support negotiation of
 digital signature algorithms during the TLS handshake. While the end-goal for
-post-quantum secure systems is strictly post-quantum signatures, we expect many
-gRPC deployments will have extended migrations in which both classical and
-post-quantum signature algorithms are supported.
+post-quantum secure systems is to strictly allow post-quantum signatures, we
+expect many gRPC deployments will have extended migrations in which both
+classical and post-quantum signature algorithms are supported.
 
 In the TLS 1.3 handshake, signature algorithms are negotiated as follows, per
 [RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3): the
@@ -149,16 +150,16 @@ contains the tools for users to implement their own migration strategy - namely
 two items:
 
 1. Adding APIs to configure the `signature_algorithms` TLS1.3 extension.
-1. Ensuring the CertificateProvider interface abstractions work for
-multi-certificate setups with mixed signatures and negotiation via configuring
-the `signature_algorithms` extension.
+1. Ensuring the CertificateProvider interface abstractions work for holding
+multiple certificate chains with different signatures and negotiating between
+these via configuring the `signature_algorithms` extension.
 
 #### Becoming Post-Quantum Secure
 
-To be considered post-quantum secure, there must be no classical fallback. To do
-this, the gRPC user must configure the `signature_algorithms` such that only
-ML-DSA algorithms are supported, disallowing the negotiation of classical
-algorithms.
+With regards to Post-Quantum Authenticity, a necessary (but not sufficient)
+condition is that there must be no classical fallback. To do this, the gRPC user
+must configure the `signature_algorithms` such that only ML-DSA algorithms are
+supported, disallowing the negotiation of classical algorithms.
 
 ### C++
 
@@ -390,7 +391,22 @@ additional signature schemes as they are standardized.
 
 ## Performance Analysis
 
-ML-DSA keys and signatures are significantly larger than classical signatures. This means certificates will increase in size.
+Using ML-DSA comes at a significant and unavoidable performance cost of which
+users should be aware. ML-DSA keys and signatures are significantly larger than
+classical signatures. This means certificates will increase in size. This means
+more bytes will be written to the wire, which will increase handshake cost.  In
+addition, ML-DSA signing and verification is itself more computationally
+expensive which will also increase handshake cost.
+
+Simply changing the negotiation defaults as discussed above **will not** incur
+any cost increase. The cost increase will be observed as the given ecosystem in
+which gRPC is used migrates to using ML-DSA in all parts of the certificate
+chain.
+
+Outside of the scope of this gRFC, gRPC is considering enabling TLS session
+resumption by default (it is current disabled by default). Session resumption is
+one tool that users can use to offset the increased cost required for
+post-quantum security.
 
 | Algorithm / Parameter Set | Security Profile | Public Key Size | Signature Size | Total Overhead (Key + Sig) | Size Increase vs. ECDSA P-256 |
 | :--- | :--- | :---: | :---: | :---: | :---: |
@@ -400,17 +416,3 @@ ML-DSA keys and signatures are significantly larger than classical signatures. T
 | **ML-DSA-44** | NIST Level 2 (128-bit) | 1,312 B | 2,420 B | 3,732 B | ~29× larger |
 | **ML-DSA-65** | NIST Level 3 (192-bit) | 1,952 B | 3,309 B | 5,261 B | ~41× larger |
 | **ML-DSA-87** | NIST Level 5 (256-bit) | 2,592 B | 4,627 B | 7,219 B | ~56× larger |
-
-ML-DSA signatures are also more costly to compute. The below performance benchmarks will be added as support is added in gRPC.
-
-### C++ Performance Comparison
-
-| Benchmark | Real Time / Op | CPU Time / Op | Instructions / Op | Peak Mem (Bytes) | Allocs / Op |
-| :---- | :---: | :---: | :---: | :---: | :---: |
-| BM_TlsConnection (Default ECDSA P-256) | TBD | TBD | TBD | TBD | TBD |
-| BM_TlsConnection_ML-DSA-65 | TBD | TBD | TBD | TBD | TBD |
-| BM_TlsConnection_ML-DSA-87 | TBD | TBD | TBD | TBD | TBD |
-| | | | | | |
-| BM_MtlsConnection (Default ECDSA P-256) | TBD | TBD | TBD | TBD | TBD |
-| BM_MtlsConnection_ML-DSA-65 | TBD | TBD | TBD | TBD | TBD |
-| BM_MtlsConnection_ML-DSA-87 | TBD | TBD | TBD | TBD | TBD |
