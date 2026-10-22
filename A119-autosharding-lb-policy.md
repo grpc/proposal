@@ -3,7 +3,7 @@ A119: Auto-Sharding LB Policy
 * Author: easwars
 * Approver: markdroth
 * Implemented in: TBD
-* Last updated: 2026-10-14
+* Last updated: 2026-10-21
 * Discussion at: <https://groups.google.com/g/grpc-io/c/BXcwH6ytqRs>
 
 ## Abstract
@@ -229,9 +229,10 @@ like this:
 
 ```python
 class Slice:
-  start_key:  bytes      # Inclusive
-  end_key:    bytes      # Exclusive, None for sentinel
-  endpoints:  list[int]  # Indices into Assignment.endpoint_names
+  start_key:  bytes        # Inclusive
+  end_key:    bytes        # Exclusive, None for sentinel
+  endpoints:  list[int]    # Indices into Assignment.endpoint_names
+  fallback_disabled: bool  # True when the sharding server assigned no endpoints
 
 class Assignment:
   slices:         list[Slice]  # List of non-overlapping key-range slice assignments
@@ -255,8 +256,9 @@ change.
 
 ```python
 class SliceEntry:
-  start_key: bytes      # Inclusive start key
-  endpoints: list[int]  # Indices into list[PickerEndpoint] in Picker
+  start_key: bytes         # Inclusive start key
+  endpoints: list[int]     # Indices into list[PickerEndpoint] in Picker
+  fallback_disabled: bool  # True when the sharding server assigned no endpoints
 
 class SliceMap:
   slices:        list[SliceEntry] # Sorted by start_key
@@ -315,7 +317,10 @@ def build_slice_map(endpoint_map: EndpointMap, assignment: Assignment | None) ->
 
   # Build SliceEntry for each Slice in the assignment.
   for slice_data in assignment.slices:
-    slice_entry = SliceEntry(start_key=slice_data.start_key, endpoints=[])
+    slice_entry = SliceEntry(
+      start_key=slice_data.start_key,
+      endpoints=[],
+      fallback_disabled=slice_data.fallback_disabled,
 
     for idx in slice_data.endpoints:
       # Map index -> hostname -> EndpointState.index
@@ -379,9 +384,12 @@ At creation time, the `AutoshardingClient` is passed the following:
     with an empty string.
 * A UUID created by the LB policy at build time. The `AutoshardingClient` must
   reuse this value across stream restarts.
-* A timeout that determines how long to wait for the initial assignment from the
-  sharding service. The LB policy passes the value of the
-  `initial_assignment_timeout` field from the LB policy configuration here.
+* A timeout that determines how long to wait for an initial result (a valid
+  assignment or an error) from the sharding service. The LB policy passes the
+  value of the `initial_assignment_timeout` field from the LB policy
+  configuration here.
+* A callback to receive valid assignments from the `AutoshardingClient`.
+* A callback to receive errors from the `AutoshardingClient`.
 
 #### Contract of the AutoshardingClient
 
@@ -390,17 +398,20 @@ simple and the picker's binary search on the `SliceMap` remains fast and
 correct, the `AutoshardingClient` must produce an `Assignment` that conforms to
 the following rules:
 
-1. The list of `Slice`s must cover the entire possible keyspace, starting from
+1. The list of `Slices` must cover the entire possible keyspace, starting from
    the minimum possible key (the empty byte string `b""`) and ending with the
    maximum possible key (infinity, represented as `None`).
-2. The `slices` list must be sorted in ascending lexicographical order by
+1. The `Slices` list must be sorted in ascending lexicographical order by
    `start_key`.
-3. The partitioning must be contiguous and non-overlapping. For every slice
+1. The partitioning must be contiguous and non-overlapping. For every slice
    index `i` from `0` to `N - 2`, `slices[i].end_key` must exactly equal
    `slices[i + 1].start_key`.
-4. Any gaps in the key-ranges returned by the autosharding server must be
-   explicitly filled by the `AutoshardingClient` as a `Slice` entry with an
-   empty `endpoints` list (`[]`).
+1. Any gaps in the key-ranges (whether omitted by the server or created locally
+   because of  invalid `Slices` being dropped during validation) must be filled
+   as an entry with an empty`endpoints` list (`[]`) and `fallback_disabled` set
+   to `False`.
+1. For valid `Slices` where the sharding server explicitly specified an empty
+   endpoints list, the `fallback_disabled` must be set to `True`.
 
 The `AutoshardingClient` must report valid assignments to the LB policy as and
 when it receives them from the autosharding server. If it encounters errors, it
@@ -409,7 +420,8 @@ valid assignment. Once a given `AutoshardingClient` reports a valid assignment,
 it does not need to report any errors after that, because the LB policy will
 continue to use the previous valid assignment.
 
-The `AutoshardingClient` must report the following scenarios as errors:
+The `AutoshardingClient` must report the following scenarios as errors (and
+cancel the initial assignment timer if it is still running)::
 
 * The stream fails without receiving a valid assignment
 * The stream receives an invalid assignment
@@ -434,9 +446,34 @@ gets the initial result from the new `AutoshardingClient`. While the LB policy
 is using an existing assignment, it must continue to process endpoint updates
 from the Name Resolver and state updates from the child LB policies as normal.
 
-Whenever the AutoshardingClient returns a result to the LB policy, the LB policy
-must create a new picker and return it to the channel, which will retry any
-queued RPCs. The behavior will be as follows (first match wins):
+Whenever the `AutoshardingClient` returns a result to the LB policy via the
+registered callbacks, the LB policy updates its `self.assignment` and
+`self.assignment_error` fields in a mutually exclusive manner (synchronized with
+updates from the Name Resolver and child LB policies), marks the `SliceMap` for
+regeneration, and updates the channel state and picker, which will retry any
+queued RPCs:
+
+```python
+def on_assignment_update(self, assignment: Assignment):
+  self.assignment = assignment
+  self.assignment_error = None
+  self.regenerate_slice_map = True
+  self.update_state_and_picker()
+
+def on_assignment_error(self, err: Error):
+  self.assignment = None
+  self.assignment_error = err
+  self.regenerate_slice_map = True
+  self.update_state_and_picker()
+```
+
+Note that `self.regenerate_slice_map` is also set to `True` in
+`on_assignment_error` so that if the LB policy was previously using a valid
+assignment from an earlier `AutoshardingClient` instance and fallback is
+enabled, rebuilding the `SliceMap` with `self.assignment = None` clears out the
+previous slices and routes all RPCs to the fallback pool.
+
+The resulting picker behavior will be as follows (first match wins):
 
 * If the result was a valid assignment, the LB policy will build a `SliceMap`
   and construct a picker that uses that new `SliceMap`.
@@ -525,8 +562,8 @@ validates the assignment as follows:
 1. The `generation` in `AssignmentMetadata` is strictly greater than any
    previously accepted generation.
 2. Each `Slice` has `start_key < end_key`, non-overlapping key-ranges, and
-   valid indices into the combined endpoint list. `Slice`s that fail validation
-   are treated as gaps.
+   all indices into the combined endpoint list are valid. `Slice`s that fail
+   validation are treated as gaps.
 
 The `AutoshardingClient` then replies with an `AssignmentAck` (carrying the
 received `generation`) and notifies the LB policy according to the outcome:
@@ -558,52 +595,63 @@ or fail.
 #### Handling Slices with no endpoints
 
 The sharding server could return an assignment that contains some `Slices` that
-have no endpoints assinged to them. For example, in a multi-tenant sharding
+have no endpoints assigned to them. For example, in a multi-tenant sharding
 scenario, we could have a case where every key has a tenant ID as prefix and
 thus every client will use only part of the key space that starts with its
 tenant ID.  In this case, the first and last `Slice` in the assignment will
-contain no endpoints, while middle slices will cover single tenant keys. And in
-this case, we want to disable fallback for the `Slices` that don't have any
-endpoints, even if fallback is enabled in the LB policy configuration.
-
-gRPC needs specialized handling for these `Slices` to ensure that fallback is
-disabled for them. This could be handled as follows:
-
-* A new field, `fallback_disabled`, will be added to the `Slice` data structure
-  stored within an `Assignment` (see [Assignment](#assignment) for details).
-* The `AutoshardingClient` will set the `fallback_disabled` field to true for
-  `Slices` where the sharding server specified no endpoints.
-* This boolean will also be propagated to slices stored in the `SliceMap`.
-* At pick time, if the `Picker` ends up selecting a `Slice` where
-  `fallback_disabled` is set to `true`, it will drop the pick. This ensures all
-  RPCs (including `wait_for_ready` ones) fail immediately without retries.
+contain no endpoints, while middle slices will cover single tenant keys.  We
+want to disable fallback for `Slices` where the sharding server has not
+specified any endpoints, even if fallback is enabled in the LB policy
+configuration. This is handled by propagating a `fallback_disabled` flag from
+the `AutoshardingClient` all the way to the picker, and is described in detail
+in sections on [fallback](#fallback-mechanism) and on the [Picker](#the-picker).
 
 ### Fallback Mechanism
 
 The LB policy must support a fallback mechanism that utilizes all endpoints
-provided by the Name Resolver. There are two types of fallback:
-
-* Per-slice fallback: This happens when the LB policy contains valid endpoints
-  and assignments, but all endpoints in the matching `SliceEntry` for an RPC are
-  in `TRANSIENT_FAILURE`.
-* Fallback at `AutoshardingClient` startup: This happens when the
-  `AutoshardingClient` returns an error before returning a valid assignment. See
-  [AutoshardingClient](#contract-of-the-autoshardingclient) for more details on
-  when it returns an error.
-  * By default, when the `AutoshardingClient` returns an error, the LB policy
-    will construct a picker that fails all picks with `UNAVAILABLE` status and
-    an appropriate error message. Note that this can be implemented by building
-    a `SliceMap` with an empty `Assignment` and using the picker [described
-    here](#the-picker) or by using a dedicated fallback/erroring picker.
-  * However, if fallback is enabled, then the LB policy will instead construct a
-    picker that will use fallback for all RPCs, regardless of key.
-
-Key considerations here:
+provided by the Name Resolver. Key considerations here:
 
 * The LB policy must employ the fallback mechanism only when enabled in the LB
   policy configuration.
 * The LB policy must consider all available endpoints during fallback and must
   not employ any sort of subsetting.
+
+Specifically, a `SliceEntry` can end up with an empty endpoints in four
+scenarios:
+
+* Assignment sent by the sharding server contains gaps
+* `Slice` failed validation and was treated as a gap
+* `Slice` contained no endpoints reported by the Name Resolver
+* `Slice` sent by the sharding server contained no endpoints
+
+The first three scenaiors are treated the same by the picker because the
+`SliceEntry` will have the `fallback_disabled` field set to `False`. RPCs
+matching these slices will uses the fallback pool when fallback is enabled.
+
+For the last scenario alone, per-slice fallback is **disabled** regardless of
+whether fallback is enabled in the LB policy configuration, causing RPCs
+matching these slices to fail.
+
+#### Per-slice fallback
+This happens when the LB policy contains valid endpoints and assignments, and
+for the matching `SliceEntry`, `fallback_disabled` is `False` and either:
+
+* All endpoints in the `SliceEntry` are in `TRANSIENT_FAILURE`, or
+* The `SliceEntry` contains no endpoints.
+
+#### Fallback at `AutoshardingClient` startup
+
+This happens when the `AutoshardingClient` returns an error before returning a
+valid assignment. See [AutoshardingClient](#contract-of-the-autoshardingclient)
+for more details on when it returns an error.
+
+* By default, when the `AutoshardingClient` returns an error, the LB policy
+    will construct a picker that fails all picks with `UNAVAILABLE` status and
+    an appropriate error message. Note that this can be implemented by building
+    a `SliceMap` with an empty `Assignment` and using the picker [described
+    here](#the-picker) or by using a dedicated fallback/erroring picker.
+* However, if fallback is enabled, then the LB policy will instead construct a
+    picker that will use fallback for all RPCs, regardless of key.
 
 ### Load Balancing Configuration
 
@@ -630,9 +678,12 @@ message AutoshardingLbConfig {
  // If true, fallback mechanism is enabled.
  bool enable_fallback = 4;
 
- // How long to wait for the initial assignment from the sharding service. If
- // no assignment is received before the timer fires, the LB policy  will either
- // go into fallback mode (if enable_fallback is true) or fail RPCs.
+ // The maximum amount of time to wait for a result (either a valid assignment
+ // or an error) from the sharding service before exiting the state where RPCs
+ // are queued. If the sharding service returns an error (or the stream fails)
+ // before this timeout expires, the LB policy immediately enters fallback mode
+ // (if enable_fallback is true) or fails RPCs without waiting for the timer.
+ //
  // Defaults to 60 seconds if not specified.
  google.protobuf.Duration initial_assignment_timeout = 5;
 }
@@ -724,19 +775,23 @@ def handle_name_resolver_update(
   # Update cached copy of the configuration before building the new Picker.
   self.config = config
 
+  self.update_state_and_picker()
+  return OK
+
+def update_state_and_picker(self):
   # If the LB policy is yet to receive an assignment or error from the
   # AutoshardingClient, RPCs must be queued.
   if self.assignment is None and self.assignment_error is None:
     self.update_channel_state(IDLE, QueuePicker())
-    return OK
+    return
 
   # If the LB policy received an error from the AutoshardingClient and
   # fallback is disabled, RPCs must be failed.
-  if self.assignment_error is not None and not config.enable_fallback:
+  if self.assignment_error is not None and not self.config.enable_fallback:
     self.update_channel_state(
         TRANSIENT_FAILURE, ErrorPicker(self.assignment_error)
     )
-    return OK
+    return
 
   # Rebuild the SliceMap only when required.
   if self.regenerate_slice_map:
@@ -759,24 +814,32 @@ def handle_name_resolver_update(
   # Build new picker and update the channel.
   picker = self.build_picker()
   self.update_channel_state(agg_state, picker)
-  return OK
 ```
 
 ### Handling updates from child policies
 
 When the LB policy receives a state update from one of its child policies,
-containing the new connectivity state and picker for the child policy, the LB
-policy must perform the following:
+containing the new connectivity state and picker for the child policy, it
+updates the corresponding `EndpointState` in `EndpointMap` and invokes
+`update_state_and_picker()` (shown in the [Handling updates from the Name
+Resolver](#handling-updates-from-the-name-resolver) section above):
 
-* Update the `EndpointState` stored in the `EndpointMap` corresponding to the
-  child policy.
-* Build a new `Picker` with the existing `SliceMap` and updated `EndpointMap`.
-  * Since the order or number of endpoints did not change as part of this
-    update, the `Picker` will be able to build a new `list[PickerEndpoint]` and
-    use it with the existing `SliceMap`.
-* Compute the aggregated connectivity state of the gRPC channel as described in
-  [Aggregated Connectivity State](#aggregated-connectivity-state).
-* Update the gRPC channel with the new connectivity state and `Picker`.
+```python
+def handle_child_policy_update(
+    self, hostname: str, new_state: ConnectivityState, new_picker: Picker
+):
+  es = self.endpoint_map.m.get(hostname)
+  if es is None:
+    return
+  es.state = new_state
+  es.picker = new_picker
+  self.update_state_and_picker()
+```
+
+Note that since the order or number of endpoints does not change as part of a
+child policy state update, `self.regenerate_slice_map` is not set here, allowing
+`update_state_and_picker()` to reuse the existing `SliceMap` when building a new
+`Picker`.
 
 ### Creating a gRPC Channel to the Autosharding Service
 
@@ -900,20 +963,25 @@ class Picker:
     # Extract sharding key from request metadata/header
     key = extract_key_from_metadata(pick_args, self.lb_config.key_header_name)
     if key is None:
-      return PICK_FAILED
+      return PICK_DROP(TBD??)
 
     # Lookup matching slice range index and SliceEntry
     slice_idx = self.slice_map.lookup(key)
 
     # No assignment covers this key. This is only possible when the
-    # initial_assignment_timeout has expired *and* no valid assignments have
-    # been received from the sharding service. Implementations may choose to use
-    # a different "erroring" picker in this case, and thereby guarantee that
+    # AutoshardingClient returns an error. Implementations may choose to use a
+    # different "erroring" picker in this case, and thereby guarantee that
     # SliceMap lookups always return a valid result.
     if slice_idx is None:
       if self.lb_config.enable_fallback:
         return self.pick_from_endpoint_indices(self.slice_map.fallback_pool, pick_args)
       return PICK_FAILED
+
+    # If the sharding server explicitly assigned no endpoints to this slice,
+    # fallback is disabled regardless of lb_config.enable_fallback.
+    slice_entry = self.slice_map.slices[slice_idx]
+    if slice_entry.fallback_disabled:
+      return PICK_DROP(Unavailable)
 
     # Matching key range is in fallback mode and fallback is enabled
     if self.slice_in_fallback[slice_idx] and self.lb_config.enable_fallback:
@@ -922,12 +990,12 @@ class Picker:
     # Delegate to assigned endpoints for the matching key range.
     # When the matching key range is in fallback, but fallback is disabled, this
     # will yield a better error message.
-    slice_entry = self.slice_map.slices[slice_idx]
     return self.pick_from_endpoint_indices(slice_entry.endpoints, pick_args)
 
   def pick_from_endpoint_indices(self, indices: list[int], pick_args: PickArgs) -> PickResult:
-    # This can be true only when the matching entry is in fallback mode
-    # (due to having zero endpoints) *and* fallback is disabled.
+    # This can be true only when the matching entry has zero resolved endpoints
+    # (either because it is a gap or because none of its assigned endpoints are
+    # present in the EndpointMap) *and* fallback is disabled.
     if not indices:
       return PICK_FAILED
 
@@ -990,36 +1058,36 @@ described in [gRFC A42][A42] to determine the aggregated connectivity state of
 the gRPC Channel. The complete connectivity state aggregation rules are as
 follows:
 
-1. If there is at least one subchannel in `READY` state, report `READY`.
-2. If there are 2 or more subchannels in `TRANSIENT_FAILURE` state, report
+1. If there is at least one child policy in `READY` state, report `READY`.
+2. If there are 2 or more children in `TRANSIENT_FAILURE` state, report
    `TRANSIENT_FAILURE`.
-3. If there is at least one subchannel in `CONNECTING` state, report
-   `CONNECTING`.
-4. If there is one subchannel in `TRANSIENT_FAILURE` and there is more than
-   one subchannel, report state `CONNECTING`.
-5. If there is at least one subchannel in `IDLE` state, report `IDLE`.
+3. If there is at least one child in `CONNECTING` state, report `CONNECTING`.
+4. If there is one child in `TRANSIENT_FAILURE` and there is more than one
+   child, report state `CONNECTING`.
+5. If there is at least one child in `IDLE` state, report `IDLE`.
 6. Otherwise, report `TRANSIENT_FAILURE`.
 
 Unlike most other LB policies, which start off in `CONNECTING`, this policy
 starts off in `IDLE` because it establishes connections lazily in response to
 RPCs. It uses a heuristic and reports `TRANSIENT_FAILURE` when at least two
-subchannels are in `TRANSIENT_FAILURE` and none of the subchannels are `READY`.
-This heuristic is an attempt to balance the need to allow the `priority` policy
-(which would be an ancestor to this LB policy in the tree of LB policies used in
-xDS use-cases) to quickly failover to the next priority and the desire to avoid
-reporting the entire policy as having failed when the problem is just one
-individual subchannel that happens to be unreachable.
+child policies are in `TRANSIENT_FAILURE` and none are `READY`.  This heuristic
+is an attempt to balance the need to allow the `priority` policy (which would be
+an ancestor to this LB policy in the tree of LB policies used in xDS use-cases)
+to quickly failover to the next priority and the desire to avoid reporting the
+entire policy as having failed when the problem is just one individual child
+policy that happens to be unreachable.
 
 The specific behavior that will enable this LB policy to stop reporting
 `TRANSIENT_FAILURE` even when it is not receiving picks will be that whenever
-this policy receives a subchannel connectivity state update or a resolver
-update, if the aggregated connectivity state is `TRANSIENT_FAILURE` or
+this policy receives a connectivity state update from one of its children or a
+resolver update, if the aggregated connectivity state is `TRANSIENT_FAILURE` or
 `CONNECTING` and there are no endpoints in `CONNECTING` state, the policy will
 choose one of the endpoints in `IDLE` state (if any) to trigger a connection
 attempt on. It does not matter which `IDLE` endpoint is chosen; that is left up
 to the implementation to determine. An efficient way to choose an `IDLE`
 endpoint is to keep track of the first `IDLE` endpoint while iterating through
-all endpoints to determine the aggregated connectivity state and use it directly.
+all endpoints to determine the aggregated connectivity state and use it
+directly.
 
 An alternative approach is shown in the following pseudo-code:
 
@@ -1090,9 +1158,12 @@ message Autosharding {
  // If true, fallback mechanism is enabled.
  bool enable_fallback = 4;
 
- // How long to wait for the initial assignment from the sharding service. If
- // no assignment is received before the timer fires, the LB policy  will either
- // go into fallback mode (if enable_fallback is true) or fail RPCs.
+ // The maximum amount of time to wait for a result (either a valid assignment
+ // or an error) from the sharding service before exiting the state where RPCs
+ // are queued. If the sharding service returns an error (or the stream fails)
+ // before this timeout expires, the LB policy immediately enters fallback mode
+ // (if enable_fallback is true) or fails RPCs without waiting for the timer.
+ //
  // Defaults to 60 seconds if not specified.
  google.protobuf.Duration initial_assignment_timeout = 5;
 }
