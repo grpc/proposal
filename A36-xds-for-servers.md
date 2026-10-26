@@ -205,8 +205,8 @@ validation must be updated to allow [Route.non_forwarding_action][] as a valid
 requested `:authority`. Routes are matched the same as on client-side.
 `Route.non_forwarding_action` is expected for all Routes used on server-side and
 `Route.route` continues to be expected for all Routes used on client-side; a
-Route with an inappropriate `action` causes RPCs matching that route and
-reaching the end of the filter chain to fail with UNAVAILABLE. If
+Route with an inappropriate `action` causes RPCs matching that route to fail
+with UNAVAILABLE when the route is selected, before any filters run. If
 `HttpConnectionManager.rds` references a NACKed resource without a previous good
 version, an unavailable resource because of communication failures with control
 plane or a triggered loading timeout, or a non-existent resource, then all RPCs
