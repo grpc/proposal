@@ -406,10 +406,12 @@ and its
     [Cluster](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L701)
 *   Can be
     [Weighted\_clusters](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L719)
-    *   The sum of
-        [weights](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L278)
-        must add up to the
-        [total\_weight](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L335).
+    *   Each cluster's
+        [weight](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L278)
+        is treated as 0 if unset. The sum of the weights must be greater
+        than 0 and must not exceed the uint32 max.
+        [total\_weight](https://github.com/envoyproxy/envoy/blob/v1.13.1/api/envoy/api/v2/route/route_components.proto#L335)
+        is ignored; the total is the sum of the weights.
 *   Can be unset or an unsupported field. The route containing this action will be
    ignored.
     *   At the time of this gRFC,
