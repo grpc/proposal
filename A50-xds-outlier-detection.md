@@ -52,7 +52,8 @@ message OutlierDetectionLoadBalancingConfig {
   google.protobuf.Duration max_ejection_time = 3;
 
   // The maximum % of an address list that can be ejected due to outlier
-  // detection. Defaults to 10% but will eject at least one address regardless of the value.
+  // detection. Defaults to 10%. Ejection never takes the ejected percentage
+  // above this value, so a value of 0 disables ejection.
   google.protobuf.UInt32Value max_ejection_percent = 4;
 
   // Parameters for the success rate ejection algorithm.
@@ -92,7 +93,7 @@ message OutlierDetectionLoadBalancingConfig {
   // some threshold, independently of any other endpoint.
   message FailurePercentageEjection {
     // The failure percentage to use when determining failure percentage-based outlier detection. If
-    // the failure percentage of a given address is greater than or equal to this value, it will be
+    // the failure percentage of a given address is greater than this value, it will be
     // ejected. Defaults to 85.
     google.protobuf.UInt32Value threshold = 1;
 
