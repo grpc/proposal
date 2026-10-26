@@ -285,8 +285,8 @@ ABNF definition of the filter pattern:
 Full-Method-Name -> {IDL-specific service name} "/" {method name}
 Service-Wildcard -> {IDL-specific service name} "/*"
 
-Header-Config -> "h" [ ":"  *DIGIT]    ; Max length of each header that should be logged
-Message-Config -> "m" [":"  *DIGIT]    ; Max length of each message that should be logged
+Header-Config -> "h" [ ":"  1*DIGIT]    ; Max length of each header that should be logged
+Message-Config -> "m" [":"  1*DIGIT]    ; Max length of each message that should be logged
 Pattern-Config -> "{" Message-Config / ( Header-Config [";" Message-Config] ) "}"
 
 Global-Default-Pattern -> "*"  [Pattern-Config]
@@ -294,7 +294,9 @@ Per-Service-Pattern -> Service-Wildcard [Pattern-Config]
 Per-Method-Pattern -> Full-Method-Name [Pattern-Config]
 Excluded-Method -> "-" Full-Method-Name
 
-Config-String -> *1( Global-Default-Pattern ) *( "," ( Per-Service-Pattern / Per-Method-Pattern / Excluded-Method ) )
+Pattern -> Global-Default-Pattern / Per-Service-Pattern / Per-Method-Pattern / Excluded-Method
+
+Config-String -> [ Pattern *( "," Pattern ) ]    ; Global-Default-Pattern may appear at most once, in any position
 ```
 
 If the full name of a method can match several patterns in the filter string,
