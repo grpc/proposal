@@ -188,7 +188,7 @@ in [A43: gRPC authorization API][A43]:
           "type": "string",
           "enum": ["NONE", "ON_DENY", "ON_ALLOW", "ON_DENY_AND_ALLOW"]
         },
-        "audit_logger": {
+        "audit_loggers": {
           "description": "Audit logger configurations",
           "type": "array",
           "items": {
