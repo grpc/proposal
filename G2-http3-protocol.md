@@ -88,6 +88,7 @@ H3_REQUEST_INCOMPLETE(0x010d)|n/a|INTERNAL
 H3_MESSAGE_ERROR(0x010e)|n/a|INTERNAL
 H3_CONNECT_ERROR(0x010f)|CONNECT_ERROR|INTERNAL
 H3_VERSION_FALLBACK(0x0110)|n/a|INTERNAL
+(any other code)|n/a|INTERNAL
 n/a|FLOW_CONTROL_ERROR(3)|INTERNAL
 n/a|STREAM_CLOSED|No mapping as there is no open stream to propagate to. Implementations should log.
 n/a|COMPRESSION_ERROR|INTERNAL
@@ -95,10 +96,17 @@ n/a|INADEQUATE_SECURITY| PERMISSION_DENIED … with additional detail indicating
 
 #### Connection management
 
-`GOAWAY` and `PING` frames exist in HTTP/3 and serve the same purpose as in HTTP/2.
+`GOAWAY` frames exist in HTTP/3 and serve the same purpose as in HTTP/2.
+HTTP/3 has no `PING` frame; keepalive may instead use QUIC `PING` frames or the
+QUIC idle timeout, which serve the same purpose as HTTP/2 `PING`.
 One notable difference is the `GOAWAY` frame in HTTP/2 reports the last
 successfully processed stream ID. In HTTP/3 the `GOAWAY` frame ID value must be greater
 than the last successfully processed stream ID.
+
+As in HTTP/2, a server shutting down gracefully should use two `GOAWAY` frames.
+The first carries the largest possible client-initiated bidirectional stream ID
+(2^62-4), as RFC 9114 suggests. After at least one round trip, the second
+carries the real limit. `GOAWAY` IDs must never increase.
 
 ### Exceeding deadlines
 
