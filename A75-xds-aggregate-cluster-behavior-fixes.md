@@ -111,9 +111,13 @@ will use the LB policy configured in the underlying cluster.  However,
 to avoid causing backward-compatibility problems, we will not require
 the aggregate cluster to be configured with the CLUSTER_PROVIDED LB
 policy the way that Envoy does; instead, we will simply ignore the LB
-policy configured in the aggregate cluster.  This seems unlikely to
-cause problems in practice, because Envoy's aggregate cluster
-functionality probably doesn't work with anything except the
+policy configured in the aggregate cluster.  Note that the LB policy
+fields in the aggregate cluster are still validated the same way as for
+any other cluster, so the aggregate cluster resource will be NACKed if
+they are invalid (e.g., if they specify CLUSTER_PROVIDED, which gRPC
+does not support); the resulting LB policy is simply not used.  This
+seems unlikely to cause problems in practice, because Envoy's aggregate
+cluster functionality probably doesn't work with anything except the
 CLUSTER_PROVIDED LB policy anyway, so the LB policy in the aggregate
 cluster probably doesn't provide any useful information.
 
