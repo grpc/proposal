@@ -209,11 +209,10 @@ Each *rule* has the following semantics -
    1. If TLS is not used, matching fails.
    2. If there is no client certificate, we get a match if principal is an empty
       string.
-   3. If we have a client certificate, we check against certificate contents. A
-      match is found if principal matches URI SANs from the certificate. If
-      there are no URI SANs in certificate, or no match was found, we check
-      against DNS SANs. Similarly, if certificate has no DNS SANs or match wasn't
-      found, we check against Subject field from certificate.
+   3. If we have a client certificate, we check against certificate contents,
+      using the same rules as Envoy's `principal_name` (see gRFC A41). A match
+      is found if principal matches any URI SAN, any DNS SAN, or the Subject
+      field (formatted as an RFC 2253 name) of the certificate.
 3. Each *request* could contain a list of URL *paths* (i.e. fully qualified RPC
    methods) and list of http *headers* to match. Refer JSON schema above to
    understand matching semantics.
@@ -224,11 +223,11 @@ Each *rule* has the following semantics -
 #### Example
 
 In the following policy example
-- Peer identity from ["spiffe://foo.com/sa/admin1", "spiffe://foo.com/sa/admin2"] is 
+- Peer identity from ["spiffe://foo.com/sa/admin1", "spiffe://foo.com/sa/admin2"] is
   authorized to access any RPC methods in pkg.service
 - Any authenticated user is allowed to access "foo" and "bar" RPC methods if the
   HTTP header includes a name "dev-path" with prefix value "dev/path/".
-- Nobody can access "secret" RPC method, not even the admins as deny rules are evaluated 
+- Nobody can access "secret" RPC method, not even the admins as deny rules are evaluated
   first.
 
 ```json
@@ -392,7 +391,7 @@ GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_s
  *   destroy this string.
  */
 GRPCAPI grpc_authorization_policy_provider* grpc_authorization_policy_provider_file_watcher_create(
-	const char* authz_policy_path, unsigned int refresh_interval_sec, 
+	const char* authz_policy_path, unsigned int refresh_interval_sec,
 	grpc_status_code* code, const char** error_details);
 
 /**
@@ -407,7 +406,7 @@ GRPCAPI void grpc_authorization_policy_provider_release(grpc_authorization_polic
 
 ```C++
 grpc::Status status;
-std::shared_ptr<AuthorizationPolicyProviderInterface> provider = 
+std::shared_ptr<AuthorizationPolicyProviderInterface> provider =
 	StaticDataAuthorizationPolicyProvider::Create(authz_policy, &status);
 ServerBuilder builder;
 builder.SetAuthorizationPolicyProvider(provider);
@@ -418,7 +417,7 @@ std::unique_ptr<grpc::Server> server = builder.BuildAndStart();
 
 ```C++
 grpc::Status status;
-std::shared_ptr<AuthorizationPolicyProviderInterface> provider = 
+std::shared_ptr<AuthorizationPolicyProviderInterface> provider =
 	FileWatcherAuthorizationPolicyProvider::Create(
 		authz_policy_path, /*refresh_interval_sec=*/3600, &status);
 ServerBuilder builder;
@@ -474,13 +473,13 @@ func NewFileWatcher(file string, duration time.Duration) (*FileWatcherIntercepto
 }
 
 func (i *FileWatcherInterceptor) UnaryInterceptor(
-	ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) 
+	ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler)
 		(resp interface{}, err error) {
   // ...
 }
 
 func (i *FileWatcherInterceptor) StreamInterceptor(
-	srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) 
+	srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler)
 		(err error) {
   // ...
 }
@@ -648,13 +647,13 @@ closeable.close();
 gRPC Authorization internally implements RBAC Engine(s) based on Envoy [RBAC policy](https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/rbac/v3/rbac.proto).
 We decided to create a new policy language "gRPC authorization policy" instead of
 consuming Envoy RBAC directly due to following reasons:
-- Envoy RBAC is a complex language, and we preferred using a simple human readable 
+- Envoy RBAC is a complex language, and we preferred using a simple human readable
   policy language
-- With our own language, we can provide a stable API, even when Envoy undergoes 
+- With our own language, we can provide a stable API, even when Envoy undergoes
   versioning updates.
 
 Note that gRPC authorization policy is a subset of Envoy RBAC, and it does not
-support all the fields that are present in Envoy RBAC. 
+support all the fields that are present in Envoy RBAC.
 
 RBAC policy provides service-level and method-level access control for a service.
 Engines process incoming RPC request attributes against policy configs and make a
@@ -685,5 +684,5 @@ languages.
 
 ## Implementation
 
-The implementation order will be C++, Go, Java and then wrapped languages. The 
+The implementation order will be C++, Go, Java and then wrapped languages. The
 implementation will be done by ashithasantosh.
