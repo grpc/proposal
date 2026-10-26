@@ -55,8 +55,10 @@ struct ssl_private_key_method_st {
 
 For TLS\>=1.2 with ECDHE, a requirement for this feature, the `decrypt` method is not needed. We will provide an
 interface through which users can provide a custom private key signer, with the
-higher-level functionality being a function that takes in unsigned bytes and a
-signature algorithm and returns signed bytes.
+higher-level functionality being a function that takes in the data to sign and a
+signature algorithm and returns signed bytes. The data to sign is either the
+unhashed message or its digest, as the language's TLS library defines it. The
+signature algorithm is always provided.
 
 ```
 string signed_bytes sign(string algorithm, string unsigned_bytes)
