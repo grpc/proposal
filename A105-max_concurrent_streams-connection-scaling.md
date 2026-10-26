@@ -568,6 +568,7 @@ def StartConnectionAttempt(self):
 
 # Called when a connection attempt succeeds.
 def OnConnectionAttemptSucceeded(self, new_connection):
+  self.connection_attempt = None
   self.connections.append(new_connection)
   self.pending_backoff_timer = None
   self.backoff_state = None
