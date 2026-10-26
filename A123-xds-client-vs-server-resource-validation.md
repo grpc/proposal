@@ -3,7 +3,7 @@ A123: xDS Client vs. Server Resource Validation
 * Author(s): @markdroth
 * Approver: @ejona, @dfawley
 * Implemented in: <language, ...>
-* Last updated: 2026-10-21
+* Last updated: 2026-10-26
 * Discussion at: https://groups.google.com/g/grpc-io/c/cMpxYlKadv0
 
 ## Abstract
@@ -55,12 +55,14 @@ in [A88]), which will avoid failing data plane RPCs.
 * [A39: xDS HTTP Filter Support][A39]
 * [A71: xDS Fallback][A71]
 * [A88: xDS Data Error Handling][A88]
+* [A103: xDS Composite Filter][A103]
 
 [A27]: A27-xds-global-load-balancing.md
 [A36]: A36-xds-for-servers.md
 [A39]: A39-xds-http-filters.md
 [A71]: A71-xds-fallback.md
 [A88]: A88-xds-data-error-handling.md
+[A103]: A103-xds-composite-filter.md
 
 ## Proposal
 
@@ -86,18 +88,20 @@ the generic XdsClient code.
 On the client side, gRPC will reject resources in the following cases:
 - A Listener resource that contains a TCP listener instead of an API
   listener (see [A27] and [A36]).
-- A listener or RouteConfiguration resource that contains a filter
+- A Listener or RouteConfiguration resource that contains a filter
   config for a filter that is not supported on the client side (see
-  [A39]).
+  [A39]).  This includes filters configured underneath the composite
+  filter (see [A103]).
 - A RouteConfiguration resource that contains a route specifying a
   `NonForwardingAction` (see [A36]).
 
 On the server side, gRPC will reject resources in the following cases:
 - A Listener resource that contains an API listener instead of a TCP
   listener (see [A27] and [A36]).
-- A listener or RouteConfiguration resource that contains a filter
+- A Listener or RouteConfiguration resource that contains a filter
   config for a filter that is not supported on the server side (see
-  [A39]).
+  [A39]).  This includes filters configured underneath the composite
+  filter (see [A103]).
 - A RouteConfiguration resource that contains a route specifying any
   action other than `NonForwardingAction` (see [A36]).
 
