@@ -76,7 +76,7 @@ This function will iterate over the list of `Policy` messages in `LoadBalancingP
 - `envoy.extensions.load_balancing_policies.ring_hash.v3.RingHash`
   - The gRPC policy name will be `ring_hash_experimental`.
   - The `minimum_ring_size` and `maximum_ring_size` xDS fields are converted to the `minRingSize` and `maxRingSize` fields in service config
-  - The `hash_function` field will not be converted, but will need to be validated. Any function besides `XX_HASH` will cause the conversion to fail
+  - The `hash_function` field will not be converted, but will need to be validated. Any function besides `XX_HASH` or `DEFAULT_HASH` (which means xxHash, and is the field's default value) will cause the conversion to fail
 - `envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin`
   - The gRPC policy name will be `round_robin`.
   - Has no configuration - an empty JSON object is returned
