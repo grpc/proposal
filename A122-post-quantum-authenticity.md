@@ -48,15 +48,16 @@ described below.
 
 To achieve post-quantum authenticity, applications must use ML-DSA digital
 signatures during a TLS handshake, which is only supported in TLS 1.3 and
-requires having credentials with ML-DSA keys. In addition, all credential in the
-chain from leaf to root-of-trust must be signed with ML-DSA keys. To facilitate
-the migration to ML-DSA-based credentials, gRPC must allow applications to
-negotiate their use in a TLS handshake. To that end, in TLS 1.3 ([RFC 8446
-Section 4.2.3](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3)),
-digital signature algorithms are negotiated via the `signature_algorithms`
-extension in the `ClientHello` handshake message (for server authentication) and
-in the `CertificateRequest` handshake message (for mTLS client authentication).
-A peer may only authenticate using a certificate chain that is both signed by an
+requires having credentials with ML-DSA keys. In addition, all credentials in
+the chain from leaf to root-of-trust must be signed with ML-DSA keys. To
+facilitate the migration to ML-DSA-based credentials, gRPC must allow
+applications to negotiate their use in a TLS handshake. To that end, in TLS 1.3
+([RFC 8446 Section
+4.2.3](https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.3)), digital
+signature algorithms are negotiated via the `signature_algorithms` extension in
+the `ClientHello` handshake message (for server authentication) and in the
+`CertificateRequest` handshake message (for mTLS client authentication).  A peer
+may only authenticate using a certificate chain that is both signed by an
 algorithm advertised by the verifying peer and can sign the handshake transcript
 utilizing an algorithm advertised by the verifying peer.
 
@@ -95,9 +96,9 @@ To enable post-quantum authenticity in gRPC, we must achieve the following 2 goa
 
 1. Enable gRPC applications to establish TLS connections using ML-DSA
 credentials.
-1. Enable gRPC applications to configure the signature algorithms negotiated
-during the TLS handshake. This necessary for requiring (instead of just
-preferring) ML-DSA, and will be useful during migration.
+1. Give gRPC users the tools to safely migrate to post-quantum credentials and
+roots via support for signature algorithm negotiation during the TLS1.3
+handshake.
 
 Enabling gRPC application to establish TLS connections using ML-DSA credentials
 does not require public API changes - rather, gRPC's internals must ensure that
