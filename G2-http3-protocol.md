@@ -103,10 +103,8 @@ One notable difference is the `GOAWAY` frame in HTTP/2 reports the last
 successfully processed stream ID. In HTTP/3 the `GOAWAY` frame ID value must be greater
 than the last successfully processed stream ID.
 
-As in HTTP/2, a server shutting down gracefully should use two `GOAWAY` frames.
-The first carries the largest possible client-initiated bidirectional stream ID
-(2^62-4), as RFC 9114 suggests. After at least one round trip, the second
-carries the real limit. `GOAWAY` IDs must never increase.
+As in HTTP/2, a server shutting down gracefully, as described in RFC 9114
+"Connection Shutdown".
 
 ### Exceeding deadlines
 
