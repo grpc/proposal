@@ -3,7 +3,7 @@ A92: xDS ExtAuthz Support
 * Author(s): @markdroth
 * Approver: @ejona86, @dfawley
 * Implemented in: <language, ...>
-* Last updated: 2026-10-15
+* Last updated: 2026-10-28
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
 
 ## Abstract
@@ -55,6 +55,22 @@ side.
 
 ### Filter Behavior
 
+#### ExtAuthz Side Channel
+
+The ext_authz filter will create a gRPC channel to the ext_authz server.
+It will use the mechanism described in [A102] to determine the server to
+talk to and the channel credentials to use.
+
+We do not want to recreate this channel on LDS updates, unless the
+target URI or channel credentials changes.  The ext_authz filter will
+use the filter state retention mechanism described in [A83] to retain
+the channel across updates.
+
+Implementations will use the mechanism described in [A110] to set options
+for the side channel.
+
+#### Handling Client Initial Metadata
+
 On both the gRPC client and server side, the ext_authz filter will perform
 the per-RPC authorization check when it sees the client's initial metadata
 (i.e., at the start of the stream).
@@ -86,19 +102,50 @@ the data plane RPC will be allowed.  In that case, if the
 will add a `x-envoy-auth-failure-mode-allowed: true` request header to
 the data plane RPC.
 
-#### ExtAuthz Side Channel
+The behavior for handling client initial metadata is summarized in the
+following chart:
 
-The ext_authz filter will create a gRPC channel to the ext_authz server.
-It will use the mechanism described in [A102] to determine the server to
-talk to and the channel credentials to use.
+```mermaid
+flowchart TD
+    ClientHeaders(["Client Headers"]) --> FilterEnabled{"Is ext_authz filter enabled?"}
 
-We do not want to recreate this channel on LDS updates, unless the
-target URI or channel credentials changes.  The ext_authz filter will
-use the filter state retention mechanism described in [A83] to retain
-the channel across updates.
+    %% Disabled branch
+    FilterEnabled -->|"No"| DenyAtDisable{"Is deny_at_disable set to true?"}
+    DenyAtDisable -->|"No"| PassDisabled(["Pass data plane RPC to next filter in the chain"])
+    DenyAtDisable -->|"Yes"| FailDisabled["Fail data plane RPC with status_on_error"]
 
-Implementations will use the mechanism described in [A110] to set options
-for the side channel.
+    %% Enabled branch
+    FilterEnabled -->|"Yes"| SendCheck["Send Check RPC to ext_authz server"]
+    SendCheck --> RpcSucceeded{"Did RPC succeed?"}
+
+    %% RPC failed branch
+    RpcSucceeded -->|"No"| FailureAllowed{"Is failure allowed?"}
+
+    %% RPC succeeded branch
+    RpcSucceeded -->|"Yes"| CheckStatusOk{"Did ext_authz server return OK status?"}
+
+    %% OK response branch
+    CheckStatusOk -->|"Yes"| HeaderMutations["Perform request header mutations (and store response header mutations)"]
+    HeaderMutations --> HeaderMutationsOk{"Mutations successful?"}
+    HeaderMutationsOk -->|"No"| FailureAllowed
+    HeaderMutationsOk -->|"Yes"| PassOk(["Pass data plane RPC to next filter in the chain"])
+
+    %% Denied response branch
+    CheckStatusOk -->|"No"| TrailerMutations["Perform trailer mutations"]
+    TrailerMutations --> TrailerMutationsOk{"Mutations successful?"}
+    TrailerMutationsOk -->|"No"| FailureAllowed
+    TrailerMutationsOk -->|"Yes"| FailDenied["Fail data plane RPC with status from denied_response (and mutated trailers)"]
+
+    %% Shared failure_mode_allow completion
+    FailureAllowed -->|"Yes"| AddFailureHeader["Add x-envoy-auth-failure-mode-allowed: true if failure_mode_allow_header_add is true"]
+    AddFailureHeader --> PassFailureAllowed(["Pass data plane RPC to next filter in the chain"])
+    FailureAllowed -->|"No"| FailStatusOnError["Fail data plane RPC with status_on_error"]
+
+    classDef pass fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef fail fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000
+    class PassDisabled,PassOk,PassFailureAllowed pass
+    class FailDisabled,FailDenied,FailStatusOnError fail
+```
 
 ### Filter Configuration
 
