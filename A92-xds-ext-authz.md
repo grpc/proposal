@@ -102,6 +102,31 @@ the data plane RPC will be allowed.  In that case, if the
 will add a `x-envoy-auth-failure-mode-allowed: true` request header to
 the data plane RPC.
 
+If the RPC to the ext_authz service succeeds, then the filter
+will apply the results as described in [Handling the ext_authz
+Response](#handling-the-ext_authz-response) below.  However, if any of the
+header mutations in the ext_authz response is invalid or disallowed (see
+[Header Mutations](#header-mutations) below), the RPC will be treated
+as if it had failed, meaning that it will be handled as described in
+the previous paragraph.
+
+If the response indicates that the RPC should be allowed, then the
+filter will do the following:
+- Apply the mutations from the `ok_response.headers` and
+  `ok_response.headers_to_remove` fields to the client initial metadata
+  before forwarding it to the next filter.
+- Save the mutations from the `ok_response.response_headers_to_add` field
+  to be later applied to the server's initial metadata.  The filter
+  will then need to intercept the server initial metadata to apply
+  these mutations.  (Note: These mutations will not be applied if the
+  RPC winds up seeing a Trailers-Only response, because there is no
+  server initial metadata in that case.)
+
+If the response indicates that the RPC should be denied, then the filter
+will immediately fail the RPC (thus generating a Trailers-Only response).
+It will apply the mutations from the `denied_response.headers` field to
+the trailing metadata.
+
 The behavior for handling client initial metadata is summarized in the
 following chart:
 
