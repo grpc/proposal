@@ -3,7 +3,7 @@ A119: Auto-Sharding LB Policy
 * Author: easwars
 * Approver: markdroth
 * Implemented in: TBD
-* Last updated: 2026-10-21
+* Last updated: 2026-10-29
 * Discussion at: <https://groups.google.com/g/grpc-io/c/BXcwH6ytqRs>
 
 ## Abstract
@@ -145,20 +145,16 @@ endpoints from the Name Resolver. If multiple endpoints share the same hostname,
 implementations may arbitrarily pick one and drop the others.
 
 ```python
-# Builds an endpointMap with the new set of resolver endpoints and returns a
-# boolean indicating if the order or count of endpoints changed. This is used to
-# determine if a new SliceMap needs to be built.
-def update_endpoint_map(self, resolved_endpoints: list[Endpoint]) -> bool:
+# Builds an endpointMap with the new set of resolver endpoints.
+def update_endpoint_map(self, resolved_endpoints: list[Endpoint]):
   old_map = self.endpoint_map.m if self.endpoint_map is not None else {}
   new_map = EndpointMap(m={})
-  order_or_count_changed = False
 
   for endpoint in resolved_endpoints:
     # De-duplicate endpoints sharing the same hostname within this update.
     if endpoint.hostname in new_map.m:
       continue
 
-    idx = len(new_map.m)
     if endpoint.hostname in old_map:
       # Retain existing child LB state for endpoints still present.
       prev = old_map[endpoint.hostname]
@@ -169,17 +165,11 @@ def update_endpoint_map(self, resolved_endpoints: list[Endpoint]) -> bool:
           state    = prev.state,
           picker   = prev.picker,
       )
-      if prev.index != idx:
-        order_or_count_changed = True
     else:
       new_map.m[endpoint.hostname] = EndpointState(
           index    = len(new_map.m),
           endpoint = endpoint,
       )
-      order_or_count_changed = True
-
-  if len(new_map.m) != len(old_map):
-    order_or_count_changed = True
 
   # Shut down child policies for endpoints removed in this update.
   for hostname, es in old_map.items():
@@ -187,7 +177,6 @@ def update_endpoint_map(self, resolved_endpoints: list[Endpoint]) -> bool:
       es.child_lb.close()
 
   self.endpoint_map = new_map
-  return order_or_count_changed
 ```
 
 The pseudo-code above handles closing of child policies associated with removed
@@ -300,7 +289,7 @@ The `SliceMap` is generated from the `EndpointMap` and `Assignment` when either
 of them change. Here is the pseudo-code for the logic to build the `SliceMap`:
 
 ```python
-def build_slice_map(endpoint_map: EndpointMap, assignment: Assignment | None) -> SliceMap:
+def build_slice_map(endpoint_map: EndpointMap, assignment: Assignment | Error) -> SliceMap:
   slice_map = SliceMap(slices=[], fallback_pool=[], generation=0)
 
   # Populate fallback_pool deterministically sorted by endpoint index.
@@ -308,9 +297,7 @@ def build_slice_map(endpoint_map: EndpointMap, assignment: Assignment | None) ->
       es.index for es in sorted(endpoint_map.m.values(), key=lambda es: es.index)
   ]
 
-  # If no assignment has been received yet (startup case), return early with
-  # empty slices.
-  if assignment is None:
+  if assignment.is_error():
       return slice_map
 
   slice_map.generation = assignment.generation
@@ -388,8 +375,8 @@ At creation time, the `AutoshardingClient` is passed the following:
   assignment or an error) from the sharding service. The LB policy passes the
   value of the `initial_assignment_timeout` field from the LB policy
   configuration here.
-* A callback to receive valid assignments from the `AutoshardingClient`.
-* A callback to receive errors from the `AutoshardingClient`.
+* A callback that will receive either a valid assignment or an error from the
+  `AutoshardingClient`.
 
 #### Contract of the AutoshardingClient
 
@@ -421,7 +408,7 @@ it does not need to report any errors after that, because the LB policy will
 continue to use the previous valid assignment.
 
 The `AutoshardingClient` must report the following scenarios as errors (and
-cancel the initial assignment timer if it is still running)::
+cancel the initial assignment timer if it is still running):
 
 * The stream fails without receiving a valid assignment
 * The stream receives an invalid assignment
@@ -447,31 +434,15 @@ is using an existing assignment, it must continue to process endpoint updates
 from the Name Resolver and state updates from the child LB policies as normal.
 
 Whenever the `AutoshardingClient` returns a result to the LB policy via the
-registered callbacks, the LB policy updates its `self.assignment` and
-`self.assignment_error` fields in a mutually exclusive manner (synchronized with
-updates from the Name Resolver and child LB policies), marks the `SliceMap` for
-regeneration, and updates the channel state and picker, which will retry any
-queued RPCs:
+registered callback, the LB policy updates its `self.assignment` field
+(synchronized with updates from the Name Resolver and child LB policies) and
+updates the channel state and picker, which will retry any queued RPCs:
 
 ```python
-def on_assignment_update(self, assignment: Assignment):
-  self.assignment = assignment
-  self.assignment_error = None
-  self.regenerate_slice_map = True
-  self.update_state_and_picker()
-
-def on_assignment_error(self, err: Error):
-  self.assignment = None
-  self.assignment_error = err
-  self.regenerate_slice_map = True
-  self.update_state_and_picker()
+def on_assignment_update(self, assignment: Assignment | Error):  
+  self.assignment = assignment  
+  self.update_state_and_picker(True)  
 ```
-
-Note that `self.regenerate_slice_map` is also set to `True` in
-`on_assignment_error` so that if the LB policy was previously using a valid
-assignment from an earlier `AutoshardingClient` instance and fallback is
-enabled, rebuilding the `SliceMap` with `self.assignment = None` clears out the
-previous slices and routes all RPCs to the fallback pool.
 
 The resulting picker behavior will be as follows (first match wins):
 
@@ -616,13 +587,13 @@ provided by the Name Resolver. Key considerations here:
 * The LB policy must consider all available endpoints during fallback and must
   not employ any sort of subsetting.
 
-Specifically, a `SliceEntry` can end up with an empty endpoints in four
-scenarios:
+A `SliceEntry` ends up with an empty list of endpoints in four scenarios:
 
-* Assignment sent by the sharding server contains gaps
-* `Slice` failed validation and was treated as a gap
-* `Slice` contained no endpoints reported by the Name Resolver
-* `Slice` sent by the sharding server contained no endpoints
+* Assignment sent by the sharding server contained gaps.
+* `Slice` failed validation and was treated as a gap.
+* None of the `Slice`'s endpoint names were found in the list reported by the
+ Name Resolver.
+* The sharding server sent a `Slice` containing no endpoint names.
 
 The first three scenaiors are treated the same by the picker because the
 `SliceEntry` will have the `fallback_disabled` field set to `False`. RPCs
@@ -690,8 +661,9 @@ message AutoshardingLbConfig {
 ```
 
 When parsing the JSON LB configuration, the LB policy must ensure that the
-`key_header_name` field contains a valid gRPC header name. If not, the
-configuration must be rejected.
+`key_header_name` field contains a valid gRPC header name as specified in the
+[gRPC over HTTP/2 spec][gRPC over HTTP/2]. If not, the configuration must be
+rejected.
 
 Key considerations regarding the LB policy configuration that must be handled by
 the "Channel Factory".
@@ -712,25 +684,23 @@ pseudo-code:
 def handle_name_resolver_update(
     self, state: ResolverState, config: LbConfig
 ) -> Status:
+  # Fail if no channel factory in resolver state attributes.
+  channel_factory = get_channel_factory_from_resolver_state(state)
+  if channel_factory is None:
+    self.update_channel_state(
+        TRANSIENT_FAILURE, ErrorPicker("no channel factory in resolver state")
+    )
+    return BAD_RESOLVER_STATE
+
   # Update the EndpointMap with the new set of filtered endpoints and lazily
   # create/remove `pick_first` child policies for each endpoint.
-  order_or_count_changed = self.update_endpoint_map(state.endpoints)
-  if order_or_count_changed:
-    self.regenerate_slice_map = True
+  self.update_endpoint_map(state.endpoints)
   self.update_child_policies()
 
   # Fail if there are no valid endpoints.
   if not self.endpoint_map:
     self.update_channel_state(
         TRANSIENT_FAILURE, ErrorPicker("no endpoints from resolver")
-    )
-    return BAD_RESOLVER_STATE
-
-  # Fail if no channel factory in resolver state attributes.
-  channel_factory = get_channel_factory_from_resolver_state(state)
-  if channel_factory is None:
-    self.update_channel_state(
-        TRANSIENT_FAILURE, ErrorPicker("no channel factory in resolver state")
     )
     return BAD_RESOLVER_STATE
 
@@ -775,28 +745,27 @@ def handle_name_resolver_update(
   # Update cached copy of the configuration before building the new Picker.
   self.config = config
 
-  self.update_state_and_picker()
+  self.update_state_and_picker(True)
   return OK
 
-def update_state_and_picker(self):
+def update_state_and_picker(self, regenerate_slice_map: bool):
   # If the LB policy is yet to receive an assignment or error from the
   # AutoshardingClient, RPCs must be queued.
-  if self.assignment is None and self.assignment_error is None:
+  if self.assignment is None:
     self.update_channel_state(IDLE, QueuePicker())
     return
 
   # If the LB policy received an error from the AutoshardingClient and
   # fallback is disabled, RPCs must be failed.
-  if self.assignment_error is not None and not self.config.enable_fallback:
+  if self.assignment.is_error() and not self.config.enable_fallback:
     self.update_channel_state(
-        TRANSIENT_FAILURE, ErrorPicker(self.assignment_error)
+        TRANSIENT_FAILURE, ErrorPicker(self.assignment.error())
     )
     return
 
   # Rebuild the SliceMap only when required.
-  if self.regenerate_slice_map:
+  if regenerate_slice_map:
     self.slice_map = build_slice_map(self.endpoint_map, self.assignment)
-    self.regenerate_slice_map = False
 
   # Compute the channel's aggregated connectivity state.
   agg_state = self.compute_aggregated_connectivity_state()
@@ -818,28 +787,26 @@ def update_state_and_picker(self):
 
 ### Handling updates from child policies
 
-When the LB policy receives a state update from one of its child policies,
+When the LB policy receives a state update from one of its child policies
 containing the new connectivity state and picker for the child policy, it
 updates the corresponding `EndpointState` in `EndpointMap` and invokes
 `update_state_and_picker()` (shown in the [Handling updates from the Name
-Resolver](#handling-updates-from-the-name-resolver) section above):
+Resolver](#handling-updates-from-the-name-resolver) section above).
+Implementations must ensure that a lingering callback from a child policy for an
+endpoint that has since been removed by the Name Resolver is handled gracefully.
 
 ```python
 def handle_child_policy_update(
-    self, hostname: str, new_state: ConnectivityState, new_picker: Picker
+    self, es: EndpointState, new_state: ConnectivityState, new_picker: Picker
 ):
-  es = self.endpoint_map.m.get(hostname)
-  if es is None:
-    return
   es.state = new_state
   es.picker = new_picker
-  self.update_state_and_picker()
+  self.update_state_and_picker(False)
 ```
 
-Note that since the order or number of endpoints does not change as part of a
-child policy state update, `self.regenerate_slice_map` is not set here, allowing
-`update_state_and_picker()` to reuse the existing `SliceMap` when building a new
-`Picker`.
+Note that since the order or number of endpoints did not change as part of a
+child policy state update, the existing `SliceMap` should be reused when
+building a new `Picker`.
 
 ### Creating a gRPC Channel to the Autosharding Service
 
@@ -963,7 +930,7 @@ class Picker:
     # Extract sharding key from request metadata/header
     key = extract_key_from_metadata(pick_args, self.lb_config.key_header_name)
     if key is None:
-      return PICK_DROP(TBD??)
+      return PICK_DROP(Internal)
 
     # Lookup matching slice range index and SliceEntry
     slice_idx = self.slice_map.lookup(key)
@@ -975,7 +942,7 @@ class Picker:
     if slice_idx is None:
       if self.lb_config.enable_fallback:
         return self.pick_from_endpoint_indices(self.slice_map.fallback_pool, pick_args)
-      return PICK_FAILED
+      return PICK_FAILED(Unavailable)
 
     # If the sharding server explicitly assigned no endpoints to this slice,
     # fallback is disabled regardless of lb_config.enable_fallback.
@@ -997,7 +964,7 @@ class Picker:
     # (either because it is a gap or because none of its assigned endpoints are
     # present in the EndpointMap) *and* fallback is disabled.
     if not indices:
-      return PICK_FAILED
+      return PICK_FAILED(Unavailable)
 
     # Pick a random starting index within the pool
     first_index = random_index(indices)
@@ -1373,7 +1340,9 @@ unless there is a valid use-case for it.
 
 ## Implementation
 
-TBD
+Implemented in Go.
+
+In progress in C++ and Java.
 
 [A42]: A42-xds-ring-hash-lb-policy.md
 [A52]: A52-xds-custom-lb-policies.md
@@ -1385,3 +1354,4 @@ TBD
 [A102]: <https://github.com/grpc/proposal/pull/510>
 [A121]: <https://github.com/grpc/proposal/pull/556>
 [Autosharding]: <https://github.com/GoogleCloudPlatform/autosharding/blob/main/proto/autosharding/v1/autosharding.proto>
+[gRPC over HTTP/2]: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
