@@ -423,10 +423,10 @@ The following client-side metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.client_ext_authz.allowed_rpcs | Counter | {RPCs} | grpc.target | Number of RPCs that were allowed by the ext_authz server. |
+| grpc.client_ext_authz.allowed_rpcs | Counter | {RPCs} | grpc.target | Number of RPCs that were allowed by the ext_authz server or by virtue of `failure_mode_allow` being true. |
 | grpc.client_ext_authz.denied_rpcs | Counter | {RPCs} | grpc.target | Number of RPCs that were denied by the ext_authz server. |
 | grpc.client_ext_authz.filter_disabled_rpcs | Counter | {RPCs} | grpc.target | Number of RPCs for which the filter was disabled. |
-| grpc.client_ext_authz.failed_rpcs | Counter | {RPCs} | grpc.target | Number of RPCs for which the ext_authz call-out failed. |
+| grpc.client_ext_authz.failed_rpcs | Counter | {RPCs} | grpc.target | Number of RPCs for which the ext_authz call-out failed or contained invalid data (e.g., disallowed header mutations). |
 
 #### Server-Side Metrics
 
@@ -434,10 +434,10 @@ The following server-side metrics will be exported:
 
 | Name          | Type  | Unit  | Labels  | Description |
 | ------------- | ----- | ----- | ------- | ----------- |
-| grpc.server_ext_authz.allowed_rpcs | Counter | {RPCs} | | Number of RPCs that were allowed by the ext_authz server. |
+| grpc.server_ext_authz.allowed_rpcs | Counter | {RPCs} | | Number of RPCs that were allowed by the ext_authz server or by virtue of `failure_mode_allow` being true. |
 | grpc.server_ext_authz.denied_rpcs | Counter | {RPCs} | | Number of RPCs that were denied by the ext_authz server. |
 | grpc.server_ext_authz.filter_disabled_rpcs | Counter | {RPCs} | | Number of RPCs for which the filter was disabled. |
-| grpc.server_ext_authz.failed_rpcs | Counter | {RPCs} | | Number of RPCs for which the ext_authz call-out failed. |
+| grpc.server_ext_authz.failed_rpcs | Counter | {RPCs} | | Number of RPCs for which the ext_authz call-out failed or contained invalid data (e.g., disallowed header mutations). |
 
 ### Temporary environment variable protection
 
