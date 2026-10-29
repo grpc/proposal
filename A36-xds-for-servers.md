@@ -7,6 +7,7 @@ A36: xDS-Enabled Servers
 * Implemented in: <language, ...>
 * Last updated: 2021-08-11
 * Discussion at: https://groups.google.com/g/grpc-io/c/CDjGypQi1J0
+* Updated by: [A123: xDS Client vs. Server Resource Validation](A123-xds-client-vs-server-resource-validation.md)
 
 ## Abstract
 
