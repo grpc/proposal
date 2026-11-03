@@ -52,7 +52,8 @@ message OutlierDetectionLoadBalancingConfig {
   google.protobuf.Duration max_ejection_time = 3;
 
   // The maximum % of an address list that can be ejected due to outlier
-  // detection. Defaults to 10% but will eject at least one address regardless of the value.
+  // detection. Defaults to 10%. Ejection never takes the ejected percentage
+  // above this value, so a value of 0 disables ejection.
   google.protobuf.UInt32Value max_ejection_percent = 4;
 
   // Parameters for the success rate ejection algorithm.
@@ -92,7 +93,7 @@ message OutlierDetectionLoadBalancingConfig {
   // some threshold, independently of any other endpoint.
   message FailurePercentageEjection {
     // The failure percentage to use when determining failure percentage-based outlier detection. If
-    // the failure percentage of a given address is greater than or equal to this value, it will be
+    // the failure percentage of a given address is greater than this value, it will be
     // ejected. Defaults to 85.
     google.protobuf.UInt32Value threshold = 1;
 
@@ -186,7 +187,7 @@ The subchannel wrapper will track the latest state update from the underlying su
  1. If the number of addresses with request volume of at least `success_rate_ejection.request_volume` is less than `success_rate_ejection.minimum_hosts`, stop.
  2. Calculate the mean and standard deviation of the fractions of successful requests among addresses with total request volume of at least `success_rate_ejection.request_volume`.
  3. For each address:
-    1. If the percentage of ejected addresses is greater than or equal to `max_ejection_percent`, stop.
+    1. If ejecting one more address would make the percentage of ejected addresses greater than `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `success_rate_ejection.request_volume`, continue to the next address.
     3. If the address's success rate is less than `(mean - stdev * (success_rate_ejection.stdev_factor / 1000))`, then choose a random integer in `[0, 100)`. If that number is less than `success_rate_ejection.enforcement_percentage`, eject that address.
 
@@ -194,7 +195,7 @@ The subchannel wrapper will track the latest state update from the underlying su
 
  1. If the number of addresses with request volume of at least `failure_percentage_ejection.request_volume` is less than `failure_percentage_ejection.minimum_hosts`, stop.
  2. For each address:
-    1. If the percentage of ejected addresses is greater than or equal to `max_ejection_percent`, stop.
+    1. If ejecting one more address would make the percentage of ejected addresses greater than `max_ejection_percent`, stop.
     2. If the address's total request volume is less than `failure_percentage_ejection.request_volume`, continue to the next address.
     3. If the address's failure percentage is greater than `failure_percentage_ejection.threshold`, then choose a random integer in `[0, 100)`. If that number is less than `failiure_percentage_ejection.enforcement_percentage`, eject that address.
 
