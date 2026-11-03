@@ -103,19 +103,19 @@ One notable difference is the `GOAWAY` frame in HTTP/2 reports the last
 successfully processed stream ID. In HTTP/3 the `GOAWAY` frame ID value must be greater
 than the last successfully processed stream ID.
 
-As in HTTP/2, a server shutting down gracefully, as described in RFC 9114
-"Connection Shutdown".
+As in HTTP/2, servers should follow a graceful shutdown procedure, as described
+in RFC 9114 "Connection Shutdown".
 
 ### Exceeding deadlines
 
 When an RPC has exceeded its deadline, the server will reset the stream. In HTTP/2, a stream
-is reset using the `RST_STREAM` frame. The `RST_STREAM` frame doesn't exist in HTTP/3. 
+is reset using the `RST_STREAM` frame. The `RST_STREAM` frame doesn't exist in HTTP/3.
 Instead, this action is performed using a QUIC frame, called `RESET_STREAM`.
 
-|                           | Frame        | Error code                   | Layer    
+|                           | Frame        | Error code                   | Layer
 ----------------------------|--------------|------------------------------|----------
-Deadline exceeded HTTP/2    | RST_STREAM   | CANCEL(8)                    | HTTP     
-Deadline exceeded HTTP/3    | RESET_STREAM | H3_REQUEST_CANCELLED(0x010c) | QUIC     
+Deadline exceeded HTTP/2    | RST_STREAM   | CANCEL(8)                    | HTTP
+Deadline exceeded HTTP/3    | RESET_STREAM | H3_REQUEST_CANCELLED(0x010c) | QUIC
 
 [RESET_STREAM](https://www.rfc-editor.org/rfc/rfc9000.html#name-reset_stream-frames) abruptly
 terminates sending on a stream. An important difference between HTTP/2 and
