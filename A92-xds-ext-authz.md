@@ -3,7 +3,7 @@ A92: xDS ExtAuthz Support
 * Author(s): @markdroth
 * Approver: @ejona86, @dfawley
 * Implemented in: <language, ...>
-* Last updated: 2026-10-28
+* Last updated: 2026-11-05
 * Discussion at: https://groups.google.com/g/grpc-io/c/sPfb9NoB474
 
 ## Abstract
@@ -438,6 +438,34 @@ The following server-side metrics will be exported:
 | grpc.server_ext_authz.denied_rpcs | Counter | {RPCs} | | Number of RPCs that were denied by the ext_authz server. |
 | grpc.server_ext_authz.filter_disabled_rpcs | Counter | {RPCs} | | Number of RPCs for which the filter was disabled. |
 | grpc.server_ext_authz.failed_rpcs | Counter | {RPCs} | | Number of RPCs for which the ext_authz call-out failed or contained invalid data (e.g., disallowed header mutations). |
+
+#### Metric Semantics
+
+The following semantics apply to both client-side and server-side
+metrics.
+
+For each RPC, the filter will do all of the following:
+- Increment exactly one of `allowed_rpcs` or `denied_rpcs` based on
+  whether the filter allowed or denied the RPC, regardless of how the
+  filter made that decision.
+- If the filter was disabled for the RPC, then the filter will also
+  increment the `filter_disabled` metric.
+- If the RPC failed or contained an invalid header mutation, then the
+  filter will also increment the `failed_rpcs` metric.
+
+The following table shows the behavior in all cases that arise from this
+design:
+
+| Filter Config | ExtAuthz RPC Result  | Metric Incremented | Notes |
+| ------------- | -------------------- | ------------------ | ----- |
+| (any) | valid ok_response | allowed_rpcs | |
+| (any) | valid denied_response | denied_rpcs | |
+| filter_enabled=0%, deny_at_disable=false | N/A | allowed_rpcs, filter_disabled_rpcs | Same thing if filter_enabled=N% and RPC value is less than N |
+| filter_enablede0%, deny_at_disable=true | N/A | denied_rpcs, filter_disabled_rpcs | Same thing if filter_enabled=N% and RPC value is less than N |
+| failure_mode_allow=true | failed RPC | allowed_rpcs, failed_rpcs | |
+| failure_mode_allow=false | failed RPC | denied_rpcs, failed_rpcs | |
+| failure_mode_allow=true | ok_response or denied_response containing an invalid header mutation | allowed_rpcs, failed_rpcs | |
+| failure_mode_allow=false | ok_response or denied_response containing an invalid header mutation | denied_rpcs, failed_rpcs | |
 
 ### Temporary environment variable protection
 
