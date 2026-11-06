@@ -239,7 +239,7 @@ of the default TLS 1.3 signature algorithms list
 However, unlike `tls.Config.CurvePreferences`, Go's `tls.Config` does not
 currently expose a top-level `SignatureAlgorithms` field to override the
 `signature_algorithms` extension sent in `ClientHello` and `CertificateRequest`.
-Instead, `crypto/tls` exposes:
+Instead, with regards to signature algorithms, `crypto/tls` exposes:
 * `tls.Certificate.SupportedSignatureAlgorithms` (`[]tls.SignatureScheme`) to
   restrict which signature schemes a local private key may be used for when
   signing.
@@ -247,14 +247,25 @@ Instead, `crypto/tls` exposes:
   `tls.CertificateRequestInfo.SignatureSchemes` (`[]tls.SignatureScheme`) during
   certificate selection callbacks.
 
-We propose that `advancedtls` will provide a direct option for users to restrict
-or configure `SignatureAlgorithms`. We will add
-`advancedtls.Options.SignatureAlgorithms` (`[]tls.SignatureScheme`), which will:
-1. Populate `SupportedSignatureAlgorithms` on certificates managed by
-   `advancedtls` so signing is restricted to the configured schemes.
-2. Validate during handshake verification (and pass through to `tls.Config` if
-   Go adds a connection-level `tls.Config` field in the future) that the peer's
-   certificate and handshake signature use an allowed `tls.SignatureScheme`.
+Neither of these options give us the flexibility needed. Because there is no way
+to modify the `ClientHello` or the `CertificateRequest`, there is no current way
+in Golang for a local peer to configure these values for it's remote peer.
+
+The Go security team is actively working in this area, and what our final API
+looks like will be dependent upon the work they do.
+
+Our fallback will be to add a knob for `SignatureAlgorithms` and enforce it at
+verification time. This means that we could locally enforce signature algorithm
+requirements, but they would not be used by the remote peer during its
+certificate selection process. The main behavioral worry here is the following
+case:
+
+* Client - only wants to support ML-DSA. Cannot currently advertise that to the peer, so the signature_algorithms list it sends still has RSA. Checks the signature algorithm of the peer certificate during verification.
+* Server - Has identities configured in preference order: [RSA, ML-DSA]
+
+In this case, the handshake would fail - the server would select its RSA
+identity to send, and the client would fail during verification of that
+certificate.
 
 Go API Changes:
 ```go
@@ -262,9 +273,9 @@ package advancedtls
 
 type Options struct {
 	// ...
-	// SignatureAlgorithms contains the signature schemes that will be used
-	// during the TLS handshake, in preference order. If empty, the default
-	// will be used.
+  // This description depends on if the crypto/tls gives us a way to
+  // configure signature_algorithms or if we must do it during verification
+  // time.
 	SignatureAlgorithms []tls.SignatureScheme
 	// ...
 }
