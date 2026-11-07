@@ -460,8 +460,8 @@ design:
 | ------------- | -------------------- | ------------------ | ----- |
 | (any) | valid ok_response | allowed_rpcs | |
 | (any) | valid denied_response | denied_rpcs | |
-| filter_enabled=0%, deny_at_disable=false | N/A | allowed_rpcs, filter_disabled_rpcs | Same thing if filter_enabled=N% and RPC value is less than N |
-| filter_enablede0%, deny_at_disable=true | N/A | denied_rpcs, filter_disabled_rpcs | Same thing if filter_enabled=N% and RPC value is less than N |
+| filter_enabled=0%, deny_at_disable=false | N/A | allowed_rpcs, filter_disabled_rpcs | Same thing if filter_enabled=N% and RPC value is greater than or equal to N |
+| filter_enabled=0%, deny_at_disable=true | N/A | denied_rpcs, filter_disabled_rpcs | Same thing if filter_enabled=N% and RPC value is greater than or equal to N |
 | failure_mode_allow=true | failed RPC | allowed_rpcs, failed_rpcs | |
 | failure_mode_allow=false | failed RPC | denied_rpcs, failed_rpcs | |
 | failure_mode_allow=true | ok_response or denied_response containing an invalid header mutation | allowed_rpcs, failed_rpcs | |
