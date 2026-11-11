@@ -4,7 +4,7 @@ A122 - Post-Quantum Cryptography: Authenticity (Signature Algorithms)
 * Approver: markdroth, ejona86, easwars, matthewstevenson88, dfawley
 * Implemented in: C++, Go, Java
 * Last updated: 2026-10-09
-* Discussion at: <google group thread> (filled after thread exists)
+* Discussion at: https://groups.google.com/g/grpc-io/c/USPrymxp9Ag?e=48417069
 
 ## Abstract
 
@@ -60,19 +60,6 @@ the `ClientHello` handshake message (for server authentication) and in the
 may only authenticate using a certificate chain that is both signed by an
 algorithm advertised by the verifying peer and can sign the handshake transcript
 utilizing an algorithm advertised by the verifying peer.
-
-In addition, there is another TLS extension named `signature_algorithms_cert`
-that allow further customization beyond the `signature_algorithms` extension. If
-unset, the value of `signature_algorithms` is used. We do not plan to support
-setting this extension separately at this time. In fact, in Golang for example
-it is simply not supported. It is detailed below for completeness. This
-extension separately represents a list of algorithms for which we can verify
-*static* certificate signatures, while `signature_algorithms` represents
-algorithms for which we can verify *handshake transcript signatures*. This was
-introduced for legacy systems who can take the compute burden of static
-verification of certificate signatures (which can be done off of the hot path of
-the handshake), but not the burden of hot-path signature verification of the
-handshake transcript.
 
 Currently, support for ML-DSA in the default TLS `signature_algorithms` list
 varies across underlying cryptographic libraries. 
@@ -164,6 +151,8 @@ supported, disallowing the negotiation of classical algorithms.
 
 ### C++
 
+The following table represents the default signature algorithms for different versions of OpenSSL and BoringSSL as of 2026-11-11.
+
 | Library / Version | Default Verification Signature Algorithms | Source / Notes |
 | :--- | :--- | :--- |
 | BoringSSL | **Verify (`kVerifySignatureAlgorithms`, advertised in `ClientHello` / `CertificateRequest`)**:<br>`{ecdsa_secp256r1_sha256, rsa_pss_rsae_sha256, ...}`<br><br>**Sign (`kSignSignatureAlgorithms`)**:<br>`{mldsa44, mldsa65, mldsa87, ed25519, ecdsa_secp256r1_sha256, ...}` | [BoringSSL `kVerifySignatureAlgorithms`](https://github.com/google/boringssl/blob/fbb876dcee91c83a78d930dc9fab79db0c12053e/ssl/extensions.cc#L286-L302)<br>[BoringSSL `kSignSignatureAlgorithms`](https://github.com/google/boringssl/blob/fbb876dcee91c83a78d930dc9fab79db0c12053e/ssl/extensions.cc#L306-L332) | 
@@ -175,14 +164,14 @@ across SSL libraries. `ML-DSA` algorithms are supported in BoringSSL and
 OpenSSL 3.5+.
 Notably, BoringSSL is the case where we will take an opinionated default, as
 BoringSSL has not yet added default support for MLDSA. Eventually, when
-BoringSSL updates it's defaults, our opinionated default will be removed in
+BoringSSL updates its defaults, our opinionated default will be removed in
 favor of the security library default. This is consistent with the design in
 [A120] - we will take opinionated defaults only when the security library has
 not yet taken post-quantum defaults.
 
 | Library / Version | Configuration / Behavior |
 | :--- | :--- |
-| BoringSSL | If `signature_algorithms` is set on `TlsCredentialsOptions`, configure via `SSL_CTX_set1_sigalgs_list` (required to advertise/verify `mldsa65` and `mldsa87`). Otherwise, prepend `mldsa87, mldsa65, mldsa44` to BoringSSL defaults. This is consistent with our approach in [A120] for post-quantum key exchange.|
+| BoringSSL | If `signature_algorithms` is set on `TlsCredentialsOptions`, configure via `SSL_CTX_set1_sigalgs_list`. Otherwise, prepend `mldsa87, mldsa65, mldsa44` to BoringSSL defaults. This is consistent with our approach in [A120] for post-quantum key exchange.|
 | OpenSSL < 3.5 | If `signature_algorithms` is set, configure classical algorithms via `SSL_CTX_set1_sigalgs_list` (`ML-DSA` returns `TSI_INVALID_ARGUMENT`). Otherwise, use OpenSSL defaults. |
 | OpenSSL >= 3.5 | If `signature_algorithms` is set, configure via `SSL_CTX_set1_sigalgs_list`. Otherwise, use OpenSSL 3.5+ defaults (`{mldsa65, mldsa87, mldsa44, ...}`). |
 
@@ -376,6 +365,19 @@ Enabling post-quantum signature algorithms and
 providing a consistent cross-language configuration API allows gRPC users to
 begin deploying and testing post-quantum PKI hierarchies well ahead of the
 Eo2028 CRQC horizon, without disrupting existing classical deployments.
+
+There is another TLS extension named `signature_algorithms_cert` that allow
+further customization beyond the `signature_algorithms` extension. If unset, the
+value of `signature_algorithms` is used. We do not plan to support setting this
+extension separately at this time. In fact, in Golang for example it is simply
+not supported. It is detailed below for completeness. This extension separately
+represents a list of algorithms for which we can verify
+*static* certificate signatures, while `signature_algorithms` represents
+algorithms for which we can verify *handshake transcript signatures*. This was
+introduced for legacy systems who can take the compute burden of static
+verification of certificate signatures (which can be done off of the hot path of
+the handshake), but not the burden of hot-path signature verification of the
+handshake transcript.
 
 ### Why ML-DSA
 
