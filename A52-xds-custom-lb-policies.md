@@ -5,6 +5,7 @@ A52: gRPC xDS Custom Load Balancer Configuration
 * Implemented in:
 * Last updated: 2022-04-22
 * Discussion at: https://groups.google.com/g/grpc-io/c/BoRazEVUEz0
+* Updated by: [A119: Auto-Sharding LB Policy](A119-autosharding-lb-policy.md)
 
 ## Abstract
 Adds the ability to configure custom load balancing policies retrieved from a control plane via the xDS API.
