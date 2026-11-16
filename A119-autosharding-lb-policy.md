@@ -488,9 +488,15 @@ def on_assignment_update(self, assignment: Assignment | Error):
   first_result = self.assignment is None
   self.assignment = assignment
   self.slice_map = build_slice_map(self.endpoint_map, self.assignment)
-  if first_result:
-    self.maybe_start_initial_connect()
+  usable = not self.assignment.is_error() or self.config.enable_fallback
+  if first_result and usable:
+    self.start_initial_connect_timer()
   self.update_state_and_picker()
+  # A request to exit IDLE seen while waiting for the first result is handled
+  # only after the picker for that result has been reported. See "Initial
+  # connection behavior".
+  if first_result and usable and self.seen_exit_idle:
+    self.exit_idle()
 ```
 
 The resulting picker behavior will be as follows (first match wins):
@@ -786,22 +792,14 @@ heuristic is an attempt to balance the need to allow the `priority` policy
 (which would be an ancestor to this LB policy in the tree of LB policies used
 in xDS use-cases) to quickly failover to the next priority and the desire to
 avoid reporting the entire policy as having failed when the problem is just one
-individual child policy that happens to be unreachable.
-
-The aggregated connectivity state is computed as shown in the following
-pseudo-code. Since it already iterates over all endpoints, this is also where
-`initial_connect_pending` is cleared once any endpoint has moved out of `IDLE`.
+individual child policy that happens to be unreachable. The aggregated
+connectivity state is computed as shown in the following pseudo-code.
 
 ```python
 def compute_aggregated_connectivity_state(self) -> ConnectivityState:
   counts = {READY: 0, CONNECTING: 0, IDLE: 0, TRANSIENT_FAILURE: 0}
   for endpoint in self.endpoint_map.m.values():
     counts[endpoint.state] += 1
-
-  # Once any endpoint has moved out of IDLE, the aggregated state can no longer
-  # be IDLE. See "Initial connection behavior".
-  if self.initial_connect_pending and counts[IDLE] != len(self.endpoint_map.m):
-    self.clear_initial_connect()
 
   if counts[READY] > 0:
     return READY
@@ -825,8 +823,10 @@ choose one of the endpoints in `IDLE` state (if any) at random to trigger a
 connection attempt on. Choosing the endpoint at random ensures that load is
 distributed evenly across backends when many clients trigger connection
 attempts at the same time, in line with the behavior specified for `ring_hash`
-in [gRFC A117][A117]. This rule is not applied while `initial_connect_pending`
-is set. See [Initial connection behavior](#initial-connection-behavior).
+in [gRFC A117][A117]. While the LB policy is waiting for the first result from
+the `AutoshardingClient`, or for the initial connect timer to fire, it reports
+`CONNECTING` instead of `IDLE`, and does not apply this rule. See [Initial
+connection behavior](#initial-connection-behavior).
 
 This rule is implemented by `connect_to_random_idle_endpoint()` below, which is
 also used to trigger connection attempts that are not caused by picks in
@@ -874,16 +874,18 @@ def update_state_and_picker(self):
     )
     return
 
-  # Compute the channel's aggregated connectivity state. This also clears
-  # initial_connect_pending when the first endpoint moves out of IDLE.
+  # Compute the channel's aggregated connectivity state.
   agg_state = self.compute_aggregated_connectivity_state()
 
-  # If no endpoint has moved out of IDLE yet, report CONNECTING instead of IDLE,
-  # and do not proactively trigger connection attempts. See "Initial connection
-  # behavior".
-  if agg_state == IDLE and self.initial_connect_pending:
-    self.update_channel_state(CONNECTING, self.build_picker())
-    return
+  # While the initial connect timer is running, report CONNECTING instead of
+  # IDLE, and do not proactively trigger connection attempts. Once an endpoint
+  # has moved out of IDLE (e.g., because a pick triggered a connection attempt),
+  # the timer is no longer needed. See "Initial connection behavior".
+  if self.initial_connect_timer_running():
+    if agg_state == IDLE:
+      self.update_channel_state(CONNECTING, self.build_picker())
+      return
+    self.cancel_initial_connect_timer()
 
   # If aggregated state is TRANSIENT_FAILURE or CONNECTING, request a connection
   # on a random IDLE endpoint (if any), unless an endpoint is already
@@ -935,7 +937,7 @@ Note that since the order or number of endpoints did not change as part of a
 child policy state update, the existing `SliceMap` should be reused when
 building a new `Picker`.
 
-### Initial connection behavior
+### Initial Connection Behavior
 
 Because this LB policy creates connections lazily, all endpoints are `IDLE`
 when the first result is received from the `AutoshardingClient`. The
@@ -946,75 +948,77 @@ policy is an ancestor of this policy, reporting `IDLE` cancels its failover
 timer, and moving back to `CONNECTING` starts a new one. This effectively
 extends the time it takes to fail over to a lower priority.
 
-To avoid this, the LB policy maintains an `initial_connect_pending` flag. The
-flag is set when the LB policy is created and is cleared when either of the
+To avoid this, the LB policy distinguishes the following states:
+
+1. Waiting for the first result from the `AutoshardingClient`, indicated by
+   `self.assignment is None`. The LB policy reports `CONNECTING` and queues
+   RPCs.
+1. Waiting for the initial connect timer to fire, indicated by
+   `self.initial_connect_timer is not None`. The LB policy starts this 500ms
+   timer when it receives the first result, if that result is usable (a valid
+   assignment, or an error with fallback enabled), to give queued RPCs a chance
+   to trigger a connection attempt to the endpoint they are routed to. While
+   the timer is running, the LB policy reports `CONNECTING` instead of `IDLE`,
+   and does not apply the proactive connection rule from the [Aggregated
+   Connectivity State](#aggregated-connectivity-state) section.
+1. A connection attempt has been triggered, and the LB policy is waiting for the
+   endpoint to report `CONNECTING`, and then `READY` or `TRANSIENT_FAILURE`.
+
+The LB policy moves from the second state to the third when any of the
 following happens:
 
-* The LB policy observes that at least one endpoint has moved out of `IDLE`,
-  when computing the aggregated connectivity state (see
-  `compute_aggregated_connectivity_state()` in the [Aggregated Connectivity
-  State](#aggregated-connectivity-state) section). The flag must be cleared
-  only based on the state reported by the child policies, not when the LB
-  policy requests a connection, because some implementations request
-  connections asynchronously.
-* The LB policy reports `TRANSIENT_FAILURE`. After this, the `priority` LB
-  policy will have cancelled its failover timer, and reporting `IDLE` later is
-  harmless.
+* The timer fires. The LB policy triggers a connection attempt to a random
+  `IDLE` endpoint.
+* The LB policy receives a request to exit `IDLE`. It cancels the timer and
+  triggers a connection attempt to a random `IDLE` endpoint. See [Handling
+  requests to exit IDLE](#handling-requests-to-exit-idle).
+* An endpoint moves out of `IDLE`, for example because a pick triggered a
+  connection attempt. The LB policy cancels the timer.
 
-When `initial_connect_pending` is set and a result is available from the
-`AutoshardingClient`, the LB policy reports `CONNECTING` instead of `IDLE`, and
-does not apply the proactive connection rule from the [Aggregated Connectivity
-State](#aggregated-connectivity-state) section.
+If a request to exit `IDLE` is received in the first state, the LB policy
+records it, and handles it as described above once it has received the first
+usable result and reported the picker for it. Handling it before reporting the
+picker would cause the LB policy to report `IDLE`, since connection attempts
+are triggered asynchronously, and the endpoint would still be `IDLE` when the
+aggregated connectivity state is computed.
 
-When the first usable result (a valid assignment, or an error with fallback
-enabled) is received while the flag is set, the LB policy starts a 500ms timer
-to give queued RPCs a chance to trigger a connection attempt to the endpoint
-they are routed to. When the timer fires, if the flag is still set, the LB
-policy triggers a connection attempt to a random `IDLE` endpoint and restarts
-the timer (in case that endpoint is removed before it reports a new state). If
-a request to exit `IDLE` was seen while waiting for the result, the LB policy
-also triggers a connection attempt to a random `IDLE` endpoint immediately. If
-a request to exit `IDLE` is received after the timer has been started, the LB
-policy does not wait for the timer to fire. See [Handling requests to exit
-IDLE](#handling-requests-to-exit-idle).
+The third state is not treated specially. In rare cases, such as when the Name
+Resolver removes the endpoint before it reports `CONNECTING`, the LB policy may
+report `IDLE` in this state. This can also happen with `ring_hash`, and is
+acceptable.
+
+When the LB policy reports `TRANSIENT_FAILURE` because of a Name Resolver error,
+or because of an error from the `AutoshardingClient` with fallback disabled, it
+cancels the timer and discards any recorded request to exit `IDLE` (see
+`clear_initial_connect()` below). After this, the `priority` LB policy will have
+cancelled its failover timer, and reporting `IDLE` later is harmless.
 
 The pseudo-code for `connect_to_random_idle_endpoint()` is shown in the
 [Aggregated Connectivity State](#aggregated-connectivity-state) section.
 
 ```python
-def maybe_start_initial_connect(self):
-  usable = not self.assignment.is_error() or self.config.enable_fallback
-  if usable and self.initial_connect_pending:
-    if self.seen_exit_idle:
-      self.connect_to_random_idle_endpoint()
-    self.start_initial_connect_timer()
-
 def start_initial_connect_timer(self):
-  # Stop the existing timer (if any) before starting a new one, so that at most
-  # one timer is running at any time.
-  self.cancel_initial_connect_timer()
+  if self.initial_connect_timer is not None:
+    return
   self.initial_connect_timer = start_timer(500ms, self.on_initial_connect_timer)
 
 def cancel_initial_connect_timer(self):
-  # Implementations must ensure that the callback of a cancelled timer does
-  # nothing, even if the timer has already fired and its callback is pending.
-  if self.initial_connect_timer is not None:
-    self.initial_connect_timer.cancel()
-    self.initial_connect_timer = None
+  self.initial_connect_timer.cancel()
+  self.initial_connect_timer = None
 
 def initial_connect_timer_running(self) -> bool:
   return self.initial_connect_timer is not None
 
 def on_initial_connect_timer(self):
+  # Implementations must ensure that the callback of a cancelled timer does
+  # nothing, even if the timer has already fired and its callback is pending.
   self.initial_connect_timer = None
-  if self.initial_connect_pending:
-    self.connect_to_random_idle_endpoint()
-    self.start_initial_connect_timer()
+  self.connect_to_random_idle_endpoint()
 
 def clear_initial_connect(self):
-  self.initial_connect_pending = False
   self.seen_exit_idle = False
-  self.cancel_initial_connect_timer()
+  if self.initial_connect_timer is not None:
+    self.cancel_initial_connect_timer()
 ```
 
 ### Handling requests to exit IDLE
@@ -1024,27 +1028,23 @@ calls `channel.GetState(try_to_connect=true)`. In line with the behavior
 specified for `ring_hash` in [gRFC A117][A117], the LB policy handles such a
 request as follows:
 
-* If `initial_connect_pending` is set and no result has been received from the
-  `AutoshardingClient` yet, the LB policy records that it saw the request. This
-  causes a connection attempt to be triggered as soon as the first usable
-  result is received. See [Initial connection
-  behavior](#initial-connection-behavior).
-* If `initial_connect_pending` is set and the initial connect timer is running
-  (i.e., the first usable result has been received), the LB policy immediately
-  triggers a connection attempt to an `IDLE` endpoint chosen at random. The
-  timer is left running, in case that endpoint is removed before it reports a
-  new state.
+* If waiting for an initial result from the `AutoshardingClient`, the LB policy
+  records that it saw the request and returns immediately. This causes a
+  connection attempt to be triggered as soon as the first usable result is
+  received. See [Initial connection behavior](#initial-connection-behavior).
+* If the initial connect timer is running, the LB policy cancels it and triggers
+  a connection attempt to an `IDLE` endpoint chosen at random.
 * If the most recently reported state is `IDLE`, the LB policy triggers a
   connection attempt to an `IDLE` endpoint chosen at random.
 * Otherwise, the request is ignored.
 
 ```python
 def exit_idle(self):
-  if self.initial_connect_pending:
-    if self.initial_connect_timer_running():
-      self.connect_to_random_idle_endpoint()
-    else:
-      self.seen_exit_idle = True
+  if self.assignment is None:
+    self.seen_exit_idle = True
+  elif self.initial_connect_timer_running():
+    self.cancel_initial_connect_timer()
+    self.connect_to_random_idle_endpoint()
   # current_state is the state most recently reported via
   # update_channel_state().
   elif self.current_state == IDLE:
