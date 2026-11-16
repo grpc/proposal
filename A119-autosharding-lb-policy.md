@@ -474,7 +474,9 @@ normal.
 Whenever the `AutoshardingClient` returns a result to the LB policy via the
 registered callback, the LB policy updates its `self.assignment` field
 (synchronized with updates from the Name Resolver and child LB policies) and
-updates the channel state and picker, which will retry any queued RPCs.
+updates the channel state and picker, which will retry any queued RPCs (except
+in one case, described in [Initial connection
+behavior](#initial-connection-behavior)).
 
 When the LB policy replaces its `AutoshardingClient`, the new one is created
 before the previous one is closed (see [Handling updates from the Name
@@ -490,13 +492,14 @@ def on_assignment_update(self, assignment: Assignment | Error):
   self.slice_map = build_slice_map(self.endpoint_map, self.assignment)
   usable = not self.assignment.is_error() or self.config.enable_fallback
   if first_result and usable:
+    if self.seen_exit_idle:
+      # The picker is updated when the endpoint reports its new state. See
+      # "Initial connection behavior".
+      self.seen_exit_idle = False
+      self.connect_to_random_idle_endpoint()
+      return
     self.start_initial_connect_timer()
   self.update_state_and_picker()
-  # A request to exit IDLE seen while waiting for the first result is handled
-  # only after the picker for that result has been reported. See "Initial
-  # connection behavior".
-  if first_result and usable and self.seen_exit_idle:
-    self.exit_idle()
 ```
 
 The resulting picker behavior will be as follows (first match wins):
@@ -956,11 +959,12 @@ To avoid this, the LB policy distinguishes the following states:
 1. Waiting for the initial connect timer to fire, indicated by
    `self.initial_connect_timer is not None`. The LB policy starts this 500ms
    timer when it receives the first result, if that result is usable (a valid
-   assignment, or an error with fallback enabled), to give queued RPCs a chance
-   to trigger a connection attempt to the endpoint they are routed to. While
-   the timer is running, the LB policy reports `CONNECTING` instead of `IDLE`,
-   and does not apply the proactive connection rule from the [Aggregated
-   Connectivity State](#aggregated-connectivity-state) section.
+   assignment, or an error with fallback enabled) and no request to exit `IDLE`
+   was received in the first state, to give queued RPCs a chance to trigger a
+   connection attempt to the endpoint they are routed to. While the timer is
+   running, the LB policy reports `CONNECTING` instead of `IDLE`, and does not
+   apply the proactive connection rule from the [Aggregated Connectivity
+   State](#aggregated-connectivity-state) section.
 1. A connection attempt has been triggered, and the LB policy is waiting for the
    endpoint to report `CONNECTING`, and then `READY` or `TRANSIENT_FAILURE`.
 
@@ -976,11 +980,13 @@ following happens:
   connection attempt. The LB policy cancels the timer.
 
 If a request to exit `IDLE` is received in the first state, the LB policy
-records it, and handles it as described above once it has received the first
-usable result and reported the picker for it. Handling it before reporting the
-picker would cause the LB policy to report `IDLE`, since connection attempts
-are triggered asynchronously, and the endpoint would still be `IDLE` when the
-aggregated connectivity state is computed.
+records it. When it receives the first usable result, it does not start the
+timer, and instead triggers a connection attempt to a random `IDLE` endpoint
+right away, moving directly to the third state. It does not update its picker
+at that point, since connection attempts are triggered asynchronously, and the
+endpoint would still be `IDLE` when the aggregated connectivity state is
+computed, causing the LB policy to report `IDLE`. Instead, the picker is
+updated when the endpoint reports its new state.
 
 The third state is not treated specially. In rare cases, such as when the Name
 Resolver removes the endpoint before it reports `CONNECTING`, the LB policy may
