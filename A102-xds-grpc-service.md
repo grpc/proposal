@@ -4,7 +4,7 @@ A102: xDS `GrpcService` Support and Header Representations
 * Approver: @ejona86, @dfawley
 * Status: {Draft, In Review, Ready for Implementation, Implemented}
 * Implemented in: <language, ...>
-* Last updated: 2026-09-09
+* Last updated: 2026-11-16
 * Discussion at: https://groups.google.com/g/grpc-io/c/3hguVpr8maE
 
 ## Abstract
@@ -317,12 +317,12 @@ An individual header value is represented as an
 message, which will be used as follows:
 - [key](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L404):
   The header name.  When reading, the entry will be considered invalid
-  if empty, if not all lower-case, if length exceeds 16384, if the key is
+  if empty, if not all lower-case, if length exceeds 32768, if the key is
   `host`, if it starts with `:` or `grpc-`, or if it is not a valid gRPC
   header name.
 - [raw_value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L422):
   The header value.  When reading, the entry will be considered invalid
-  if the length exceeds 16384 or if it does not contain a valid gRPC
+  if the length exceeds 32768 or if it does not contain a valid gRPC
   header value.  When writing a `HeaderValue` proto for a header whose
   name ends in `-bin`, the value must be base64-encoded.
 - [value](https://github.com/envoyproxy/envoy/blob/cdd19052348f7f6d85910605d957ba4fe0538aec/api/envoy/config/core/v3/base.proto#L415):
@@ -330,7 +330,7 @@ message, which will be used as follows:
   `HeaderValue` proto, this field will be used only if the `raw_value`
   field is unset.  When writing a `HeaderValue` proto, this field will
   never be used; the `raw_value` field will always be used instead.
-  The entry will be considered invalid if the length exceeds 16384 or if
+  The entry will be considered invalid if the length exceeds 32768 or if
   it does not contain a valid gRPC header value.
 
 A
