@@ -130,9 +130,13 @@ address list.  Specifically:
   reports READY, which happens after all handshakes are complete),
   we choose that connection.  If there is a timer running, we cancel
   the timer.
+- Each time a subchannel reports TRANSIENT_FAILURE, we will increase a
+  counter for the number of connection failures. The counter is reset
+  any time re-resolution is requested.
 - We will wait for at least one connection attempt on every address to
   fail before we consider the first pass to be complete.  At that point,
-  we will request re-resolution.  As per [gRFC A62][A62], we will report
+  we will request re-resolution if the number of connection failures is at
+  least the number of subchannels.  As per [gRFC A62][A62], we will report
   TRANSIENT_FAILURE state and will continue trying to connect.  We will
   stay in TRANSIENT_FAILURE until either (a) we become connected or (b)
   the LB policy is destroyed by the channel shutting down or going IDLE.
@@ -143,18 +147,18 @@ all times, with no regard for the order of the addresses.  Each
 individual subchannel will provide [backoff behavior][backoff-spec],
 reporting TRANSIENT_FAILURE while in backoff and then IDLE when backoff
 has finished.  The pick_first policy will therefore automatically
-request a connection whenever a subchannel reports IDLE.  We will count
-the number of connection failures, and when that number reaches the
-number of subchannels, we will request re-resolution; note that because
+request a connection whenever a subchannel reports IDLE.  When the
+number of connection failures reaches the number of subchannels (and not
+in the first pass), we will request re-resolution; note that because
 the backoff state will differ across the subchannels, this may mean that
 we have seen multiple failures of a single subchannel and no failures
 from another subchannel, but this is a close enough approximation and
 very simple to implement.
 
 Note that every time the LB policy receives a new address list, it will
-start an initial Happy Eyeballs pass over the new list, even if some of
+start a new first pass over the new list using Happy Eyeballs, even if some of
 the subchannels are not actually new due to their addresses having been
-present on both the old and new lists.  This means that on the initial
+present on both the old and new lists.  This means that on the first
 pass through the address list for a subsequent address list update, when
 pick_first decides to start a connection attempt on a given subchannel
 (whether because it is the first subchannel in the list or because the
